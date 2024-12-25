@@ -15,6 +15,7 @@ import { Emitter } from '../base/emitter.ts';
 import { Commit } from '../repo/commit.ts';
 import { SchemaManager } from '../cfds/base/schema.ts';
 import { assert } from '../base/error.ts';
+import { getGoatConfig } from '../server/config.ts';
 
 const COMMIT_SUBMIT_RETRY = 10;
 
@@ -260,6 +261,18 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
 
     this._previousServerFilter = syncResp.filter;
     this._previousServerSize = syncResp.size;
+
+    const config = getGoatConfig();
+    if (syncResp.buildVersion !== config.version) {
+      // New version detected. Save everything before continuing.
+      await this.repo.db.flushAll();
+      if (config.debug) {
+        location.reload();
+      } else {
+        this._setIsOnline(false);
+        return false;
+      }
+    }
 
     this.afterMessageSent(reqMsg);
 

@@ -18,7 +18,7 @@ import {
   itemPathNormalize,
   ItemPathPart,
 } from './path.ts';
-import { isBrowser, uniqueId } from '../base/common.ts';
+import { isBrowser, mapIterable, uniqueId } from '../base/common.ts';
 import { SchemaDataType } from '../cfds/base/schema.ts';
 import { Item } from '../cfds/base/item.ts';
 import {
@@ -432,6 +432,16 @@ export class GoatDB {
     path = itemPathNormalize(path);
     const fileEntry = this._files.get(itemPathGetRepoId(path));
     return fileEntry ? JSONLogFileFlush(fileEntry) : Promise.resolve();
+  }
+
+  /**
+   * Flushes all pending writes for all repositories to disk.
+   */
+  async flushAll(): Promise<void> {
+    const promises = mapIterable(this._repositories.keys(), (path) =>
+      this.flush(path),
+    );
+    await Promise.allSettled(promises);
   }
 
   /**
