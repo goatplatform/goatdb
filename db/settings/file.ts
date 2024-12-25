@@ -60,7 +60,6 @@ export class FileSettings implements DBSettingsProvider {
         // Ignore any errors
       }
     }
-
     if (!currentSession) {
       // Clients must request the server to generate a new session for them
       if (this.mode === 'client') {
@@ -125,6 +124,7 @@ export class FileSettings implements DBSettingsProvider {
       roots,
       trustedSessions,
     };
+    assert(this.mode !== 'client' || roots.length > 0);
     // await Deno.mkdir(path.dirname(this.filePath), { recursive: true });
     if (
       !(await writeTextFile(
