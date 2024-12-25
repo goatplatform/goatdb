@@ -125,7 +125,9 @@ export function useDBReady(): DBReadyState {
               onStoreChange();
             }
           })
-          .catch(() => {
+          .catch((err) => {
+            console.error(err);
+            debugger;
             error = true;
             if (!cancelled) {
               onStoreChange();
