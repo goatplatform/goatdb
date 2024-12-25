@@ -364,6 +364,7 @@ export class Query<
     const key = commit.key;
     const prevHeadId = this._headIdForKey.get(key);
     const currentHead = repo.headForKey(key);
+    this._age = Math.max(this._age, commit.age || 0);
     if (currentHead && prevHeadId !== currentHead?.id) {
       const prevDoc = prevHeadId
         ? repo.recordForCommit(prevHeadId)
@@ -378,7 +379,6 @@ export class Query<
         currentHead,
       );
     }
-    this._age = Math.max(this._age, commit.age || 0);
   }
 
   private async scanRepo(): Promise<void> {
