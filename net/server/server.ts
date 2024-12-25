@@ -36,7 +36,7 @@ import { prettyJSON } from '../../base/common.ts';
 import { GoatDB } from '../../db/db.ts';
 import { SyncEndpoint } from './sync.ts';
 import { persistSession } from './auth.ts';
-import { kSchemaTask } from '../../web-app/src/schemes.ts';
+import setupSchemas from '../../web-app/src/schemes.ts';
 // import { StatsEndpoint } from './stats.ts';
 // import {
 //   BenchmarkResults,
@@ -44,7 +44,7 @@ import { kSchemaTask } from '../../web-app/src/schemes.ts';
 //   runInsertBenchmark,
 // } from './benchmark.ts';
 
-kSchemaTask;
+setupSchemas();
 
 const BASE_ORG_ID = 'localhost';
 export const ENV_REPLICAS = 'REPLICAS';

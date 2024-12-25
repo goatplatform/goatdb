@@ -5,7 +5,7 @@ import React, {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { GoatDB, type DBConfig } from '../db/db.ts';
+import { GoatDB } from '../db/db.ts';
 import { Schema } from '../cfds/base/schema.ts';
 import { ManagedItem } from '../db/managed-item.ts';
 import { MutationPack, mutationPackHasField } from '../db/mutations.ts';

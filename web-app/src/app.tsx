@@ -2,6 +2,9 @@ import React, { useRef } from 'react';
 import { createUseStyles } from 'react-jss';
 import { useDB, useDBReady, useQuery } from '../../react/db.tsx';
 import { kSchemaTask } from './schemes.ts';
+import setupSchemas from './schemes.ts';
+
+setupSchemas();
 
 const REPO_PATH = '/data/tasks';
 
