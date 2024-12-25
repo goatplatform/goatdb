@@ -37,6 +37,8 @@ import { QueryConfig, Query } from '../repo/query.ts';
 import { md51 } from '../external/md5.ts';
 import { sendLoginEmail } from '../net/rest-api.ts';
 import { normalizeEmail } from '../base/string.ts';
+import { FileImplGet } from '../base/json-log/file-impl.ts';
+import { FileImplOPFS } from '../base/json-log/file-impl-opfs.ts';
 
 /**
  * Denotes the type of the requested operation.
@@ -106,10 +108,8 @@ export type OpenOptions = Omit<RepositoryConfig, 'storage' | 'authorizer'>;
 
 export class GoatDB {
   readonly orgId: string;
-  readonly path: string;
   readonly schemaManager: SchemaManager;
-  readonly queryPersistence?: QueryPersistence;
-  private readonly _settingsProvider: DBSettingsProvider;
+  private readonly _basePath: string;
   private readonly _repositories: Map<string, Repository>;
   private readonly _openPromises: Map<string, Promise<Repository>>;
   private readonly _files: Map<string, JSONLogFile>;
@@ -121,6 +121,9 @@ export class GoatDB {
     Query<Schema, Schema, ReadonlyJSONValue>
   >();
   private readonly _authConfig: AuthConfig;
+  private _path: string | undefined;
+  private _settingsProvider: DBSettingsProvider | undefined;
+  queryPersistence?: QueryPersistence;
   private _trustPool: TrustPool | undefined;
   private _syncSchedulers: SyncScheduler[] | undefined;
   private _trustPoolPromise: Promise<TrustPool>;
@@ -128,12 +131,8 @@ export class GoatDB {
 
   constructor(config: DBConfig) {
     startJSONLogWorkerIfNeeded();
-    this.path = config.path;
+    this._basePath = config.path;
     this.schemaManager = config.schemaManager || SchemaManager.default;
-    this._settingsProvider = new FileSettings(
-      this.path,
-      isBrowser() ? 'client' : 'server',
-    );
     this.orgId = config?.orgId || 'localhost';
     this._authConfig = config.authRules || [];
     this._repositories = new Map();
@@ -148,12 +147,11 @@ export class GoatDB {
           : Array.from(new Set(config.peers));
       this._repoClients = new Map();
     }
-    if (this.path) {
-      this.queryPersistence = new QueryPersistence(
-        new QueryPersistenceFile(this.path),
-      );
-    }
     this._trustPoolPromise = this._getTrustPoolImpl();
+  }
+
+  get path(): string {
+    return this._path || this._basePath;
   }
 
   /**
@@ -168,7 +166,7 @@ export class GoatDB {
    * Returns the settings object of this DB instance.
    */
   get settings(): DBSettings {
-    return this._settingsProvider.settings;
+    return this._settingsProvider!.settings;
   }
 
   /**
@@ -483,6 +481,22 @@ export class GoatDB {
   }
 
   private async _createTrustPool(): Promise<void> {
+    const fileIndex = await pickInstanceNumber();
+    debugger;
+    this._path = fileIndex
+      ? path.join(
+          path.dirname(this._basePath),
+          path.basename(this._basePath) + '_' + fileIndex,
+        )
+      : this._basePath;
+    this._settingsProvider = new FileSettings(
+      this._path,
+      isBrowser() ? 'client' : 'server',
+    );
+    this.queryPersistence = new QueryPersistence(
+      new QueryPersistenceFile(this._path),
+    );
+
     await this._settingsProvider.load();
     const settings = this._settingsProvider.settings;
     this._trustPool = new TrustPool(
@@ -644,5 +658,30 @@ function authRuleForRepo(
         return rule;
       }
     }
+  }
+}
+
+function pickInstanceNumber(
+  startIndex: number = 0,
+): Promise<number | undefined> {
+  if (FileImplGet() === FileImplOPFS) {
+    const { promise: indefinitePromise } = Promise.withResolvers();
+    const { promise, resolve } = Promise.withResolvers<number | undefined>();
+    navigator.locks.request(
+      'GoatDB-' + startIndex,
+      { ifAvailable: true },
+      async (lockOrNull) => {
+        if (lockOrNull === null) {
+          resolve(await pickInstanceNumber(startIndex + 1));
+        }
+        if (lockOrNull !== null) {
+          resolve(startIndex);
+          return indefinitePromise;
+        }
+      },
+    );
+    return promise;
+  } else {
+    return Promise.resolve(undefined);
   }
 }
