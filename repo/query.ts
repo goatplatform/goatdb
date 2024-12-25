@@ -408,6 +408,7 @@ export class Query<
       if (commitAge > maxAge) {
         maxAge = commitAge;
       }
+      this._age = maxAge;
       if (cache && commitAge <= cache.age) {
         if (cachedKeys.has(key)) {
           const head = repo.headForKey(key);

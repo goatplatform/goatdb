@@ -482,7 +482,6 @@ export class GoatDB {
 
   private async _createTrustPool(): Promise<void> {
     const fileIndex = await pickInstanceNumber();
-    debugger;
     this._path = fileIndex
       ? path.join(
           path.dirname(this._basePath),
@@ -661,18 +660,25 @@ function authRuleForRepo(
   }
 }
 
+let gSelectedInstanceNumber = -1;
+
 function pickInstanceNumber(
   startIndex: number = 0,
 ): Promise<number | undefined> {
   if (FileImplGet() === FileImplOPFS) {
     const { promise: indefinitePromise } = Promise.withResolvers();
     const { promise, resolve } = Promise.withResolvers<number | undefined>();
+    if (gSelectedInstanceNumber >= 0) {
+      resolve(gSelectedInstanceNumber);
+    }
     navigator.locks.request(
       'GoatDB-' + startIndex,
       { ifAvailable: true },
       async (lockOrNull) => {
         if (lockOrNull === null) {
-          resolve(await pickInstanceNumber(startIndex + 1));
+          const idx = (await pickInstanceNumber(startIndex + 1))!;
+          gSelectedInstanceNumber = idx;
+          resolve(idx);
         }
         if (lockOrNull !== null) {
           resolve(startIndex);

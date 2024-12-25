@@ -498,14 +498,8 @@ export class TrustPool {
     this._sessions = sessions;
     this._changeCallback = changeCallback;
 
-    if (trustedSessions) {
-      trustedSessions.forEach((s) => sessions.set(s.id, s));
-    }
-
-    for (const s of this.roots) {
-      sessions.set(s.id, s);
-    }
-    sessions.set(currentSession.id, currentSession);
+    this.addSessionUnsafe(currentSession);
+    trustedSessions?.forEach((s) => this.addSessionUnsafe(s));
   }
 
   get currentSession(): OwnedSession {
