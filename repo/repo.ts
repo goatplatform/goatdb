@@ -1371,15 +1371,15 @@ export class Repository<
       await this._runUpdatesOnNewLeafCommit(c);
     }
     // Notify everyone else
+    for (const c of result) {
+      this.emit('NewCommitSync', c);
+    }
     if (this.priorityRepo || typeof Deno !== 'undefined') {
       // Do it synchronously in the server
       for (const c of result) {
         this.emit('NewCommit', c);
       }
     } else {
-      for (const c of result) {
-        this.emit('NewCommitSync', c);
-      }
       // And asynchronously in the client
       CoroutineScheduler.sharedScheduler().forEach(
         result,
