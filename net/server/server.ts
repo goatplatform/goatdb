@@ -36,7 +36,7 @@ import { prettyJSON } from '../../base/common.ts';
 import { GoatDB } from '../../db/db.ts';
 import { SyncEndpoint } from './sync.ts';
 import { persistSession } from './auth.ts';
-import setupSchemas from '../../web-app/src/schemes.ts';
+import setupSchemas from '../../web-app/src/schemas.ts';
 // import { StatsEndpoint } from './stats.ts';
 // import {
 //   BenchmarkResults,

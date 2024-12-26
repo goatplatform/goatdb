@@ -1,12 +1,11 @@
 import React, { useRef } from 'react';
 import { createUseStyles } from 'react-jss';
 import { useDB, useDBReady, useQuery } from '../../react/db.tsx';
-import { kSchemaTask } from './schemes.ts';
-import setupSchemas from './schemes.ts';
+import { kSchemaTask } from './schemas.ts';
+import setupSchemas from './schemas.ts';
+import { coreValueCompare } from '../../base/core-types/comparable.ts';
 
 setupSchemas();
-
-const REPO_PATH = '/data/tasks';
 
 const useAppStyles = createUseStyles({
   app: {},
@@ -23,7 +22,9 @@ export function Header() {
       <input type="text" ref={ref}></input>
       <button
         onClick={() => {
-          db.create(REPO_PATH, kSchemaTask, {
+          // Create a new task at the tasks repository. It'll automatically
+          // trigger the query below and update the list
+          db.create('/data/tasks', kSchemaTask, {
             text: ref.current!.value,
           });
         }}
@@ -36,10 +37,17 @@ export function Header() {
 
 export function Contents() {
   const styles = useAppStyles();
+  // Open a query that fetches all tasks sorted by their texts.
+  // The hook will automatically trigger a re-render when changes are made
+  // either locally or by remote users.
   const query = useQuery({
     schema: kSchemaTask,
-    source: REPO_PATH,
-    // predicate: ({ item }) => item.get('text').startsWith('lorem'),
+    source: '/data/tasks',
+    sortDescriptor: ({ left, right }) =>
+      coreValueCompare(left.get('text'), right.get('text')),
+    // When set to true, the query will update with intermittent results as it
+    // scans its source resulting in a more responsive UI
+    showIntermittentResults: true,
   });
   return (
     <div>
@@ -55,12 +63,13 @@ export function Contents() {
 
 export function App() {
   const ready = useDBReady();
-
-  if (ready === 'error') {
-    return <div>Error! Please reload the page.</div>;
-  }
+  // Handle initial loading phase
   if (ready === 'loading') {
     return <div>Loading...</div>;
   }
+  if (ready === 'error') {
+    return <div>Error! Please reload the page.</div>;
+  }
+  // Once  loaded, continue to the contents of the app
   return <Contents />;
 }

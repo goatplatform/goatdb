@@ -23,9 +23,9 @@ GoatDB also guarantees causal consistency, meaning changes are shared in the cor
 
 _**Caveats:**_ Currently the demo runs only on Mac and Linux. Windows support is in the works.
 
-1. Install Deno 1.46.3 - See [this issue](#2).
-2. Install Node.JS. This is a temporary hack that'll soon be removed.
-3. Checkout this repository.
+1. Install [Deno](https://docs.deno.com/runtime/getting_started/installation/) 1.46.3 - See [this issue](#2).
+2. Checkout this repository.
+3. `cd` into the checked out repo.
 4. Run `npm install`. This is a temporary hack that'll soon be removed.
 5. Run `deno run -A server/debug-server.ts -d /path/to/data/dir`
 
