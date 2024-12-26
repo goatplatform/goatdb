@@ -8,6 +8,8 @@ import { Schema } from '../cfds/base/schema.ts';
 import { BloomFilter } from '../base/bloom.ts';
 import { GoatDB } from '../db/db.ts';
 import { ReadonlyJSONValue } from '../base/interfaces.ts';
+import { isBrowser } from '../base/common.ts';
+import { CoroutineScheduler } from '../base/coroutine.ts';
 
 const BLOOM_FPR = 0.01;
 
@@ -391,13 +393,12 @@ export class Query<
     let maxAge = 0;
     // const ages = new Set<number>();
     const cachedKeys = new Set(cache?.results || []);
-    for (const key of (typeof this.source === 'string'
-      ? repo
-      : this.source
-    ).keys()) {
+
+    const processKey = (key: string, stopHandle: () => void) => {
       ++total;
       if (!this.isActive) {
-        break;
+        stopHandle();
+        return;
       }
       const commitAge = repo.storage.ageForKey[key] || 0;
       // if (commitAge > (cache?.age || 0)) {
@@ -418,11 +419,37 @@ export class Query<
           }
         }
         ++skipped;
-        continue;
+        return;
       }
       const head = repo.headForKey(key)!;
       if (head) {
         this.onNewCommit(head);
+      }
+    };
+    const keysIter = (
+      typeof this.source === 'string' ? repo : this.source
+    ).keys();
+    if (isBrowser()) {
+      let cancelCallback: undefined | (() => void);
+      const cancelPromise = CoroutineScheduler.sharedScheduler().forEach(
+        keysIter,
+        (key) => {
+          if (!cancelCallback) {
+            cancelCallback = () => cancelPromise.cancel();
+          }
+          processKey(key, cancelCallback);
+        },
+      );
+    } else {
+      let stopProcessing = false;
+      const stopProcessingHandle = () => {
+        stopProcessing = true;
+      };
+      for (const key of keysIter) {
+        processKey(key, stopProcessingHandle);
+        if (stopProcessing) {
+          break;
+        }
       }
     }
     if (this.isActive) {
