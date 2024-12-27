@@ -16,9 +16,9 @@
 
 **sys**: Reserved for system-level operations. This type should not be used in application code.
 
-**data**: A general-purpose repository for storing user data.
+**data**: A general-purpose repository for storing the main application data.
 
-**user**: A repository for user-specific data, such as settings and preferences.
+**user**: Used for user-specific data, such as settings, private collections, etc.
 
 ## System Repositories
 
