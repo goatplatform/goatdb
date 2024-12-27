@@ -218,10 +218,14 @@ export class Item<S extends Schema = Schema>
   get<T extends keyof SchemaDataType<S>>(
     key: string & T,
   ): SchemaDataType<S>[T] {
+    const fieldDef = SchemaGetFieldDef(this.schema, key);
     assert(
-      SchemaGetFieldDef(this.schema, key) !== undefined,
+      fieldDef !== undefined,
       `Unknown field name '${key}' for schema '${this.schema.ns}'`,
     );
+    if (!Object.hasOwn(this._data, key) && fieldDef.default !== undefined) {
+      return fieldDef.default(this._data);
+    }
     return this._data[key] as SchemaDataType<S>[T];
   }
 
