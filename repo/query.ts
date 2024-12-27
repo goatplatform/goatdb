@@ -184,8 +184,7 @@ export class Query<
     if (!this._cachedResults || this._cachedResultsAge !== this.age) {
       this._cachedResults = [];
       this._cachedResultsAge = this.age;
-      for (const k of this._includedPaths) {
-        const path = itemPathJoin(this.repo.path, k);
+      for (const path of this._includedPaths) {
         this._cachedResults.push(this.db.item(path));
       }
       if (this.sortDescriptor) {
@@ -319,6 +318,7 @@ export class Query<
     currentDoc: Item<IS>,
     head?: Commit,
   ): void {
+    this._age = Math.max(this._age, head?.age || 0);
     if (!prevDoc?.isEqual(currentDoc)) {
       if (head) {
         this._headIdForKey.set(path, head.id);
@@ -326,33 +326,29 @@ export class Query<
         this._headIdForKey.delete(path);
       }
       this._tempRecordForKey.delete(path);
-      if (!currentDoc.isDeleted) {
-        if (!this._predicateInfo) {
-          this._predicateInfo = { path, item: currentDoc, ctx: this.context };
-        } else {
-          this._predicateInfo.path = path;
-          this._predicateInfo.item = currentDoc;
-          this._predicateInfo.ctx = this.context;
-        }
-        if (
-          (!this.scheme || this.scheme.ns === currentDoc.schema.ns) &&
-          this.predicate(this._predicateInfo!)
-        ) {
-          this.addPathToResults(path, currentDoc);
-        } else if (this._bloomFilter.has(path)) {
-          const idx = this._includedPaths.indexOf(path);
-          if (idx >= 0) {
-            this._includedPaths.splice(idx, 1);
-            // If the number of removed items gets above the desired threshold,
-            // rebuild our filter to maintain a reasonable FPR
-            if (
-              ++this._bloomFilterDeleteCount >=
-              this._bloomFilterCount * 0.1
-            ) {
-              this._rebuildBloomFilter();
-            }
-            this.emit('DocumentChanged', path, currentDoc);
+      if (!this._predicateInfo) {
+        this._predicateInfo = { path, item: currentDoc, ctx: this.context };
+      } else {
+        this._predicateInfo.path = path;
+        this._predicateInfo.item = currentDoc;
+        this._predicateInfo.ctx = this.context;
+      }
+      if (
+        (!this.scheme || this.scheme.ns === currentDoc.schema.ns) &&
+        !currentDoc.isDeleted &&
+        this.predicate(this._predicateInfo!)
+      ) {
+        this.addPathToResults(path, currentDoc);
+      } else if (this._bloomFilter.has(path)) {
+        const idx = this._includedPaths.indexOf(path);
+        if (idx >= 0) {
+          this._includedPaths.splice(idx, 1);
+          // If the number of removed items gets above the desired threshold,
+          // rebuild our filter to maintain a reasonable FPR
+          if (++this._bloomFilterDeleteCount >= this._bloomFilterCount * 0.1) {
+            this._rebuildBloomFilter();
           }
+          this.emit('DocumentChanged', path, currentDoc);
         }
       }
     }
@@ -372,7 +368,7 @@ export class Query<
         ? repo.recordForCommit(currentHead)
         : Item.nullItem();
       this.handleDocChange(
-        key,
+        itemPathJoin(repo.path, key),
         prevDoc as unknown as Item<IS>,
         currentDoc as unknown as Item<IS>,
         currentHead,
