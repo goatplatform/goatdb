@@ -4,6 +4,8 @@ import { kSchemaTask, type SchemaTypeTask } from './schemas.ts';
 import setupSchemas from './schemas.ts';
 import { coreValueCompare } from '../../base/core-types/comparable.ts';
 
+// This is only temporary. In the near future schemas will be auto-registered
+// without an explicity call.
 setupSchemas();
 
 export function Header() {
