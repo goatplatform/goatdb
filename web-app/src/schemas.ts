@@ -10,7 +10,7 @@ export const kSchemaTask = {
     },
   },
 } as const;
-export type SchemeTypeTask = typeof kSchemaTask;
+export type SchemaTypeTask = typeof kSchemaTask;
 
 export default function setup(): void {
   SchemaManager.default.register(kSchemaTask);

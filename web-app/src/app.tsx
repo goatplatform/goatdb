@@ -1,18 +1,10 @@
 import React, { useRef } from 'react';
-import { createUseStyles } from 'react-jss';
-import { useDB, useDBReady, useQuery } from '../../react/db.tsx';
-import { kSchemaTask } from './schemas.ts';
+import { useDB, useDBReady, useItem, useQuery } from '../../react/db.tsx';
+import { kSchemaTask, type SchemaTypeTask } from './schemas.ts';
 import setupSchemas from './schemas.ts';
 import { coreValueCompare } from '../../base/core-types/comparable.ts';
 
 setupSchemas();
-
-const useAppStyles = createUseStyles({
-  app: {},
-  task: {
-    border: '1px solid black',
-  },
-});
 
 export function Header() {
   const db = useDB();
@@ -35,8 +27,24 @@ export function Header() {
   );
 }
 
+export type TaskItemProps = {
+  path: string;
+};
+export function TaskItem({ path }: TaskItemProps) {
+  // By calling the useItem() hook we ensure this component will rerender
+  // whenever our task changes.
+  const task = useItem<SchemaTypeTask>(path);
+  return (
+    <input
+      type="text"
+      value={task.get('text')}
+      // Updating the item automatically triggers remote updates in realtime
+      onChange={(event) => task.set('text', event.target.value)}
+    />
+  );
+}
+
 export function Contents() {
-  const styles = useAppStyles();
   // Open a query that fetches all tasks sorted by their texts.
   // The hook will automatically trigger a re-render when changes are made
   // either locally or by remote users.
@@ -52,9 +60,9 @@ export function Contents() {
   return (
     <div>
       <Header />
-      {query.results().map(({ key, item }) => (
-        <div key={key} className={styles.task}>
-          {item.get('text')}
+      {query.results().map(({ path }) => (
+        <div key={path}>
+          <TaskItem path={path} />
         </div>
       ))}
     </div>
