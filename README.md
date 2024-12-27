@@ -19,6 +19,8 @@ GoatDB also guarantees causal consistency, meaning changes are shared in the cor
 • [Queries](docs/query.md)
 • [Schemas](docs/schema.md)
 
+Check out [web-app/src/app.tsx](web-app/src/app.tsx) to get an idea of what it's like to build apps using GoatDB.
+
 ### Running the Demo
 
 _**Caveats:**_ Currently the demo runs only on Mac and Linux. Windows support is in the works.
