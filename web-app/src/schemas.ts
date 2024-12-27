@@ -8,6 +8,10 @@ export const kSchemaTask = {
       type: 'string',
       default: () => '',
     },
+    done: {
+      type: 'boolean',
+      default: () => false,
+    },
   },
 } as const;
 export type SchemaTypeTask = typeof kSchemaTask;

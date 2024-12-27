@@ -36,13 +36,27 @@ export function TaskItem({ path }: TaskItemProps) {
   // By calling the useItem() hook we ensure this component will rerender
   // whenever our task changes.
   const task = useItem<SchemaTypeTask>(path);
+  // Updating the item automatically triggers remote updates in realtime
   return (
-    <input
-      type="text"
-      value={task.get('text')}
-      // Updating the item automatically triggers remote updates in realtime
-      onChange={(event) => task.set('text', event.target.value)}
-    />
+    <div>
+      <input
+        type="checkbox"
+        checked={task.get('done')}
+        onChange={(event) => task.set('done', event.target.checked)}
+      />
+      <input
+        type="text"
+        value={task.get('text')}
+        onChange={(event) => task.set('text', event.target.value)}
+      />
+      <button
+        onClick={() => {
+          task.isDeleted = true;
+        }}
+      >
+        Delete
+      </button>
+    </div>
   );
 }
 
