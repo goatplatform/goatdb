@@ -15,6 +15,7 @@ import {
   itemPath,
   itemPathGetPart,
   itemPathGetRepoId,
+  itemPathJoin,
   itemPathNormalize,
   ItemPathPart,
 } from './path.ts';
@@ -39,6 +40,7 @@ import { sendLoginEmail } from '../net/rest-api.ts';
 import { normalizeEmail } from '../base/string.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
 import { FileImplOPFS } from '../base/json-log/file-impl-opfs.ts';
+import { assert } from '../base/error.ts';
 
 /**
  * Denotes the type of the requested operation.
@@ -283,6 +285,9 @@ export class GoatDB {
    * @returns         A managed item that tracks both local and remote edits.
    */
   item<S extends Schema>(...pathComps: string[]): ManagedItem<S> {
+    for (const s of pathComps) {
+      assert(typeof s === 'string'); // Sanity check
+    }
     const path = itemPathNormalize(pathComps.join('/'));
     let item = this._items.get(path);
     if (!item) {
@@ -308,15 +313,12 @@ export class GoatDB {
     schema: S,
     data: Partial<SchemaDataType<S>>,
   ): ManagedItem<S> {
-    const path = itemPath(...Repository.parseId(repoPath), uniqueId());
-    let item = this._items.get(path);
-    if (!item) {
-      item = new ManagedItem(this, path);
-      this._items.set(path, item);
+    const item = this.item<S>(...Repository.parseId(repoPath), uniqueId());
+    if (item.schema.ns === null) {
       item.schema = schema;
       item.setMulti(data);
     }
-    return item as unknown as ManagedItem<S>;
+    return item;
   }
 
   /**
@@ -585,6 +587,11 @@ export class GoatDB {
       // commitIds.add(c.id);
       // }
     });
+    repo.attach('NewCommit', async (c: Commit) => {
+      await repo.mergeIfNeeded(c.key);
+      const item = this._items.get(itemPathJoin(repo.path, c.key));
+      item?.rebase();
+    });
     if (this._syncSchedulers) {
       const clients: RepoClient[] = [];
       for (const scheduler of this._syncSchedulers) {
@@ -597,10 +604,11 @@ export class GoatDB {
         );
         clients.push(c);
         if (!loadedFromBackup) {
-          await c.sync();
+          c.sync().then(() => {
+            c.ready = true;
+            c.startSyncing();
+          });
         }
-        c.ready = true;
-        c.startSyncing();
       }
       this._repoClients!.set(repoId, clients);
     }

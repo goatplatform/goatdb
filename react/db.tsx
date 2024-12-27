@@ -56,18 +56,16 @@ export function useItem<S extends Schema>(
   ...pathCompsOrOpts: (string | UseItemOpts)[]
 ): ManagedItem<S> {
   const db = useDB();
-  let change = 0;
-  const [_, setRenderCount] = useState(change);
   // Options object may appear either at the beginning or at the end
-  const opts =
-    typeof pathCompsOrOpts[0] !== 'string'
-      ? (pathCompsOrOpts[0] as UseItemOpts)
-      : typeof pathCompsOrOpts[pathCompsOrOpts.length - 1] !== 'string'
-      ? (pathCompsOrOpts[pathCompsOrOpts.length - 1] as UseItemOpts)
-      : undefined;
+  let opts: UseItemOpts | undefined;
+  if (typeof pathCompsOrOpts[0] !== 'string') {
+    opts = pathCompsOrOpts.shift() as UseItemOpts;
+  } else if (typeof pathCompsOrOpts[pathCompsOrOpts.length - 1] !== 'string') {
+    opts = pathCompsOrOpts.pop() as UseItemOpts;
+  }
   const item = db.item<S>(...(pathCompsOrOpts as string[]));
-  useEffect(
-    () =>
+  const subscribe = useCallback(
+    (onStoreChange: () => void) =>
       item.attach('change', (mutations: MutationPack) => {
         // Skip unneeded updates if a specific set of keys was provided
         if (opts?.keys !== undefined) {
@@ -79,10 +77,12 @@ export function useItem<S extends Schema>(
             return;
           }
         }
-        setRenderCount(++change);
+        onStoreChange();
       }),
     [item],
   );
+  const getSnapshot = useCallback(() => item.age, [item]);
+  useSyncExternalStore(subscribe, getSnapshot);
   return item;
 }
 

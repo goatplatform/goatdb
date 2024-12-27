@@ -8,7 +8,7 @@ import {
 } from '../db/session.ts';
 import * as ArrayUtils from '../base/array.ts';
 import { Dictionary } from '../base/collections/dict.ts';
-import { filterIterable } from '../base/common.ts';
+import { filterIterable, mapIterable } from '../base/common.ts';
 import { coreValueCompare, coreValueEquals } from '../base/core-types/index.ts';
 import { assert } from '../base/error.ts';
 import * as SetUtils from '../base/set.ts';
@@ -37,6 +37,7 @@ import { RedBlackTree } from 'std/data_structures/red_black_tree.ts';
 import { AuthRule, GoatDB } from '../db/db.ts';
 // import { BloomFilter } from '../base/bloom.ts';
 import { BloomFilter } from '../cpp/bloom_filter.ts';
+import { itemPathJoin } from '../db/path.ts';
 
 export type EventDocumentChanged = 'DocumentChanged';
 export type EventNewCommit = 'NewCommit';
@@ -336,13 +337,14 @@ export class Repository<
     let leaves = this._cachedLeavesForKey.get(key);
     if (!leaves) {
       const adjList = this._adjList;
-      const result: Commit[] = [];
+      // const result: Commit[] = [];
+      leaves = [];
       for (const c of this.commitsForKey(key, session)) {
         if (!adjList.hasInEdges(c.id) && this.hasRecordForCommit(c)) {
-          result.push(c);
+          leaves.push(c);
         }
       }
-      leaves = this.filterLatestCommitsByConnection(result);
+      // leaves = this.filterLatestCommitsByConnection(result);
       Object.freeze(leaves);
       this._cachedLeavesForKey.set(key, leaves);
     }
@@ -361,6 +363,12 @@ export class Repository<
       );
     }
     return this.storage.allKeys();
+  }
+
+  paths(session?: Session): Iterable<string> {
+    return mapIterable(this.keys(session), (key) =>
+      itemPathJoin(this.path, key),
+    );
   }
 
   /**
@@ -893,7 +901,9 @@ export class Repository<
     // If no LCA is found then we're dealing with concurrent writers who all
     // created of the same key unaware of each other.
     // Use the null record as a base in this case.
-    const base = lca ? this.recordForCommit(lca).clone() : Item.nullItem();
+    const base = lca
+      ? this.recordForCommit(lca).clone()
+      : Item.nullItem().clone();
     // Upgrade base to merge scheme
     if (scheme.ns !== null) {
       base.upgradeSchema(scheme);
@@ -1117,8 +1127,8 @@ export class Repository<
     });
     commit = this.deltaCompressIfNeeded(commit);
     const signedCommit = await signCommit(session, commit);
-    this._cachedHeadsByKey.delete(key);
     await this.persistVerifiedCommits([signedCommit]);
+    this.invalidateCachesForKey(key);
     return (await this.mergeIfNeeded(key)) || signedCommit;
   }
 
@@ -1283,6 +1293,13 @@ export class Repository<
     return result;
   }
 
+  private invalidateCachesForKey(key: string): void {
+    this._cachedHeadsByKey.delete(key);
+    this._cachedLeavesForKey.delete(key);
+    this._cachedValueForKey.delete(key);
+    this._cachedCommitsPerUser.clear();
+  }
+
   async persistCommits(commits: Iterable<Commit>): Promise<Commit[]> {
     const batchSize = 50;
     const result: Commit[] = [];
@@ -1312,7 +1329,6 @@ export class Repository<
   async persistVerifiedCommits(commits: Iterable<Commit>): Promise<Commit[]> {
     const adjList = this._adjList;
     const result: Commit[] = [];
-    const commitsAffectingTmpRecords: Commit[] = [];
     let batch: Commit[] = [];
     for (const c of commits) {
       if (c.orgId !== undefined && c.orgId !== this.orgId) {
@@ -1329,13 +1345,6 @@ export class Repository<
           for (const p of c.parents) {
             adjList.addEdge(c.id, p, 'parent');
           }
-          // Invalidate temporary merge values on every commit change
-          if (!this._cachedHeadsByKey.has(c.key)) {
-            this._cachedValueForKey.delete(c.key);
-            commitsAffectingTmpRecords.push(c);
-          }
-          this._cachedHeadsByKey.delete(c.key);
-          this._cachedLeavesForKey.delete(c.key);
         }
         batch = [];
       }
@@ -1348,15 +1357,8 @@ export class Repository<
         for (const p of c.parents) {
           adjList.addEdge(c.id, p, 'parent');
         }
-        // Invalidate temporary merge values on every commit change
-        if (!this._cachedHeadsByKey.has(c.key)) {
-          this._cachedValueForKey.delete(c.key);
-          commitsAffectingTmpRecords.push(c);
-        }
-        this._cachedHeadsByKey.delete(c.key);
       }
     }
-    this._cachedCommitsPerUser.clear();
 
     // const leaves = result.filter((c) => this.commitIsHighProbabilityLeaf(c));
     // for (const c of leaves) {
@@ -1367,8 +1369,10 @@ export class Repository<
     //   commitsAffectingTmpRecords,
     //   result.filter((c) => this.commitIsHighProbabilityLeaf(c)),
     // )) {
-    for (const c of commitsAffectingTmpRecords) {
-      await this._runUpdatesOnNewLeafCommit(c);
+    for (const c of result) {
+      if (!this._adjList.hasInEdges(c.id)) {
+        await this._runUpdatesOnNewLeafCommit(c);
+      }
     }
     // Notify everyone else
     for (const c of result) {
@@ -1412,7 +1416,7 @@ export class Repository<
     const storage = this.storage;
     const result: Commit[] = [];
     for (const persistedCommit of await storage.persistCommits(batch)) {
-      this._cachedHeadsByKey.delete(persistedCommit.key);
+      this.invalidateCachesForKey(persistedCommit.key);
       result.push(persistedCommit);
     }
     return result;

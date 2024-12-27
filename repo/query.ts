@@ -10,15 +10,17 @@ import { GoatDB } from '../db/db.ts';
 import { ReadonlyJSONValue } from '../base/interfaces.ts';
 import { isBrowser } from '../base/common.ts';
 import { CoroutineScheduler } from '../base/coroutine.ts';
+import { itemPathGetPart, itemPathJoin, ItemPathPart } from '../db/path.ts';
+import { ManagedItem } from '../db/managed-item.ts';
 
 const BLOOM_FPR = 0.01;
 
 export type Entry<S extends Schema = Schema> = [
-  key: string | null,
+  path: string | null,
   item: Item<S>,
 ];
 export type PredicateInfo<S extends Schema, CTX> = {
-  key: string;
+  path: string;
   item: Item<S>;
   ctx: CTX;
 };
@@ -27,10 +29,8 @@ export type Predicate<S extends Schema, CTX extends ReadonlyJSONValue> = (
 ) => boolean;
 
 export type SortInfo<S extends Schema, CTX> = {
-  left: Item<S>;
-  right: Item<S>;
-  keyLeft: string;
-  keyRight: string;
+  left: ManagedItem<S>;
+  right: ManagedItem<S>;
   ctx: CTX;
 };
 export type SortDescriptor<S extends Schema, CTX> = (
@@ -75,7 +75,7 @@ export class Query<
   private readonly sortDescriptor: SortDescriptor<OS, CTX> | undefined;
   private readonly _headIdForKey: Map<string, string>; // Key -> Commit ID
   private readonly _tempRecordForKey: Map<string, Item<OS>>;
-  private readonly _includedKeys: string[];
+  private readonly _includedPaths: string[];
   private _loadingFinished = false;
   private _scanTimeMs = 0;
   private _bloomFilter: BloomFilter;
@@ -85,7 +85,7 @@ export class Query<
   private _age = 0;
   private _sourceListenerCleanup?: () => void;
   private _closed = false;
-  private _cachedResults: { key: string; item: Item<OS> }[] | undefined;
+  private _cachedResults: ManagedItem<OS>[] | undefined;
   private _cachedResultsAge = 0;
   private _loading: boolean = true;
 
@@ -133,7 +133,7 @@ export class Query<
     this._headIdForKey = new Map();
     this._tempRecordForKey = new Map();
     // this._includedKeys = new Set();
-    this._includedKeys = [];
+    this._includedPaths = [];
     this._bloomFilterSize = 1024;
     this._bloomFilter = new BloomFilter({
       size: this._bloomFilterSize,
@@ -150,7 +150,7 @@ export class Query<
   }
 
   get count(): number {
-    return this._includedKeys.length;
+    return this._includedPaths.length;
   }
 
   get scanTimeMs(): number {
@@ -169,39 +169,36 @@ export class Query<
     return this._loading;
   }
 
-  has(key: string): boolean {
-    if (!this._bloomFilter.has(key)) {
+  has(path: string): boolean {
+    if (!this._bloomFilter.has(path)) {
       return false;
     }
-    return this._includedKeys.includes(key);
+    return this._includedPaths.includes(path);
   }
 
-  keys(): Iterable<string> {
-    return this._includedKeys;
+  paths(): Iterable<string> {
+    return this._includedPaths;
   }
 
-  results(): readonly { key: string; item: Item<OS> }[] {
+  results(): readonly ManagedItem<OS>[] {
     if (!this._cachedResults || this._cachedResultsAge !== this.age) {
       this._cachedResults = [];
       this._cachedResultsAge = this.age;
-      for (const k of this._includedKeys) {
-        this._cachedResults.push({ key: k, item: this.valueForKey(k) });
+      for (const k of this._includedPaths) {
+        const path = itemPathJoin(this.repo.path, k);
+        this._cachedResults.push(this.db.item(path));
       }
       if (this.sortDescriptor) {
-        this._cachedResults.sort((e1, e2) => {
+        this._cachedResults.sort((left, right) => {
           if (!this._sortInfo) {
             this._sortInfo = {
-              keyLeft: e1.key,
-              left: e1.item,
-              keyRight: e2.key,
-              right: e2.item,
+              left,
+              right,
               ctx: this.context,
             };
           } else {
-            this._sortInfo.keyLeft = e1.key;
-            this._sortInfo.left = e1.item;
-            this._sortInfo.keyRight = e2.key;
-            this._sortInfo.right = e2.item;
+            this._sortInfo.left = left;
+            this._sortInfo.right = right;
             this._sortInfo.ctx = this.context;
           }
           return this.sortDescriptor!(this._sortInfo);
@@ -212,15 +209,15 @@ export class Query<
     return this._cachedResults;
   }
 
-  valueForKey(key: string): Item<OS> {
+  valueForPath(key: string): Item<OS> {
     const head = this._headIdForKey.get(key);
     return ((head && this.repo.recordForCommit(head)) ||
       this._tempRecordForKey.get(key))!;
   }
 
   *entries(): Generator<Entry<OS>> {
-    for (const key of this._includedKeys) {
-      yield [key, this.valueForKey(key)!];
+    for (const key of this._includedPaths) {
+      yield [key, this.valueForPath(key)!];
     }
   }
 
@@ -297,43 +294,43 @@ export class Query<
     super.suspend();
   }
 
-  private addKeyToResults(key: string, currentDoc: Item<IS>): void {
+  private addPathToResults(path: string, currentDoc: Item<IS>): void {
     // Insert to the results set
     if (
-      this.has(key) ||
-      (this.limit > 0 && this._includedKeys.length >= this.limit)
+      this.has(path) ||
+      (this.limit > 0 && this._includedPaths.length >= this.limit)
     ) {
       return;
     }
-    this._includedKeys.push(key);
+    this._includedPaths.push(path);
     // Rebuild bloom filter if it became too big, to maintain its FPR
     if (++this._bloomFilterCount >= this._bloomFilterSize) {
       this._rebuildBloomFilter();
     } else {
-      this._bloomFilter.add(key);
+      this._bloomFilter.add(path);
     }
     // Report this change downstream
-    this.emit('DocumentChanged', key, currentDoc);
+    this.emit('DocumentChanged', path, currentDoc);
   }
 
   private handleDocChange(
-    key: string,
+    path: string,
     prevDoc: Item<IS> | undefined,
     currentDoc: Item<IS>,
     head?: Commit,
   ): void {
     if (!prevDoc?.isEqual(currentDoc)) {
       if (head) {
-        this._headIdForKey.set(key, head.id);
+        this._headIdForKey.set(path, head.id);
       } else {
-        this._headIdForKey.delete(key);
+        this._headIdForKey.delete(path);
       }
-      this._tempRecordForKey.delete(key);
+      this._tempRecordForKey.delete(path);
       if (!currentDoc.isDeleted) {
         if (!this._predicateInfo) {
-          this._predicateInfo = { key, item: currentDoc, ctx: this.context };
+          this._predicateInfo = { path, item: currentDoc, ctx: this.context };
         } else {
-          this._predicateInfo.key = key;
+          this._predicateInfo.path = path;
           this._predicateInfo.item = currentDoc;
           this._predicateInfo.ctx = this.context;
         }
@@ -341,11 +338,11 @@ export class Query<
           (!this.scheme || this.scheme.ns === currentDoc.schema.ns) &&
           this.predicate(this._predicateInfo!)
         ) {
-          this.addKeyToResults(key, currentDoc);
-        } else if (this._bloomFilter.has(key)) {
-          const idx = this._includedKeys.indexOf(key);
+          this.addPathToResults(path, currentDoc);
+        } else if (this._bloomFilter.has(path)) {
+          const idx = this._includedPaths.indexOf(path);
           if (idx >= 0) {
-            this._includedKeys.splice(idx, 1);
+            this._includedPaths.splice(idx, 1);
             // If the number of removed items gets above the desired threshold,
             // rebuild our filter to maintain a reasonable FPR
             if (
@@ -354,7 +351,7 @@ export class Query<
             ) {
               this._rebuildBloomFilter();
             }
-            this.emit('DocumentChanged', key, currentDoc);
+            this.emit('DocumentChanged', path, currentDoc);
           }
         }
       }
@@ -387,35 +384,29 @@ export class Query<
     const startTime = performance.now();
     const repo = this.repo;
     const cache = await repo.db.queryPersistence?.get(repo.path, this.id);
-    // let ageChange = 0;
     let skipped = 0;
     let total = 0;
     let maxAge = 0;
-    // const ages = new Set<number>();
-    const cachedKeys = new Set(cache?.results || []);
+    const cachedPaths = new Set(cache?.results || []);
 
-    const processKey = (key: string, stopHandle: () => void) => {
+    const processPath = (path: string, stopHandle: () => void) => {
+      const key = itemPathGetPart(path, ItemPathPart.Item);
       ++total;
       if (!this.isActive) {
         stopHandle();
         return;
       }
-      const commitAge = repo.storage.ageForKey[key] || 0;
-      // if (commitAge > (cache?.age || 0)) {
-      //   ++ageChange;
-      // }
-      // assert(!ages.has(commitAge));
-      // ages.add(commitAge);
+      const commitAge = repo.storage.ageForKey[path] || 0;
       if (commitAge > maxAge) {
         maxAge = commitAge;
       }
       this._age = maxAge;
       if (cache && commitAge <= cache.age) {
-        if (cachedKeys.has(key)) {
+        if (cachedPaths.has(path)) {
           const head = repo.headForKey(key);
           if (head) {
-            this._headIdForKey.set(key, head.id);
-            this.addKeyToResults(key, repo.valueForKey<IS>(key)![0]);
+            this._headIdForKey.set(path, head.id);
+            this.addPathToResults(path, repo.valueForKey<IS>(key)![0]);
           }
         }
         ++skipped;
@@ -426,18 +417,18 @@ export class Query<
         this.onNewCommit(head);
       }
     };
-    const keysIter = (
+    const pathsIter = (
       typeof this.source === 'string' ? repo : this.source
-    ).keys();
+    ).paths();
     if (isBrowser()) {
       let cancelCallback: undefined | (() => void);
       const cancelPromise = CoroutineScheduler.sharedScheduler().forEach(
-        keysIter,
-        (key) => {
+        pathsIter,
+        (path) => {
           if (!cancelCallback) {
             cancelCallback = () => cancelPromise.cancel();
           }
-          processKey(key, cancelCallback);
+          processPath(path, cancelCallback);
         },
       );
     } else {
@@ -445,8 +436,8 @@ export class Query<
       const stopProcessingHandle = () => {
         stopProcessing = true;
       };
-      for (const key of keysIter) {
-        processKey(key, stopProcessingHandle);
+      for (const key of pathsIter) {
+        processPath(key, stopProcessingHandle);
         if (stopProcessing) {
           break;
         }
@@ -481,7 +472,7 @@ export class Query<
     });
     // Reset the counter before re-adding all keys
     this._bloomFilterCount = 0;
-    for (const key of this.keys()) {
+    for (const key of this.paths()) {
       this._bloomFilter.add(key);
       ++this._bloomFilterCount;
     }

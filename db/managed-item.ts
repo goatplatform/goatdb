@@ -7,6 +7,7 @@ import { Emitter } from '../base/emitter.ts';
 import { MutationPack, mutationPackAppend } from './mutations.ts';
 import { SimpleTimer, Timer } from '../base/timer.ts';
 import { GoatDB } from './db.ts';
+import { assert } from '../base/error.ts';
 
 export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
   private readonly _commitDelayTimer: Timer;
@@ -14,6 +15,8 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
   private _item!: Item<S>;
   private _commitPromise?: Promise<void>;
   private _detachHandler?: () => void;
+  private _age: number = 0;
+  private _commitInProgress: boolean = false;
 
   constructor(readonly db: GoatDB, readonly path: string) {
     super();
@@ -82,6 +85,10 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
       this._item.isDeleted = flag;
       this.onChange(['isDeleted', true, oldValue]);
     }
+  }
+
+  get age(): number {
+    return this._age;
   }
 
   has<T extends keyof SchemaDataType<S>>(key: string & T): boolean {
@@ -183,11 +190,14 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
   private onChange(
     mutations: MutationPack<keyof SchemaDataType<S> & string>,
   ): void {
+    ++this._age;
     this.emit('change', mutations);
     this._commitDelayTimer.schedule();
   }
 
   private async _commitImpl(): Promise<void> {
+    assert(!this._commitInProgress);
+    this._commitInProgress = true;
     this._commitDelayTimer.unschedule();
     const currentDoc = this._item.clone();
     const key = itemPathGetPart(this.path, ItemPathPart.Item);
@@ -196,6 +206,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
     if (newHead) {
       this.rebase();
     }
+    this._commitInProgress = false;
   }
 
   private async loadRepoAndDoc(): Promise<void> {

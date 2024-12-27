@@ -168,7 +168,7 @@ export class QueryPersistence {
     for (const q of queries) {
       repoCache.queries[q.id] = {
         age: q.age,
-        results: Array.from(q.keys()),
+        results: Array.from(q.paths()),
       };
     }
     this._cachedDataForRepo.delete(repoId);
