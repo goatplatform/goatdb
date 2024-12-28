@@ -42,6 +42,7 @@ import {
   coreValueEquals,
 } from '../../base/core-types/index.ts';
 import { SchemaGetFieldDef } from './schema.ts';
+import { Readwrite } from '../../base/types.ts';
 
 export interface ReadonlyItem<S extends Schema> {
   readonly isNull: boolean;
@@ -340,7 +341,9 @@ export class Item<S extends Schema = Schema>
     return result;
   }
 
-  cloneData(onlyFields?: (keyof SchemaDataType<S>)[]): SchemaDataType<S> {
+  cloneData(
+    onlyFields?: (keyof SchemaDataType<S>)[],
+  ): Readwrite<SchemaDataType<S>> {
     return clone(this._schema, this._data, onlyFields);
   }
 
