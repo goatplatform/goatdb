@@ -103,7 +103,8 @@ export class SyncEndpoint implements Endpoint {
       () => services.db.repository(path)!.numberOfCommits(userSession),
       services.db.clientsForRepo(path),
       true,
-      path.startsWith('/sys/'),
+      false,
+      // path.startsWith('/sys/'),
     );
   }
 

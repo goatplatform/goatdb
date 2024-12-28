@@ -387,39 +387,45 @@ export async function decodeSession(
   };
 }
 
-export async function sessionToRecord(
+export async function sessionToItem(
   session: Session,
 ): Promise<Item<SchemaTypeSession>> {
   const encodedSession = await encodeSession(session);
-  return encodedSessionToRecord(encodedSession);
+  return encodedSessionToItem(encodedSession);
 }
 
-export async function sessionFromRecord(record: Item): Promise<Session> {
-  return await decodeSession(encodedSessionFromRecord(record));
+export async function sessionFromItem(
+  record: Item<SchemaTypeSession>,
+): Promise<Session> {
+  return await decodeSession(encodedSessionFromItem(record));
 }
 
-export function encodedSessionToRecord(
+export function encodedSessionToItem(
   encodedSession: EncodedSession,
 ): Item<SchemaTypeSession> {
-  const data = {
-    ...encodedSession,
-    publicKey: JSON.stringify(encodedSession.publicKey),
-    expiration: deserializeDate(encodedSession.expiration),
-  };
-  // Private keys don't exist in the Session scheme, but just to be extra
-  // cautious, we delete the field here as well.
-  delete (data as any).privateKey;
   return new Item<SchemaTypeSession>({
     schema: kSchemaSession,
-    data,
+    data: {
+      id: encodedSession.id,
+      owner: encodedSession.owner,
+      expiration: deserializeDate(encodedSession.expiration),
+      publicKey: JSON.stringify(encodedSession.publicKey),
+    },
   });
 }
 
-export function encodedSessionFromRecord(record: Item): EncodedSession {
-  const data = record.cloneData(['id', 'owner', 'publicKey', 'expiration']);
-  data.publicKey = JSON.parse(data.publicKey as string);
-  data.expiration = serializeDate(data.expiration as Date);
-  return data as EncodedSession;
+export function encodedSessionFromItem(
+  item: Item<SchemaTypeSession>,
+): EncodedSession {
+  const result: EncodedSession = {
+    id: item.get('id'),
+    publicKey: JSON.parse(item.get('publicKey')),
+    expiration: serializeDate(item.get('expiration')),
+  };
+  if (item.has('owner')) {
+    result.owner = item.get('owner');
+  }
+  return result;
 }
 
 interface RequestSignatureMetadata extends ReadonlyJSONObject {

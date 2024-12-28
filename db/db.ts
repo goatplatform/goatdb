@@ -1,5 +1,5 @@
 import * as path from 'std/path/mod.ts';
-import { Session, TrustPool } from './session.ts';
+import { Session, sessionFromItem, TrustPool } from './session.ts';
 import { Repository, RepositoryConfig } from '../repo/repo.ts';
 import { DBSettings, DBSettingsProvider } from './settings/settings.ts';
 import { FileSettings } from './settings/file.ts';
@@ -10,7 +10,11 @@ import { SyncScheduler } from '../net/sync-scheduler.ts';
 import { QueryPersistence } from '../repo/query-persistance.ts';
 import { QueryPersistenceFile } from './persistance/query-file.ts';
 import { ManagedItem } from './managed-item.ts';
-import { Schema, SchemaManager } from '../cfds/base/schema.ts';
+import {
+  Schema,
+  SchemaManager,
+  SchemaTypeSession,
+} from '../cfds/base/schema.ts';
 import {
   itemPath,
   itemPathGetPart,
@@ -339,7 +343,7 @@ export class GoatDB {
     data: SchemaDataType<S>,
   ): Promise<void> {
     const repo = await this.open(path);
-    let key = itemPathGetPart(path, ItemPathPart.Item);
+    let key = itemPathGetPart(path, 'item');
     if (key.length <= 0) {
       key = uniqueId();
     }
@@ -479,7 +483,14 @@ export class GoatDB {
     await this._createTrustPool();
     // Open /sys/sessions so all known sessions are properly loaded into our
     // new trust pool
-    await this.open('/sys/sessions');
+    const sessionsRepo = await this.open('/sys/sessions');
+    // Although the repository automatically adds new sessions to the trust
+    // pool, the initial bootstrapping must happen explicitly as the chain of
+    // sessions won't be loaded in the correct order.
+    for (const key of sessionsRepo.keys()) {
+      const s = sessionsRepo.valueForKey<SchemaTypeSession>(key)![0];
+      this._trustPool?.addSessionUnsafe(await sessionFromItem(s));
+    }
     // Open /sys/users so we can perform login and basic operations without
     // waiting
     await this.open('/sys/users');
@@ -608,6 +619,9 @@ export class GoatDB {
             c.ready = true;
             c.startSyncing();
           });
+        } else {
+          c.ready = true;
+          c.startSyncing();
         }
       }
       this._repoClients!.set(repoId, clients);

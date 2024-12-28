@@ -147,7 +147,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
       return;
     }
     const [doc, head] = repo.rebase(
-      itemPathGetPart(this.path, ItemPathPart.Item),
+      itemPathGetPart(this.path, 'item'),
       this._item,
       this._head,
     );
@@ -173,7 +173,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
     const repo = this.repository;
     if (!this._detachHandler && repo) {
       this._detachHandler = repo.attach('DocumentChanged', (key: string) => {
-        if (itemPathGetPart(this.path, ItemPathPart.Item) === key) {
+        if (itemPathGetPart(this.path, 'item') === key) {
           this.rebase();
         }
       });
@@ -200,7 +200,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
     this._commitInProgress = true;
     this._commitDelayTimer.unschedule();
     const currentDoc = this._item.clone();
-    const key = itemPathGetPart(this.path, ItemPathPart.Item);
+    const key = itemPathGetPart(this.path, 'item');
     const repo = await this.db.open(itemPathGetRepoId(this.path));
     const newHead = await repo.setValueForKey(key, currentDoc, this._head);
     if (newHead) {
@@ -221,9 +221,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
    * @param repo The repository to load from.
    */
   private loadInitialDoc(repo: Repository): void {
-    const entry = repo.valueForKey<S>(
-      itemPathGetPart(this.path, ItemPathPart.Item),
-    );
+    const entry = repo.valueForKey<S>(itemPathGetPart(this.path, 'item'));
     if (this.schema.ns === null) {
       if (entry) {
         // If our contents are still null, replace them with the item and schema

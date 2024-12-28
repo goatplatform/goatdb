@@ -1,13 +1,13 @@
 import {
   decodeSignature,
   EncodedSession,
-  encodedSessionFromRecord,
+  encodedSessionFromItem,
   encodeSession,
   OwnedSession,
   Session,
   SESSION_CRYPTO_KEY_GEN_PARAMS,
   sessionIdFromSignature,
-  sessionToRecord,
+  sessionToItem,
   signData,
   verifyData,
   verifyRequestSignature,
@@ -32,6 +32,7 @@ import { GoatDB } from '../../db/db.ts';
 import { coreValueCompare } from '../../base/core-types/comparable.ts';
 import { bsearch, bsearch_idx } from '../../base/algorithms.ts';
 import { itemPathGetPart, ItemPathPart } from '../../db/path.ts';
+import { ManagedItem } from '../../db/managed-item.ts';
 
 export const kAuthEndpointPaths = [
   '/auth/session',
@@ -188,16 +189,13 @@ export class AuthEndpoint implements Endpoint {
       return responseForError('AccessDenied');
     }
 
-    const { key: userKey, item: userItem } = await fetchUserByEmail(
-      services,
-      email,
-    );
+    const userItem = await fetchUserByEmail(services, email);
     // TODO (ofri): Rate limit this call
 
     // Unconditionally generate the signed token so this call isn't vulnerable
     // to timing attacks.
     const signedToken = await signData(services.settings.session, undefined, {
-      u: userKey || '',
+      u: itemPathGetPart(userItem?.path, 'item') || '',
       s: requestingSessionId,
       ts: Date.now(),
       sl: uniqueId(),
@@ -270,7 +268,7 @@ export class AuthEndpoint implements Endpoint {
       session.owner = userKey;
       sessionsRepo.setValueForKey(
         session.id,
-        await sessionToRecord(session),
+        await sessionToItem(session),
         sessionsRepo.headForKey(session.id),
       );
       // Let the updated session time to replicate
@@ -300,7 +298,7 @@ export async function persistSession(
   session: Session | OwnedSession,
 ): Promise<void> {
   const repo = await services.db.open('/sys/sessions');
-  const record = await sessionToRecord(session);
+  const record = await sessionToItem(session);
   await repo.setValueForKey(session.id, record, undefined);
   await services.db.flush('/sys/sessions');
 }
@@ -324,10 +322,7 @@ export async function fetchEncodedRootSessions(
 async function fetchUserByEmail(
   services: ServerServices,
   email: string,
-): Promise<{
-  key: string | undefined;
-  item: Item<SchemaTypeUser> | undefined;
-}> {
+): Promise<ManagedItem<SchemaTypeUser> | undefined> {
   email = normalizeEmail(email);
   const query = services.db.query({
     schema: kSchemaUser,
@@ -338,7 +333,7 @@ async function fetchUserByEmail(
   await query.loadingFinished();
   const results = query.results();
   const userIdx = bsearch_idx(results.length, (idx) =>
-    coreValueCompare(results[idx].item.get('email'), email),
+    coreValueCompare(results[idx].get('email'), email),
   );
   if (userIdx >= 0) {
     return results[userIdx];
@@ -348,22 +343,22 @@ async function fetchUserByEmail(
     const item = services.db.create('/sys/users', kSchemaUser, {
       email: email,
     });
-    const key = itemPathGetPart(item.path, ItemPathPart.Item);
-    return {
-      key,
-      item: services.db
-        .repository('/sys/users')!
-        .valueForKey<SchemaTypeUser>(key)![0],
-    };
+    const key = itemPathGetPart(item.path, 'item');
+    return services.db.item('/sys/users', key);
   }
-  return { key: undefined, item: undefined };
+  return undefined;
 }
 
 export async function fetchSessionById(
   services: ServerServices,
   sessionId: string,
 ): Promise<Session | undefined> {
-  return (await services.db.getTrustPool()).getSession(sessionId);
+  const tp = await services.db.getTrustPool();
+  const session = tp.getSession(sessionId);
+  if (!session) {
+    debugger;
+  }
+  return session;
 }
 
 export function fetchUserById(

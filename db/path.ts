@@ -2,12 +2,16 @@ import { Repository } from '../repo/repo.ts';
 
 export type RepoType = string;
 
-export enum ItemPathPart {
-  Type = 0,
-  Repository = 1,
-  Item = 2,
-  Embed = 3,
-}
+export const kItemPathParts = ['type', 'repo', 'item', 'embed'] as const;
+
+export type ItemPathPart = (typeof kItemPathParts)[number];
+
+// export enum ItemPathPart {
+//   Type = 0,
+//   Repository = 1,
+//   Item = 2,
+//   Embed = 3,
+// }
 
 export function itemPath<T extends RepoType>(
   type: T,
@@ -21,12 +25,30 @@ export function itemPath<T extends RepoType>(
 export function itemPathGetPart<T extends string>(
   path: string,
   part: ItemPathPart,
-): T {
+): T;
+
+export function itemPathGetPart<T extends string>(
+  path: undefined,
+  part: ItemPathPart,
+): undefined;
+
+export function itemPathGetPart<T extends string>(
+  path: string | undefined,
+  part: ItemPathPart,
+): T | undefined;
+
+export function itemPathGetPart<T extends string>(
+  path: string | undefined,
+  part: ItemPathPart,
+): T | undefined {
+  if (!path) {
+    return undefined;
+  }
   let start = 0;
   if (path[start] === '/') {
     ++start;
   }
-  for (let i = 0; i < part; ++i) {
+  for (let i = 0; i < kItemPathParts.indexOf(part); ++i) {
     while (start < path.length && path[start] !== '/') {
       ++start;
     }
@@ -46,8 +68,8 @@ export function itemPathGetPart<T extends string>(
 
 export function itemPathGetRepoId(path: string): string {
   return Repository.path(
-    itemPathGetPart(path, ItemPathPart.Type),
-    itemPathGetPart(path, ItemPathPart.Repository),
+    itemPathGetPart(path, 'type'),
+    itemPathGetPart(path, 'repo'),
   );
 }
 
@@ -69,10 +91,10 @@ export function itemPathNormalize(path: string): string {
     return path;
   }
   return itemPath(
-    itemPathGetPart(path, ItemPathPart.Type),
-    itemPathGetPart(path, ItemPathPart.Repository),
-    itemPathGetPart(path, ItemPathPart.Item),
-    itemPathGetPart(path, ItemPathPart.Embed),
+    itemPathGetPart(path, 'type'),
+    itemPathGetPart(path, 'repo'),
+    itemPathGetPart(path, 'item'),
+    itemPathGetPart(path, 'embed'),
   );
 }
 

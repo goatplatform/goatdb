@@ -2,7 +2,7 @@ import { Emitter } from '../base/emitter.ts';
 // import { BloomFilter } from '../base/bloom.ts';
 import {
   Session,
-  sessionFromRecord,
+  sessionFromItem,
   signCommit,
   TrustPool,
 } from '../db/session.ts';
@@ -21,6 +21,7 @@ import {
   kSchemaSession,
   Schema,
   SchemaEquals,
+  SchemaTypeSession,
 } from '../cfds/base/schema.ts';
 import { Commit, commitContentsIsDocument, DeltaContents } from './commit.ts';
 import { AdjacencyList } from '../base/adj-list.ts';
@@ -227,9 +228,6 @@ export class Repository<
     const { authorizer } = this;
     const commits = this.storage.commitsForKeyDesc(key);
     for (const c of commits) {
-      // if (!this._commitsCache.has(c.id)) {
-      //   this._runUpdatesOnNewCommit(c);
-      // }
       if (
         !session ||
         session.id === this.trustPool.currentSession.id ||
@@ -1398,12 +1396,12 @@ export class Repository<
     // Auto add newly discovered sessions to our trust pool
     if (commit.scheme?.ns === kSchemaSession.ns) {
       this._cachedHeadsByKey.delete(commit.key);
-      const headEntry = this.valueForKey(commit.key);
+      const headEntry = this.valueForKey<SchemaTypeSession>(commit.key);
       if (!headEntry) {
         return;
       }
       await this.trustPool.addSession(
-        await sessionFromRecord(headEntry[0]),
+        await sessionFromItem(headEntry[0]),
         commit,
       );
     }

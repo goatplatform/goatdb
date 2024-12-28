@@ -386,7 +386,7 @@ export class Query<
     const cachedPaths = new Set(cache?.results || []);
 
     const processPath = (path: string, stopHandle: () => void) => {
-      const key = itemPathGetPart(path, ItemPathPart.Item);
+      const key = itemPathGetPart(path, 'item');
       ++total;
       if (!this.isActive) {
         stopHandle();
