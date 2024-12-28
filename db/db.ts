@@ -38,7 +38,7 @@ import {
 } from '../base/json-log/json-log.ts';
 import { ReadonlyJSONObject, ReadonlyJSONValue } from '../base/interfaces.ts';
 import { BloomFilter } from '../cpp/bloom_filter.ts';
-import { QueryConfig, Query } from '../repo/query.ts';
+import { QueryConfig, Query, generateQueryId } from '../repo/query.ts';
 import { md51 } from '../external/md5.ts';
 import { sendLoginEmail } from '../net/rest-api.ts';
 import { normalizeEmail } from '../base/string.ts';
@@ -402,10 +402,11 @@ export class GoatDB {
   ): Query<IS, OS, CTX> {
     let id = config.id;
     if (!id) {
-      id = md51(
-        (config.predicate !== undefined
-          ? config.predicate.toString()
-          : 'undefined') + config.sortDescriptor?.toString(),
+      id = generateQueryId(
+        config.predicate,
+        config.sortDescriptor,
+        config.ctx,
+        config.schema?.ns,
       );
     }
     let q = this._openQueries.get(id);

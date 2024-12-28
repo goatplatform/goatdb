@@ -1,8 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useDB, useDBReady, useItem, useQuery } from '../../react/db.tsx';
 import { kSchemaTask, type SchemaTypeTask } from './schemas.ts';
 import setupSchemas from './schemas.ts';
-import { coreValueCompare } from '../../base/core-types/comparable.ts';
 
 // This is only temporary. In the near future schemas will be auto-registered
 // without an explicity call.
@@ -61,6 +60,7 @@ export function TaskItem({ path }: TaskItemProps) {
 }
 
 export function Contents() {
+  const [showChecked, setShowChecked] = useState(true);
   // Open a query that fetches all tasks sorted by their texts.
   // The hook will automatically trigger a re-render when changes are made
   // either locally or by remote users.
@@ -71,13 +71,26 @@ export function Contents() {
     // will automatically re-evaluate the query when the function changes.
     sortDescriptor: ({ left, right }) =>
       left.get('text').localeCompare(right.get('text')),
+    // Wheen feeding a predicate with external state, use the optional ctx value
+    predicate: ({ item, ctx }) => !item.get('done') || ctx.showChecked,
     // When set to true, the query will update with intermittent results as it
     // scans its source resulting in a more responsive UI
     showIntermittentResults: true,
+    ctx: {
+      showChecked,
+    },
   });
   return (
     <div>
       <Header />
+      <div>
+        <span>Show Checked</span>
+        <input
+          type="checkbox"
+          checked={showChecked}
+          onChange={(event) => setShowChecked(event.target.checked)}
+        />
+      </div>
       {query.results().map(({ path }) => (
         <div key={path}>
           <TaskItem path={path} />

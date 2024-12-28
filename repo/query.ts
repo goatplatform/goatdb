@@ -8,7 +8,7 @@ import { Schema } from '../cfds/base/schema.ts';
 import { BloomFilter } from '../base/bloom.ts';
 import { GoatDB } from '../db/db.ts';
 import { ReadonlyJSONValue } from '../base/interfaces.ts';
-import { isBrowser } from '../base/common.ts';
+import { isBrowser, uniqueId } from '../base/common.ts';
 import { CoroutineScheduler } from '../base/coroutine.ts';
 import { itemPathGetPart, itemPathJoin, ItemPathPart } from '../db/path.ts';
 import { ManagedItem } from '../db/managed-item.ts';
@@ -480,21 +480,21 @@ export class Query<
 
 const gGeneratedQueryIds = new Map<string, string>();
 
-function generateQueryId<
+export function generateQueryId<
   IS extends Schema = Schema,
   OS extends IS = IS,
   CTX extends ReadonlyJSONValue = ReadonlyJSONValue,
 >(
-  predicate: Predicate<IS, CTX>,
-  sortDescriptor?: SortDescriptor<OS, CTX>,
-  ctx?: CTX,
-  ns?: string | null,
+  predicate: Predicate<IS, CTX> | undefined,
+  sortDescriptor: SortDescriptor<OS, CTX> | undefined,
+  ctx: CTX | undefined,
+  ns: string | null | undefined,
 ): string {
-  const key =
-    predicate.toString() +
-    sortDescriptor?.toString() +
-    JSON.stringify(ctx) +
-    ns;
+  const baseId =
+    predicate !== undefined && sortDescriptor !== undefined
+      ? predicate?.toString() + sortDescriptor?.toString()
+      : 'null';
+  const key = baseId + JSON.stringify(ctx) + ns;
   let hash = gGeneratedQueryIds.get(key);
   if (!hash) {
     hash = md51(key);
