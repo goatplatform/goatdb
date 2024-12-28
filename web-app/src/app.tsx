@@ -67,8 +67,10 @@ export function Contents() {
   const query = useQuery({
     schema: kSchemaTask,
     source: '/data/tasks',
+    // Predicate and sort descriptor are expressed as plain functions. GoatDB
+    // will automatically re-evaluate the query when the function changes.
     sortDescriptor: ({ left, right }) =>
-      coreValueCompare(left.get('text'), right.get('text')),
+      left.get('text').localeCompare(right.get('text')),
     // When set to true, the query will update with intermittent results as it
     // scans its source resulting in a more responsive UI
     showIntermittentResults: true,
