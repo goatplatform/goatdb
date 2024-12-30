@@ -12,7 +12,7 @@ GoatDB also guarantees causal consistency, meaning changes are shared in the cor
 
 ## Getting Started
 
-[React Hooks](react/hooks.tsx)
+[React Hooks](docs/react.md)
 • [API Overview](docs/api.md)
 • [Architecture Overview](docs/architecture.md)
 • [Concepts](docs/concepts.md)
