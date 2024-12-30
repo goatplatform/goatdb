@@ -12,12 +12,13 @@ GoatDB also guarantees causal consistency, meaning changes are shared in the cor
 
 ## Getting Started
 
-[API Overview](docs/api.md)
+[React Hooks](react/hooks.tsx)
+• [API Overview](docs/api.md)
 • [Architecture Overview](docs/architecture.md)
 • [Concepts](docs/concepts.md)
-• [FAQ](docs/faq.md)
 • [Queries](docs/query.md)
 • [Schemas](docs/schema.md)
+• [FAQ](docs/faq.md)
 
 Check out [web-app/src/app.tsx](web-app/src/app.tsx) to get an idea of what it's like to build apps using GoatDB.
 
@@ -33,7 +34,9 @@ _**Caveats:**_ Currently the demo runs only on Mac and Linux. Windows support is
 
 An interactive debug server will then start on http://localhost:8080
 
-Follow the Issues tab to track progress toward v0.1.
+The first public release (v0.1) is targeted for Q1 2025. Progress is tracked in the Issues tab.
+
+Contact: ofri [at] goatdb.com.
 
 ## Why GoatDB?
 
@@ -77,10 +80,6 @@ GoatDB enables efficient telemetry collection for distributed systems with delta
 ## Project Status
 
 GoatDB has been production-tested in Ovvio’s real-time collaboration platform since January 2024 ([https://ovvio.io](https://ovvio.io)). This open-source release decouples the database core for broader adoption. Alongside this, an upcoming managed service platform will make deploying GoatDB even easier, offering features like one-click deployment, automated backups, and infrastructure-free operation for developers.
-
-The first public release (v0.1) is targeted for Q1 2025. Progress is tracked in the Issues tab.
-
-Contact: ofri [at] goatdb.com.
 
 ## Further Reading
 

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { useDB, useDBReady, useItem, useQuery } from '../../react/db.tsx';
+import { useDB, useDBReady, useItem, useQuery } from '../../react/hooks.tsx';
 import { kSchemaTask, type SchemaTypeTask } from './schemas.ts';
 import setupSchemas from './schemas.ts';
 
@@ -71,7 +71,7 @@ export function Contents() {
     // will automatically re-evaluate the query when the function changes.
     sortDescriptor: ({ left, right }) =>
       left.get('text').localeCompare(right.get('text')),
-    // Wheen feeding a predicate with external state, use the optional ctx value
+    // When feeding a predicate with external state, use the optional ctx value
     predicate: ({ item, ctx }) => !item.get('done') || ctx.showChecked,
     // When set to true, the query will update with intermittent results as it
     // scans its source resulting in a more responsive UI

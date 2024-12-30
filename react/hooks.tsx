@@ -39,6 +39,10 @@ export type UseItemOpts = {
 };
 
 export function useItem<S extends Schema>(
+  ...pathCompsOrOpts: string[]
+): ManagedItem<S>;
+
+export function useItem<S extends Schema>(
   opts: UseItemOpts,
   ...pathCompsOrOpts: string[]
 ): ManagedItem<S>;
@@ -46,10 +50,6 @@ export function useItem<S extends Schema>(
 export function useItem<S extends Schema>(
   path: string,
   opts: UseItemOpts,
-): ManagedItem<S>;
-
-export function useItem<S extends Schema>(
-  ...pathCompsOrOpts: string[]
 ): ManagedItem<S>;
 
 export function useItem<S extends Schema>(
@@ -86,32 +86,17 @@ export function useItem<S extends Schema>(
   return item;
 }
 
-export interface UseQueryOpts<
-  IS extends Schema,
-  CTX extends ReadonlyJSONValue,
-  OS extends IS = IS,
-> extends Omit<QueryConfig<IS, OS, CTX>, 'db'> {
-  showIntermittentResults?: boolean;
-}
-
-export function useQuery<
-  IS extends Schema,
-  CTX extends ReadonlyJSONValue,
-  OS extends IS = IS,
->(config: UseQueryOpts<IS, CTX, OS>): Query<IS, OS, CTX> {
-  const db = useDB();
-  const query = db.query(config);
-  const subscribe = useCallback(
-    (onStoreChange: () => void) => query.onResultsChanged(onStoreChange),
-    [query],
-  );
-  const getSnapshot = useCallback(() => query.results(), [query]);
-  useSyncExternalStore(subscribe, getSnapshot);
-  return query;
-}
-
+/**
+ * Represents the state of the loading process.
+ */
 export type DBReadyState = 'loading' | 'ready' | 'error';
 
+/**
+ * A hook for monitoring the DB's loading process. The hook triggers whenever
+ * the loading process changes its state.
+ *
+ * @returns The state of the loading process.
+ */
 export function useDBReady(): DBReadyState {
   const db = useDB();
   let error = false;
@@ -148,4 +133,31 @@ export function useDBReady(): DBReadyState {
     return db.ready ? 'ready' : 'loading';
   }, [db]);
   return useSyncExternalStore(subscribe, getSnapshot);
+}
+
+export interface UseQueryOpts<
+  IS extends Schema,
+  CTX extends ReadonlyJSONValue,
+  OS extends IS = IS,
+> extends Omit<QueryConfig<IS, OS, CTX>, 'db'> {
+  // If set to true, the hook will trigger with intermittent results while the
+  // initial scan executes. This results in more frequent UI updates which can
+  // lead to more responsive UI.
+  showIntermittentResults?: boolean;
+}
+
+export function useQuery<
+  IS extends Schema,
+  CTX extends ReadonlyJSONValue,
+  OS extends IS = IS,
+>(config: UseQueryOpts<IS, CTX, OS>): Query<IS, OS, CTX> {
+  const db = useDB();
+  const query = db.query(config);
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => query.onResultsChanged(onStoreChange),
+    [query],
+  );
+  const getSnapshot = useCallback(() => query.results(), [query]);
+  useSyncExternalStore(subscribe, getSnapshot);
+  return query;
 }

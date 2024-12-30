@@ -2,6 +2,22 @@
 
 The main API entry point is the `GoatDB` class from [db.ts](../db/db.ts).
 
+## Table of Contents
+
+- [GoatDB API](#goatdb-api)
+  - [Creating a new DB instance](#creating-a-new-db-instance)
+  - [Working with Repositories](#working-with-repositories)
+    - [Opening a Repository](#opening-a-repository)
+    - [Closing a Repository](#closing-a-repository)
+  - [Working with Items](#working-with-items)
+    - [Managed Item](#managed-item)
+      - [Reading a Field](#reading-a-field)
+      - [Writing a Field](#writing-a-field)
+      - [Listening to Updates](#listening-to-updates)
+    - [Bulk Loading](#bulk-loading)
+  - [Querying Items](#querying-items)
+    - [Accessing Query Results](#accessing-query-results)
+
 ## Creating a new DB instance
 
 ```javascript
