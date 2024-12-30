@@ -308,24 +308,18 @@ export class Repository<
     );
     // 2log[fpr](N) = K. Since FPR = 0.25, we're using 2log[4](N).
     const agreementSize = 2 * (Math.log2(graphSize) / Math.log2(4));
+    // We must consider the newest commits as leaves, otherwise we'd deadlock
+    // and not converge on all branches. These cases work out OK because the
+    // merge will take the latest commit per connection thus skipping
+    // temporary gaps in the graph.
     if (commitsForKey.length < agreementSize) {
-      // We must consider the newest commits as leaves, otherwise we'd deadlock
-      // and not converge on all branches. These cases work out OK because the
-      // merge will take the latest commit per connection thus skipping
-      // temporary gaps in the graph.
       return true;
     }
-    const dateCutoff = candidate.timestamp;
+    // For older commits we can consult their ancestors filter
     for (let i = 0; i <= agreementSize; ++i) {
       const c = commitsForKey[i];
-      if (c.timestamp <= dateCutoff) {
-        return c.session === this.trustPool.currentSession.id;
-      }
       if (!c.ancestorsFilter.has(id)) {
-        return (
-          c.session === this.trustPool.currentSession.id ||
-          !commitInGracePeriod(c)
-        );
+        return true;
       }
     }
     return false;

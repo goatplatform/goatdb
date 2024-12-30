@@ -16,6 +16,7 @@ import { Commit } from '../repo/commit.ts';
 import { SchemaManager } from '../cfds/base/schema.ts';
 import { assert } from '../base/error.ts';
 import { getGoatConfig } from '../server/config.ts';
+import { sleep } from '../base/time.ts';
 
 const COMMIT_SUBMIT_RETRY = 10;
 
@@ -255,8 +256,9 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
         trace: e.stack,
       });
       this._setIsOnline(false);
-      this._requestInProgress = false;
       return false;
+    } finally {
+      this._requestInProgress = false;
     }
 
     this._previousServerFilter = syncResp.filter;
