@@ -16,6 +16,14 @@
 #include "BloomFilter.hpp"
 #include "MurmurHash3.h"
 
+// Endianness check at compile time
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#error "Big endian systems are not supported for compilation"
+#elif defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || \
+    defined(__AARCH64EB__) || defined(_MIBSEB) || defined(__MIBSEB) || defined(__MIBSEB__)
+#error "Big endian systems are not supported for compilation"
+#endif
+
 static std::mt19937 _gGen{static_cast<std::mt19937::result_type>(
     std::chrono::system_clock::now().time_since_epoch().count())};
 static std::uniform_int_distribution<> _gDis(0, std::numeric_limits<int>::max());
@@ -66,28 +74,18 @@ BloomFilter::~BloomFilter()
 
 const char *BloomFilter::getInternalPointer() const
 {
-#if IS_BIG_ENDIAN
-    throw std::runtime_error("Big endian systems are not supported");
-#endif
     return reinterpret_cast<const char *>(internal);
 }
 
 char *BloomFilter::getMutableInternalPointer()
 {
-#if IS_BIG_ENDIAN
-    throw std::runtime_error("Big endian systems are not supported");
-#endif
     return reinterpret_cast<char *>(internal);
 }
 
-// Zero-copy constructor
 BloomFilter::BloomFilter(const char *buff)
 {
-#if IS_BIG_ENDIAN
-    throw std::runtime_error("Big endian systems are not supported");
-#endif
-    internal =
-        const_cast<BloomFilterSerialized *>(reinterpret_cast<const BloomFilterSerialized *>(buff));
+    internal = const_cast<BloomFilterSerialized *>(
+        reinterpret_cast<const BloomFilterSerialized *>(buff));
 }
 
 auto BloomFilter::hashString(const std::string &value, uint32_t seed) -> uint32_t
