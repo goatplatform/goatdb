@@ -1,3 +1,4 @@
+import * as path from 'std/path/mod.ts';
 import { shuffle } from './base/array.ts';
 import { uniqueId } from './base/common.ts';
 import { coreValueCompare } from './base/core-types/comparable.ts';
@@ -129,15 +130,17 @@ async function populateDB(db: GoatDB): Promise<void> {
   // console.log(`Edited ${editCount}`);
 }
 
-const REPO_FILE_PATH =
-  '/Users/ofri/Documents/ovvio/goatdb-test/test/notes.jsonl';
+const REPO_FILE_PATH = path.resolve('test_data/test/notes.jsonl');
 
-const DB_PATH = '/Users/ofri/Documents/ovvio/goatdb-test/';
+const DB_PATH = path.resolve('test_data/');
 
 export async function testsMain(): Promise<void> {
+  console.log(`Running benchmark at ${DB_PATH}`);
   const fileStart = performance.now();
-  await Deno.readFile(REPO_FILE_PATH);
-  console.log(`File read in ${(performance.now() - fileStart) / 1000} sec`);
+  try {
+    await Deno.readFile(REPO_FILE_PATH);
+    console.log(`File read in ${(performance.now() - fileStart) / 1000} sec`);
+  } catch (_: unknown) {}
   // await BloomFilter.initNativeFunctions();
   const db = new GoatDB({
     path: DB_PATH,
