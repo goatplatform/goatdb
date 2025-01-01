@@ -7,18 +7,24 @@ interface BloomFilterModule extends EmscriptenModule {
     ident: string,
     returnType: string,
     argTypes: string[],
-    args: (number | string | boolean)[],
+    args: (number | string | boolean)[]
   ) => R;
   cwrap: <R = number, A extends any[] = (number | string | boolean)[]>(
     ident: string,
     returnType: string,
-    argTypes: string[],
+    argTypes: string[]
   ) => (...args: A) => R;
   _malloc: (size: number) => number;
   _free: (ptr: number) => void;
   HEAPU8: Uint8Array;
   HEAPU32: Uint32Array;
   UTF8ToString: (ptr: number) => string;
+}
+
+function checkEndianness(): boolean {
+  const buffer = new ArrayBuffer(2);
+  new DataView(buffer).setInt16(0, 256, true);
+  return new Int16Array(buffer)[0] === 256;
 }
 
 declare global {
@@ -28,6 +34,9 @@ declare global {
 let moduleLoadPromise: Promise<void>;
 
 function initializeModule(): Promise<void> {
+  if (!checkEndianness()) {
+    throw new Error('This application requires a little-endian system');
+  }
   if (!moduleLoadPromise) {
     moduleLoadPromise = (async () => {
       const wasmUrl =
@@ -35,14 +44,14 @@ function initializeModule(): Promise<void> {
           ? new URL('/__system_assets/bloom_filter.wasm', self.location.href)
           : new URL(
               '../assets/__system_assets/bloom_filter.wasm',
-              import.meta.url,
+              import.meta.url
             );
       const jsUrl =
         self.Deno === undefined
           ? new URL('/__system_assets/bloom_filter.js', self.location.href)
           : new URL(
               '../assets/__system_assets/bloom_filter.js',
-              import.meta.url,
+              import.meta.url
             );
 
       const wasmResponse = await fetch(wasmUrl);
@@ -75,7 +84,7 @@ export class BloomFilter {
   private static create_bloom_filter: (
     size: number,
     fpr: number,
-    _ptr: number,
+    _ptr: number
   ) => number;
   private static add_to_filter: (ptr: number, str: string) => void;
   private static check_in_filter: (ptr: number, str: string) => number;
@@ -90,6 +99,10 @@ export class BloomFilter {
   private static get_bloom_filter_number_of_hashes: (data: number) => number;
 
   static async initNativeFunctions(): Promise<void> {
+    if (!checkEndianness()) {
+      throw new Error('This application requires a little-endian system');
+    }
+
     if (!this.create_bloom_filter) {
       await initializeModule();
       this.create_bloom_filter = Module.cwrap('createBloomFilter', 'number', [
@@ -100,7 +113,7 @@ export class BloomFilter {
       this.create_bloom_filter_from_data = Module.cwrap(
         'createBloomFilterFromData',
         'number',
-        ['number'],
+        ['number']
       );
       this.add_to_filter = Module.cwrap('addToFilter', 'void', [
         'number',
@@ -116,17 +129,17 @@ export class BloomFilter {
       this.get_bloom_filter_pointer = Module.cwrap(
         'getBloomFilterPointer',
         'number',
-        ['number'],
+        ['number']
       );
       this.get_bloom_filter_size = Module.cwrap(
         'getBloomFilterSize',
         'number',
-        ['number'],
+        ['number']
       );
       this.get_bloom_filter_number_of_hashes = Module.cwrap(
         'getBloomFilterNumberOfHashes',
         'number',
-        ['number'],
+        ['number']
       );
       this._malloc = Module._malloc;
       this._free = Module._free;
@@ -199,7 +212,7 @@ export class BloomFilter {
 
     if (filterPtr === 0) {
       throw new Error(
-        `Failed to create BloomFilter from data with pointer ${ptr}`,
+        `Failed to create BloomFilter from data with pointer ${ptr}`
       );
     }
 

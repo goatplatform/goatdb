@@ -88,7 +88,7 @@ function changeText(text: string): string {
     textWords.splice(
       randomInt(0, textWords.length),
       0,
-      kWords[randomInt(0, kWords.length)],
+      kWords[randomInt(0, kWords.length)]
     );
   }
   return textWords.join(' ');
@@ -130,7 +130,7 @@ async function populateDB(db: GoatDB): Promise<void> {
 }
 
 const REPO_FILE_PATH =
-  '/Users/ofri/Documents/ovvio/goatdb-test/test/notes.jsonl';
+  '/Users/ofri/Documents/ovvio/goatdb-test/test/notes1M.jsonl';
 
 const DB_PATH = '/Users/ofri/Documents/ovvio/goatdb-test/';
 
@@ -154,7 +154,7 @@ export async function testsMain(): Promise<void> {
       .numberOfCommits()
       .toLocaleString()}\n# Keys = ${repo.storage
       .numberOfKeys()
-      .toLocaleString()}`,
+      .toLocaleString()}`
   );
 
   if (repo.numberOfCommits() === 0) {
@@ -166,7 +166,7 @@ export async function testsMain(): Promise<void> {
     console.log(
       `Populating repo ended. Took ${populatingTime / 1000} sec, avg ${
         populatingTime / ITEM_COUNT
-      }ms/item`,
+      }ms/item`
     );
   } else {
     // const editCount = await editDB(db, 0.5);
@@ -193,7 +193,7 @@ export async function testsMain(): Promise<void> {
   console.log(
     `Reading ${keys.length.toLocaleString()} items took ${
       readTime / 1000
-    } sec. Avg ${readTime / keys.length} ms / key`,
+    } sec. Avg ${readTime / keys.length} ms / key`
   );
 
   // debugger;
@@ -247,7 +247,7 @@ export async function testsMain(): Promise<void> {
   console.log(
     `Query finished in ${
       (performance.now() - queryStart) / queryIter
-    } ms.\n# Results = ${prevCount}`,
+    } ms.\n# Results = ${prevCount}`
   );
 
   // Deno.exit();

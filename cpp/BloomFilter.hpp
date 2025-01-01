@@ -5,19 +5,11 @@
 #include <stdexcept>
 #include <string>
 
-// TODO: check these preprocessor directives..
 #if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-#define IS_BIG_ENDIAN 1
-#elif defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-#define IS_BIG_ENDIAN 0
+#error "Big endian systems are not supported for compilation"
 #elif defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || \
     defined(__AARCH64EB__) || defined(_MIBSEB) || defined(__MIBSEB) || defined(__MIBSEB__)
-#define IS_BIG_ENDIAN 1
-#elif defined(__LITTLE_ENDIAN__) || defined(__ARMEL__) || defined(__THUMBEL__) || \
-    defined(__AARCH64EL__) || defined(_MIPSEL) || defined(__MIPSEL) || defined(__MIPSEL__)
-#define IS_BIG_ENDIAN 0
-#else
-#error "Unable to determine endianness, manual configuration required"
+#error "Big endian systems are not supported for compilation"
 #endif
 
 class FalsePositiveRate
