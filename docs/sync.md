@@ -37,9 +37,9 @@ $$\text{cycles} = 2 \cdot \log_{\text{fpr}}(\max(M, N))$$
 
 This formula allows the system to trade increased overhead for reduced latency or vice versa.
 
-## Minimal Example of Synchronization
+## Example of Synchronization
 
-Here is a minimal example of how synchronization works between two nodes:
+Here is an example of how synchronization works between two nodes:
 
 ### Initial State
 
