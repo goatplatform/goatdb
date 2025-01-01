@@ -16,14 +16,6 @@
 #include "BloomFilter.hpp"
 #include "MurmurHash3.h"
 
-// Endianness check at compile time
-#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-#error "Big endian systems are not supported for compilation"
-#elif defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || \
-    defined(__AARCH64EB__) || defined(_MIBSEB) || defined(__MIBSEB) || defined(__MIBSEB__)
-#error "Big endian systems are not supported for compilation"
-#endif
-
 static std::mt19937 _gGen{static_cast<std::mt19937::result_type>(
     std::chrono::system_clock::now().time_since_epoch().count())};
 static std::uniform_int_distribution<> _gDis(0, std::numeric_limits<int>::max());
