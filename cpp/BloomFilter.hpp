@@ -6,10 +6,10 @@
 #include <string>
 
 #if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-#error "Big endian systems are not supported for compilation"
+#error "TODO: Big Endian support"
 #elif defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || \
     defined(__AARCH64EB__) || defined(_MIBSEB) || defined(__MIBSEB) || defined(__MIBSEB__)
-#error "Big endian systems are not supported for compilation"
+#error "TODO: Big Endian support"
 #endif
 
 class FalsePositiveRate
