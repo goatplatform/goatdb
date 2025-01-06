@@ -6,7 +6,7 @@ import {
 } from '../base/core-types/base.ts';
 import { Item } from '../cfds/base/item.ts';
 import { Edit } from '../cfds/base/edit.ts';
-import {
+import type {
   ConstructorDecoderConfig,
   Decodable,
   Decoder,
@@ -15,19 +15,17 @@ import { isDecoderConfig } from '../base/core-types/encoding/utils.ts';
 import { uniqueId } from '../base/common.ts';
 import { coreValueEquals } from '../base/core-types/equals.ts';
 import { assert } from '../base/error.ts';
-import { Schema, SchemaManager } from '../cfds/base/schema.ts';
-import { VersionNumber } from '../base/version-number.ts';
+import { type Schema, SchemaManager } from '../cfds/base/schema.ts';
+import type { VersionNumber } from '../base/version-number.ts';
 import { getGoatConfig } from '../server/config.ts';
-import { Comparable, coreValueCompare } from '../base/core-types/index.ts';
-import { ReadonlyJSONArray, ReadonlyJSONObject } from '../base/interfaces.ts';
+import { type Comparable, coreValueCompare } from '../base/core-types/index.ts';
+import type { ReadonlyJSONObject } from '../base/interfaces.ts';
 import {
   JSONCyclicalDecoder,
   JSONCyclicalEncoder,
 } from '../base/core-types/encoding/json.ts';
 // import { BloomFilter } from '../base/bloom.ts';
 import { BloomFilter } from '../cpp/bloom_filter.ts';
-import { encodeBase64 } from 'std/encoding/base64.ts';
-import { decodeBase64 } from '../base/buffer.ts';
 
 export type CommitResolver = (commitId: string) => Commit;
 

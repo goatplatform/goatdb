@@ -1,4 +1,4 @@
-import * as path from 'std/path/mod.ts';
+import * as path from 'std/path';
 import { shuffle } from './base/array.ts';
 import { uniqueId } from './base/common.ts';
 import { coreValueCompare } from './base/core-types/comparable.ts';

@@ -5,7 +5,7 @@ import {
   S3Client,
 } from 'npm:@aws-sdk/client-s3';
 import { Upload } from 'npm:@aws-sdk/lib-storage';
-import * as path from 'std/path/mod.ts';
+import * as path from 'std/path';
 import { defaultAssetsBuild } from './generate-static-assets.ts';
 import { VCurrent } from '../base/version-number.ts';
 import { getRepositoryPath } from '../base/development.ts';

@@ -1,4 +1,4 @@
-import * as path from 'std/path/mod.ts';
+import * as path from 'std/path';
 import { JSONCyclicalEncoder } from '../../base/core-types/encoding/json.ts';
 import { assert } from '../../base/error.ts';
 import { JSONLogFile } from '../../base/json-log.ts';

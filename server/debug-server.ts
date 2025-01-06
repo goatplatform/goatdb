@@ -1,5 +1,5 @@
 import yargs from 'yargs';
-import * as path from 'std/path/mod.ts';
+import * as path from 'std/path';
 import { SimpleTimer } from '../base/timer.ts';
 import { tuple4Get, tuple4Set } from '../base/tuple.ts';
 import { VersionNumber } from '../base/version-number.ts';

@@ -1,6 +1,6 @@
 // @deno-types="https://deno.land/x/esbuild@v0.19.2/mod.d.ts"
 import * as esbuild from 'esbuild';
-import * as path from 'std/path/mod.ts';
+import * as path from 'std/path';
 import { assert, notReached } from './base/error.ts';
 import { retry } from './base/time.ts';
 import { getImportMapPath, getRepositoryPath } from './base/development.ts';

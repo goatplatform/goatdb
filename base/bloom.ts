@@ -1,15 +1,15 @@
-import { encodeBase64 } from 'std/encoding/base64.ts';
+import { encodeBase64 } from 'std/encoding';
 import { assert } from './error.ts';
 import { MurmurHash3 } from './hash.ts';
-import { CoreValue, Encodable, Encoder } from './core-types/base.ts';
+import type { CoreValue, Encodable, Encoder } from './core-types/base.ts';
 import {
-  ConstructorDecoderConfig,
-  Decodable,
-  DecodedValue,
-  Decoder,
+  type ConstructorDecoderConfig,
+  type Decodable,
+  type DecodedValue,
+  type Decoder,
   isDecoderConfig,
 } from './core-types/encoding/index.ts';
-import { ReadonlyJSONObject } from './interfaces.ts';
+import type { ReadonlyJSONObject } from './interfaces.ts';
 import { allocateBuffer, cacheBufferForReuse } from './buffer.ts';
 import { decodeBase64 } from './buffer.ts';
 
@@ -139,7 +139,7 @@ export class BloomFilter implements Encodable, Decodable {
   /**
    * Returns the number of bytes the filter occupies.
    */
-  get byteSize() {
+  get byteSize(): number {
     return this._filter.byteSize;
   }
 

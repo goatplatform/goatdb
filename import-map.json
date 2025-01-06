@@ -1,7 +1,10 @@
 {
   "imports": {
     "global.d.ts": "./global.d.ts",
-    "std/": "https://deno.land/std@0.220.1/",
+    "std/path": "jsr:@std/path@^1.0.8",
+    "std/fs": "jsr:@std/fs@^1.0.8",
+    "std/data_structures": "jsr:@std/data-structures@^1.0.5",
+    "std/encoding": "jsr:@std/encoding@^1.0.6",
     "direction": "https://unpkg.com/direction@1.0.3",
     "yargs": "https://deno.land/x/yargs@v17.7.2-deno/deno.ts",
     "esbuild": "https://deno.land/x/esbuild@v0.19.12/mod.js",
@@ -12,7 +15,7 @@
     "react-router-dom": "https://esm.sh/react-router-dom@6.20",
     "react-router": "https://esm.sh/react-router@6.20.0",
     "react-reconciler": "https://esm.sh/react-reconciler@0.29.0",
-    "react": "https://esm.sh/react@18.2.0",
-    "react-jss": "https://esm.sh/react-jss@10.10.0"
+    "react": "npm:react@18.2.0",
+    "react-jss": "npm:react-jss@10.10.0"
   }
 }

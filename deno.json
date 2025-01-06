@@ -9,5 +9,12 @@
     "lineWidth": 80,
     "indentWidth": 2,
     "singleQuote": true
+  },
+  "name": "@goatdb/goatdb",
+  "version": "0.0.1",
+  "license": "AGPL/ELV2",
+  "exports": {
+    ".": "./mod.ts",
+    "./react": "./react/hooks.tsx"
   }
 }

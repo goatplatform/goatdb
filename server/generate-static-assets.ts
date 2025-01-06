@@ -1,6 +1,6 @@
 // @deno-types="https://deno.land/x/esbuild@v0.19.2/mod.d.ts"
 import * as esbuild from 'esbuild';
-import * as path from 'std/path/mod.ts';
+import * as path from 'std/path';
 import { getRepositoryPath } from '../base/development.ts';
 import { VCurrent, VersionNumber } from '../base/version-number.ts';
 import {

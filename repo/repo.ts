@@ -34,7 +34,7 @@ import { CoroutineScheduler } from '../base/coroutine.ts';
 import { SchedulerPriority } from '../base/coroutine.ts';
 import { CONNECTION_ID } from './commit.ts';
 import { compareStrings } from '../base/string.ts';
-import { RedBlackTree } from 'std/data_structures/red_black_tree.ts';
+import { RedBlackTree } from 'std/data_structures';
 import { AuthRule, GoatDB } from '../db/db.ts';
 // import { BloomFilter } from '../base/bloom.ts';
 import { BloomFilter } from '../cpp/bloom_filter.ts';
@@ -155,7 +155,7 @@ export class Repository<
     return id;
   }
 
-  static readonly sysDirId = this.path('sys', 'dir');
+  static readonly sysDirId: string = this.path('sys', 'dir');
 
   get orgId(): string {
     return this.trustPool.orgId;

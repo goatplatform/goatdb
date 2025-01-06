@@ -1,4 +1,4 @@
-import * as path from 'std/path/mod.ts';
+import * as path from 'std/path';
 
 export function toAbsolutePath(p: string): string {
   if (path.isAbsolute(p)) {

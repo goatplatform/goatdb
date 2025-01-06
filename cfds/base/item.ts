@@ -354,7 +354,7 @@ export class Item<S extends Schema = Schema>
     this.invalidateCaches();
   }
 
-  diff(other: Item<S>, byCharacter?: boolean) {
+  diff(other: Item<S>, byCharacter?: boolean): DataChanges {
     assert(other instanceof Item);
     this.normalize();
     other.normalize();

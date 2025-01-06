@@ -238,7 +238,7 @@ export class SchemaManager {
    * The default manager. Unless explicitly specified, GoatDB will default to
    * this manager.
    */
-  static readonly default = new this();
+  static readonly default: SchemaManager = new this();
 
   /**
    * Initialize a new schemaManager.

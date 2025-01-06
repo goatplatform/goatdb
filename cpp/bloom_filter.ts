@@ -1,6 +1,5 @@
-// @deno-types="https://raw.githubusercontent.com/DefinitelyTyped/DefinitelyTyped/master/types/emscripten/index.d.ts"
-import { encodeBase64 } from 'std/encoding/base64.ts';
-import type { EmscriptenModule } from 'https://raw.githubusercontent.com/DefinitelyTyped/DefinitelyTyped/master/types/emscripten/index.d.ts';
+import { encodeBase64 } from 'std/encoding';
+import type { EmscriptenModule } from './emscripten.d.ts';
 
 interface BloomFilterModule extends EmscriptenModule {
   ccall: <R = number | string | boolean | void>(
@@ -21,9 +20,7 @@ interface BloomFilterModule extends EmscriptenModule {
   UTF8ToString: (ptr: number) => string;
 }
 
-declare global {
-  let Module: BloomFilterModule;
-}
+let Module: BloomFilterModule;
 
 let moduleLoadPromise: Promise<void>;
 

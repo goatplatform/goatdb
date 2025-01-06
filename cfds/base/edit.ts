@@ -1,22 +1,19 @@
 import {
-  DataChanges,
-  DecodedDataChange,
+  type DataChanges,
+  type DecodedDataChange,
   decodedDataChanges,
 } from './object.ts';
-import { Schema, SchemaManager } from './schema.ts';
-import { JSONValue, ReadonlyJSONObject } from '../../base/interfaces.ts';
+import { type Schema, SchemaManager } from './schema.ts';
+import type { JSONValue, ReadonlyJSONObject } from '../../base/interfaces.ts';
 import {
   JSONCyclicalDecoder,
   JSONCyclicalEncoder,
-  JSONDecoder,
-  JSONEncoder,
 } from '../../base/core-types/encoding/json.ts';
 import {
-  ConstructorDecoderConfig,
-  Decoder,
+  type ConstructorDecoderConfig,
   isDecoderConfig,
 } from '../../base/core-types/encoding/index.ts';
-import {
+import type {
   Clonable,
   Encodable,
   Encoder,
@@ -90,7 +87,7 @@ export class Edit implements Encodable, Equatable, Clonable {
     });
   }
 
-  get affectedKeys() {
+  get affectedKeys(): Iterable<string> {
     return Object.keys(this.changes);
   }
 

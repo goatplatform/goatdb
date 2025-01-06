@@ -1,5 +1,5 @@
 import { assert } from './error.ts';
-import { decodeBase32, encodeBase32 } from 'std/encoding/base32.ts';
+import { decodeBase32, encodeBase32 } from 'std/encoding';
 
 export function splice(
   str: string,
