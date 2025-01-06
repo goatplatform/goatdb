@@ -52,7 +52,7 @@ function initializeModule(): Promise<void> {
         const localModule = {
           wasmBinary,
           onRuntimeInitialized: () => {
-            (globalThis as any).Module = localModule;
+            Module = localModule as unknown as BloomFilterModule;
             resolve();
           },
         };
