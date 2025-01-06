@@ -37,7 +37,7 @@ import {
   startJSONLogWorkerIfNeeded,
 } from '../base/json-log/json-log.ts';
 import { ReadonlyJSONObject, ReadonlyJSONValue } from '../base/interfaces.ts';
-import { BloomFilter } from '../cpp/bloom_filter.ts';
+// import { BloomFilter } from '../cpp/bloom_filter.ts';
 import { QueryConfig, Query, generateQueryId } from '../repo/query.ts';
 import { md51 } from '../external/md5.ts';
 import { sendLoginEmail } from '../net/rest-api.ts';
@@ -45,6 +45,7 @@ import { normalizeEmail } from '../base/string.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
 import { FileImplOPFS } from '../base/json-log/file-impl-opfs.ts';
 import { assert } from '../base/error.ts';
+import { BloomFilter } from '../base/bloom.ts';
 
 /**
  * Denotes the type of the requested operation.
@@ -547,7 +548,7 @@ export class GoatDB {
     repoId: string,
     opts?: OpenOptions,
   ): Promise<Repository> {
-    await BloomFilter.initNativeFunctions();
+    // await BloomFilter.initNativeFunctions();
     repoId = Repository.normalizePath(repoId);
     let trustPool: TrustPool;
     // Special Case: skip the call to loadSysSessions() when loading user

@@ -24,8 +24,8 @@ import {
   JSONCyclicalDecoder,
   JSONCyclicalEncoder,
 } from '../base/core-types/encoding/json.ts';
-// import { BloomFilter } from '../base/bloom.ts';
-import { BloomFilter } from '../cpp/bloom_filter.ts';
+import { BloomFilter } from '../base/bloom.ts';
+// import { BloomFilter } from '../cpp/bloom_filter.ts';
 
 export type CommitResolver = (commitId: string) => Commit;
 
@@ -259,7 +259,8 @@ export class Commit implements Encodable, Decodable, Equatable, Comparable {
       encoder.set('p', parents);
     }
     if (this._ancestorsFilter) {
-      encoder.set('af', this.ancestorsFilter.serialize());
+      // encoder.set('af', this.ancestorsFilter.serialize());
+      encoder.set('af', this.ancestorsFilter);
     }
     if (this._ancestorsCount) {
       encoder.set('ac', this.ancestorsCount);
@@ -364,13 +365,13 @@ export class Commit implements Encodable, Decodable, Equatable, Comparable {
     this._session = decoder.get<string>('s')!;
     this._timestamp = decoder.get<number>('ts') || Date.now();
     this._parents = decoder.get<string[]>('p');
-    // const filterDecoder = decoder.getDecoder('af');
-    this._ancestorsFilter = decoder.has('af')
-      ? BloomFilter.deserialize(decoder.get<string>('af')!)
-      : undefined;
-    // if (filterDecoder instanceof JSONCyclicalDecoder) {
-    //   filterDecoder.finalize();
-    // }
+    // this._ancestorsFilter = decoder.has('af')
+    //   ? BloomFilter.deserialize(decoder.get<string>('af')!)
+    //   : undefined;
+    const filterDecoder = decoder.getDecoder('af');
+    if (filterDecoder instanceof JSONCyclicalDecoder) {
+      filterDecoder.finalize();
+    }
     this._ancestorsCount = decoder.get<number>('ac');
     const contentsDecoder = decoder.getDecoder('c');
     this._contents = commitContentsDeserialize(
