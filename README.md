@@ -29,9 +29,7 @@ Check out [web-app/src/app.tsx](web-app/src/app.tsx) to get an idea of what it's
 _**Caveats:**_ Currently the demo runs only on Mac and Linux. Windows support is in the works.
 
 1. Install [Deno](https://docs.deno.com/runtime/getting_started/installation/)
-2. Checkout this repository.
-3. `cd` into the checked out repo.
-4. Run `deno run -A server/debug-server.ts -d /path/to/data/dir`
+2. Run `deno run -A server/debug-server.ts -d /path/to/data/dir`
 
 An interactive debug server will then start on http://localhost:8080
 
