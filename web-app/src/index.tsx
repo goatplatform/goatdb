@@ -1,5 +1,5 @@
 import React from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot } from 'npm:react-dom@19.0.0/client';
 import { App } from './app.tsx';
 
 const domNode = document.getElementById('root')!;

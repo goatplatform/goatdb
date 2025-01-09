@@ -1,5 +1,5 @@
-// @deno-types="https://deno.land/x/esbuild@v0.19.2/mod.d.ts"
-import * as esbuild from 'esbuild';
+import * as esbuild from 'npm:esbuild@0.20.2';
+import { denoPlugins } from 'jsr:@luca/esbuild-deno-loader';
 import * as path from 'std/path';
 import { getRepositoryPath } from '../base/development.ts';
 import { VCurrent, VersionNumber } from '../base/version-number.ts';
@@ -7,7 +7,6 @@ import {
   ReBuildContext,
   isReBuildContext,
   ENTRY_POINTS,
-  createOvvioImportPlugin,
   bundleResultFromBuildResult,
 } from '../build.ts';
 import {
@@ -48,7 +47,11 @@ export async function buildAssets(
     : bundleResultFromBuildResult(
         await ctx.build({
           entryPoints: ENTRY_POINTS,
-          plugins: [await createOvvioImportPlugin()],
+          plugins: [
+            ...denoPlugins({
+              configPath: `${await getRepositoryPath()}/deno.json`,
+            }),
+          ],
           bundle: true,
           write: false,
           sourcemap: 'linked',

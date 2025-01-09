@@ -1,10 +1,9 @@
-import { walk } from 'std/fs/walk.ts';
-import { exists } from 'std/fs/mod.ts';
-import { extname } from 'std/path/mod.ts';
+import { walk, exists } from 'std/fs';
+import { extname } from 'std/path';
 import { Endpoint, ServerServices } from './server.ts';
 import { getRequestPath } from './utils.ts';
 import { JSONObject, ReadonlyJSONObject } from '../../base/interfaces.ts';
-import { decodeBase64, encodeBase64 } from 'std/encoding/base64.ts';
+import { decodeBase64, encodeBase64 } from 'std/encoding';
 
 const STATIC_ASSETS_CACHE_DURATION_SEC = 86400;
 

@@ -1,6 +1,6 @@
 import yargs from 'yargs';
 import * as path from 'std/path';
-import { decodeBase64Url } from 'std/encoding/base64url.ts';
+import { decodeBase64Url } from 'std/encoding';
 import { Dictionary } from '../../base/collections/dict.ts';
 import {
   log,

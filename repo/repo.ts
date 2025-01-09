@@ -34,10 +34,10 @@ import { CoroutineScheduler } from '../base/coroutine.ts';
 import { SchedulerPriority } from '../base/coroutine.ts';
 import { CONNECTION_ID } from './commit.ts';
 import { compareStrings } from '../base/string.ts';
-import { RedBlackTree } from 'std/data_structures';
+import { RedBlackTree } from '@std/data-structures';
 import { AuthRule, GoatDB } from '../db/db.ts';
-// import { BloomFilter } from '../base/bloom.ts';
-import { BloomFilter } from '../cpp/bloom_filter.ts';
+import { BloomFilter } from '../base/bloom.ts';
+// import { BloomFilter } from '../cpp/bloom_filter.ts';
 import { itemPathJoin } from '../db/path.ts';
 
 export type EventDocumentChanged = 'DocumentChanged';

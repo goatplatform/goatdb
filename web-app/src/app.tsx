@@ -1,5 +1,6 @@
+// @deno-types="npm:@types/react"
 import React, { useRef, useState } from 'react';
-import { useDB, useDBReady, useItem, useQuery } from '../../react/hooks.tsx';
+import { useDB, useDBReady, useItem, useQuery } from '../../react/hooks.ts';
 import { kSchemaTask, type SchemaTypeTask } from './schemas.ts';
 import setupSchemas from './schemas.ts';
 

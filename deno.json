@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "lib": ["dom", "dom.iterable", "dom.asynciterable", "deno.ns"]
+    "lib": ["dom", "dom.iterable", "dom.asynciterable", "deno.ns"],
+    "jsx": "precompile"
   },
-  "importMap": "./import-map.json",
   "lock": false,
   "fmt": {
     "useTabs": false,
@@ -15,6 +15,16 @@
   "license": "AGPL/ELV2",
   "exports": {
     ".": "./mod.ts",
-    "./react": "./react/hooks.tsx"
+    "./react": "./react/hooks.ts"
+  },
+  "imports": {
+    "@std/data-structures": "jsr:@std/data-structures@^1.0.5",
+    "std/path": "jsr:@std/path@^1.0.8",
+    "std/fs": "jsr:@std/fs@^1.0.8",
+    "std/encoding": "jsr:@std/encoding@^1.0.6",
+    "react": "npm:react@19.0.0",
+    "react-jss": "npm:react-jss@10.10.0",
+    "yargs": "npm:yargs@17.7.2",
+    "esbuild": "npm:esbuild"
   }
 }
