@@ -1,4 +1,4 @@
-import * as path from 'std/path';
+import * as path from '@std/path';
 import { assert } from '../error.ts';
 import { JSONObject, ReadonlyJSONObject } from '../interfaces.ts';
 import { SerialScheduler } from '../serial-scheduler.ts';

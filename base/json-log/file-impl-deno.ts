@@ -1,4 +1,4 @@
-import * as path from 'std/path';
+import * as path from '@std/path';
 import { FileImpl } from './file-impl-interface.ts';
 
 export const FileImplDeno: FileImpl<Deno.FsFile> = {

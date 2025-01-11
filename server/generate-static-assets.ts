@@ -1,18 +1,18 @@
 import * as esbuild from 'npm:esbuild@0.20.2';
 import { denoPlugins } from 'jsr:@luca/esbuild-deno-loader';
-import * as path from 'std/path';
+import * as path from '@std/path';
 import { getRepositoryPath } from '../base/development.ts';
 import { VCurrent, VersionNumber } from '../base/version-number.ts';
 import {
   ReBuildContext,
   isReBuildContext,
-  ENTRY_POINTS,
   bundleResultFromBuildResult,
 } from '../build.ts';
 import {
+  APP_ENTRY_POINT,
+  Asset,
   StaticAssets,
   compileAssetsDirectory,
-  kEntryPointsNames,
   staticAssetsToJS,
 } from '../net/server/static-assets.ts';
 import { getGoatConfig } from './config.ts';
@@ -38,7 +38,9 @@ function generateConfigSnippet(
 
 export async function buildAssets(
   ctx: ReBuildContext | typeof esbuild,
+  entryPoints: { in: string; out: string }[],
   version: VersionNumber,
+  assetsDir?: string,
   serverURL?: string,
   orgId?: string,
 ): Promise<StaticAssets> {
@@ -46,7 +48,7 @@ export async function buildAssets(
     ? ctx.rebuild()
     : bundleResultFromBuildResult(
         await ctx.build({
-          entryPoints: ENTRY_POINTS,
+          entryPoints,
           plugins: [
             ...denoPlugins({
               configPath: `${await getRepositoryPath()}/deno.json`,
@@ -59,59 +61,87 @@ export async function buildAssets(
         }),
       ));
 
+  debugger;
   const repoPath = await getRepositoryPath();
-  const result = {} as StaticAssets;
+  // System assets are always included and are placed at the root
+  const result: StaticAssets = await compileAssetsDirectory(
+    path.join(repoPath, 'assets'),
+  );
   const textEncoder = new TextEncoder();
-  for (const ep of kEntryPointsNames) {
-    const { source, map } = buildResults[ep];
-    const assets = await compileAssetsDirectory(
-      path.join(repoPath, 'assets'),
-      path.join(repoPath, ep, 'assets'),
-    );
-    assets['/app.js'] = {
+  // For app code, include html and css files
+  if (Object.hasOwn(buildResults, APP_ENTRY_POINT)) {
+    const { source, map } = buildResults[APP_ENTRY_POINT];
+    if (assetsDir) {
+      // User provided assets are placed under /assets/
+      Object.assign(result, await compileAssetsDirectory(assetsDir, '/assets'));
+    }
+    result['/app.js'] = {
       data: textEncoder.encode(
         generateConfigSnippet(version, serverURL, orgId) + source,
       ),
       contentType: 'text/javascript',
     };
-    assets['/app.js.map'] = {
+    result['/app.js.map'] = {
       data: textEncoder.encode(map),
       contentType: 'application/json',
     };
-    try {
-      assets['/index.html'] = {
-        data: await Deno.readFile(path.join(repoPath, ep, 'src', 'index.html')),
-        contentType: 'text/html',
-      };
-    } catch (_: unknown) {
-      // ignore
+    if (assetsDir && Object.hasOwn(result, '/assets/index.html')) {
+      result['/index.html'] = result['/assets/index.html'];
     }
-    try {
-      assets['/index.css'] = {
-        data: await Deno.readFile(path.join(repoPath, ep, 'src', 'index.css')),
-        contentType: 'text/css',
-      };
-    } catch (_: unknown) {
-      // ignore
+    if (assetsDir && Object.hasOwn(result, '/assets/index.css')) {
+      result['/index.css'] = result['/assets/index.css'];
     }
-    result[ep] = assets;
+  }
+  // All other entries include as
+  for (const ep of Object.keys(buildResults)) {
+    if (ep === APP_ENTRY_POINT) {
+      continue;
+    }
+    const { source, map } = buildResults[ep];
+    result[`/${ep}.js`] = {
+      data: textEncoder.encode(
+        generateConfigSnippet(version, serverURL, orgId) + source,
+      ),
+      contentType: 'text/javascript',
+    };
+    result[`/${ep}.js.map`] = {
+      data: textEncoder.encode(map),
+      contentType: 'application/json',
+    };
   }
   return result;
 }
 
-export async function defaultAssetsBuild(): Promise<void> {
+export async function defaultAssetsBuild(
+  appPath: string,
+  version = VCurrent,
+  ctx: ReBuildContext,
+): Promise<void> {
   const repoPath = await getRepositoryPath();
   await Deno.mkdir(path.join(repoPath, 'build'), { recursive: true });
 
   console.log('Bundling client code...');
-  const assets = await buildAssets(esbuild, VCurrent);
+  const assets = await buildAssets(
+    ctx,
+    [
+      {
+        in: path.resolve(appPath),
+        out: APP_ENTRY_POINT,
+      },
+      {
+        in: path.join(
+          await getRepositoryPath(),
+          '__file_worker',
+          'json-log.worker.ts',
+        ),
+        out: '__file_worker',
+      },
+    ],
+    version,
+  );
   await Deno.writeTextFile(
     path.join(repoPath, 'build', 'staticAssets.json'),
     JSON.stringify(staticAssetsToJS(assets)),
   );
   esbuild.stop();
-}
-
-if (import.meta.main) {
-  defaultAssetsBuild();
 }

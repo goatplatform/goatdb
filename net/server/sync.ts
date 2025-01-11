@@ -93,14 +93,14 @@ export class SyncEndpoint implements Endpoint {
       json,
       async (values) =>
         (
-          await services.db.repository(path)!.persistCommits(values)
+          await (await services.db.open(path)).persistCommits(values)
         ).length,
       async () =>
         mapIterable(
           (await services.db.open(path)).commits(userSession),
           (c) => [c.id, c],
         ),
-      () => services.db.repository(path)!.numberOfCommits(userSession),
+      async () => (await services.db.open(path)).numberOfCommits(userSession),
       services.db.clientsForRepo(path),
       true,
       false,
@@ -113,7 +113,7 @@ export class SyncEndpoint implements Endpoint {
     msgJSON: JSONObject,
     persistCommits: (commits: Commit[]) => Promise<number>,
     fetchAll: () => Promise<Iterable<[string, Commit]>>,
-    getLocalCount: () => number,
+    getLocalCount: () => Promise<number>,
     replicas: Iterable<RepoClient> | undefined,
     includeMissing: boolean,
     lowAccuracy: boolean,
@@ -146,7 +146,7 @@ export class SyncEndpoint implements Endpoint {
     const syncResp = SyncMessage.build(
       msg.filter,
       await fetchAll(),
-      getLocalCount(),
+      await getLocalCount(),
       msg.size,
       syncCycles,
       services.organizationId,

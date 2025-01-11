@@ -1,4 +1,4 @@
-import { encodeBase64 } from 'std/encoding';
+import { encodeBase64 } from '@std/encoding';
 import type { EmscriptenModule } from './emscripten.d.ts';
 
 interface BloomFilterModule extends EmscriptenModule {

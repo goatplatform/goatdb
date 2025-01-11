@@ -1,6 +1,5 @@
-import yargs from 'yargs';
-import * as path from 'std/path';
-import { decodeBase64Url } from 'std/encoding';
+import * as path from '@std/path';
+import { decodeBase64Url } from '@std/encoding';
 import { Dictionary } from '../../base/collections/dict.ts';
 import {
   log,
@@ -54,7 +53,7 @@ interface BaseServerContext {
   readonly dir: string;
   readonly replicas: string[];
   readonly port: number;
-  readonly silent?: boolean;
+  readonly verbose?: boolean;
   readonly sesRegion?: string;
   readonly serverProcessIndex: number;
   readonly serverProcessCount: number;
@@ -63,10 +62,15 @@ interface BaseServerContext {
 /**
  * CLI arguments consumed by our server.
  */
-interface Arguments extends BaseServerContext {
+interface Arguments {
+  readonly dir: string;
   readonly b64replicas?: string;
   readonly pool?: string;
   readonly version?: boolean;
+  readonly replicas?: string[];
+  readonly port?: number;
+  readonly verbose?: boolean;
+  readonly sesRegion?: string;
 }
 
 // Stuff that's shared to all organizations served by this server
@@ -160,68 +164,13 @@ export class Server {
   private _httpServer?: Deno.HttpServer;
 
   constructor(
-    args?: Arguments,
+    args: Arguments,
     staticAssets?: StaticAssets,
-    buildInfo?: BuildInfo,
     readonly remapLocalhost?: string,
   ) {
     this._endpoints = [];
     this._middlewares = [];
     getGoatConfig().serverData = this;
-    if (args === undefined) {
-      args = yargs(Deno.args)
-        .option('port', {
-          alias: 'p',
-          type: 'number',
-          description: 'The port on which the server accepts incoming requests',
-          default: 8080,
-        })
-        .option('replicas', {
-          alias: 'r',
-          type: 'array',
-          default: [],
-          description:
-            'A list of replica URLs which this server will sync with',
-        })
-        .option('b64replicas', {
-          alias: 'r64',
-          type: 'string',
-          default: [],
-          description: 'A base64 url encoded JSON array of replicas',
-        })
-        .option('silent', {
-          type: 'boolean',
-          default: true,
-          description: 'Disables metric logging to stdout',
-        })
-        .option('dir', {
-          alias: 'd',
-          description:
-            'A full path to a local directory which will host all repositories managed by this server',
-        })
-        .option('sesRegion', {
-          description:
-            'An AWS region to use for sending emails with SES. Defaults to us-east-1.',
-        })
-        .option('pool', {
-          description: 'Process pool configuration in the form of "idx:count".',
-        })
-        // .option('version', {
-        //   description: 'Display version information about this build',
-        // })
-        .version(
-          `GoatDB Server Version ${tuple4ToString(
-            VCurrent,
-          )}\nBuild Info:\n${prettyJSON(buildInfo || generateBuildInfo())}`,
-        )
-        .demandOption(
-          ['dir'],
-          // 'Please provide a local directory for this server'
-        )
-        // .demandOption(['app'], 'Please provide')
-        .parse();
-    }
-
     const [serverProcessIndex, serverProcessCount] = parsePoolConfig(
       args?.pool,
     );
@@ -233,7 +182,7 @@ export class Server {
       // new JSONLogStream(path.join(dir, `log-${serverProcessIndex}.jsonl`)),
       // prometeusLogStream,
     ];
-    if (args?.silent !== true) {
+    if (args?.verbose) {
       logStreams.splice(0, 0, new ConsoleLogStream());
     }
     setGlobalLoggerStreams(logStreams);
@@ -261,7 +210,7 @@ export class Server {
       serverProcessCount,
       email: new EmailService(sesRegion),
       logger: newLogger(logStreams),
-      silent: args?.silent === true,
+      verbose: args?.verbose === true,
       staticAssets,
       sesRegion,
     } as ServerContext;
@@ -488,7 +437,7 @@ export class Server {
       },
       this.processRequest.bind(this),
     );
-    if (this._baseContext.silent === true) {
+    if (this._baseContext.verbose !== true) {
       console.log('STARTED');
     }
     sleep(kSecondMs).then(() => {

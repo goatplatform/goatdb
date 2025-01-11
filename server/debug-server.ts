@@ -1,19 +1,13 @@
-import yargs from 'yargs';
-import * as path from 'std/path';
+import * as path from '@std/path';
 import { SimpleTimer } from '../base/timer.ts';
 import { tuple4Get, tuple4Set } from '../base/tuple.ts';
-import { VersionNumber } from '../base/version-number.ts';
+import type { VersionNumber } from '../base/version-number.ts';
 import { createBuildContext } from '../build.ts';
 import { getGoatConfig } from './config.ts';
 import { Server } from '../net/server/server.ts';
 import { getRepositoryPath } from '../base/development.ts';
-import { buildAssets } from './generate-static-assets.ts';
-import { prettyJSON } from '../base/common.ts';
-
-interface Arguments {
-  namespace?: string;
-  benchmark?: boolean;
-}
+import { buildAssets, defaultAssetsBuild } from './generate-static-assets.ts';
+import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 
 function incrementBuildNumber(version: VersionNumber): VersionNumber {
   return tuple4Set(version, 0, tuple4Get(version, 0) + 1);
@@ -52,19 +46,18 @@ async function openBrowser(): Promise<void> {
   }
 }
 
-async function main(): Promise<void> {
-  const args: Arguments = yargs(Deno.args)
-    .version(false)
-    .option('namespace', {
-      description: 'Remap localhost to the specified organization id.',
-    })
-    .option('benchmark', {
-      description: 'Run benchmarks rather than debug server',
-      type: 'boolean',
-      default: false,
-    })
-    .parse();
-  const server = new Server(undefined, undefined, undefined);
+export async function startDebugServer(
+  scriptPath: string,
+  dataDir: string,
+  assetsDir?: string,
+): Promise<void> {
+  const server = new Server(
+    {
+      dir: dataDir,
+    },
+    undefined,
+    undefined,
+  );
   await server.setup();
   // if (args.benchmark === true) {
   //   console.log(`Benchmark started...`);
@@ -73,36 +66,53 @@ async function main(): Promise<void> {
   //   Deno.exit();
   // }
   console.log('Starting web-app bundling...');
-  const ctx = await createBuildContext();
+  const entryPoints = [
+    {
+      in: path.resolve(scriptPath),
+      out: APP_ENTRY_POINT,
+    },
+    {
+      in: path.join(
+        await getRepositoryPath(),
+        '__file_worker',
+        'json-log.worker.ts',
+      ),
+      out: '__file_worker',
+    },
+  ];
+  const ctx = await createBuildContext(entryPoints);
   Deno.addSignalListener('SIGTERM', () => {
     ctx.close();
   });
-  const serverURL = args.namespace
-    ? `https://${args.namespace}.ovvio.io`
-    : undefined;
   const watcher = Deno.watchFs(await getRepositoryPath());
   const orgId = 'localhost';
   (await server.servicesForOrganization(orgId)).staticAssets =
-    await buildAssets(ctx, getGoatConfig().version, serverURL, orgId);
+    await buildAssets(
+      ctx,
+      entryPoints,
+      getGoatConfig().version,
+      assetsDir,
+      undefined,
+      orgId,
+    );
   await server.start();
   openBrowser();
   const rebuildTimer = new SimpleTimer(300, false, async () => {
     console.log('Changes detected. Rebuilding static assets...');
     try {
       const config = getGoatConfig();
-      const version =
-        serverURL === undefined
-          ? incrementBuildNumber(config.version)
-          : config.version;
+      const version = incrementBuildNumber(config.version);
       (await server.servicesForOrganization(orgId)).staticAssets =
-        await buildAssets(ctx, version, serverURL, orgId);
+        await buildAssets(
+          ctx,
+          entryPoints,
+          version,
+          assetsDir,
+          undefined,
+          orgId,
+        );
       config.version = version;
       console.log('Static assets updated.');
-      if (serverURL !== undefined) {
-        console.log(
-          `NOTICE: Automatic reload disabled when the --org flag is provided.`,
-        );
-      }
     } catch (e) {
       console.error('Build failed. Will try again on next save.');
     }
@@ -115,5 +125,3 @@ async function main(): Promise<void> {
     }
   }
 }
-
-main();

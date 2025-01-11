@@ -1,4 +1,4 @@
-import * as path from 'std/path';
+import * as path from '@std/path';
 import { Session, sessionFromItem, TrustPool } from './session.ts';
 import { Repository, RepositoryConfig } from '../repo/repo.ts';
 import { DBSettings, DBSettingsProvider } from './settings/settings.ts';

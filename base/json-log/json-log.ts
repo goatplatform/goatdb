@@ -36,7 +36,7 @@ export function startJSONLogWorkerIfNeeded(): Worker {
         },
       );
     } else {
-      gWorker = new Worker('/__file_worker/app.js', {
+      gWorker = new Worker('/__file_worker.js', {
         type: 'module',
       });
     }
