@@ -23,6 +23,7 @@ import type { ReadonlyJSONObject } from '../base/interfaces.ts';
 import {
   JSONCyclicalDecoder,
   JSONCyclicalEncoder,
+  JSONEncoder,
 } from '../base/core-types/encoding/json.ts';
 import { BloomFilter } from '../base/bloom.ts';
 // import { BloomFilter } from '../cpp/bloom_filter.ts';
@@ -260,7 +261,7 @@ export class Commit implements Encodable, Decodable, Equatable, Comparable {
     }
     if (this._ancestorsFilter) {
       // encoder.set('af', this.ancestorsFilter.serialize());
-      encoder.set('af', this.ancestorsFilter);
+      encoder.set('af', JSONCyclicalEncoder.serialize(this.ancestorsFilter));
     }
     if (this._ancestorsCount) {
       encoder.set('ac', this.ancestorsCount);
@@ -368,11 +369,16 @@ export class Commit implements Encodable, Decodable, Equatable, Comparable {
     // this._ancestorsFilter = decoder.has('af')
     //   ? BloomFilter.deserialize(decoder.get<string>('af')!)
     //   : undefined;
-    const filterDecoder = decoder.getDecoder('af');
-    if (filterDecoder instanceof JSONCyclicalDecoder) {
-      filterDecoder.finalize();
+    if (decoder.has('af')) {
+      const filterDecoder = decoder.getDecoder('af');
+      this._ancestorsFilter = new BloomFilter({ decoder: filterDecoder });
+      if (filterDecoder instanceof JSONCyclicalDecoder) {
+        filterDecoder.finalize();
+      }
+    } else {
+      this._ancestorsFilter = undefined;
     }
-    this._ancestorsCount = decoder.get<number>('ac');
+    this._ancestorsCount = decoder.get<number>('ac') || 0;
     const contentsDecoder = decoder.getDecoder('c');
     this._contents = commitContentsDeserialize(
       contentsDecoder,

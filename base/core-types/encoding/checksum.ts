@@ -71,7 +71,7 @@ export abstract class ChecksumEncoder<
     return this.checksumForString(this.convertValue(value, options));
   }
 
-  convertValue(value: CoreValue | object, options?: OT): string {
+  override convertValue(value: CoreValue | object, options?: OT): string {
     const type = getCoreTypeOrUndef(value);
     if (type === undefined) {
       let v = gUnknownValuesHashes.get(value as object);

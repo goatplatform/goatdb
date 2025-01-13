@@ -224,7 +224,7 @@ export class JSONCyclicalDecoder extends JSONDecoder {
   //   return valueNeedsJSONDecode(value);
   // }
 
-  decodeValue(value: ReadonlyJSONValue): DecodedValue {
+  override decodeValue(value: ReadonlyJSONValue): DecodedValue {
     if (isEncodedRefObject(value)) {
       if (!this._tempRefs) this._tempRefs = [];
       this._tempRefs.push(value.__r);
@@ -235,7 +235,7 @@ export class JSONCyclicalDecoder extends JSONDecoder {
     return super.decodeValue(value);
   }
 
-  protected decodeObject(jsonObj: ReadonlyJSONObject): {
+  protected override decodeObject(jsonObj: ReadonlyJSONObject): {
     [key: string]: DecodedValue;
   } {
     if (isEncodedRef(jsonObj) && this._tempRefs) {
@@ -245,7 +245,10 @@ export class JSONCyclicalDecoder extends JSONDecoder {
     return super.decodeObject(jsonObj);
   }
 
-  getDecoder(key: string, offset?: number): Decoder<string, ReadonlyJSONValue> {
+  override getDecoder(
+    key: string,
+    offset?: number,
+  ): Decoder<string, ReadonlyJSONValue> {
     let value = this._data[key];
     if (isEncodedEncodable(value)) {
       value = value.__v;
