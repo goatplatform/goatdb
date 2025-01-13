@@ -210,7 +210,7 @@ export class Query<
 
   valueForPath(key: string): Item<OS> {
     const head = this._headIdForKey.get(key);
-    return ((head && this.repo.recordForCommit(head)) ||
+    return ((head && this.repo.itemForCommit(head)) ||
       this._tempRecordForKey.get(key))!;
   }
 
@@ -362,10 +362,10 @@ export class Query<
     this._age = Math.max(this._age, commit.age || 0);
     if (currentHead && prevHeadId !== currentHead?.id) {
       const prevDoc = prevHeadId
-        ? repo.recordForCommit(prevHeadId)
+        ? repo.itemForCommit(prevHeadId)
         : Item.nullItem();
       const currentDoc = currentHead
-        ? repo.recordForCommit(currentHead)
+        ? repo.itemForCommit(currentHead)
         : Item.nullItem();
       this.handleDocChange(
         itemPathJoin(repo.path, key),

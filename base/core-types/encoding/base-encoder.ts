@@ -196,16 +196,16 @@ export abstract class JSONBaseEncoder<
   T extends ReadonlyJSONValue,
   OT extends CoreOptions = CoreOptions,
 > extends BaseEncoder<ReadonlyJSONValue, T, OT> {
-  abstract getOutput(): T;
-  abstract newEncoder(): JSONBaseEncoder<T, OT>;
+  abstract override getOutput(): T;
+  abstract override newEncoder(): JSONBaseEncoder<T, OT>;
 
-  protected abstract setPrimitive(
+  protected abstract override setPrimitive(
     key: string,
     value: ReadonlyJSONValue,
     options?: OT,
   ): void;
 
-  set(key: string, value: CoreValue, options?: OT): void {
+  override set(key: string, value: CoreValue, options?: OT): void {
     if (value === undefined) {
       return;
     }

@@ -45,7 +45,7 @@ class RefSet {
 export abstract class BaseCyclicalEncoder<
   R extends JSONValue,
   T,
-  OT extends CoreOptions = CoreOptions
+  OT extends CoreOptions = CoreOptions,
 > implements Encoder<string, CoreValue, T, OT>
 {
   set(key: string, value: CoreValue, options?: OT): void {
@@ -145,7 +145,7 @@ export interface EncodedRefObject extends ReadonlyJSONObject {
 }
 
 export function isEncodedRefObject(
-  v: ReadonlyJSONValue
+  v: ReadonlyJSONValue,
 ): v is EncodedRefObject {
   if (getCoreType(v) === CoreType.Object) {
     const obj = v as ReadonlyJSONObject;

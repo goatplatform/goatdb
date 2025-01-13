@@ -263,16 +263,16 @@ export class Repository<
       }
       commit = this.getCommit(commit);
     }
-    if (!this.hasRecordForCommit(commit)) {
+    if (!this.hasItemForCommit(commit)) {
       return null;
     }
-    const finalRecord = this.recordForCommit(commit);
+    const finalRecord = this.itemForCommit(commit);
     const fields = new Set<string>();
     for (const p of commit.parents) {
-      if (!this.hasRecordForCommit(p)) {
+      if (!this.hasItemForCommit(p)) {
         return null;
       }
-      const rec = this.recordForCommit(p);
+      const rec = this.itemForCommit(p);
       SetUtils.update(fields, rec.diffKeys(finalRecord, false));
     }
     return Array.from(fields);
@@ -332,7 +332,7 @@ export class Repository<
       // const result: Commit[] = [];
       leaves = [];
       for (const c of this.commitsForKey(key, session)) {
-        if (!adjList.hasInEdges(c.id) && this.hasRecordForCommit(c)) {
+        if (!adjList.hasInEdges(c.id) && this.hasItemForCommit(c)) {
           leaves.push(c);
         }
       }
@@ -394,14 +394,14 @@ export class Repository<
     const includedCommits: Commit[] = [];
     for (const c of commits) {
       if (!result) {
-        if (this.hasRecordForCommit(c)) {
+        if (this.hasItemForCommit(c)) {
           result = c;
-          scheme = this.recordForCommit(c).schema;
+          scheme = this.itemForCommit(c).schema;
           includedCommits.push(c);
         }
         continue;
       }
-      if (!this.hasRecordForCommit(c)) {
+      if (!this.hasItemForCommit(c)) {
         continue;
       }
       let [newBase, foundRoot] = this._findLCAMergeBase(result, c);
@@ -415,7 +415,7 @@ export class Repository<
       }
       result = newBase;
       includedCommits.push(c);
-      const s = this.recordForCommit(c).schema;
+      const s = this.itemForCommit(c).schema;
       assert(scheme.ns === null || scheme.ns === s.ns); // Sanity check
       if (s.version > (scheme?.version || 0)) {
         scheme = s;
@@ -460,9 +460,9 @@ export class Repository<
     if (c1.key !== c2.key) {
       return [undefined, false];
     }
-    if (c1.contentsChecksum === c2.contentsChecksum) {
-      return [c1, false];
-    }
+    // if (c1.contentsChecksum === c2.contentsChecksum) {
+    //   return [c1, false];
+    // }
     if (c1.parents.includes(c2.id)) {
       return [c2, false];
     }
@@ -483,7 +483,7 @@ export class Repository<
           .map((id) => this.getCommit(id))
           .sort(compareCommitsDesc);
         for (const base of prioritizedBases) {
-          if (this.hasRecordForCommit(base)) {
+          if (this.hasItemForCommit(base)) {
             return [base, reachedRoot];
           }
         }
@@ -558,7 +558,7 @@ export class Repository<
       if (
         candidate.timestamp < ts &&
         (sessions as string[]).includes(candidate.session) &&
-        this.hasRecordForCommit(candidate)
+        this.hasItemForCommit(candidate)
       ) {
         return candidate;
       }
@@ -566,7 +566,7 @@ export class Repository<
     return undefined;
   }
 
-  hasRecordForCommit(c: Commit | string): boolean {
+  hasItemForCommit(c: Commit | string): boolean {
     // let tail: Commit[] = [];
     while (c !== undefined) {
       if (this._cachedCommitsWithRecord.has(typeof c === 'string' ? c : c.id)) {
@@ -608,7 +608,7 @@ export class Repository<
       this._commitIsCorruptedResult.set(c.id, false);
       return false;
     }
-    const result = this.recordForCommit(contents.base).clone();
+    const result = this.itemForCommit(contents.base).clone();
     if (result.checksum === contents.edit.srcChecksum) {
       result.patch(contents.edit.changes);
       if (result.checksum === contents.edit.dstChecksum) {
@@ -633,7 +633,7 @@ export class Repository<
     }
     const result: Commit[] = [];
     for (const p of parentsToCheck) {
-      if (this.commitIsCorrupted(p) || !this.hasRecordForCommit(p)) {
+      if (this.commitIsCorrupted(p) || !this.hasItemForCommit(p)) {
         ArrayUtils.append(
           result,
           this.findNonCorruptedParentsFromCommits(p.parents),
@@ -648,7 +648,7 @@ export class Repository<
   findLatestNonCorruptedCommitForKey(key: string): Commit | undefined {
     const commits = this.commitsForKey(key);
     for (const c of commits) {
-      if (!this.commitIsCorrupted(c) && this.hasRecordForCommit(c)) {
+      if (!this.commitIsCorrupted(c) && this.hasItemForCommit(c)) {
         return c;
       }
     }
@@ -657,7 +657,7 @@ export class Repository<
 
   static callCount = 0;
 
-  recordForCommit<S extends Schema>(c: Commit | string): Item<S> {
+  itemForCommit<S extends Schema>(c: Commit | string): Item<S> {
     try {
       if (++Repository.callCount === 2) {
         debugger;
@@ -675,7 +675,7 @@ export class Repository<
           let commitCorrupted = this._commitIsCorruptedResult.get(c.id);
           if (commitCorrupted !== true) {
             const contents: DeltaContents = c.contents as DeltaContents;
-            result = this.recordForCommit(contents.base).clone();
+            result = this.itemForCommit(contents.base).clone();
             if (result.checksum === contents.edit.srcChecksum) {
               result.patch(contents.edit.changes);
               commitCorrupted = result.checksum !== contents.edit.dstChecksum;
@@ -705,7 +705,7 @@ export class Repository<
             );
             // No good parents are available. This key is effectively null.
             result = lastGoodCommit
-              ? this.recordForCommit(lastGoodCommit)
+              ? this.itemForCommit(lastGoodCommit)
               : Item.nullItem();
           }
           // assert(result.checksum === contents.edit.srcChecksum);
@@ -733,7 +733,7 @@ export class Repository<
       // entry.timestamp = performance.now();
       return head;
     }
-    if (!this.hasRecordForCommit(head)) {
+    if (!this.hasItemForCommit(head)) {
       return undefined;
       // const ancestors = this.findNonCorruptedParentsFromCommits(head.parents);
       // if (!ancestors || ancestors.length === 0) {
@@ -757,18 +757,18 @@ export class Repository<
   ): Commit | undefined {
     commits = Array.from(commits).sort(compareCommitsDesc);
     for (const c of commits) {
-      if (c.connectionId === CONNECTION_ID && this.hasRecordForCommit(c)) {
+      if (c.connectionId === CONNECTION_ID && this.hasItemForCommit(c)) {
         return c;
       }
     }
     const sessionId = this.trustPool.currentSession.id;
     for (const c of commits) {
-      if (c.session === sessionId && this.hasRecordForCommit(c)) {
+      if (c.session === sessionId && this.hasItemForCommit(c)) {
         return c;
       }
     }
     for (const c of commits) {
-      if (this.hasRecordForCommit(c)) {
+      if (this.hasItemForCommit(c)) {
         return c;
       }
     }
@@ -798,7 +798,7 @@ export class Repository<
       return cacheEntry.commit;
     }
     const leaves = this.leavesForKey(key);
-    if (leaves.length === 1 && this.hasRecordForCommit(leaves[0])) {
+    if (leaves.length === 1 && this.hasItemForCommit(leaves[0])) {
       return this.cacheHeadForKey(key, leaves[0]);
     }
     if (leaves.length > 1) {
@@ -862,7 +862,7 @@ export class Repository<
   ): [Item, Commit | undefined] {
     commitsToMerge = this.filterLatestCommitsByConnection(
       commitsToMerge,
-    ).filter((c) => this.hasRecordForCommit(c));
+    ).filter((c) => this.hasItemForCommit(c));
     if (!commitsToMerge.length) {
       return [Item.nullItem(), undefined];
     }
@@ -881,7 +881,7 @@ export class Repository<
       foundRoot = true;
     } else if (commitsToMerge.length === 1) {
       // Special case: a single chain of commits.
-      scheme = this.recordForCommit(commitsToMerge[0]).schema || kNullSchema;
+      scheme = this.itemForCommit(commitsToMerge[0]).schema || kNullSchema;
       foundRoot = false;
     } else {
       [commitsToMerge, lca, scheme, foundRoot] =
@@ -894,7 +894,7 @@ export class Repository<
     // created of the same key unaware of each other.
     // Use the null record as a base in this case.
     const base = lca
-      ? this.recordForCommit(lca).clone()
+      ? this.itemForCommit(lca).clone()
       : Item.nullItem().clone();
     // Upgrade base to merge scheme
     if (scheme.ns !== null) {
@@ -909,7 +909,7 @@ export class Repository<
     // error.
     const nullRecord = Item.nullItem();
     for (const c of roots) {
-      const record = this.recordForCommit(c);
+      const record = this.itemForCommit(c);
       if (record.isNull) {
         continue;
       }
@@ -920,7 +920,7 @@ export class Repository<
     }
     // Second, compute a compound diff from our base to all unique records
     for (const c of commitsToMerge) {
-      let record = this.recordForCommit(c);
+      let record = this.itemForCommit(c);
       // Before computing the diff, upgrade the record to the scheme decided
       // for this merge.
       if (scheme.ns !== null) {
@@ -1023,7 +1023,7 @@ export class Repository<
       mergeLeaderSession === sessionId
     ) {
       // Filter out any commits with equal records
-      const commitsToMerge = commitsWithUniqueRecords(
+      const commitsToMerge = this.commitsWithUniqueItems(
         leaves.filter((c) => this.commitIsHighProbabilityLeaf(c)),
       ).sort(coreValueCompare);
       if (commitsToMerge.length === 1) {
@@ -1040,6 +1040,28 @@ export class Repository<
     return undefined;
   }
 
+  private commitsWithUniqueItems(commits: readonly Commit[]): Commit[] {
+    const result: Commit[] = [];
+    const items: Item[] = [];
+    for (const c of commits) {
+      if (this.hasItemForCommit(c)) {
+        const item = this.itemForCommit(c);
+        let foundMatch = false;
+        for (const i of items) {
+          if (i.isEqual(item)) {
+            foundMatch = true;
+            break;
+          }
+        }
+        if (!foundMatch) {
+          items.push(item);
+          result.push(c);
+        }
+      }
+    }
+    return result;
+  }
+
   valueForKey<T extends Schema = Schema>(
     key: string,
   ): [Item<T>, Commit] | undefined {
@@ -1047,7 +1069,7 @@ export class Repository<
     if (!this._cachedValueForKey.has(key)) {
       const head = this.headForKey(key);
       if (head) {
-        result = [this.recordForCommit(head), head];
+        result = [this.itemForCommit(head), head];
       }
       // if (!result) {
       //   result = Document.nullDocument();
@@ -1102,7 +1124,7 @@ export class Repository<
       );
     }
     if (parentCommit) {
-      const headRecord = this.recordForCommit(parentCommit);
+      const headRecord = this.itemForCommit(parentCommit);
       if (headRecord.isEqual(value as unknown as Item)) {
         return undefined;
       }
@@ -1151,12 +1173,12 @@ export class Repository<
     if (!currentHead || currentHead.id === headId) {
       return [record, headId instanceof Commit ? headId.id : undefined];
     }
-    const headRecord = this.recordForCommit<S>(currentHead);
+    const headRecord = this.itemForCommit<S>(currentHead);
     if (headRecord.isEqual(record)) {
       return [record, headId instanceof Commit ? headId.id : undefined];
     }
     const baseRecord = headId
-      ? this.recordForCommit<S>(headId).clone()
+      ? this.itemForCommit<S>(headId).clone()
       : (Item.nullItem() as Item<S>);
     if (
       !headRecord.isNull &&
@@ -1191,7 +1213,7 @@ export class Repository<
     const lastRecordCommit = this.lastRecordCommitForKey(key);
     let deltaCommit: Commit | undefined;
     if (lastRecordCommit) {
-      const baseRecord = this.recordForCommit(lastRecordCommit);
+      const baseRecord = this.itemForCommit(lastRecordCommit);
       const changes = baseRecord.diff(fullCommit.contents.record, false);
       const edit = new Edit({
         changes: changes,
@@ -1274,7 +1296,7 @@ export class Repository<
                 result.push(c);
               }
             } else {
-              // debugger;
+              debugger;
               // this.trustPool.verify(c);
             }
           })(),
@@ -1507,11 +1529,11 @@ export class Repository<
           if (i === 0) {
             break;
           }
-          if (this.hasRecordForCommit(c)) {
+          if (this.hasItemForCommit(c)) {
             console.log(
               `Reverting ${key} to ${new Date(c.timestamp).toLocaleString()}`,
             );
-            this.setValueForKey(key, this.recordForCommit(c), undefined);
+            this.setValueForKey(key, this.itemForCommit(c), undefined);
             break;
           }
         }
@@ -1531,7 +1553,7 @@ export class Repository<
     }
     for (const c of this.commitsForKey(commit.key)) {
       if (
-        this.hasRecordForCommit(c) &&
+        this.hasItemForCommit(c) &&
         c.timestamp < commit.timestamp &&
         filter(c)
       ) {
@@ -1575,37 +1597,15 @@ export class Repository<
           head,
           (c) => !connectionIds.includes(c.connectionId),
         );
-        if (parent && this.hasRecordForCommit(parent)) {
+        if (parent && this.hasItemForCommit(parent)) {
           console.log(
             `Reverting ${key} to ${parent.timestamp.toLocaleString()}`,
           );
-          this.setValueForKey(key, this.recordForCommit(parent), undefined);
+          this.setValueForKey(key, this.itemForCommit(parent), undefined);
         }
       }
     }
   }
-}
-
-function commitsWithUniqueRecords(commits: Iterable<Commit>): Commit[] {
-  const result: Commit[] = [];
-  for (const c of commits) {
-    const checksum = c.contentsChecksum;
-    let found = false;
-    for (let i = 0; i < result.length; ++i) {
-      const r = result[i];
-      if (r.contentsChecksum === checksum) {
-        if (c.timestamp > r.timestamp || c.connectionId === CONNECTION_ID) {
-          result[i] = c;
-          found = true;
-          break;
-        }
-      }
-    }
-    if (!found) {
-      result.push(c);
-    }
-  }
-  return result;
 }
 
 function compareCommitsDesc(c1: Commit, c2: Commit): number {
