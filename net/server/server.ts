@@ -9,7 +9,7 @@ import {
   setGlobalLoggerStreams,
 } from '../../logging/log.ts';
 import { HTTPMethod } from '../../logging/metrics.ts';
-import { PrometheusLogStream } from '../../server/prometeus-stream.ts';
+// import { PrometheusLogStream } from '../../server/prometeus-stream.ts';
 // import { SyncEndpoint, SyncService } from './sync.ts';
 import { StaticAssets, StaticAssetsEndpoint } from './static-assets.ts';
 import { ConsoleLogStream } from '../../logging/console-stream.ts';
@@ -35,7 +35,7 @@ import { prettyJSON } from '../../base/common.ts';
 import { GoatDB } from '../../db/db.ts';
 import { SyncEndpoint } from './sync.ts';
 import { persistSession } from './auth.ts';
-import setupSchemas from '../../web-app/src/schemas.ts';
+import { AppConfig } from '../../cli/config.ts';
 // import { StatsEndpoint } from './stats.ts';
 // import {
 //   BenchmarkResults,
@@ -43,14 +43,13 @@ import setupSchemas from '../../web-app/src/schemas.ts';
 //   runInsertBenchmark,
 // } from './benchmark.ts';
 
-setupSchemas();
-
 const BASE_ORG_ID = 'localhost';
 export const ENV_REPLICAS = 'REPLICAS';
 
 interface BaseServerContext {
   // Full path to data directory
   readonly dir: string;
+  readonly appConfig: AppConfig;
   readonly replicas: string[];
   readonly port: number;
   readonly verbose?: boolean;
@@ -64,6 +63,7 @@ interface BaseServerContext {
  */
 interface Arguments {
   readonly dir: string;
+  readonly appConfig: AppConfig;
   readonly b64replicas?: string;
   readonly pool?: string;
   readonly version?: boolean;
@@ -177,7 +177,7 @@ export class Server {
     const dir = args!.dir;
     this._servicesByOrg = new Map();
     const settingsService = new SettingsService();
-    const prometeusLogStream = new PrometheusLogStream();
+    // const prometeusLogStream = new PrometheusLogStream();
     const logStreams: LogStream[] = [
       // new JSONLogStream(path.join(dir, `log-${serverProcessIndex}.jsonl`)),
       // prometeusLogStream,
@@ -201,7 +201,7 @@ export class Server {
     //   JSON.parse(decoder.decode(decodeBase64Url(envReplicasStr)));
     this._baseContext = {
       settings: settingsService,
-      prometheusLogStream: prometeusLogStream,
+      // prometheusLogStream: prometeusLogStream,
       // sqliteLogStream,
       dir,
       replicas: replicas || args?.replicas || [],
@@ -213,6 +213,7 @@ export class Server {
       verbose: args?.verbose === true,
       staticAssets,
       sesRegion,
+      appConfig: args.appConfig,
     } as ServerContext;
     // Monitoring
     this.registerMiddleware(new MetricsMiddleware(logStreams));

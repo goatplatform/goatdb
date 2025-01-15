@@ -1,5 +1,5 @@
-import * as esbuild from 'npm:esbuild@0.20.2';
-import { denoPlugins } from 'jsr:@luca/esbuild-deno-loader';
+import * as esbuild from 'esbuild';
+import { denoPlugins } from '@luca/esbuild-deno-loader';
 import * as path from '@std/path';
 import { getRepositoryPath } from '../base/development.ts';
 import { VCurrent, VersionNumber } from '../base/version-number.ts';
@@ -16,6 +16,7 @@ import {
   staticAssetsToJS,
 } from '../net/server/static-assets.ts';
 import { getGoatConfig } from './config.ts';
+import { AppConfig } from '../cli/config.ts';
 
 function generateConfigSnippet(
   version: VersionNumber,
@@ -40,26 +41,31 @@ export async function buildAssets(
   ctx: ReBuildContext | typeof esbuild,
   entryPoints: { in: string; out: string }[],
   version: VersionNumber,
-  assetsDir?: string,
+  appConfig: AppConfig,
   serverURL?: string,
   orgId?: string,
 ): Promise<StaticAssets> {
-  const buildResults = await (isReBuildContext(ctx)
-    ? ctx.rebuild()
-    : bundleResultFromBuildResult(
-        await ctx.build({
-          entryPoints,
-          plugins: [
-            ...denoPlugins({
-              configPath: `${await getRepositoryPath()}/deno.json`,
-            }),
-          ],
-          bundle: true,
-          write: false,
-          sourcemap: 'linked',
-          outdir: 'output',
-        }),
-      ));
+  const buildResults = await(
+    isReBuildContext(ctx)
+      ? ctx.rebuild()
+      : bundleResultFromBuildResult(
+          await ctx.build({
+            entryPoints,
+            plugins: [
+              ...denoPlugins({
+                configPath: `${await getRepositoryPath()}/deno.json`,
+              }),
+            ],
+            bundle: true,
+            write: false,
+            sourcemap: 'linked',
+            outdir: 'output',
+            logOverride: {
+              'empty-import-meta': 'silent',
+            },
+          }),
+        ),
+  );
 
   debugger;
   const repoPath = await getRepositoryPath();
@@ -71,9 +77,12 @@ export async function buildAssets(
   // For app code, include html and css files
   if (Object.hasOwn(buildResults, APP_ENTRY_POINT)) {
     const { source, map } = buildResults[APP_ENTRY_POINT];
-    if (assetsDir) {
+    if (appConfig.assets) {
       // User provided assets are placed under /assets/
-      Object.assign(result, await compileAssetsDirectory(assetsDir, '/assets'));
+      Object.assign(
+        result,
+        await compileAssetsDirectory(appConfig.assets, '/assets'),
+      );
     }
     result['/app.js'] = {
       data: textEncoder.encode(
@@ -85,11 +94,25 @@ export async function buildAssets(
       data: textEncoder.encode(map),
       contentType: 'application/json',
     };
-    if (assetsDir && Object.hasOwn(result, '/assets/index.html')) {
-      result['/index.html'] = result['/assets/index.html'];
+    if (appConfig.html) {
+      try {
+        result['/index.html'] = {
+          data: await Deno.readFile(appConfig.html),
+          contentType: 'text/html',
+        };
+      } catch (_: unknown) {
+        throw new Error(`Error loading ${appConfig.html}`);
+      }
     }
-    if (assetsDir && Object.hasOwn(result, '/assets/index.css')) {
-      result['/index.css'] = result['/assets/index.css'];
+    if (appConfig.css) {
+      try {
+        result['/index.css'] = {
+          data: await Deno.readFile(appConfig.css),
+          contentType: 'text/css',
+        };
+      } catch (_: unknown) {
+        throw new Error(`Error loading ${appConfig.css}`);
+      }
     }
   }
   // All other entries include as

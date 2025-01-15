@@ -1,8 +1,8 @@
 import { walk, exists } from '@std/fs';
 import { extname } from '@std/path';
-import { Endpoint, ServerServices } from './server.ts';
+import type { Endpoint, ServerServices } from './server.ts';
 import { getRequestPath } from './utils.ts';
-import { JSONObject, ReadonlyJSONObject } from '../../base/interfaces.ts';
+import type { JSONObject, ReadonlyJSONObject } from '../../base/interfaces.ts';
 import { decodeBase64, encodeBase64 } from '@std/encoding';
 
 const STATIC_ASSETS_CACHE_DURATION_SEC = 86400;
@@ -53,9 +53,9 @@ export type StaticAssets = Record<string, Asset>;
 
 export class StaticAssetsEndpoint implements Endpoint {
   filter(
-    services: ServerServices,
+    _services: ServerServices,
     req: Request,
-    info: Deno.ServeHandlerInfo,
+    _info: Deno.ServeHandlerInfo,
   ): boolean {
     return req.method === 'GET';
   }
@@ -63,7 +63,7 @@ export class StaticAssetsEndpoint implements Endpoint {
   processRequest(
     services: ServerServices,
     req: Request,
-    info: Deno.ServeHandlerInfo,
+    _info: Deno.ServeHandlerInfo,
   ): Promise<Response> {
     if (!services.staticAssets) {
       return Promise.resolve(new Response(null, { status: 404 }));

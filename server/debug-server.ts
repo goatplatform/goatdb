@@ -5,9 +5,11 @@ import type { VersionNumber } from '../base/version-number.ts';
 import { createBuildContext } from '../build.ts';
 import { getGoatConfig } from './config.ts';
 import { Server } from '../net/server/server.ts';
-import { getRepositoryPath } from '../base/development.ts';
-import { buildAssets, defaultAssetsBuild } from './generate-static-assets.ts';
+// import { getRepositoryPath } from '../base/development.ts';
+import { buildAssets } from './generate-static-assets.ts';
+import { loadAppConfig } from '../cli/config.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
+import { SchemaManager } from '../mod.ts';
 
 function incrementBuildNumber(version: VersionNumber): VersionNumber {
   return tuple4Set(version, 0, tuple4Get(version, 0) + 1);
@@ -46,14 +48,18 @@ async function openBrowser(): Promise<void> {
   }
 }
 
-export async function startDebugServer(
-  scriptPath: string,
-  dataDir: string,
-  assetsDir?: string,
-): Promise<void> {
+export async function startDebugServer(appConfigPath: string): Promise<void> {
+  appConfigPath = path.resolve(appConfigPath);
+  const appConfig = await loadAppConfig(appConfigPath);
+  const projectDir = path.dirname(appConfigPath);
+  const dataDir = path.join(projectDir, 'server-data');
+  await appConfig.schemaSetupTs();
+  const mgr = SchemaManager.default;
+  debugger;
   const server = new Server(
     {
       dir: dataDir,
+      appConfig,
     },
     undefined,
     undefined,
@@ -68,30 +74,23 @@ export async function startDebugServer(
   console.log('Starting web-app bundling...');
   const entryPoints = [
     {
-      in: path.resolve(scriptPath),
+      in: path.resolve(appConfig.js),
       out: APP_ENTRY_POINT,
     },
-    {
-      in: path.join(
-        await getRepositoryPath(),
-        '__file_worker',
-        'json-log.worker.ts',
-      ),
-      out: '__file_worker',
-    },
   ];
+
   const ctx = await createBuildContext(entryPoints);
   Deno.addSignalListener('SIGTERM', () => {
     ctx.close();
   });
-  const watcher = Deno.watchFs(await getRepositoryPath());
+  const watcher = Deno.watchFs(projectDir);
   const orgId = 'localhost';
   (await server.servicesForOrganization(orgId)).staticAssets =
     await buildAssets(
       ctx,
       entryPoints,
       getGoatConfig().version,
-      assetsDir,
+      appConfig,
       undefined,
       orgId,
     );
@@ -107,7 +106,7 @@ export async function startDebugServer(
           ctx,
           entryPoints,
           version,
-          assetsDir,
+          appConfig,
           undefined,
           orgId,
         );

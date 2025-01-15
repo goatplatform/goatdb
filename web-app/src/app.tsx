@@ -1,8 +1,8 @@
 // @deno-types="npm:@types/react"
 import React, { useRef, useState } from 'react';
 import { useDB, useDBReady, useItem, useQuery } from '../../react/hooks.ts';
-import { kSchemaTask, type SchemaTypeTask } from './schemas.ts';
-import setupSchemas from './schemas.ts';
+import { kSchemaTask, type SchemaTypeTask } from './schema.ts';
+import setupSchemas from './schema.ts';
 
 // This is only temporary. In the near future schemas will be auto-registered
 // without an explicity call.

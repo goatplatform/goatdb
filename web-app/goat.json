@@ -1,0 +1,7 @@
+{
+  "schema": "src/schema.ts",
+  "js": "src/index.tsx",
+  "html": "src/index.html",
+  "css": "src/index.css",
+  "assets": "assets"
+}

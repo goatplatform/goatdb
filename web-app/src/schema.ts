@@ -1,4 +1,4 @@
-import { SchemaManager } from '../../cfds/base/schema.ts';
+import { SchemaManager } from '@goatdb/goatdb';
 
 export const kSchemaTask = {
   ns: 'task',
