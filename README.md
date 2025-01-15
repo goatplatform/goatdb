@@ -14,6 +14,8 @@ GoatDB is a real-time, distributed, scalable Version Control Database (VCDB) tha
 
 GoatDB also guarantees causal consistency, meaning changes are shared in the correct order across clients and servers, so data always makes sense to users. Its edge-native design eliminates many backend challenges, making both development and deployment easier while supporting modern workloads at scale.
 
+👉 If you like what we're building, please star ⭐️ our project. We really appreciate it! 🙏
+
 ## Getting Started
 
 [React Hooks](docs/react.md)
