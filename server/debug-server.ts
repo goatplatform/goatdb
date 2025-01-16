@@ -87,7 +87,7 @@ export async function startDebugServer(
   options: DebugServerOptions,
 ): Promise<never> {
   const server = new Server(options);
-  console.log('Starting web-app bundling...');
+  console.log('Building client code...');
   const entryPoints = [
     {
       in: path.resolve(options.jsPath),
