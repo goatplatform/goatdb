@@ -25,6 +25,12 @@ function shouldRebuildAfterPathChange(p: string): boolean {
   if (p.includes('.git/')) {
     return false;
   }
+  if (p.startsWith('server-data/')) {
+    return false;
+  }
+  if (p.startsWith('build/')) {
+    return false;
+  }
   return true;
 }
 
@@ -56,8 +62,14 @@ export type LiveReloadOptions = {
   watchDir?: string;
   /**
    * An optional filter function that decides what changes under the `watchDir`
-   * will trigger a reload. The default implementation ignores all paths
-   * starting with '.' and everything under .git/ and under node_modules/
+   * will trigger a reload. The default implementation ignores the following
+   * paths:
+   *
+   * - All paths starting with '.'
+   * - .git/*
+   * - node_modules/*
+   * - server-data/*
+   * - build/*
    *
    * @param path The changed path.
    * @returns `true` for a rebuild to happen, `false` otherwise.
