@@ -14,23 +14,19 @@ function incrementBuildNumber(version: VersionNumber): VersionNumber {
   return tuple4Set(version, 0, tuple4Get(version, 0) + 1);
 }
 
+const kIgnoredDirectories = ['node_modules', '.git', 'server-data', 'build'];
+
 function shouldRebuildAfterPathChange(p: string): boolean {
-  const name = path.basename(p);
-  if (name.startsWith('.') || p.startsWith('.')) {
+  const components = p.split(path.SEPARATOR_PATTERN);
+  for (const comp of components) {
+    if (comp.startsWith('.')) {
+      return false;
+    }
+  }
+  if (kIgnoredDirectories.includes(components[0])) {
     return false;
   }
-  if (p.startsWith('node_modules/')) {
-    return false;
-  }
-  if (p.includes('.git/')) {
-    return false;
-  }
-  if (p.startsWith('server-data/')) {
-    return false;
-  }
-  if (p.startsWith('build/')) {
-    return false;
-  }
+  console.log(`Detected change at ${p}`);
   return true;
 }
 
@@ -74,7 +70,7 @@ export type LiveReloadOptions = {
    * @param path The changed path.
    * @returns `true` for a rebuild to happen, `false` otherwise.
    */
-  watchIgnore?: (path: string) => boolean;
+  watchFilter?: (path: string) => boolean;
 };
 
 export type DebugServerOptions = Omit<ServerOptions, 'staticAssets'> &
@@ -118,7 +114,7 @@ export async function startDebugServer(
     await server.start();
     openBrowser();
     const rebuildTimer = new SimpleTimer(300, false, async () => {
-      console.log('Changes detected. Rebuilding static assets...');
+      console.log('Rebuilding client code...');
       try {
         const config = getGoatConfig();
         const version = incrementBuildNumber(config.version);
@@ -132,16 +128,17 @@ export async function startDebugServer(
             orgId,
           );
         config.version = version;
-        console.log('Static assets updated.');
+        console.log('Done');
       } catch (err: unknown) {
         console.error('Build failed. Will try again on next save.');
         console.error(err);
       }
     });
-    const filterFunc = options.watchIgnore || shouldRebuildAfterPathChange;
+    const filterFunc = options.watchFilter || shouldRebuildAfterPathChange;
+    const cwd = Deno.cwd();
     for await (const event of watcher) {
       for (const p of event.paths) {
-        if (filterFunc(p)) {
+        if (filterFunc(p.substring(cwd.length + 1))) {
           rebuildTimer.schedule();
         }
       }
