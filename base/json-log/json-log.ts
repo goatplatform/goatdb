@@ -29,14 +29,11 @@ let gWorker: Worker | undefined;
 export function startJSONLogWorkerIfNeeded(): Worker {
   if (gWorker === undefined) {
     if (self.Deno !== undefined) {
-      gWorker = new Worker(
-        import.meta.resolve('../../__file_worker/json-log.worker.ts'),
-        {
-          type: 'module',
-        },
-      );
+      gWorker = new Worker(new URL('./json-log.worker.ts', import.meta.url), {
+        type: 'module',
+      });
     } else {
-      gWorker = new Worker('/__system_assets/__file_worker.js', {
+      gWorker = new Worker('/system-assets/file_worker.worker.js', {
         type: 'module',
       });
     }

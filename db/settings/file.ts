@@ -1,11 +1,11 @@
 import * as path from '@std/path';
 import {
-  OwnedSession,
-  EncodedSession,
+  type OwnedSession,
+  type EncodedSession,
   decodeSession,
   generateSession,
   encodeSession,
-  Session,
+  type Session,
   generateKeyPair,
 } from '../session.ts';
 import { prettyJSON } from '../../base/common.ts';
@@ -15,7 +15,7 @@ import {
 } from '../../base/core-types/encoding/json.ts';
 import { kDayMs, kSecondMs } from '../../base/date.ts';
 import { assert } from '../../base/error.ts';
-import { DBSettings, DBSettingsProvider } from './settings.ts';
+import type { DBSettings, DBSettingsProvider } from './settings.ts';
 import { readTextFile, writeTextFile } from '../../base/json-log/json-log.ts';
 import { createNewSession } from '../../net/rest-api.ts';
 import { serviceUnavailable } from '../../cfds/base/errors.ts';

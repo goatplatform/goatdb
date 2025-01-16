@@ -1,16 +1,10 @@
-import React, {
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  useSyncExternalStore,
-} from 'react';
+import React, { useCallback, useContext, useSyncExternalStore } from 'react';
 import { GoatDB } from '../db/db.ts';
-import { Schema } from '../cfds/base/schema.ts';
-import { ManagedItem } from '../db/managed-item.ts';
-import { MutationPack, mutationPackHasField } from '../db/mutations.ts';
-import { ReadonlyJSONValue } from '../base/interfaces.ts';
-import { Query, QueryConfig } from '../repo/query.ts';
+import type { Schema } from '../cfds/base/schema.ts';
+import type { ManagedItem } from '../db/managed-item.ts';
+import { type MutationPack, mutationPackHasField } from '../db/mutations.ts';
+import type { ReadonlyJSONValue } from '../base/interfaces.ts';
+import type { Query, QueryConfig } from '../repo/query.ts';
 import { getBaseURL } from '../net/rest-api.ts';
 
 type GoatDBCtxProps = {
@@ -112,7 +106,6 @@ export function useDBReady(): DBReadyState {
           })
           .catch((err) => {
             console.error(err);
-            debugger;
             error = true;
             if (!cancelled) {
               onStoreChange();

@@ -2,9 +2,9 @@
  * This file implements a background worker for the JSONLogFile interface in
  * json-log-background.ts
  */
-import { assert } from '../base/error.ts';
-import { ReadonlyJSONObject } from '../base/interfaces.ts';
-import {
+import { assert } from '../error.ts';
+import type { ReadonlyJSONObject } from '../interfaces.ts';
+import type {
   WorkerFileReq,
   WorkerFileRespAppend,
   WorkerFileRespClose,
@@ -13,12 +13,10 @@ import {
   WorkerFileRespOpen,
   WorkerFileRespScan,
   WorkerReadTextFileResp,
-  WorkerWriteTextFileReq,
   WorkerWriteTextFileResp,
-} from '../base/json-log/json-log-worker-req.ts';
-import { FileImpl } from '../base/json-log/file-impl-interface.ts';
-import { FileImplGet } from '../base/json-log/file-impl.ts';
-import * as SetUtils from '../base/set.ts';
+} from './json-log-worker-req.ts';
+import type { FileImpl } from './file-impl-interface.ts';
+import { FileImplGet } from './file-impl.ts';
 
 const FILE_READ_BUF_SIZE_BYTES = 1024 * 1024; // 8KB
 const PAGE_SIZE = 1024;
@@ -289,6 +287,7 @@ async function writeTextFile(path: string, text: string): Promise<boolean> {
 }
 
 function main(): void {
+  debugger;
   console.log(`WORKER STARTED`);
   onmessage = async (event: MessageEvent<WorkerFileReq>) => {
     switch (event.data.type) {
@@ -403,4 +402,4 @@ function main(): void {
   };
 }
 
-main();
+if (import.meta.main) main();

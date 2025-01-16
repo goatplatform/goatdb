@@ -1,12 +1,5 @@
 import { assert } from '../../base/error.ts';
-import {
-  Schema,
-  SchemaDataType,
-  SchemaEquals,
-  SchemaManager,
-  SchemaRequiredFields,
-  kNullSchema,
-} from './schema.ts';
+import { Schema, SchemaDataType, SchemaEquals, kNullSchema } from './schema.ts';
 import {
   clone,
   DataChanges,
@@ -43,6 +36,7 @@ import {
 } from '../../base/core-types/index.ts';
 import { SchemaGetFieldDef } from './schema.ts';
 import { Readwrite } from '../../base/types.ts';
+import { SchemaManager } from './schema-manager.ts';
 
 export interface ReadonlyItem<S extends Schema> {
   readonly isNull: boolean;

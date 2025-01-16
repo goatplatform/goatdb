@@ -19,11 +19,7 @@ export async function bundle(
         out: APP_ENTRY_POINT,
       },
     ],
-    plugins: [
-      ...denoPlugins({
-        configPath: `${await getRepositoryPath()}/deno.json`,
-      }),
-    ],
+    plugins: [...denoPlugins()],
     bundle: true,
     write: false,
     sourcemap: 'linked',
@@ -71,15 +67,14 @@ export async function createBuildContext(
 ): Promise<ReBuildContext> {
   const ctx = await esbuild.context({
     entryPoints,
-    plugins: [
-      ...denoPlugins({
-        configPath: `${await getRepositoryPath()}/deno.json`,
-      }),
-    ],
+    plugins: [...denoPlugins()],
     bundle: true,
     write: false,
     sourcemap: 'linked',
     outdir: 'output',
+    logOverride: {
+      'empty-import-meta': 'silent',
+    },
   });
   return {
     rebuild: async () => bundleResultFromBuildResult(await ctx.rebuild()),

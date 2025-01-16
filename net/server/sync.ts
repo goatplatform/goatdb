@@ -122,7 +122,7 @@ export class SyncEndpoint implements Endpoint {
     const msg = new SyncMessage(
       {
         decoder,
-        orgId: services.organizationId,
+        orgId: services.orgId,
       },
       services.db.schemaManager,
     );
@@ -149,7 +149,7 @@ export class SyncEndpoint implements Endpoint {
       await getLocalCount(),
       msg.size,
       syncCycles,
-      services.organizationId,
+      services.orgId,
       services.db.schemaManager,
       // Don't return new commits to old clients
       includeMissing && msg.buildVersion >= getGoatConfig().version,

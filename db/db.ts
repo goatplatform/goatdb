@@ -10,11 +10,7 @@ import { SyncScheduler } from '../net/sync-scheduler.ts';
 import { QueryPersistence } from '../repo/query-persistance.ts';
 import { QueryPersistenceFile } from './persistance/query-file.ts';
 import { ManagedItem } from './managed-item.ts';
-import {
-  Schema,
-  SchemaManager,
-  SchemaTypeSession,
-} from '../cfds/base/schema.ts';
+import { Schema, SchemaTypeSession } from '../cfds/base/schema.ts';
 import {
   itemPath,
   itemPathGetPart,
@@ -36,16 +32,18 @@ import {
   JSONLogFileStartCursor,
   startJSONLogWorkerIfNeeded,
 } from '../base/json-log/json-log.ts';
-import { ReadonlyJSONObject, ReadonlyJSONValue } from '../base/interfaces.ts';
+import type {
+  ReadonlyJSONObject,
+  ReadonlyJSONValue,
+} from '../base/interfaces.ts';
 // import { BloomFilter } from '../cpp/bloom_filter.ts';
-import { QueryConfig, Query, generateQueryId } from '../repo/query.ts';
-import { md51 } from '../external/md5.ts';
+import { type QueryConfig, Query, generateQueryId } from '../repo/query.ts';
 import { sendLoginEmail } from '../net/rest-api.ts';
 import { normalizeEmail } from '../base/string.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
 import { FileImplOPFS } from '../base/json-log/file-impl-opfs.ts';
 import { assert } from '../base/error.ts';
-import { BloomFilter } from '../base/bloom.ts';
+import { SchemaManager } from '../cfds/base/schema-manager.ts';
 
 /**
  * Denotes the type of the requested operation.

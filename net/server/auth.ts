@@ -20,18 +20,17 @@ import { HTTPMethod } from '../../logging/metrics.ts';
 import { Endpoint, ServerServices } from './server.ts';
 import { getBaseURL, getRequestPath } from './utils.ts';
 // import { ResetPasswordEmail } from '../../emails/reset-password.tsx';
-import { kSchemaUser, Schema, SchemaTypeUser } from '../../cfds/base/schema.ts';
+import { kSchemaUser, SchemaTypeUser } from '../../cfds/base/schema.ts';
 import { normalizeEmail } from '../../base/string.ts';
 import { ReadonlyJSONObject } from '../../base/interfaces.ts';
 import { accessDenied } from '../../cfds/base/errors.ts';
 import { copyToClipboard } from '../../base/development.ts';
-import { MemRepoStorage, Repository } from '../../repo/repo.ts';
 import { sleep } from '../../base/time.ts';
 import { isDevelopmentBuild } from '../../base/development.ts';
 import { GoatDB } from '../../db/db.ts';
 import { coreValueCompare } from '../../base/core-types/comparable.ts';
-import { bsearch, bsearch_idx } from '../../base/algorithms.ts';
-import { itemPathGetPart, ItemPathPart } from '../../db/path.ts';
+import { bsearch_idx } from '../../base/algorithms.ts';
+import { itemPathGetPart } from '../../db/path.ts';
 import { ManagedItem } from '../../db/managed-item.ts';
 
 export const kAuthEndpointPaths = [
@@ -194,12 +193,16 @@ export class AuthEndpoint implements Endpoint {
 
     // Unconditionally generate the signed token so this call isn't vulnerable
     // to timing attacks.
-    const signedToken = await signData(services.settings.session, undefined, {
-      u: itemPathGetPart(userItem?.path, 'item') || '',
-      s: requestingSessionId,
-      ts: Date.now(),
-      sl: uniqueId(),
-    });
+    const signedToken = await signData(
+      services.db.settings.currentSession,
+      undefined,
+      {
+        u: itemPathGetPart(userItem?.path, 'item') || '',
+        s: requestingSessionId,
+        ts: Date.now(),
+        sl: uniqueId(),
+      },
+    );
     const clickURL = `${getBaseURL(services)}/auth/temp-login?t=${signedToken}`;
     if (isDevelopmentBuild()) {
       // console.log(`****** ${clickURL} ******`);
@@ -339,7 +342,7 @@ async function fetchUserByEmail(
     return results[userIdx];
   }
   // Lazily create operator users
-  if (services.settings.operatorEmails.includes(email)) {
+  if (services.operatorEmails?.includes(email)) {
     const item = services.db.create('/sys/users', kSchemaUser, {
       email: email,
     });
@@ -435,7 +438,7 @@ export async function requireSignedUser(
     if (email === undefined || email.length <= 0) {
       throw accessDenied();
     }
-    if (!services.settings.operatorEmails.includes(email)) {
+    if (!services.operatorEmails?.includes(email)) {
       throw accessDenied();
     }
   }

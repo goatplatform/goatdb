@@ -4,6 +4,11 @@ import type { Endpoint, ServerServices } from './server.ts';
 import { getRequestPath } from './utils.ts';
 import type { JSONObject, ReadonlyJSONObject } from '../../base/interfaces.ts';
 import { decodeBase64, encodeBase64 } from '@std/encoding';
+import kEncodedSystemAssets from '../../system-assets/assets.json' with { type: 'json' };
+
+const kSystemAssets = staticAssetsFromJS(kEncodedSystemAssets);
+
+debugger;
 
 const STATIC_ASSETS_CACHE_DURATION_SEC = 86400;
 
@@ -70,7 +75,7 @@ export class StaticAssetsEndpoint implements Endpoint {
     }
     const path = getRequestPath(req);
     const asset =
-      services.staticAssets[path] || services.staticAssets['/index.html'];
+      kSystemAssets[path as keyof typeof kSystemAssets] || services.staticAssets[path] || services.staticAssets['/index.html'];
 
     if (!asset) {
       return Promise.resolve(new Response(null, { status: 404 }));
@@ -94,6 +99,7 @@ export class StaticAssetsEndpoint implements Endpoint {
 
 export async function compileAssetsDirectory(
   dir: string,
+  filter?: (path: string) => boolean,
   prefix?: string,
 ): Promise<Record<string, Asset>> {
   const result: Record<string, Asset> = {};
@@ -106,6 +112,9 @@ export async function compileAssetsDirectory(
     followSymlinks: false,
     exts: kValidFileExtensions,
   })) {
+    if (filter && !filter(path)) {
+      continue;
+    }
     const origExt = extname(path);
     let ext = origExt.substring(1);
     if (ext === 'ts') {

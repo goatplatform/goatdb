@@ -4,7 +4,7 @@ import { uniqueId } from './base/common.ts';
 import { coreValueCompare } from './base/core-types/comparable.ts';
 import { assert } from './base/error.ts';
 import { randomInt } from './base/math.ts';
-import { SchemaManager } from './cfds/base/schema.ts';
+import { SchemaManager } from './cfds/base/schema-manager.ts';
 import { BloomFilter } from './cpp/bloom_filter.ts';
 import { GoatDB } from './db/db.ts';
 import { Query } from './repo/query.ts';

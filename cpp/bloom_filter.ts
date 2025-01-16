@@ -29,18 +29,12 @@ function initializeModule(): Promise<void> {
     moduleLoadPromise = (async () => {
       const wasmUrl =
         self.Deno === undefined
-          ? new URL('/__system_assets/bloom_filter.wasm', self.location.href)
-          : new URL(
-              '../assets/__system_assets/bloom_filter.wasm',
-              import.meta.url,
-            );
+          ? new URL('/system-assets/bloom_filter.wasm', self.location.href)
+          : new URL('../system-assets/bloom_filter.wasm', import.meta.url);
       const jsUrl =
         self.Deno === undefined
-          ? new URL('/__system_assets/bloom_filter.js', self.location.href)
-          : new URL(
-              '../assets/__system_assets/bloom_filter.js',
-              import.meta.url,
-            );
+          ? new URL('/system-assets/bloom_filter.js', self.location.href)
+          : new URL('../system-assets/bloom_filter.js', import.meta.url);
 
       const wasmResponse = await fetch(wasmUrl);
       const wasmBinary = await wasmResponse.arrayBuffer();
