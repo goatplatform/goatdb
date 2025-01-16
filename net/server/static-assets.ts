@@ -8,8 +8,6 @@ import kEncodedSystemAssets from '../../system-assets/assets.json' with { type: 
 
 const kSystemAssets = staticAssetsFromJS(kEncodedSystemAssets);
 
-debugger;
-
 const STATIC_ASSETS_CACHE_DURATION_SEC = 86400;
 
 // export const kEntryPointsNames = [APP_ENTRY_POINT, '__file_worker'] as const;

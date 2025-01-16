@@ -11,13 +11,12 @@
     "singleQuote": true
   },
   "name": "@goatdb/goatdb",
-  "version": "0.0.26",
+  "version": "0.0.35",
   "license": "AGPL/ELV2",
   "exports": {
     ".": "./mod.ts",
     "./react": "./react/hooks.ts",
     "./cli": "./cli/goat.ts",
-    "./json-log.worker.ts": "./base/json-log/json-log.worker.ts",
     "./server": "./server/mod.ts"
   },
   "tasks": {

@@ -287,8 +287,6 @@ async function writeTextFile(path: string, text: string): Promise<boolean> {
 }
 
 function main(): void {
-  debugger;
-  console.log(`WORKER STARTED`);
   onmessage = async (event: MessageEvent<WorkerFileReq>) => {
     switch (event.data.type) {
       case 'open': {
@@ -402,4 +400,4 @@ function main(): void {
   };
 }
 
-if (import.meta.main) main();
+main();

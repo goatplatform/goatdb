@@ -660,7 +660,7 @@ export class Repository<
   itemForCommit<S extends Schema>(c: Commit | string): Item<S> {
     try {
       if (++Repository.callCount === 2) {
-        debugger;
+        // debugger;
       }
       let result = this._cachedRecordForCommit.get(
         typeof c === 'string' ? c : c.id,
@@ -1289,14 +1289,14 @@ export class Repository<
                 if (authorizer(this.db, this.path, c.key, session, 'write')) {
                   result.push(c);
                 } else {
-                  debugger;
+                  // debugger;
                   // authorizer(this, c, session, true);
                 }
               } else {
                 result.push(c);
               }
             } else {
-              debugger;
+              // debugger;
               // this.trustPool.verify(c);
             }
           })(),
