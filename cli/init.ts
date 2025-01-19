@@ -7,4 +7,5 @@
 //    * jsr:@luca/esbuild-deno-loader
 //    * npm:react@19.0.0
 //    * npm:react-dom@19.0.0/client
+//    * npm:yargs@17.7.2
 // 7. Create .gitignore or suggest user to edit it if already exists

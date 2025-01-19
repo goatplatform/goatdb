@@ -1,91 +1,18 @@
 import yargs from 'yargs';
-import {
-  PutObjectCommand,
-  PutObjectRequest,
-  S3Client,
-} from 'npm:@aws-sdk/client-s3';
-import { Upload } from 'npm:@aws-sdk/lib-storage';
 import * as path from '@std/path';
 import { defaultAssetsBuild } from './generate-static-assets.ts';
 import { VCurrent } from '../base/version-number.ts';
 import { getRepositoryPath } from '../base/development.ts';
 import { tuple4ToString } from '../base/tuple.ts';
-import { BuildChannel, generateBuildInfo } from './build-info.ts';
+import { type BuildChannel, generateBuildInfo } from './build-info.ts';
 
-interface Arguments {
-  upload?: boolean;
-  linux?: boolean;
-  control?: boolean;
-  both?: boolean;
-  beta?: boolean;
-  release?: boolean;
-}
+export type TargetOS = 'mac' | 'linux' | 'windows';
+export type CPUArch = 'x64' | 'aar64';
 
-export type BuildTarget = 'server' | 'control';
-
-async function compressFile(srcPath: string, dstPath: string): Promise<void> {
-  const src = await Deno.open(srcPath, { read: true, write: false });
-  const dst = await Deno.open(dstPath, {
-    read: true,
-    write: true,
-    create: true,
-    truncate: true,
-  });
-  await src.readable
-    .pipeThrough(new CompressionStream('gzip'))
-    .pipeTo(dst.writable);
-}
-
-async function uploadToS3(uploadPath: string): Promise<void> {
-  const file = await Deno.open(uploadPath, { read: true, write: false });
-  const client = new S3Client({ region: 'us-east-1' });
-  const req: PutObjectRequest = {
-    Body: file.readable,
-    Bucket: 'ovvio2-release',
-    Key: path.basename(uploadPath),
-    ACL: 'public-read',
-    ContentType: 'application/octet-stream',
-  };
-  console.log(`Uploading ${uploadPath} \u{02192} ${req.Bucket}/${req.Key}`);
-
-  const parallelUploads3 = new Upload({
-    client: client,
-    params: req,
-  });
-
-  const dot = new TextEncoder().encode('.');
-  parallelUploads3.on('httpUploadProgress', (_progress) => {
-    Deno.stdout.write(dot);
-  });
-
-  await parallelUploads3.done();
-  console.log('\nDone');
-}
-
-// async function putS3Object(uploadPath: string): Promise<boolean> {
-//   const file = await Deno.readFile(uploadPath);
-//   const client = new S3Client({ region: 'us-east-1' });
-//   const req: PutObjectRequest = {
-//     Body: file,
-//     Bucket: 'ovvio2-release',
-//     Key: path.basename(uploadPath),
-//     ACL: 'public-read',
-//   };
-//   console.log(
-//     `Uploading atomically ${uploadPath} \u{02192} ${req.Bucket}/${req.Key}`
-//   );
-//   const resp = await client.send(new PutObjectCommand(req));
-//   return resp.ETag !== undefined && resp.ETag.length > 0;
-// }
-
-export function outputFileName(
-  target: BuildTarget,
-  deployment: boolean,
-  channel?: BuildChannel,
-): string {
-  return `ovvio-${target}-${deployment ? 'linux' : Deno.build.os}${
-    channel && channel !== 'release' ? '-' + channel : ''
-  }`;
+interface BuildSpec {
+  os?: TargetOS;
+  channel?: BuildChannel;
+  arch?: CPUArch;
 }
 
 async function hashFile(
@@ -107,12 +34,7 @@ async function hashFile(
   console.log(`Checksum written successfully to ${outputFilePath}`);
 }
 
-async function build(
-  repoPath: string,
-  linux: boolean,
-  target: BuildTarget,
-  channel?: BuildChannel,
-): Promise<void> {
+async function build(repoPath: string, spec: BuildSpec): Promise<void> {
   console.log(
     `Generating ${target} executable for ${linux ? 'linux' : Deno.build.os}...`,
   );
@@ -172,7 +94,7 @@ function colorForChannel(channel: BuildChannel): string {
 }
 
 async function main(): Promise<void> {
-  const args: Arguments = yargs(Deno.args)
+  const args: BuildSpec = yargs(Deno.args)
     .option('upload', {
       type: 'boolean',
       default: false,

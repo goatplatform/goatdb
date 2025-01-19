@@ -1,7 +1,6 @@
 import * as esbuild from 'esbuild';
 import { denoPlugins } from '@luca/esbuild-deno-loader';
 import * as path from '@std/path';
-import { getRepositoryPath } from './base/development.ts';
 import { APP_ENTRY_POINT } from './net/server/static-assets.ts';
 
 export interface BundleResult {
