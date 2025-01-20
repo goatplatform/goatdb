@@ -211,6 +211,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
     if (newHead) {
       this.rebase();
     }
+    this._head = newHead;
     this._commitInProgress = false;
   }
 
