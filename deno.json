@@ -11,13 +11,13 @@
     "singleQuote": true
   },
   "name": "@goatdb/goatdb",
-  "version": "0.0.44",
+  "version": "0.0.45",
   "license": "AGPL/ELV2",
   "exports": {
     ".": "./mod.ts",
     "./react": "./react/hooks.ts",
-    "./cli": "./cli/goat.ts",
-    "./server": "./server/mod.ts"
+    "./server": "./server/mod.ts",
+    "./init": "./cli/init.ts"
   },
   "tasks": {
     "build": "deno run -A packaging/build-sys-assets.ts"
