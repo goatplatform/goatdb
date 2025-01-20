@@ -8,7 +8,7 @@
 
 ---
 
-# The Version Control Database
+# The Edge-Native Database
 
 GoatDB is a real-time, distributed, scalable Version Control Database (VCDB) that simplifies building modern, responsive applications. Unlike traditional databases, GoatDB runs most of the work—like reading, writing, and querying data—on the client side instead of relying on the server. This approach ensures your app feels fast and always works, even if the network connection is unstable.
 
