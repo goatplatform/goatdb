@@ -1,4 +1,4 @@
-import * as path from 'std/path';
+import * as path from '@std/path';
 import { assert } from '../error.ts';
 import { ReadonlyJSONObject } from '../interfaces.ts';
 import { FileImplGet } from './file-impl.ts';

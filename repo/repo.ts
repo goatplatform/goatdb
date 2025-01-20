@@ -92,7 +92,7 @@ export class Repository<
   private readonly _cachedRecordForCommit: Map<string, Item>;
   private readonly _cachedValueForKey: Map<string, [Item, Commit] | undefined>;
   private readonly _adjList: AdjacencyList;
-  private readonly _pendingMergePromises: Map<
+  private readonly _pendingCommitPromises: Map<
     string,
     Promise<Commit | undefined>
   >;
@@ -124,7 +124,7 @@ export class Repository<
     this._cachedValueForKey = new Map();
     this._cachedRecordForCommit = new Map();
     this._adjList = new AdjacencyList();
-    this._pendingMergePromises = new Map();
+    this._pendingCommitPromises = new Map();
     this._cachedCommitsPerUser = new Map();
     this._commitIsCorruptedResult = new Map();
     this.priorityRepo = priorityRepo === true;
@@ -660,7 +660,7 @@ export class Repository<
   itemForCommit<S extends Schema>(c: Commit | string): Item<S> {
     try {
       if (++Repository.callCount === 2) {
-        debugger;
+        // debugger;
       }
       let result = this._cachedRecordForCommit.get(
         typeof c === 'string' ? c : c.id,
@@ -824,7 +824,7 @@ export class Repository<
       return Promise.resolve(undefined);
     }
     const key = commitsToMerge[0].key;
-    let result = this._pendingMergePromises.get(key);
+    let result = this._pendingCommitPromises.get(key);
     if (!result) {
       result = this._createMergeCommitImpl(
         commitsToMerge,
@@ -834,11 +834,11 @@ export class Repository<
         deltaCompress,
       );
       result.finally(() => {
-        if (this._pendingMergePromises.get(key) === result) {
-          this._pendingMergePromises.delete(key);
+        if (this._pendingCommitPromises.get(key) === result) {
+          this._pendingCommitPromises.delete(key);
         }
       });
-      this._pendingMergePromises.set(key, result);
+      this._pendingCommitPromises.set(key, result);
     } else {
       // Disallow concurrent commits for any given key
       return Promise.resolve(undefined);
@@ -1094,10 +1094,24 @@ export class Repository<
     value: Item<S>,
     parentCommit: string | Commit | undefined,
   ): Promise<Commit | undefined> {
-    if (this._pendingMergePromises.has(key)) {
-      // Refuse committing while a merge is in progress
+    if (this._pendingCommitPromises.has(key)) {
+      // Refuse editing while an existing edit is in progress
       throw serviceUnavailable();
     }
+    this._pendingCommitPromises.set(
+      key,
+      this._setValueForKeyImpl(key, value, parentCommit).finally(() => {
+        this._pendingCommitPromises.delete(key);
+      }),
+    );
+    return this._pendingCommitPromises.get(key);
+  }
+
+  private async _setValueForKeyImpl<S extends Schema>(
+    key: string,
+    value: Item<S>,
+    parentCommit: string | Commit | undefined,
+  ): Promise<Commit | undefined> {
     // All keys start with null records implicitly, so need need to persist
     // them. Also, we forbid downgrading a record back to null once initialized.
     if (value.isNull) {
@@ -1118,10 +1132,8 @@ export class Repository<
       }
       parentCommit = this.getCommit(parentCommit);
     }
-    if (!parentCommit) {
-      parentCommit = this.pickBestCommitForCurrentClient(
-        this.commitsForKey(key),
-      );
+    if (!parentCommit && latest) {
+      parentCommit = latest[1];
     }
     if (parentCommit) {
       const headRecord = this.itemForCommit(parentCommit);
@@ -1177,9 +1189,9 @@ export class Repository<
     if (headRecord.isEqual(record)) {
       return [record, headId instanceof Commit ? headId.id : undefined];
     }
-    const baseRecord = headId
-      ? this.itemForCommit<S>(headId).clone()
-      : (Item.nullItem() as Item<S>);
+    const baseRecord = (
+      headId ? this.itemForCommit<S>(headId) : (Item.nullItem() as Item<S>)
+    ).clone();
     if (
       !headRecord.isNull &&
       !SchemaEquals(baseRecord.schema, headRecord.schema)
@@ -1289,14 +1301,14 @@ export class Repository<
                 if (authorizer(this.db, this.path, c.key, session, 'write')) {
                   result.push(c);
                 } else {
-                  debugger;
+                  // debugger;
                   // authorizer(this, c, session, true);
                 }
               } else {
                 result.push(c);
               }
             } else {
-              debugger;
+              // debugger;
               // this.trustPool.verify(c);
             }
           })(),
@@ -1421,6 +1433,7 @@ export class Repository<
         commit,
       );
     }
+    this.invalidateCachesForKey(commit.key);
     this.emit('DocumentChanged', commit.key);
   }
 

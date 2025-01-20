@@ -1,22 +1,21 @@
 import { EaseInExpoTimer, EaseInOutSineTimer } from '../base/timer.ts';
-import { BloomFilter } from '../base/bloom.ts';
+import type { BloomFilter } from '../base/bloom.ts';
 import { SyncMessage } from './message.ts';
 import { log } from '../logging/log.ts';
 import { MovingAverage } from '../base/math.ts';
 import {
-  SyncConfig,
+  type SyncConfig,
   syncConfigGetCycles,
   SyncPriority,
-  SyncScheduler,
+  type SyncScheduler,
 } from './sync-scheduler.ts';
-import { Repository } from '../repo/repo.ts';
+import type { Repository } from '../repo/repo.ts';
 import { randomInt } from '../base/math.ts';
 import { Emitter } from '../base/emitter.ts';
-import { Commit } from '../repo/commit.ts';
-import { SchemaManager } from '../cfds/base/schema.ts';
+import type { Commit } from '../repo/commit.ts';
+import { SchemaManager } from '../cfds/base/schema-manager.ts';
 import { assert } from '../base/error.ts';
 import { getGoatConfig } from '../server/config.ts';
-import { sleep } from '../base/time.ts';
 
 const COMMIT_SUBMIT_RETRY = 10;
 
@@ -247,13 +246,13 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
         reqMsg,
         priority,
       )) as typeof reqMsg;
-    } catch (e) {
+    } catch (e: unknown) {
       log({
         severity: 'INFO',
         error: 'SerializeError',
-        value: e.message,
-        message: e.message,
-        trace: e.stack,
+        value: (e as Error).message,
+        message: (e as Error).message,
+        trace: (e as Error).stack,
       });
       this._setIsOnline(false);
       return false;

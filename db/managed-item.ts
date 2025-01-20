@@ -167,6 +167,11 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
     }
   }
 
+  downloadDebugGraph(): void {
+    const key = itemPathGetPart(this.path, 'item');
+    this.repository?.downloadDebugNetworkForKey(key);
+  }
+
   reset(): void {}
 
   activate(): void {
@@ -206,6 +211,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
     if (newHead) {
       this.rebase();
     }
+    this._head = newHead;
     this._commitInProgress = false;
   }
 

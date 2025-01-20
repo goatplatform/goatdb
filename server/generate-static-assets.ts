@@ -1,21 +1,20 @@
-import * as esbuild from 'npm:esbuild@0.20.2';
-import { denoPlugins } from 'jsr:@luca/esbuild-deno-loader';
-import * as path from 'std/path';
-import { getRepositoryPath } from '../base/development.ts';
-import { VCurrent, VersionNumber } from '../base/version-number.ts';
+import type * as esbuild from 'esbuild';
+import * as path from '@std/path';
+import { denoPlugins } from '@luca/esbuild-deno-loader';
+import { VCurrent, type VersionNumber } from '../base/version-number.ts';
 import {
-  ReBuildContext,
+  type ReBuildContext,
   isReBuildContext,
-  ENTRY_POINTS,
   bundleResultFromBuildResult,
 } from '../build.ts';
 import {
-  StaticAssets,
+  APP_ENTRY_POINT,
+  type StaticAssets,
   compileAssetsDirectory,
-  kEntryPointsNames,
-  staticAssetsToJS,
 } from '../net/server/static-assets.ts';
 import { getGoatConfig } from './config.ts';
+import { notImplemented } from '../base/error.ts';
+import type { AppConfig } from './app-config.ts';
 
 function generateConfigSnippet(
   version: VersionNumber,
@@ -38,7 +37,9 @@ function generateConfigSnippet(
 
 export async function buildAssets(
   ctx: ReBuildContext | typeof esbuild,
+  entryPoints: { in: string; out: string }[],
   version: VersionNumber,
+  appConfig: AppConfig,
   serverURL?: string,
   orgId?: string,
 ): Promise<StaticAssets> {
@@ -46,72 +47,116 @@ export async function buildAssets(
     ? ctx.rebuild()
     : bundleResultFromBuildResult(
         await ctx.build({
-          entryPoints: ENTRY_POINTS,
-          plugins: [
-            ...denoPlugins({
-              configPath: `${await getRepositoryPath()}/deno.json`,
-            }),
-          ],
+          entryPoints,
+          plugins: [...denoPlugins()],
           bundle: true,
           write: false,
           sourcemap: 'linked',
           outdir: 'output',
+          logOverride: {
+            'empty-import-meta': 'silent',
+          },
         }),
       ));
 
-  const repoPath = await getRepositoryPath();
-  const result = {} as StaticAssets;
+  // System assets are always included and are placed at the root
+  const result: StaticAssets = {};
   const textEncoder = new TextEncoder();
-  for (const ep of kEntryPointsNames) {
-    const { source, map } = buildResults[ep];
-    const assets = await compileAssetsDirectory(
-      path.join(repoPath, 'assets'),
-      path.join(repoPath, ep, 'assets'),
-    );
-    assets['/app.js'] = {
+  // For app code, include html and css files
+  if (Object.hasOwn(buildResults, APP_ENTRY_POINT)) {
+    const { source, map } = buildResults[APP_ENTRY_POINT];
+    if (appConfig.assetsPath) {
+      // User provided assets are placed under /assets/
+      Object.assign(
+        result,
+        await compileAssetsDirectory(
+          path.resolve(appConfig.assetsPath),
+          appConfig.assetsFilter,
+          '/assets',
+        ),
+      );
+    }
+    result['/app.js'] = {
       data: textEncoder.encode(
         generateConfigSnippet(version, serverURL, orgId) + source,
       ),
       contentType: 'text/javascript',
     };
-    assets['/app.js.map'] = {
+    result['/app.js.map'] = {
       data: textEncoder.encode(map),
       contentType: 'application/json',
     };
-    try {
-      assets['/index.html'] = {
-        data: await Deno.readFile(path.join(repoPath, ep, 'src', 'index.html')),
-        contentType: 'text/html',
-      };
-    } catch (_: unknown) {
-      // ignore
+    if (appConfig.htmlPath) {
+      try {
+        result['/index.html'] = {
+          data: await Deno.readFile(appConfig.htmlPath),
+          contentType: 'text/html',
+        };
+      } catch (_: unknown) {
+        throw new Error(`Error loading ${appConfig.htmlPath}`);
+      }
     }
-    try {
-      assets['/index.css'] = {
-        data: await Deno.readFile(path.join(repoPath, ep, 'src', 'index.css')),
-        contentType: 'text/css',
-      };
-    } catch (_: unknown) {
-      // ignore
+    if (appConfig.cssPath) {
+      try {
+        result['/index.css'] = {
+          data: await Deno.readFile(appConfig.cssPath),
+          contentType: 'text/css',
+        };
+      } catch (_: unknown) {
+        throw new Error(`Error loading ${appConfig.cssPath}`);
+      }
     }
-    result[ep] = assets;
+  }
+  // All other entries include as
+  for (const ep of Object.keys(buildResults)) {
+    if (ep === APP_ENTRY_POINT) {
+      continue;
+    }
+    const { source, map } = buildResults[ep];
+    result[`/${ep}.js`] = {
+      data: textEncoder.encode(
+        generateConfigSnippet(version, serverURL, orgId) + source,
+      ),
+      contentType: 'text/javascript',
+    };
+    result[`/${ep}.js.map`] = {
+      data: textEncoder.encode(map),
+      contentType: 'application/json',
+    };
   }
   return result;
 }
 
-export async function defaultAssetsBuild(): Promise<void> {
-  const repoPath = await getRepositoryPath();
-  await Deno.mkdir(path.join(repoPath, 'build'), { recursive: true });
-
-  console.log('Bundling client code...');
-  const assets = await buildAssets(esbuild, VCurrent);
-  await Deno.writeTextFile(
-    path.join(repoPath, 'build', 'staticAssets.json'),
-    JSON.stringify(staticAssetsToJS(assets)),
-  );
-  esbuild.stop();
-}
-
-if (import.meta.main) {
-  defaultAssetsBuild();
+export async function defaultAssetsBuild(
+  appPath: string,
+  version = VCurrent,
+  ctx: ReBuildContext,
+): Promise<void> {
+  notImplemented();
+  // const repoPath = await getRepositoryPath();
+  // await Deno.mkdir(path.join(repoPath, 'build'), { recursive: true });
+  // console.log('Bundling client code...');
+  // const assets = await buildAssets(
+  //   ctx,
+  //   [
+  //     {
+  //       in: path.resolve(appPath),
+  //       out: APP_ENTRY_POINT,
+  //     },
+  //     {
+  //       in: path.join(
+  //         await getRepositoryPath(),
+  //         '__file_worker',
+  //         'json-log.worker.ts',
+  //       ),
+  //       out: '__file_worker',
+  //     },
+  //   ],
+  //   version,
+  // );
+  // await Deno.writeTextFile(
+  //   path.join(repoPath, 'build', 'staticAssets.json'),
+  //   JSON.stringify(staticAssetsToJS(assets)),
+  // );
+  // esbuild.stop();
 }

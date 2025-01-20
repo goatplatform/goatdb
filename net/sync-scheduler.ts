@@ -1,16 +1,19 @@
-import { TrustPool } from '../db/session.ts';
+import type { TrustPool } from '../db/session.ts';
 import { JSONCyclicalEncoder } from '../base/core-types/encoding/json.ts';
 import { JSONCyclicalDecoder } from '../base/core-types/encoding/json.ts';
 import { kSecondMs } from '../base/date.ts';
 import { assert } from '../base/error.ts';
-import { ReadonlyJSONArray, ReadonlyJSONObject } from '../base/interfaces.ts';
+import type {
+  ReadonlyJSONArray,
+  ReadonlyJSONObject,
+} from '../base/interfaces.ts';
 import { MovingAverage, randomInt } from '../base/math.ts';
 import { sleep } from '../base/time.ts';
 import { serviceUnavailable } from '../cfds/base/errors.ts';
 import { log } from '../logging/log.ts';
 import { SyncMessage } from './message.ts';
 import { sendJSONToURL } from './rest-api.ts';
-import { SchemaManager } from '../cfds/base/schema.ts';
+import type { SchemaManager } from '../cfds/base/schema-manager.ts';
 
 const K_MAX_REQ_BATCH = 10;
 
@@ -175,12 +178,12 @@ export class SyncScheduler {
           url: this.url,
         });
       }
-    } catch (e) {
+    } catch (e: unknown) {
       log({
         severity: 'INFO',
         error: 'FetchError',
-        message: e.message,
-        trace: e.stack,
+        message: (e as Error).message,
+        trace: (e as Error).stack,
         url: this.url,
       });
       this._fetchInProgress = false;
@@ -219,13 +222,13 @@ export class SyncScheduler {
         }
         await sleep(5);
       }
-    } catch (e) {
+    } catch (e: unknown) {
       log({
         severity: 'INFO',
         error: 'SerializeError',
         value: respText,
-        message: e.message,
-        trace: e.stack,
+        message: (e as Error).message,
+        trace: (e as Error).stack,
       });
       pendingRequests.forEach((r) => r.reject(serviceUnavailable()));
       return;

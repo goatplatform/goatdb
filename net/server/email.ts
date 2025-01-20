@@ -2,7 +2,7 @@ import {
   SendEmailCommand,
   SendEmailCommandInput,
   SESv2Client,
-} from 'npm:@aws-sdk/client-sesv2';
+} from '@aws-sdk/client-sesv2';
 import { ServerServices } from './server.ts';
 import { BaseService } from './service.ts';
 import { EmailType } from '../../logging/metrics.ts';

@@ -203,6 +203,13 @@ export class Query<
           return this.sortDescriptor!(this._sortInfo);
         });
       }
+      if (this.limit > 0) {
+        const delta = this._cachedResults.length - this.limit;
+        this._cachedResults = this._cachedResults.splice(
+          this._cachedResults.length - delta - 1,
+          delta,
+        );
+      }
       Object.freeze(this._cachedResults);
     }
     return this._cachedResults;
@@ -247,7 +254,7 @@ export class Query<
     return result;
   }
 
-  protected async resume(): Promise<void> {
+  protected override async resume(): Promise<void> {
     super.resume();
     if (!this._closed) {
       if (typeof this.source === 'string') {
@@ -282,7 +289,7 @@ export class Query<
     }
   }
 
-  protected suspend(): void {
+  protected override suspend(): void {
     if (!this._closed) {
       this.repo.db.queryPersistence?.unregister(
         this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
@@ -295,18 +302,14 @@ export class Query<
 
   private addPathToResults(path: string, currentDoc: Item<IS>): void {
     // Insert to the results set
-    if (
-      this.has(path) ||
-      (this.limit > 0 && this._includedPaths.length >= this.limit)
-    ) {
-      return;
-    }
-    this._includedPaths.push(path);
-    // Rebuild bloom filter if it became too big, to maintain its FPR
-    if (++this._bloomFilterCount >= this._bloomFilterSize) {
-      this._rebuildBloomFilter();
-    } else {
-      this._bloomFilter.add(path);
+    if (!this.has(path)) {
+      this._includedPaths.push(path);
+      // Rebuild bloom filter if it became too big, to maintain its FPR
+      if (++this._bloomFilterCount >= this._bloomFilterSize) {
+        this._rebuildBloomFilter();
+      } else {
+        this._bloomFilter.add(path);
+      }
     }
     // Report this change downstream
     this.emit('DocumentChanged', path, currentDoc);

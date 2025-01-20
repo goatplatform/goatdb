@@ -1,39 +1,24 @@
-import * as esbuild from 'npm:esbuild@0.20.2';
-import { denoPlugins } from 'jsr:@luca/esbuild-deno-loader';
-import * as path from 'std/path';
-import { assert } from './base/error.ts';
-import { getRepositoryPath } from './base/development.ts';
-import {
-  kEntryPointsNames,
-  EntryPointName,
-  EntryPointIndex,
-} from './net/server/static-assets.ts';
-
-async function getEntryPoints(): Promise<{ in: string; out: string }[]> {
-  const repoPath = await getRepositoryPath();
-  return kEntryPointsNames.map((name) => {
-    return {
-      in: path.join(repoPath, name, EntryPointIndex[name]),
-      out: name,
-    };
-  });
-}
-
-export const ENTRY_POINTS = await getEntryPoints();
+import * as esbuild from 'esbuild';
+import { denoPlugins } from '@luca/esbuild-deno-loader';
+import * as path from '@std/path';
+import { APP_ENTRY_POINT } from './net/server/static-assets.ts';
 
 export interface BundleResult {
   source: string;
   map: string;
 }
 
-export async function bundle(): Promise<Record<EntryPointName, BundleResult>> {
+export async function bundle(
+  sourcePath: string,
+): Promise<Record<string, BundleResult>> {
   const result = await esbuild.build({
-    entryPoints: ENTRY_POINTS,
-    plugins: [
-      ...denoPlugins({
-        configPath: `${await getRepositoryPath()}/deno.json`,
-      }),
+    entryPoints: [
+      {
+        in: sourcePath,
+        out: APP_ENTRY_POINT,
+      },
     ],
+    plugins: [...denoPlugins()],
     bundle: true,
     write: false,
     sourcemap: 'linked',
@@ -43,11 +28,10 @@ export async function bundle(): Promise<Record<EntryPointName, BundleResult>> {
 
 export function bundleResultFromBuildResult(
   buildResult: esbuild.BuildResult,
-): Record<EntryPointName, BundleResult> {
-  const result = {} as Record<EntryPointName, BundleResult>;
+): Record<string, BundleResult> {
+  const result = {} as Record<string, BundleResult>;
   for (const file of buildResult.outputFiles!) {
-    const entryPoint = path.basename(file.path).split('.')[0] as EntryPointName;
-    assert(kEntryPointsNames.includes(entryPoint)); // Sanity check
+    const entryPoint = path.basename(file.path).split('.')[0] as string;
     let bundleResult: BundleResult | undefined = result[entryPoint];
     if (!bundleResult) {
       bundleResult = {} as BundleResult;
@@ -67,7 +51,7 @@ export function stopBackgroundCompiler(): void {
 }
 
 export interface ReBuildContext {
-  rebuild(): Promise<Record<EntryPointName, BundleResult>>;
+  rebuild(): Promise<Record<string, BundleResult>>;
   close(): void;
 }
 
@@ -77,18 +61,19 @@ export function isReBuildContext(
   return typeof (ctx as ReBuildContext).rebuild === 'function';
 }
 
-export async function createBuildContext(): Promise<ReBuildContext> {
+export async function createBuildContext(
+  entryPoints: { in: string; out: string }[],
+): Promise<ReBuildContext> {
   const ctx = await esbuild.context({
-    entryPoints: ENTRY_POINTS,
-    plugins: [
-      ...denoPlugins({
-        configPath: `${await getRepositoryPath()}/deno.json`,
-      }),
-    ],
+    entryPoints,
+    plugins: [...denoPlugins()],
     bundle: true,
     write: false,
     sourcemap: 'linked',
     outdir: 'output',
+    logOverride: {
+      'empty-import-meta': 'silent',
+    },
   });
   return {
     rebuild: async () => bundleResultFromBuildResult(await ctx.rebuild()),

@@ -1,4 +1,4 @@
-import * as path from 'std/path';
+import * as path from '@std/path';
 
 export function toAbsolutePath(p: string): string {
   if (path.isAbsolute(p)) {

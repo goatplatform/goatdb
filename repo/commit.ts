@@ -1,4 +1,4 @@
-import {
+import type {
   Encodable,
   Encoder,
   Equatable,
@@ -15,7 +15,7 @@ import { isDecoderConfig } from '../base/core-types/encoding/utils.ts';
 import { uniqueId } from '../base/common.ts';
 import { coreValueEquals } from '../base/core-types/equals.ts';
 import { assert } from '../base/error.ts';
-import { type Schema, SchemaManager } from '../cfds/base/schema.ts';
+import type { Schema } from '../cfds/base/schema.ts';
 import type { VersionNumber } from '../base/version-number.ts';
 import { getGoatConfig } from '../server/config.ts';
 import { type Comparable, coreValueCompare } from '../base/core-types/index.ts';
@@ -23,9 +23,9 @@ import type { ReadonlyJSONObject } from '../base/interfaces.ts';
 import {
   JSONCyclicalDecoder,
   JSONCyclicalEncoder,
-  JSONEncoder,
 } from '../base/core-types/encoding/json.ts';
 import { BloomFilter } from '../base/bloom.ts';
+import { SchemaManager } from '../cfds/base/schema-manager.ts';
 // import { BloomFilter } from '../cpp/bloom_filter.ts';
 
 export type CommitResolver = (commitId: string) => Commit;

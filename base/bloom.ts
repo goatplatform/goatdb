@@ -1,4 +1,4 @@
-import { encodeBase64 } from 'std/encoding';
+import { encodeBase64 } from '@std/encoding';
 import { assert } from './error.ts';
 import { MurmurHash3 } from './hash.ts';
 import type { CoreValue, Encodable, Encoder } from './core-types/base.ts';

@@ -1,20 +1,25 @@
-import { walk, exists } from 'std/fs';
-import { extname } from 'std/path';
-import { Endpoint, ServerServices } from './server.ts';
+import { walk, exists } from '@std/fs';
+import { extname } from '@std/path';
+import type { Endpoint, ServerServices } from './server.ts';
 import { getRequestPath } from './utils.ts';
-import { JSONObject, ReadonlyJSONObject } from '../../base/interfaces.ts';
-import { decodeBase64, encodeBase64 } from 'std/encoding';
+import type { JSONObject, ReadonlyJSONObject } from '../../base/interfaces.ts';
+import { decodeBase64, encodeBase64 } from '@std/encoding';
+import kEncodedSystemAssets from '../../system-assets/assets.json' with { type: 'json' };
+
+const kSystemAssets = staticAssetsFromJS(kEncodedSystemAssets);
 
 const STATIC_ASSETS_CACHE_DURATION_SEC = 86400;
 
-export const kEntryPointsNames = ['web-app', '__file_worker'] as const;
-export type EntryPointName = (typeof kEntryPointsNames)[number];
-export const EntryPointDefault: EntryPointName = 'web-app';
+// export const kEntryPointsNames = [APP_ENTRY_POINT, '__file_worker'] as const;
+// export type EntryPointName = (typeof kEntryPointsNames)[number];
+// export const EntryPointDefault: EntryPointName = APP_ENTRY_POINT;
 
-export const EntryPointIndex: Record<EntryPointName, string> = {
-  'web-app': 'src/index.tsx',
-  __file_worker: 'json-log.worker.ts',
-};
+// export const EntryPointIndex: Record<EntryPointName, string> = {
+//   APP_ENTRY_POINT: 'src/index.tsx',
+//   __file_worker: 'json-log.worker.ts',
+// };
+
+export const APP_ENTRY_POINT = 'web-app';
 
 export type ContentType =
   | 'image/svg+xml'
@@ -47,14 +52,13 @@ export interface Asset {
   contentType: ContentType;
 }
 
-export type StaticEntryPoint = Record<string, Asset>;
-export type StaticAssets = Required<Record<EntryPointName, StaticEntryPoint>>;
+export type StaticAssets = Record<string, Asset>;
 
 export class StaticAssetsEndpoint implements Endpoint {
   filter(
-    services: ServerServices,
+    _services: ServerServices,
     req: Request,
-    info: Deno.ServeHandlerInfo,
+    _info: Deno.ServeHandlerInfo,
   ): boolean {
     return req.method === 'GET';
   }
@@ -62,56 +66,15 @@ export class StaticAssetsEndpoint implements Endpoint {
   processRequest(
     services: ServerServices,
     req: Request,
-    info: Deno.ServeHandlerInfo,
+    _info: Deno.ServeHandlerInfo,
   ): Promise<Response> {
-    let path = getRequestPath(req);
-
-    const pathComps = path.split('/');
-
-    let ep: EntryPointName = EntryPointDefault;
-    if (kEntryPointsNames.includes(pathComps[1] as EntryPointName)) {
-      ep = pathComps[1] as EntryPointName;
-    }
-    const staticEP = services.staticAssets && services.staticAssets[ep];
-
-    if (!staticEP) {
+    if (!services.staticAssets) {
       return Promise.resolve(new Response(null, { status: 404 }));
     }
+    const path = getRequestPath(req);
+    const asset =
+      kSystemAssets[path as keyof typeof kSystemAssets] || services.staticAssets[path] || services.staticAssets['/index.html'];
 
-    const epRelativePath =
-      ep === EntryPointDefault
-        ? path
-        : path.substring((ep as string).length + 1);
-
-    const orgPathPrefix = `/org/${services.organizationId}/`;
-    let asset =
-      staticEP[`${orgPathPrefix}${epRelativePath.substring(1)}`] ||
-      staticEP[epRelativePath];
-
-    if (asset && epRelativePath === '/app.js') {
-      const result: string[] = [];
-      for (const p of Object.keys(staticEP)) {
-        if (p.startsWith(orgPathPrefix)) {
-          result.push(p.substring(orgPathPrefix.length - 1));
-        }
-      }
-      result.sort();
-      const snippet = `self.OvvioAssetsList = ${JSON.stringify(result)};\n`;
-      return Promise.resolve(
-        new Response(snippet + new TextDecoder().decode(asset.data), {
-          headers: {
-            'content-type': 'text/javascript',
-          },
-        }),
-      );
-    }
-
-    // Default to index page
-    if (!asset) {
-      asset = staticEP['/index.html'];
-    }
-
-    // 404 if we don't have an index
     if (!asset) {
       return Promise.resolve(new Response(null, { status: 404 }));
     }
@@ -133,64 +96,62 @@ export class StaticAssetsEndpoint implements Endpoint {
 }
 
 export async function compileAssetsDirectory(
-  ...assetsDirectories: string[]
+  dir: string,
+  filter?: (path: string) => boolean,
+  prefix?: string,
 ): Promise<Record<string, Asset>> {
   const result: Record<string, Asset> = {};
-  for (const dir of assetsDirectories) {
-    if (!(await exists(dir))) {
+  if (!(await exists(dir))) {
+    return result;
+  }
+  for await (const { path } of walk(dir, {
+    includeDirs: false,
+    includeSymlinks: false,
+    followSymlinks: false,
+    exts: kValidFileExtensions,
+  })) {
+    if (filter && !filter(path)) {
       continue;
     }
-    for await (const { path } of walk(dir, {
-      includeDirs: false,
-      includeSymlinks: false,
-      followSymlinks: false,
-      exts: kValidFileExtensions,
-    })) {
-      const origExt = extname(path);
-      let ext = origExt.substring(1);
-      if (ext === 'ts') {
-        ext = 'js';
-      }
-      let key = path.substring(dir.length).toLowerCase();
-      // Rewrite extension to match
-      key = key.substring(0, key.length - origExt.length) + '.' + ext;
-      result[key] = {
-        data: await Deno.readFile(path),
-        contentType: ContentTypeMapping[ext] || 'application/octet-stream',
-      };
+    const origExt = extname(path);
+    let ext = origExt.substring(1);
+    if (ext === 'ts') {
+      ext = 'js';
     }
+    let key = path.substring(dir.length).toLowerCase();
+    // Rewrite extension to match
+    key = key.substring(0, key.length - origExt.length) + '.' + ext;
+    if (prefix) {
+      key = `${prefix}${key}`;
+    }
+    result[key] = {
+      data: await Deno.readFile(path),
+      contentType: ContentTypeMapping[ext] || 'application/octet-stream',
+    };
   }
   return result;
 }
 
 export function staticAssetsToJS(assets: StaticAssets): ReadonlyJSONObject {
   const result: JSONObject = {};
-  for (const [ep, entry] of Object.entries(assets)) {
-    const encodedEp: JSONObject = {};
-    for (const [path, asset] of Object.entries(entry)) {
-      encodedEp[path] = {
-        data: encodeBase64(asset.data),
-        contentType: asset.contentType,
-      };
-    }
-    result[ep] = encodedEp;
+  for (const [path, asset] of Object.entries(assets)) {
+    result[path] = {
+      data: encodeBase64(asset.data),
+      contentType: asset.contentType,
+    };
   }
   return result;
 }
 
-export function staticAssetsFromJS(assets: ReadonlyJSONObject): StaticAssets {
-  const result: Record<string, StaticEntryPoint> = {};
-  for (const [ep, encodedEp] of Object.entries(assets)) {
-    const entry: StaticEntryPoint = {};
-    for (const [path, asset] of Object.entries(
-      encodedEp as ReadonlyJSONObject,
-    )) {
-      entry[path] = {
-        data: decodeBase64((asset as ReadonlyJSONObject).data as string),
-        contentType: (asset as ReadonlyJSONObject).contentType as ContentType,
-      };
-    }
-    result[ep] = entry;
+export function staticAssetsFromJS(
+  encodedAssets: ReadonlyJSONObject,
+): StaticAssets {
+  const result: StaticAssets = {};
+  for (const [path, asset] of Object.entries(encodedAssets)) {
+    result[path] = {
+      data: decodeBase64((asset as ReadonlyJSONObject).data as string),
+      contentType: (asset as ReadonlyJSONObject).contentType as ContentType,
+    };
   }
   return result as StaticAssets;
 }

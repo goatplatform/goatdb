@@ -1,11 +1,8 @@
 import { BloomFilter } from '../base/bloom.ts';
 import { uniqueId } from '../base/common.ts';
-import { CoreValue, Encodable, Encoder } from '../base/core-types/base.ts';
-import {
-  JSONCyclicalDecoder,
-  JSONCyclicalEncoder,
-} from '../base/core-types/encoding/json.ts';
-import {
+import type { CoreValue, Encodable, Encoder } from '../base/core-types/base.ts';
+import { JSONCyclicalDecoder } from '../base/core-types/encoding/json.ts';
+import type {
   ConstructorDecoderConfig,
   Decodable,
   DecodedValue,
@@ -14,10 +11,9 @@ import {
 } from '../base/core-types/encoding/types.ts';
 import { isDecoderConfig } from '../base/core-types/encoding/utils.ts';
 import { CoroutineScheduler, SchedulerPriority } from '../base/coroutine.ts';
-import { ReadonlyJSONObject } from '../base/interfaces.ts';
-import { VersionNumber } from '../base/version-number.ts';
-import { SchemaManager } from '../cfds/base/schema.ts';
-import { NormalizedLogEntry } from '../logging/entry.ts';
+import type { ReadonlyJSONObject } from '../base/interfaces.ts';
+import type { VersionNumber } from '../base/version-number.ts';
+import type { SchemaManager } from '../cfds/base/schema-manager.ts';
 import { Commit } from '../repo/commit.ts';
 import { getGoatConfig } from '../server/config.ts';
 

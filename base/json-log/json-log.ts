@@ -29,18 +29,18 @@ let gWorker: Worker | undefined;
 export function startJSONLogWorkerIfNeeded(): Worker {
   if (gWorker === undefined) {
     if (self.Deno !== undefined) {
-      gWorker = new Worker(
-        import.meta.resolve('../../__file_worker/json-log.worker.ts'),
-        {
-          type: 'module',
-        },
-      );
+      gWorker = new Worker(new URL('./json-log-worker.ts', import.meta.url), {
+        type: 'module',
+      });
     } else {
-      gWorker = new Worker('/__file_worker/app.js', {
+      gWorker = new Worker('/system-assets/json-log-worker.js', {
         type: 'module',
       });
     }
     gWorker.onmessage = handleResponse;
+    gWorker.onerror = (event) => {
+      console.error(event.error);
+    };
   }
   return gWorker;
 }
