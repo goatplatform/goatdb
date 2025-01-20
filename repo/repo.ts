@@ -1132,10 +1132,8 @@ export class Repository<
       }
       parentCommit = this.getCommit(parentCommit);
     }
-    if (!parentCommit) {
-      parentCommit = this.pickBestCommitForCurrentClient(
-        this.commitsForKey(key),
-      );
+    if (!parentCommit && latest) {
+      parentCommit = latest[1];
     }
     if (parentCommit) {
       const headRecord = this.itemForCommit(parentCommit);
@@ -1191,9 +1189,9 @@ export class Repository<
     if (headRecord.isEqual(record)) {
       return [record, headId instanceof Commit ? headId.id : undefined];
     }
-    const baseRecord = headId
-      ? this.itemForCommit<S>(headId).clone()
-      : (Item.nullItem() as Item<S>);
+    const baseRecord = (
+      headId ? this.itemForCommit<S>(headId) : (Item.nullItem() as Item<S>)
+    ).clone();
     if (
       !headRecord.isNull &&
       !SchemaEquals(baseRecord.schema, headRecord.schema)
