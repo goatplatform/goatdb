@@ -10,9 +10,7 @@
 
 # The Edge-Native Database
 
-GoatDB is a real-time, distributed, scalable Version Control Database (VCDB) that simplifies building modern, responsive applications. Unlike traditional databases, GoatDB runs most of the work—like reading, writing, and querying data—on the client side instead of relying on the server. This approach ensures your app feels fast and always works, even if the network connection is unstable.
-
-GoatDB also guarantees causal consistency, meaning changes are shared in the correct order across clients and servers, so data always makes sense to users. Its edge-native design eliminates many backend challenges, making both development and deployment easier while supporting modern workloads at scale.
+GoatDB is a real-time, distributed Version Control Database (VCDB). By running tasks like reading and writing on the client side, it ensures fast performance and offline functionality. With causal consistency and an edge-native design, GoatDB simplifies development and supports scalable, modern workloads.
 
 👉 If you like what we're building, please star ⭐️ our project. We really appreciate it! 🙏
 
@@ -26,20 +24,14 @@ GoatDB also guarantees causal consistency, meaning changes are shared in the cor
 • [Schemas](docs/schema.md)
 • [FAQ](docs/faq.md)
 
-Check out [web-app/src/app.tsx](web-app/src/app.tsx) to get an idea of what it's like to build apps using GoatDB.
+Before continuing, make sure you have Deno 2+ installed. If not, install it from [here](https://docs.deno.com/runtime/getting_started/installation/). Then, run the following commands inside your project's directory.
 
-### Running the Demo
+1. `deno add jsr:@goatdb/goatdb`
+2. `deno run -A jsr:@goatdb/goatdb/init`
 
-_**Caveats:**_ Currently the demo runs only on Mac and Linux. Windows support is in the works.
+### Starting the Debug Server
 
-1. Install [Deno](https://docs.deno.com/runtime/getting_started/installation/)
-2. Run `deno run -A server/debug-server.ts -d /path/to/data/dir`
-
-An interactive debug server will then start on http://localhost:8080
-
-The first public release (v0.1) is targeted for Q1 2025. Progress is tracked in the Issues tab.
-
-Contact: ofri [at] goatdb.com.
+`deno task debug` will start an interactive debug server at http://localhost:8080 that watches for any changes in the project and automatically rebuilds the client code.
 
 ## Why GoatDB?
 
