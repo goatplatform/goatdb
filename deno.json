@@ -11,7 +11,7 @@
     "singleQuote": true
   },
   "name": "@goatdb/goatdb",
-  "version": "0.0.45",
+  "version": "0.0.46",
   "license": "AGPL/ELV2",
   "exports": {
     ".": "./mod.ts",
