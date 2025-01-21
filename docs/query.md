@@ -1,3 +1,10 @@
+---
+permalink: /query/
+layout: default
+title: Query
+nav_order: 6
+---
+
 # Real-Time Query Mechanism
 
 In GoatDB, every node in the network maintains an independent, fully functional local copy of the database. Queries are executed locally, providing low-latency access and enabling offline capabilities. The real-time query mechanism ensures that query results are dynamically updated as the underlying data changes through incremental processing of updates.

@@ -1,3 +1,9 @@
+---
+permalink: /faq/
+layout: default
+title: FAQ
+---
+
 # GoatDB FAQ
 
 - [What is GoatDB?](#what-is-goatdb)

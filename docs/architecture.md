@@ -1,3 +1,10 @@
+---
+permalink: /architecture/
+layout: home
+title: Architecture
+nav_order: 2
+---
+
 # GoatDB Architecture Overview
 
 GoatDB is designed around principles from [distributed version control systems](https://en.wikipedia.org/wiki/Distributed_version_control), functioning as a managed peer-to-peer (P2P) network. In this architecture, the central server retains authority over all nodes, while computational and data synchronization tasks are predominantly handled by edge nodes. This design makes GoatDB an ideal foundation for building **edge-native applications** by maximizing client-side processing and minimizing reliance on centralized infrastructure.

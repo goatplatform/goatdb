@@ -1,3 +1,10 @@
+---
+permalink: /react/
+layout: home
+title: React
+nav_order: 3
+---
+
 # GoatDB React Hooks
 
 - [GoatDB React Hooks](#goatdb-react-hooks)

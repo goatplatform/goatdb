@@ -1,22 +1,26 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/4975e49c-e73c-435e-8e10-97adc2c0aaeb">
-    <source media="(prefers-color-scheme: light)" srcset="https://github.com/user-attachments/assets/270caf47-3ed8-49d4-b3b9-74a51bd2d6c0">
-    <img alt="GoatDB Logo" src="https://github.com/user-attachments/assets/270caf47-3ed8-49d4-b3b9-74a51bd2d6c0">
-  </picture>
-</p>
+---
+# Feel free to add content and custom Front Matter to this file.
+# To modify the layout, see https://jekyllrb.com/docs/themes/#overriding-theme-defaults
 
+layout: home
+title: Home
+nav_exclude: true
 ---
 
 # The Edge-Native Database
 
 GoatDB is a real-time, distributed Version Control Database (VCDB). By running tasks like reading and writing on the client side, it ensures fast performance and offline functionality. With causal consistency and an edge-native design, GoatDB simplifies development and supports scalable, modern workloads.
 
-👉 If you like what we're building, please star ⭐️ our project. We really appreciate it! 🙏
+If you like what we're building, please star our [GitHub project](<[https://](https://github.com/goatplatform/goatdb)>) ⭐️. We really appreciate it! 🙏
 
-- [Getting Started](https://goatplatform.github.io/goatdb/getting-started)
-- [Documentation](https://goatplatform.github.io/goatdb)
-- [FAQ](https://goatplatform.github.io/goatdb/faq)
+## Getting Started
+
+Before continuing, make sure you have Deno 2+ installed. If not, install it from [here](https://docs.deno.com/runtime/getting_started/installation/). Then, run the following commands inside your project's directory.
+
+1. `deno add jsr:@goatdb/goatdb`
+2. `deno run -A jsr:@goatdb/goatdb/init`
+
+👉 Head over to the [Getting Started](/getting-started) page for the full instructions.
 
 ## Why GoatDB?
 
@@ -60,12 +64,6 @@ GoatDB enables efficient telemetry collection for distributed systems with delta
 ## Project Status
 
 GoatDB has been production-tested in Ovvio’s real-time collaboration platform since January 2024 ([https://ovvio.io](https://ovvio.io)). This open-source release decouples the database core for broader adoption. Alongside this, an upcoming managed service platform will make deploying GoatDB even easier, offering features like one-click deployment, automated backups, and infrastructure-free operation for developers.
-
-## Further Reading
-
-- [Commit Graph](docs/commit-graph.md)
-- [Conflict Resolution](docs/conflict-resolution.md)
-- [Synchronization Protocol](docs/sync.md)
 
 ---
 

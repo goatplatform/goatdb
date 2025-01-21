@@ -1,3 +1,15 @@
+---
+permalink: /sync/
+layout: default
+title: Synchronization
+parent: Architecture
+---
+
+<script
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
+  type="text/javascript"
+></script>
+
 # Synchronization Protocol
 
 At the heart of GoatDB lies a [distributed commit graph](commit-graph.md). This graph must be synchronized across all nodes in the network to converge into a single version of truth.

@@ -1,3 +1,10 @@
+---
+permalink: /concepts/
+layout: home
+title: Concepts
+nav_order: 2
+---
+
 # Concepts
 
 **Item**: A basic unit of data, analogous to a row in a relational database or a document in a document database. Each item maintains its own [distributed commit graph](commit-graph.md), serving as its atomic unit. Items guarantee [Causal Consistency](https://en.wikipedia.org/wiki/Causal_consistency) within their respective commit graphs.

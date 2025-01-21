@@ -1,3 +1,10 @@
+---
+permalink: /schema/
+layout: default
+title: Schema
+nav_order: 5
+---
+
 # GoatDB Schemas
 
 A [schema](concepts.md) in GoatDB defines the structure of an [item](concepts.md). Schemas are plain JavaScript objects that are compiled into the resulting executable and are not stored directly in the database's storage. Schemas are versioned, allowing multiple versions of the same schema to coexist on different branches, which simplifies rolling deployments.
@@ -128,3 +135,34 @@ The list of supported field types is continually expanding to accommodate more u
 1. Additions and edits take precedence over deletions.
 2. Deleting works only on elements that have existed in the base version of the three way merge.
 3. Operates at the granularity of individual element nodes and single characters, meaning changes can be applied to precise parts of the text, such as modifying a single word or even a single letter, without affecting the surrounding content.
+
+## Other Field Modifiers
+
+### Default Initializer
+
+The `default` field specifies an optional function that initializes the field with a default value. This function takes the current item's data as input and outputs the default value for the field.
+
+**WARNING:** Default initializers are executed in an arbitrary order. Do not rely on the values of other default initializers being present in the data object at the time of execution.
+
+Example:
+
+```javascript
+export const kSchemaTask = {
+  ns: 'task',
+  version: 1,
+  fields: {
+    text: {
+      type: 'string',
+      default: () => 'Untitled Task',
+    },
+    dateCreated: {
+      type: 'date',
+      default: () => new Date(),
+    },
+  },
+} as const;
+```
+
+### Required Fields
+
+The `required` field accepts a boolean value. When set to `true`, the field is mandatory. GoatDB enforces this by refusing to persist or synchronize items that lack a required field, ensuring data integrity.
