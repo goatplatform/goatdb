@@ -154,3 +154,7 @@ export function useQuery<
   useSyncExternalStore(subscribe, getSnapshot);
   return query;
 }
+
+export type PropsWithPath = {
+  path: string;
+};
