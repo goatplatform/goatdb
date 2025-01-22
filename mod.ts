@@ -11,15 +11,19 @@ import {
   itemPathNormalize,
 } from './db/path.ts';
 import { Repository } from './repo/repo.ts';
+import { ManagedItem } from './db/managed-item.ts';
+import { Item } from './cfds/base/item.ts';
 
 export type { AppConfig, Schema };
 export {
   GoatDB,
+  Item,
   itemPath,
   itemPathGetPart,
   itemPathGetRepoId,
   itemPathJoin,
   itemPathNormalize,
+  ManagedItem,
   Query,
   Repository,
   SchemaManager,
