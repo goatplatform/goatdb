@@ -37,7 +37,12 @@ import type {
   ReadonlyJSONValue,
 } from '../base/interfaces.ts';
 // import { BloomFilter } from '../cpp/bloom_filter.ts';
-import { type QueryConfig, Query, generateQueryId } from '../repo/query.ts';
+import {
+  generateQueryId,
+  Query,
+  type QueryConfig,
+  QuerySource,
+} from '../repo/query.ts';
 import { sendLoginEmail } from '../net/rest-api.ts';
 import { normalizeEmail } from '../base/string.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
@@ -146,10 +151,9 @@ export class GoatDB {
     this._items = new Map();
     this._openQueries = new Map();
     if (config?.peers !== undefined) {
-      this._peerURLs =
-        typeof config.peers === 'string'
-          ? [config.peers]
-          : Array.from(new Set(config.peers));
+      this._peerURLs = typeof config.peers === 'string'
+        ? [config.peers]
+        : Array.from(new Set(config.peers));
       this._repoClients = new Map();
     }
     this._trustPoolPromise = this._getTrustPoolImpl();
@@ -402,6 +406,7 @@ export class GoatDB {
     let id = config.id;
     if (!id) {
       id = generateQueryId(
+        config.source as QuerySource,
         config.predicate,
         config.sortDescriptor,
         config.ctx,
@@ -444,8 +449,9 @@ export class GoatDB {
    * Flushes all pending writes for all repositories to disk.
    */
   async flushAll(): Promise<void> {
-    const promises = mapIterable(this._repositories.keys(), (path) =>
-      this.flush(path),
+    const promises = mapIterable(
+      this._repositories.keys(),
+      (path) => this.flush(path),
     );
     await Promise.allSettled(promises);
   }
@@ -507,9 +513,9 @@ export class GoatDB {
     const fileIndex = await pickInstanceNumber();
     this._path = fileIndex
       ? path.join(
-          path.dirname(this._basePath),
-          path.basename(this._basePath) + '_' + fileIndex,
-        )
+        path.dirname(this._basePath),
+        path.basename(this._basePath) + '_' + fileIndex,
+      )
       : this._basePath;
     this._settingsProvider = new FileSettings(
       this._path,

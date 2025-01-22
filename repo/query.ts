@@ -123,7 +123,14 @@ export class Query<
     if (!predicate) {
       predicate = () => true;
     }
-    this.id = id || generateQueryId(predicate, sortDescriptor, ctx, schema?.ns);
+    this.id = id ||
+      generateQueryId(
+        source as QuerySource,
+        predicate,
+        sortDescriptor,
+        ctx,
+        schema?.ns,
+      );
     this.context = ctx as CTX;
     this.source = source;
     this.scheme = schema;
@@ -266,8 +273,9 @@ export class Query<
           (typeof this.source === 'string'
             ? this.repo
             : this.source) as Emitter<EventDocumentChanged>
-        ).attach('DocumentChanged', (key: string) =>
-          this.onNewCommit(this.repo.headForKey(key)!),
+        ).attach(
+          'DocumentChanged',
+          (key: string) => this.onNewCommit(this.repo.headForKey(key)!),
         );
       }
     }
@@ -488,16 +496,28 @@ export function generateQueryId<
   OS extends IS = IS,
   CTX extends ReadonlyJSONValue = ReadonlyJSONValue,
 >(
+  source: QuerySource,
   predicate: Predicate<IS, CTX> | undefined,
   sortDescriptor: SortDescriptor<OS, CTX> | undefined,
   ctx: CTX | undefined,
   ns: string | null | undefined,
 ): string {
-  const baseId =
-    predicate !== undefined && sortDescriptor !== undefined
-      ? predicate?.toString() + sortDescriptor?.toString()
-      : 'null';
-  const key = baseId + JSON.stringify(ctx) + ns;
+  let key: string;
+  if (typeof source === 'string') {
+    key = source;
+  } else if (source instanceof Repository) {
+    key = source.path;
+  } else {
+    key = source.id;
+  }
+  key += '|';
+  key += predicate ? predicate.toString() : 'null';
+  key += '|';
+  key += sortDescriptor ? sortDescriptor.toString() : 'null';
+  key += '|';
+  key += JSON.stringify(ctx);
+  key += '|';
+  key += ns;
   let hash = gGeneratedQueryIds.get(key);
   if (!hash) {
     hash = md51(key);
