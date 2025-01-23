@@ -39,7 +39,7 @@ application remains reliable and responsive.
 
 ### 3. **Privacy-First Backup** 🔐
 
-Backup data with end-to-end encryption, ensuring that sensitive information is
+Move data end-to-end between clients, ensuring that sensitive information is
 never exposed to the central server.
 
 ### 4. **Collaborative Editing** 👥
