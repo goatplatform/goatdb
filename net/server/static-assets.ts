@@ -104,12 +104,13 @@ export async function compileAssetsDirectory(
   if (!(await exists(dir))) {
     return result;
   }
-  for await (const { path } of walk(dir, {
-    includeDirs: false,
-    includeSymlinks: false,
-    followSymlinks: false,
-    exts: kValidFileExtensions,
-  })) {
+  for await (
+    const { path } of walk(dir, {
+      includeDirs: false,
+      includeSymlinks: false,
+      followSymlinks: false,
+    })
+  ) {
     if (filter && !filter(path)) {
       continue;
     }
