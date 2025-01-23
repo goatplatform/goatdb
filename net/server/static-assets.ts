@@ -1,10 +1,12 @@
-import { walk, exists } from '@std/fs';
+import { exists, walk } from '@std/fs';
 import { extname } from '@std/path';
 import type { Endpoint, ServerServices } from './server.ts';
 import { getRequestPath } from './utils.ts';
 import type { JSONObject, ReadonlyJSONObject } from '../../base/interfaces.ts';
 import { decodeBase64, encodeBase64 } from '@std/encoding';
-import kEncodedSystemAssets from '../../system-assets/assets.json' with { type: 'json' };
+import kEncodedSystemAssets from '../../system-assets/assets.json' with {
+  type: 'json',
+};
 
 const kSystemAssets = staticAssetsFromJS(kEncodedSystemAssets);
 
@@ -71,9 +73,15 @@ export class StaticAssetsEndpoint implements Endpoint {
     if (!services.staticAssets) {
       return Promise.resolve(new Response(null, { status: 404 }));
     }
-    const path = getRequestPath(req);
-    const asset =
-      kSystemAssets[path as keyof typeof kSystemAssets] || services.staticAssets[path] || services.staticAssets['/index.html'];
+    let path = getRequestPath(req);
+
+    // Hack: Forcefully map AI models to the correct directory
+    if (path.startsWith('/models/')) {
+      path = '/assets' + path;
+    }
+
+    const asset = kSystemAssets[path as keyof typeof kSystemAssets] ||
+      services.staticAssets[path] || services.staticAssets['/index.html'];
 
     if (!asset) {
       return Promise.resolve(new Response(null, { status: 404 }));
