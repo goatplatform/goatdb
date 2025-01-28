@@ -26,12 +26,17 @@ import {
 
 let gWorker: Worker | undefined;
 
-export function startJSONLogWorkerIfNeeded(): Worker {
+export function startJSONLogWorkerIfNeeded(workerPath?: URL | string): Worker {
   if (gWorker === undefined) {
     if (self.Deno !== undefined) {
-      gWorker = new Worker(new URL('./json-log-worker.ts', import.meta.url), {
-        type: 'module',
-      });
+      assert(workerPath !== undefined);
+      gWorker = new Worker(
+        // new URL('build/json-log-worker.ts', import.meta.url),
+        workerPath,
+        {
+          type: 'module',
+        },
+      );
     } else {
       gWorker = new Worker('/system-assets/json-log-worker.js', {
         type: 'module',

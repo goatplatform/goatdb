@@ -1,25 +1,36 @@
-import * as path from '@std/path';
 import yargs from 'yargs';
+import * as path from '@std/path';
 import { Server } from '../net/server/server.ts';
 import { staticAssetsFromJS } from '../net/server/static-assets.ts';
-import encodedStaticAsses from '../build/staticAssets.json' with { type: 'json' };
-import buildInfo from '../build/build-info.json' assert { type: 'json' };
+import encodedStaticAsses from '../build/staticAssets.json' with {
+  type: 'json',
+};
+import buildInfo from '../build/build-info.json' with { type: 'json' };
+import { prettyJSON } from '../base/common.ts';
 
 interface Arguments {
   path?: string;
 }
 
-async function main(): Promise<void> {
-const args: Arguments = yargs(Deno.args)
-    .command('<path>', 'Start the server at the specified path')
+function main(): void {
+  yargs(Deno.args)
+    .command(
+      '<path>',
+      'Start the server at the specified path',
+      (args: Arguments) => {
+        const server = new Server({
+          staticAssets: staticAssetsFromJS(encodedStaticAsses),
+          path: args.path || path.join(Deno.cwd(), 'server-data'),
+          buildInfo,
+        });
+        server.start();
+      },
+    )
+    .command('<version>', 'Display version info about this server', () => {
+      console.log(prettyJSON(buildInfo));
+    })
     .demandCommand()
     .parse();
-
-  const server = new Server({
-    staticAssets: staticAssetsFromJS(encodedStaticAsses),
-    path: args.path || path.join(import.meta.url, 'server-data'),
-  });
-  await server.start();
 }
 
-main();
+if (import.meta.main) main();

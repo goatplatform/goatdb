@@ -1,16 +1,16 @@
-import type * as esbuild from 'esbuild';
+import * as esbuild from 'esbuild';
 import * as path from '@std/path';
 import { denoPlugins } from '@luca/esbuild-deno-loader';
 import { VCurrent, type VersionNumber } from '../base/version-number.ts';
 import {
-  type ReBuildContext,
-  isReBuildContext,
   bundleResultFromBuildResult,
+  isReBuildContext,
+  type ReBuildContext,
 } from '../build.ts';
 import {
   APP_ENTRY_POINT,
-  type StaticAssets,
   compileAssetsDirectory,
+  type StaticAssets,
 } from '../net/server/static-assets.ts';
 import { getGoatConfig } from './config.ts';
 import { notImplemented } from '../base/error.ts';
@@ -36,28 +36,34 @@ function generateConfigSnippet(
 }
 
 export async function buildAssets(
-  ctx: ReBuildContext | typeof esbuild,
+  ctx: ReBuildContext | typeof esbuild | undefined,
   entryPoints: { in: string; out: string }[],
   version: VersionNumber,
   appConfig: AppConfig,
   serverURL?: string,
   orgId?: string,
 ): Promise<StaticAssets> {
-  const buildResults = await (isReBuildContext(ctx)
-    ? ctx.rebuild()
-    : bundleResultFromBuildResult(
-        await ctx.build({
-          entryPoints,
-          plugins: [...denoPlugins()],
-          bundle: true,
-          write: false,
-          sourcemap: 'linked',
-          outdir: 'output',
-          logOverride: {
-            'empty-import-meta': 'silent',
-          },
-        }),
-      ));
+  if (!ctx) {
+    ctx = esbuild;
+  }
+  const buildResults =
+    await (isReBuildContext(ctx) ? ctx.rebuild() : bundleResultFromBuildResult(
+      await ctx.build({
+        entryPoints,
+        plugins: [...denoPlugins()],
+        bundle: true,
+        write: false,
+        sourcemap: 'linked',
+        outdir: 'output',
+        logOverride: {
+          'empty-import-meta': 'silent',
+        },
+      }),
+    ));
+
+  if (ctx === esbuild) {
+    await ctx.stop();
+  }
 
   // System assets are always included and are placed at the root
   const result: StaticAssets = {};

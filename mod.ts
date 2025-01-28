@@ -13,6 +13,7 @@ import {
 import { Repository } from './repo/repo.ts';
 import { ManagedItem } from './db/managed-item.ts';
 import { Item } from './cfds/base/item.ts';
+import { prettyJSON } from './base/common.ts';
 
 export type { AppConfig, Schema };
 export {
@@ -24,6 +25,7 @@ export {
   itemPathJoin,
   itemPathNormalize,
   ManagedItem,
+  prettyJSON,
   Query,
   Repository,
   SchemaManager,

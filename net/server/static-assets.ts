@@ -12,15 +12,6 @@ const kSystemAssets = staticAssetsFromJS(kEncodedSystemAssets);
 
 const STATIC_ASSETS_CACHE_DURATION_SEC = 86400;
 
-// export const kEntryPointsNames = [APP_ENTRY_POINT, '__file_worker'] as const;
-// export type EntryPointName = (typeof kEntryPointsNames)[number];
-// export const EntryPointDefault: EntryPointName = APP_ENTRY_POINT;
-
-// export const EntryPointIndex: Record<EntryPointName, string> = {
-//   APP_ENTRY_POINT: 'src/index.tsx',
-//   __file_worker: 'json-log.worker.ts',
-// };
-
 export const APP_ENTRY_POINT = 'web-app';
 
 export type ContentType =
@@ -47,8 +38,6 @@ const ContentTypeMapping: Record<string, ContentType> = {
   wasm: 'application/wasm',
 };
 
-const kValidFileExtensions = Object.keys(ContentTypeMapping);
-
 export interface Asset {
   data: Uint8Array;
   contentType: ContentType;
@@ -73,13 +62,7 @@ export class StaticAssetsEndpoint implements Endpoint {
     if (!services.staticAssets) {
       return Promise.resolve(new Response(null, { status: 404 }));
     }
-    let path = getRequestPath(req);
-
-    // Hack: Forcefully map AI models to the correct directory
-    if (path.startsWith('/models/')) {
-      path = '/assets' + path;
-    }
-
+    const path = getRequestPath(req);
     const asset = kSystemAssets[path as keyof typeof kSystemAssets] ||
       services.staticAssets[path] || services.staticAssets['/index.html'];
 

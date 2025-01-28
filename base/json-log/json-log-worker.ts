@@ -231,8 +231,7 @@ async function JSONLogFileAppend(
       filteredEntries.push(e);
     }
   }
-  const encodedEntries =
-    '\n' +
+  const encodedEntries = '\n' +
     filteredEntries.map((obj) => JSON.stringify(obj)).join('\n\n') +
     '\n';
   const encodedBuf = new TextEncoder().encode(encodedEntries);
@@ -286,7 +285,7 @@ async function writeTextFile(path: string, text: string): Promise<boolean> {
   }
 }
 
-function main(): void {
+export function jsonLogWorkerMain(): void {
   onmessage = async (event: MessageEvent<WorkerFileReq>) => {
     switch (event.data.type) {
       case 'open': {
@@ -400,4 +399,4 @@ function main(): void {
   };
 }
 
-main();
+// jsonLogWorkerMain();

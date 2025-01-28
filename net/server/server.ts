@@ -19,6 +19,8 @@ import { GoatDB } from '../../db/db.ts';
 import { SyncEndpoint } from './sync.ts';
 import type { DBConfig } from '../../db/db.ts';
 import { normalizeEmail } from '../../base/string.ts';
+import type { BuildInfo } from '../../server/build-info.ts';
+import { startJSONLogWorkerIfNeeded } from '../../base/json-log/json-log.ts';
 
 /**
  * A server represents a logical DB with some additional configuration options.
@@ -43,6 +45,10 @@ export interface ServerOptions extends DBConfig {
    * organization of this server.
    */
   operatorEmails?: string[];
+  /**
+   * Info about the build process.
+   */
+  buildInfo?: BuildInfo;
 }
 
 /**
@@ -134,6 +140,11 @@ export class Server {
   private _httpServer?: Deno.HttpServer;
 
   constructor(options: ServerOptions) {
+    if (options.buildInfo) {
+      startJSONLogWorkerIfNeeded(
+        new URL(options.buildInfo.logWorkerPath, import.meta.url),
+      );
+    }
     this._endpoints = [];
     this._middlewares = [];
     getGoatConfig().serverData = this;
@@ -147,7 +158,7 @@ export class Server {
     }
     if (options.operatorEmails) {
       options.operatorEmails = options.operatorEmails.map((e) =>
-        normalizeEmail(e),
+        normalizeEmail(e)
       );
     }
     this._baseOptions = options;

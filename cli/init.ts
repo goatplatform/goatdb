@@ -1,16 +1,5 @@
 import * as path from '@std/path';
 import { prettyJSON } from '../base/common.ts';
-// Steps:
-// 1. Copy project template (including deno.json and .gitignore)
-// 2. Run deno add for the following dependencies:
-//    * jsr:@std/path
-//    * jsr:@goatdb/goatdb
-//    * npm:esbuild
-//    * jsr:@luca/esbuild-deno-loader
-//    * npm:react@19.0.0
-//    * npm:react-dom@19.0.0/client
-//    * npm:yargs@17.7.2
-// 7. Create .gitignore or suggest user to edit it if already exists
 
 const cssScaffold = ``;
 const htmlScaffold = `<!DOCTYPE html>
@@ -42,7 +31,8 @@ root.render(<App />);
 
 const gitignoreScaffold = `node_modules
 .DS_Store
-server-data`;
+server-data
+build`;
 
 const appTsxScaffold = `// @deno-types="npm:@types/react"
 import React from 'react';
@@ -66,7 +56,8 @@ export function App() {
 }
 `;
 
-const devSeverScaffold = `import { startDebugServer } from '@goatdb/goatdb/server';
+const devSeverScaffold =
+  `import { startDebugServer } from '@goatdb/goatdb/server';
 import { registerSchemas } from './schema.ts';
 
 async function main(): Promise<void> {
@@ -91,7 +82,9 @@ const denoJsonScaffold = {
   },
   tasks: {
     debug: 'deno run -A debug-server.ts',
+    build: 'deno run -A build.ts',
   },
+  version: '0.0.1',
 };
 
 const schemaScaffold = `import { SchemaManager } from '@goatdb/goatdb';
@@ -158,6 +151,80 @@ export function registerSchemas(
 ): void {
   manager.register(kSchemaMyItem);
 }
+`;
+
+const serverSkaffold = `import yargs from "yargs";
+import * as path from "@std/path";
+import { Server, staticAssetsFromJS } from "@goatdb/goatdb/server";
+import { prettyJSON } from "@goatdb/goatdb";
+import { registerSchemas } from "./schema.ts";
+import { BuildInfo } from "../goatdb/server/build-info.ts";
+// These imported files will be automatically generated during compilation
+import encodedStaticAsses from "./build/staticAssets.json" with {
+  type: "json",
+};
+import kBuildInfo from "./build/buildInfo.json" with { type: "json" };
+
+interface Arguments {
+  path?: string;
+  version?: boolean;
+  info?: boolean;
+}
+
+/**
+ * This is the main server entry point. Edit it to include any custom setup
+ * as needed.
+ *
+ * The build.ts script is responsible for compiling this entry point script
+ * into a self contained executable.
+ */
+async function main(): Promise<void> {
+  const buildInfo: BuildInfo = kBuildInfo as BuildInfo;
+  const args: Arguments = yargs(Deno.args)
+    .command(
+      "<path>",
+      "Start the server at the specified path",
+    )
+    .version(buildInfo.appVersion)
+    .option("info", {
+      alias: "i",
+      desc: "Print technical information",
+      type: "boolean",
+    })
+    .help()
+    .parse();
+  registerSchemas();
+  if (args.info) {
+    console.log(buildInfo.appName + " v" + buildInfo.appVersion);
+    console.log(prettyJSON(buildInfo));
+    Deno.exit();
+  }
+  const server = new Server({
+    staticAssets: staticAssetsFromJS(encodedStaticAsses),
+    path: args.path || path.join(Deno.cwd(), "server-data"),
+    buildInfo,
+  });
+  await server.start();
+}
+
+if (import.meta.main) main();
+`;
+
+const buildSkaffold = `import { compile } from "@goatdb/goatdb/server";
+
+async function main(): Promise<void> {
+  await compile({
+    buildDir: "./build",
+    serverEntry: "./server.ts",
+    jsPath: "./scaffold/index.tsx",
+    htmlPath: "./scaffold/index.html",
+    cssPath: "./scaffold/index.css",
+    assetsPath: "./assets",
+  });
+  Deno.exit();
+}
+
+if (import.meta.main) main();
 `;
 
 async function pathExists(p: string): Promise<boolean> {
@@ -236,6 +303,14 @@ async function bootstrapProject(): Promise<void> {
   await writeTextFileIfNotExists(
     path.join(projectDir, 'schema.ts'),
     schemaScaffold,
+  );
+  await writeTextFileIfNotExists(
+    path.join(projectDir, 'server.ts'),
+    serverSkaffold,
+  );
+  await writeTextFileIfNotExists(
+    path.join(projectDir, 'build.ts'),
+    buildSkaffold,
   );
   console.log(`Installing dependencies...`);
   await installDependency('jsr:@goatdb/goatdb');
