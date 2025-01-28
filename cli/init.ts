@@ -284,12 +284,10 @@ async function mergeDenoJson(denoJsonPath: string): Promise<void> {
     }
   }
   // Merge individual tasks
-  const tasks = denoJson.tasks as JSONObject;
-  for (const [taskName, cmd] of Object.entries(tasks)) {
-    if (!Object.hasOwn(tasks, taskName)) {
-      tasks[taskName] = cmd;
-    }
-  }
+  denoJson.tasks = {
+    ...denoJsonScaffold.tasks,
+    ...(denoJson.tasks as JSONObject),
+  };
   // Update the file if it changed
   if (!coreValueEquals(initial, denoJson)) {
     await Deno.writeTextFile(denoJsonPath, prettyJSON(denoJson));
