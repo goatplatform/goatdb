@@ -1,5 +1,7 @@
 import * as path from '@std/path';
 import { prettyJSON } from '../base/common.ts';
+import { JSONObject } from '../base/interfaces.ts';
+import { coreValueEquals } from '../base/core-types/equals.ts';
 
 const cssScaffold = ``;
 const htmlScaffold = `<!DOCTYPE html>
@@ -267,6 +269,33 @@ async function installDependency(dep: string): Promise<void> {
   }
 }
 
+async function mergeDenoJson(denoJsonPath: string): Promise<void> {
+  let denoJson: JSONObject;
+  try {
+    denoJson = JSON.parse(await Deno.readTextFile(denoJsonPath));
+  } catch (_: unknown) {
+    denoJson = {};
+  }
+  const initial = { ...denoJson };
+  // Merge all root level fields
+  for (const [field, value] of Object.entries(denoJsonScaffold)) {
+    if (!Object.hasOwn(denoJson, field)) {
+      denoJson[field] = value;
+    }
+  }
+  // Merge individual tasks
+  const tasks = denoJson.tasks as JSONObject;
+  for (const [taskName, cmd] of Object.entries(tasks)) {
+    if (!Object.hasOwn(tasks, taskName)) {
+      tasks[taskName] = cmd;
+    }
+  }
+  // Update the file if it changed
+  if (!coreValueEquals(initial, denoJson)) {
+    await Deno.writeTextFile(denoJsonPath, prettyJSON(denoJson));
+  }
+}
+
 async function bootstrapProject(): Promise<void> {
   // await Deno.mkdir(projectDir, { recursive: true });
   const projectDir = Deno.cwd();
@@ -297,10 +326,6 @@ async function bootstrapProject(): Promise<void> {
     devSeverScaffold,
   );
   await writeTextFileIfNotExists(
-    path.join(projectDir, 'deno.json'),
-    prettyJSON(denoJsonScaffold),
-  );
-  await writeTextFileIfNotExists(
     path.join(projectDir, 'schema.ts'),
     schemaScaffold,
   );
@@ -311,6 +336,9 @@ async function bootstrapProject(): Promise<void> {
   await writeTextFileIfNotExists(
     path.join(projectDir, 'build.ts'),
     buildSkaffold,
+  );
+  await mergeDenoJson(
+    path.join(projectDir, 'deno.json'),
   );
   console.log(`Installing dependencies...`);
   await installDependency('jsr:@goatdb/goatdb');
