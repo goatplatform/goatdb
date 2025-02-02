@@ -142,7 +142,11 @@ export class Server {
   constructor(options: ServerOptions) {
     if (options.buildInfo) {
       startJSONLogWorkerIfNeeded(
-        new URL(options.buildInfo.logWorkerPath, import.meta.url),
+        // '/' + options.buildInfo.logWorkerPath,
+        new URL(
+          '../../base/json-log/json-log-worker-entry.ts',
+          import.meta.url,
+        ),
       );
     }
     this._endpoints = [];

@@ -286,6 +286,7 @@ async function writeTextFile(path: string, text: string): Promise<boolean> {
 }
 
 export function jsonLogWorkerMain(): void {
+  console.log(`JSONLog worker started`);
   onmessage = async (event: MessageEvent<WorkerFileReq>) => {
     switch (event.data.type) {
       case 'open': {

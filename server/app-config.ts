@@ -3,6 +3,11 @@
  */
 export type AppConfig = {
   /**
+   * The directory in which to perform the build process. Intermediate files as
+   * well as the final binary will be placed there.
+   */
+  buildDir: string;
+  /**
    * Path to the main js entry point for the client app. The server
    * automatically transpiles the client code for the browser code using
    * ESBuild.
@@ -42,4 +47,8 @@ export type AppConfig = {
    *          be skipped.
    */
   assetsFilter?: (path: string) => boolean;
+  /**
+   * Path to deno.json. Defaults to 'deno.json' inside the current directory.
+   */
+  denoJson?: string;
 };

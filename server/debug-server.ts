@@ -9,6 +9,8 @@ import { buildAssets } from './generate-static-assets.ts';
 import { notReached } from '../base/error.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import type { AppConfig } from './app-config.ts';
+import { writeWorkerSkaffold } from '../cli/compile.ts';
+import { generateBuildInfo } from './build-info.ts';
 
 function incrementBuildNumber(version: VersionNumber): VersionNumber {
   return tuple4Set(version, 0, tuple4Get(version, 0) + 1);
@@ -73,9 +75,10 @@ export type LiveReloadOptions = {
   watchFilter?: (path: string) => boolean;
 };
 
-export type DebugServerOptions = Omit<ServerOptions, 'staticAssets'> &
-  LiveReloadOptions &
-  AppConfig;
+export type DebugServerOptions =
+  & Omit<ServerOptions, 'staticAssets'>
+  & LiveReloadOptions
+  & AppConfig;
 
 /**
  * Starts a local debug server. The debug server implements a live reload that
@@ -86,8 +89,15 @@ export type DebugServerOptions = Omit<ServerOptions, 'staticAssets'> &
 export async function startDebugServer(
   options: DebugServerOptions,
 ): Promise<never> {
+  if (!options.buildInfo) {
+    options.buildInfo = await generateBuildInfo(
+      options.denoJson || path.join(Deno.cwd(), 'deno.json'),
+      path.resolve(options.buildDir),
+    );
+  }
   const server = new Server(options);
   console.log('Building client code...');
+  await writeWorkerSkaffold(options);
   const entryPoints = [
     {
       in: path.resolve(options.jsPath),

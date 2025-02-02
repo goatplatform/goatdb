@@ -16,18 +16,9 @@ export type OSArchTarget = `${TargetOS}-${CPUArch}`;
 
 export type ExecutableOptions = {
   /**
-   * The directory in which to perform the build process. Intermediate files as
-   * well as the final binary will be placed there.
-   */
-  buildDir: string;
-  /**
    * Path to main server entry file.
    */
   serverEntry: string;
-  /**
-   * Path to deno.json. Defaults to 'deno.json' inside the current directory.
-   */
-  denoJson?: string;
   /**
    * Where to place the resulting executable.
    * Default: "app".
@@ -107,21 +98,21 @@ export async function compile(options: CompileOptions): Promise<void> {
   });
   const output = await compileLocalCmd.output();
   // Cleanup
-  try {
-    await Deno.remove(assetsJsonPath);
-  } catch (_: unknown) {
-    // Skip
-  }
-  try {
-    await Deno.remove(buildInfoJsonPath);
-  } catch (_: unknown) {
-    // Skip
-  }
-  try {
-    await Deno.remove(workerTsPath);
-  } catch (_: unknown) {
-    // Skip
-  }
+  // try {
+  //   await Deno.remove(assetsJsonPath);
+  // } catch (_: unknown) {
+  //   // Skip
+  // }
+  // try {
+  //   await Deno.remove(buildInfoJsonPath);
+  // } catch (_: unknown) {
+  //   // Skip
+  // }
+  // try {
+  //   await Deno.remove(workerTsPath);
+  // } catch (_: unknown) {
+  //   // Skip
+  // }
   // Report result
   if (!output.success) {
     console.log('Compilation failed');
@@ -180,3 +171,10 @@ const kFileWorkerCode =
   `import { jsonLogWorkerMain } from "@goatdb/goatdb/server";
 jsonLogWorkerMain();
 `;
+
+export async function writeWorkerSkaffold(options: AppConfig): Promise<void> {
+  const buildDir = path.resolve(options.buildDir);
+  await Deno.mkdir(buildDir, { recursive: true });
+  const workerTsPath = path.join(buildDir, 'file-worker.ts');
+  await Deno.writeTextFile(workerTsPath, kFileWorkerCode);
+}
