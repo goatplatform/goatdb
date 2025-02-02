@@ -51,4 +51,8 @@ export type AppConfig = {
    * Path to deno.json. Defaults to 'deno.json' inside the current directory.
    */
   denoJson?: string;
+  /**
+   * If set to true, the output code bundle will be minified.
+   */
+  minify?: boolean;
 };

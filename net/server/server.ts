@@ -27,6 +27,10 @@ import { startJSONLogWorkerIfNeeded } from '../../base/json-log/json-log.ts';
  */
 export interface ServerOptions extends DBConfig {
   /**
+   * Info about the build process.
+   */
+  buildInfo: BuildInfo;
+  /**
    * The port the server will listen to. Defaults to 8080.
    */
   port?: number;
@@ -46,9 +50,9 @@ export interface ServerOptions extends DBConfig {
    */
   operatorEmails?: string[];
   /**
-   * Info about the build process.
+   * Path to deno.json. Defaults to 'deno.json' inside the current directory.
    */
-  buildInfo?: BuildInfo;
+  denoJson?: string;
 }
 
 /**
@@ -140,15 +144,16 @@ export class Server {
   private _httpServer?: Deno.HttpServer;
 
   constructor(options: ServerOptions) {
-    if (options.buildInfo) {
-      startJSONLogWorkerIfNeeded(
-        // '/' + options.buildInfo.logWorkerPath,
-        new URL(
-          '../../base/json-log/json-log-worker-entry.ts',
-          import.meta.url,
-        ),
-      );
-    }
+    // if (options.buildInfo) {
+    // }
+    startJSONLogWorkerIfNeeded(
+      // '/' + options.buildInfo.logWorkerPath,
+      new URL(
+        // '../../base/json-log/json-log-worker-entry.ts',
+        options.buildInfo.jsonLogWorkerPath,
+        import.meta.url,
+      ),
+    );
     this._endpoints = [];
     this._middlewares = [];
     getGoatConfig().serverData = this;

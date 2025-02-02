@@ -1,4 +1,3 @@
-import { jsonLogWorkerMain } from '../base/json-log/json-log-worker.ts';
 import {
   compile,
   type CompileOptions,
@@ -24,10 +23,4 @@ export type {
   LiveReloadOptions,
   TargetOS,
 };
-export {
-  compile,
-  jsonLogWorkerMain,
-  Server,
-  startDebugServer,
-  staticAssetsFromJS,
-};
+export { compile, Server, startDebugServer, staticAssetsFromJS };

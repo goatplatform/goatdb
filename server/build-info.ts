@@ -1,5 +1,6 @@
-import path from 'node:path';
+import * as path from '@std/path';
 import type { JSONObject } from '../base/interfaces.ts';
+import { notReached } from '../base/error.ts';
 
 export interface BuildInfo extends JSONObject {
   /**
@@ -27,12 +28,11 @@ export interface BuildInfo extends JSONObject {
   /**
    * Tells the server where the json-log-worker file was embedded.
    */
-  logWorkerPath: string;
+  jsonLogWorkerPath: string;
 }
 
 export async function generateBuildInfo(
   denoJsonPath: string,
-  buildDir: string,
 ): Promise<BuildInfo> {
   const info: Partial<BuildInfo> = {};
   // Creation date
@@ -63,6 +63,50 @@ export async function generateBuildInfo(
     info.appName = path.basename(path.dirname(denoJsonPath));
   }
   // Worker path
-  info.logWorkerPath = path.join(buildDir, 'file-worker.ts');
+  info.jsonLogWorkerPath = await getDependencyURL(denoJsonPath) +
+    'base/json-log/json-log-worker-entry.ts';
   return info as BuildInfo;
+}
+
+export type DenoInfoModule = {
+  kind: string;
+  local: string;
+  size: number;
+  mediaType: string;
+  specifier: string;
+};
+
+export type DenoInfoOutput = {
+  version: number;
+  roots: string[];
+  modules: DenoInfoModule[];
+};
+
+export async function getDependencyURL(denoJson?: string): Promise<string> {
+  const compileArgs = [
+    'info',
+    '--json',
+    'jsr:@goatdb/goatdb',
+  ];
+  if (denoJson) {
+    compileArgs.push(`--config=${denoJson}`);
+  }
+  const compileLocalCmd = new Deno.Command(Deno.execPath(), {
+    args: compileArgs,
+  });
+  const output = await compileLocalCmd.output();
+  const info: DenoInfoOutput = JSON.parse(
+    new TextDecoder().decode(output.stdout),
+  );
+  const prefix = 'https://jsr.io/@goatdb/goatdb/';
+  for (const module of info.modules) {
+    if (module.specifier.startsWith(prefix)) {
+      const suffix = module.specifier.substring(prefix.length);
+      const nextComp = suffix.indexOf('/');
+      if (nextComp > 0) {
+        return module.specifier.substring(0, prefix.length + nextComp + 1);
+      }
+    }
+  }
+  notReached('jsr:@goatdb/goatdb not found');
 }

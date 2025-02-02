@@ -58,6 +58,7 @@ export async function buildAssets(
         logOverride: {
           'empty-import-meta': 'silent',
         },
+        minify: appConfig.minify,
       }),
     ));
 

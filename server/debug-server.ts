@@ -8,9 +8,9 @@ import { Server, type ServerOptions } from '../net/server/server.ts';
 import { buildAssets } from './generate-static-assets.ts';
 import { notReached } from '../base/error.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
-import type { AppConfig } from './app-config.ts';
 import { writeWorkerSkaffold } from '../cli/compile.ts';
 import { generateBuildInfo } from './build-info.ts';
+import { AppConfig } from '../mod.ts';
 
 function incrementBuildNumber(version: VersionNumber): VersionNumber {
   return tuple4Set(version, 0, tuple4Get(version, 0) + 1);
@@ -19,12 +19,18 @@ function incrementBuildNumber(version: VersionNumber): VersionNumber {
 const kIgnoredDirectories = ['node_modules', '.git', 'server-data', 'build'];
 
 function shouldRebuildAfterPathChange(p: string): boolean {
+  // Ignore deno's temporary files
+  if (p.endsWith('.tmp')) {
+    return false;
+  }
+  // Ignore paths where any of the components start with '.'
   const components = p.split(path.SEPARATOR_PATTERN);
   for (const comp of components) {
     if (comp.startsWith('.')) {
       return false;
     }
   }
+  // Explicitly ignored directories
   if (kIgnoredDirectories.includes(components[0])) {
     return false;
   }
@@ -64,6 +70,7 @@ export type LiveReloadOptions = {
    * paths:
    *
    * - All paths starting with '.'
+   * - All files ending with '.tmp'
    * - .git/*
    * - node_modules/*
    * - server-data/*
@@ -76,7 +83,7 @@ export type LiveReloadOptions = {
 };
 
 export type DebugServerOptions =
-  & Omit<ServerOptions, 'staticAssets'>
+  & Omit<ServerOptions, 'staticAssets' | 'buildInfo'>
   & LiveReloadOptions
   & AppConfig;
 
@@ -89,13 +96,12 @@ export type DebugServerOptions =
 export async function startDebugServer(
   options: DebugServerOptions,
 ): Promise<never> {
-  if (!options.buildInfo) {
-    options.buildInfo = await generateBuildInfo(
+  const server = new Server({
+    ...options,
+    buildInfo: await generateBuildInfo(
       options.denoJson || path.join(Deno.cwd(), 'deno.json'),
-      path.resolve(options.buildDir),
-    );
-  }
-  const server = new Server(options);
+    ),
+  });
   console.log('Building client code...');
   await writeWorkerSkaffold(options);
   const entryPoints = [

@@ -6,8 +6,9 @@ import {
 } from '../net/server/static-assets.ts';
 import { buildAssets } from '../server/generate-static-assets.ts';
 import { getGoatConfig } from '../server/config.ts';
-import { generateBuildInfo } from '../server/build-info.ts';
+import { generateBuildInfo, getDependencyURL } from '../server/build-info.ts';
 import { notReached } from '../base/error.ts';
+import type { ServerOptions } from '../net/server/server.ts';
 
 export type TargetOS = 'mac' | 'linux' | 'windows';
 export type CPUArch = 'x64' | 'aar64';
@@ -34,12 +35,15 @@ export type ExecutableOptions = {
   arch?: CPUArch;
 };
 
-export type CompileOptions = AppConfig & ExecutableOptions;
+export type CompileOptions =
+  & Omit<ServerOptions, 'buildInfo' | 'path'>
+  & ExecutableOptions
+  & AppConfig;
 
 export async function compile(options: CompileOptions): Promise<void> {
   const targetOsArch = targetFromOSArch(options.os, options.arch);
   console.log(
-    `Starting compilation for ${targetFromOSArch()}`,
+    `Starting compilation for ${targetOsArch}`,
   );
   console.log(`Bundling assets...`);
   const entryPoints = [
@@ -48,6 +52,10 @@ export async function compile(options: CompileOptions): Promise<void> {
       out: APP_ENTRY_POINT,
     },
   ];
+  // Default to minified code for executable builds
+  if (options.minify !== false) {
+    options.minify = true;
+  }
   const assets = staticAssetsToJS(
     await buildAssets(
       undefined,
@@ -71,13 +79,12 @@ export async function compile(options: CompileOptions): Promise<void> {
     JSON.stringify(
       await generateBuildInfo(
         options.denoJson || path.join(Deno.cwd(), 'deno.json'),
-        buildDir,
       ),
     ),
   );
-  const workerTsPath = path.join(buildDir, 'file-worker.ts');
-  await Deno.writeTextFile(workerTsPath, kFileWorkerCode);
-  console.log(`Compiling...`);
+  // const workerTsPath = path.join(buildDir, 'file-worker.ts');
+  // await Deno.writeTextFile(workerTsPath, kFileWorkerCode);
+  // console.log(`Compiling...`);
   const outputFile = path.join(
     buildDir,
     `${options.outputName || 'app'}-${targetOsArch}`,
@@ -86,11 +93,17 @@ export async function compile(options: CompileOptions): Promise<void> {
     'compile',
     '-A',
     '--no-check',
-    `--include=${workerTsPath}`,
+    `--include=${
+      await getDependencyURL(options.denoJson) +
+      'base/json-log/json-log-worker-entry.ts'
+    }`,
     `--output=${outputFile}`,
   ];
   if (options.arch || options.os) {
     compileArgs.push(`--target=${denoTarget(options.os, options.arch)}`);
+  }
+  if (options.denoJson) {
+    compileArgs.push(`--config=${options.denoJson}`);
   }
   compileArgs.push(path.resolve(options.serverEntry));
   const compileLocalCmd = new Deno.Command(Deno.execPath(), {
@@ -116,6 +129,7 @@ export async function compile(options: CompileOptions): Promise<void> {
   // Report result
   if (!output.success) {
     console.log('Compilation failed');
+    console.info(`For diagnostics run "deno ${compileArgs.join(' ')}"`);
     console.error(new TextDecoder().decode(output.stdout));
     return;
   }
