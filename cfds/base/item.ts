@@ -1,5 +1,5 @@
 import { assert } from '../../base/error.ts';
-import { Schema, SchemaDataType, SchemaEquals, kNullSchema } from './schema.ts';
+import { kNullSchema, Schema, SchemaDataType, SchemaEquals } from './schema.ts';
 import {
   clone,
   DataChanges,
@@ -30,9 +30,9 @@ import {
 import { ReadonlyJSONObject } from '../../base/interfaces.ts';
 import {
   CoreValue,
+  coreValueEquals,
   Encodable,
   Encoder,
-  coreValueEquals,
 } from '../../base/core-types/index.ts';
 import { SchemaGetFieldDef } from './schema.ts';
 import { Readwrite } from '../../base/types.ts';
@@ -79,8 +79,7 @@ const checksumSerOptions: ChecksumEncoderOpts = {
  * to work with.
  */
 export class Item<S extends Schema = Schema>
-  implements ReadonlyItem<S>, Encodable
-{
+  implements ReadonlyItem<S>, Encodable {
   readonly schemaManager: SchemaManager;
   private _schema!: S;
   private _data!: SchemaDataType<S>;
@@ -375,7 +374,7 @@ export class Item<S extends Schema = Schema>
     });
   }
 
-  upgradeSchema(newSchema?: Schema): void {
+  upgradeSchema(newSchema?: Schema): boolean {
     assert(!this._locked);
     const res = this.schemaManager.upgrade(this._data, this._schema, newSchema);
     assert(res !== undefined, 'Upgrade failed');
@@ -384,7 +383,9 @@ export class Item<S extends Schema = Schema>
       [this._data, this._schema] = res as [SchemaDataType<S>, S];
       this.invalidateCaches();
       this.normalize();
+      return true;
     }
+    return false;
   }
 
   upgradeSchemaToLatest(): boolean {

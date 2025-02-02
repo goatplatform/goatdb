@@ -1,17 +1,17 @@
-import { Schema, SchemaDataType } from '../cfds/base/schema.ts';
-import { Commit } from '../repo/commit.ts';
-import { Repository } from '../repo/repo.ts';
-import { itemPathGetPart, itemPathGetRepoId, ItemPathPart } from './path.ts';
+import type { Schema, SchemaDataType } from '../cfds/base/schema.ts';
+import type { Commit } from '../repo/commit.ts';
+import type { Repository } from '../repo/repo.ts';
+import { itemPathGetPart, itemPathGetRepoId } from './path.ts';
 import { Item } from '../cfds/base/item.ts';
 import { Emitter } from '../base/emitter.ts';
-import { MutationPack, mutationPackAppend } from './mutations.ts';
-import { SimpleTimer, Timer } from '../base/timer.ts';
-import { GoatDB } from './db.ts';
+import { type MutationPack, mutationPackAppend } from './mutations.ts';
+import { SimpleTimer, type Timer } from '../base/timer.ts';
+import type { GoatDB } from './db.ts';
 import { assert } from '../base/error.ts';
 
 export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
   private readonly _commitDelayTimer: Timer;
-  private _head?: Commit;
+  private __head?: Commit;
   private _item!: Item<S>;
   private _commitPromise?: Promise<void>;
   private _detachHandler?: () => void;
@@ -31,6 +31,15 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
     } else {
       this.loadInitialDoc(repo);
     }
+  }
+
+  get _head(): Commit | undefined {
+    return this.__head;
+  }
+
+  set _head(h: Commit | undefined) {
+    assert(h !== undefined);
+    this.__head = h;
   }
 
   /**
@@ -64,8 +73,9 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
     if (this._item.isLocked) {
       this._item = this._item.clone();
     }
-    this._item.upgradeSchema(s);
-    this._commitDelayTimer.schedule();
+    if (this._item.upgradeSchema(s)) {
+      this._commitDelayTimer.schedule();
+    }
   }
 
   /**
@@ -162,7 +172,9 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
         ]);
       }
       this._item = doc;
-      this._head = head ? repo.getCommit(head) : undefined;
+      if (head) {
+        this._head = repo.getCommit(head);
+      }
       this.onChange(mutations);
     }
   }
@@ -209,9 +221,9 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
     const repo = await this.db.open(itemPathGetRepoId(this.path));
     const newHead = await repo.setValueForKey(key, currentDoc, this._head);
     if (newHead) {
+      this._head = newHead;
       this.rebase();
     }
-    this._head = newHead;
     this._commitInProgress = false;
   }
 
