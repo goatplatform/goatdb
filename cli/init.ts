@@ -158,8 +158,8 @@ export function registerSchemas(
 
 const serverSkaffold = `import yargs from "yargs";
 import * as path from "@std/path";
-import { BuildInfo, Server, staticAssetsFromJS } from "@goatdb/goatdb/server";
-import { prettyJSON } from "@goatdb/goatdb";
+import { Server, staticAssetsFromJS } from "@goatdb/goatdb/server";
+import { BuildInfo, prettyJSON } from "@goatdb/goatdb";
 import { registerSchemas } from "./schema.ts";
 // These imported files will be automatically generated during compilation
 import encodedStaticAsses from "./build/staticAssets.json" with {
@@ -222,6 +222,9 @@ async function main(): Promise<void> {
     htmlPath: "./scaffold/index.html",
     cssPath: "./scaffold/index.css",
     assetsPath: "./assets",
+    // Edit the following fields for cross compilation
+    // os: "linux",
+    // arch: "aar64",
   });
   Deno.exit();
 }
