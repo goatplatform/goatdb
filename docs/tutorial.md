@@ -7,16 +7,16 @@ nav_order: 1
 
 # Building a Todo List App with GoatDB
 
-Below is the complete tutorial in Markdown format. This tutorial walks you
-through building a full-featured Todo List app with GoatDB using React. It
-demonstrates how to leverage GoatDB’s distributed, edge-native architecture and
-real-time synchronization features.
+This tutorial walks you through building a full-featured Todo List app with
+GoatDB using React. It demonstrates how to leverage GoatDB’s distributed,
+edge-native architecture and real-time synchronization features.
 
 In this tutorial, you’ll build a Todo List app with GoatDB. You’ll learn how to:
 
 - **Set up a GoatDB project**
 - **Define versioned schemas for your data**
 - **Create React components that leverage real-time synchronization**
+- **Test real-time sync and conflict resolution**
 - **Run an edge-native application using GoatDB’s distributed architecture**
 
 ## Prerequisites
@@ -49,8 +49,6 @@ Follow these steps to set up a new GoatDB project:
 
 These steps install GoatDB and set up the underlying infrastructure for your
 application.
-
----
 
 ## 2. Define the Task Schema
 
@@ -168,6 +166,11 @@ export function TaskItem({ path }: TaskItemProps) {
       <button onClick={() => task.downloadDebugGraph()}>
         Download Commit Graph
       </button>
+      {
+        /* The above button downloads a JSON file representing the commit graph.
+          This file is formatted for inspection with Cytoscape
+          (https://cytoscape.org/) for visualization and debugging purposes. */
+      }
     </div>
   );
 }
@@ -252,22 +255,64 @@ export function App() {
 
 ## 4. Running the Application
 
+Run the development server with:
+
 ```bash
 deno task debug
 ```
 
-Will start a live-reload local server that listens at http://localhost:8080 and
-stores all data at `./server-data`
+This command will start a live-reload local server that listens at
+[http://localhost:8080](http://localhost:8080) and stores all data at
+`./server-data`.
 
-## 5. Building the Server
+## 5. Testing Real-Time Sync & Conflict Resolution
+
+One of GoatDB’s powerful features is real-time synchronization combined with
+robust conflict resolution. Follow these steps to observe these features in
+action:
+
+1. **Open the App in Two Tabs:**
+
+   - Launch your application in your browser (e.g.,
+     [http://localhost:8080](http://localhost:8080)).
+   - Open a second tab and navigate to the same URL.
+
+2. **Observe Real-Time Updates:**
+
+   - In one tab, add a new task using the input field.
+   - Watch as the new task appears in the second tab almost immediately,
+     demonstrating real-time data propagation.
+
+3. **Simulate a Conflict:**
+
+   - In both tabs, locate the same task item.
+   - Edit the task’s text in both tabs simultaneously.
+   - Observe how GoatDB’s built-in conflict resolution mechanism handles the
+     simultaneous updates. Typically, the system resolves conflicts based on the
+     commit graph and version control-inspired logic. You can also click the
+     **Download Commit Graph** button to inspect the underlying commit history
+     for deeper insights. The downloaded JSON file can be loaded into Cytoscape
+     ([https://cytoscape.org/](https://cytoscape.org/)) for visualization and
+     analysis.
+
+This interactive demo highlights how GoatDB ensures a consistent and resilient
+application state even when multiple sources make concurrent modifications.
+
+## 6. Building the Server
+
+To build a self-contained executable that includes both the server and client
+code, run:
 
 ```bash
 deno task build
 ```
 
-Will build a self contained executable including both the server and client
-code. Under the hood it uses [ESBuild](https://esbuild.github.io/) and
-[esbuild_deno_loader](https://github.com/lucacasonato/esbuild_deno_loader).
+This command leverages [ESBuild](https://esbuild.github.io/) and
+[esbuild_deno_loader](https://github.com/lucacasonato/esbuild_deno_loader) under
+the hood.
+
+> **Note:** For cross compilation details and additional build configurations,
+> please refer to the `build.ts` file.
 
 ## Conclusion
 
@@ -280,9 +325,9 @@ This Todo List app showcases the robust capabilities of GoatDB’s architecture:
 - **Version Control-Inspired Data Management:** With an append-only commit graph
   and versioned schemas, GoatDB offers a built-in audit trail and conflict
   resolution mechanism reminiscent of distributed version control systems.
-- **Real-Time Synchronization:** Through background commits and a probabilistic
-  synchronization protocol, the app achieves near-real-time updates, ensuring
-  that both local and remote changes are quickly propagated.
+- **Real-Time Synchronization & Conflict Resolution:** Through background
+  commits and a probabilistic synchronization protocol, the app achieves
+  near-real-time updates while gracefully handling concurrent modifications.
 - **Seamless Integration with React:** GoatDB’s React hooks (`useDB`,
   `useDBReady`, `useQuery`, and `useItem`) abstract away the complexities of
   state management and data synchronization, allowing you to focus on
@@ -292,5 +337,3 @@ By leveraging these architectural principles, the app not only maintains a
 consistent and resilient state but also provides a scalable foundation for
 building modern, edge-native applications. Enjoy building and extending your
 GoatDB-powered applications!
-
----
