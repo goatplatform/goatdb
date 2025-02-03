@@ -5,159 +5,215 @@ title: Tutorial
 nav_order: 1
 ---
 
-# Getting Started with GoatDB
+# Building a Todo List App with GoatDB
 
-GoatDB is a comprehensive SDK for building Single Page Applications (SPAs) using
-[Deno](https://docs.deno.com), [ESBuild](https://esbuild.github.io/), and
-[React](https://react.dev/). It offers an interactive development server and the
-capability to compile projects into standalone executables without external
-dependencies.
+Below is the complete tutorial in Markdown format. This tutorial walks you
+through building a full-featured Todo List app with GoatDB using React. It
+demonstrates how to leverage GoatDB’s distributed, edge-native architecture and
+real-time synchronization features.
 
----
+In this tutorial, you’ll build a Todo List app with GoatDB. You’ll learn how to:
 
-## Installation
+- **Set up a GoatDB project**
+- **Define versioned schemas for your data**
+- **Create React components that leverage real-time synchronization**
+- **Run an edge-native application using GoatDB’s distributed architecture**
 
-Ensure you have
-[Deno 2+](https://docs.deno.com/runtime/getting_started/installation/)
-installed. If not, install it
-[here](https://docs.deno.com/runtime/getting_started/installation/). Deno is a
-modern alternative to Node.js, offering superior developer experience and
-workflows.
+## Prerequisites
 
-For a better development experience, consider installing the Deno plugin for
-your preferred IDE.
+- [Deno](https://deno.land/) installed on your machine.
+- Basic knowledge of React and TypeScript.
+- Familiarity with command-line operations.
 
-### Steps:
+## 1. Initialize Your GoatDB Project
 
-1. Navigate to your project directory:
+Follow these steps to set up a new GoatDB project:
+
+1. **Navigate to your project directory:**
+
    ```bash
    cd /path/to/project
    ```
-2. Add GoatDB to your project:
+
+2. **Add GoatDB to your project:**
+
    ```bash
    deno add jsr:@goatdb/goatdb
    ```
-3. Initialize GoatDB:
+
+3. **Initialize GoatDB:**
+
    ```bash
    deno run -A jsr:@goatdb/goatdb/init
    ```
 
----
-
-## Starting the Debug Server
-
-After installation, start the interactive debug server by running:
-
-```bash
-deno task debug
-```
-
-This launches the server at [http://localhost:8080](http://localhost:8080). The
-server watches for project changes and automatically rebuilds the client code.
-
-**Tip:** Use an incognito browser session when accessing the debug server, as
-GoatDB persists data between sessions.
+These steps install GoatDB and set up the underlying infrastructure for your
+application.
 
 ---
 
-## Project Structure
+## 2. Define the Task Schema
 
-- **`/schema.ts`**: Define new schemas for your project here. Follow the
-  instructions in the file for guidance.
-- **`/src/`**: Contains your application’s code—the core of your project.
-- **`/scaffold/`**: Hosts the root HTML, CSS, and TSX files for your project.
-  Edit these for application-wide effects.
-
----
-
-# Creating a Schema
-
-To create a schema:
-
-1. Open `schema.ts` and remove the placeholder schema.
-2. Add a new schema definition, for example:
-
-   ```typescript
-   export const kSchemaTask = {
-     ns: 'task',
-     version: 1,
-     fields: {
-       text: {
-         type: 'string',
-         default: () => 'Untitled',
-       },
-       done: {
-         type: 'boolean',
-         default: () => false,
-       },
-     },
-   } as const;
-   export type SchemaTypeTask = typeof kSchemaTask;
-   ```
-
-   This schema defines a task with two fields:
-
-   - **`text`**: A string with a default value of "Untitled."
-   - **`done`**: A boolean with a default value of `false`.
-
-3. Register the schema by updating the `registerSchemas()` function at the
-   bottom of the file:
-   ```typescript
-   export function registerSchemas(
-     manager: SchemaManager = SchemaManager.default,
-   ): void {
-     manager.register(kSchemaTask);
-   }
-   ```
-
-**Note:** Both client and server code call this function during initialization
-to ensure consistent schema definitions. Schema versions are automatically
-managed, and items are upgraded on-the-fly.
-
----
-
-# Storing Data
-
-In GoatDB, data is organized into repositories—collections of items designed to:
-
-- Hold up to 100,000 items (this limit may increase in future versions).
-- Contain items with various schemas within the same repository.
-
-Repositories automatically track item histories and synchronize changes
-independently with the server. This design improves performance and enables
-real-time collaboration.
-
-### Repository Usage
-
-For a simple to-do list, store all tasks in the `/data/tasks` repository. GoatDB
-will create the repository automatically when needed—no manual setup required.
-
-### Benefits of Repositories:
-
-- **Optimized Performance**: Group related items together to minimize overhead.
-- **Flexible Permissions**: Access rules can be applied at the item level,
-  allowing granular control within a single repository.
-- **Versioning**: Repositories seamlessly upgrade item schemas to the latest
-  version, so you never deal with outdated data.
-
-**Pro Tip:** Keep related items within the same repository to take full
-advantage of GoatDB’s synchronization and performance optimizations.
-
----
-
-# Querying Data
-
-To query data, edit the `Contents` component in `src/app.tsx`:
+Create a file named `schema.ts` that defines the structure of your task items.
+In GoatDB, schemas are plain JavaScript objects that define the versioned
+structure of your data.
 
 ```typescript
+// schema.ts
+import { SchemaManager } from '@goatdb/goatdb';
+
+export const kSchemaTask = {
+  ns: 'task',
+  version: 1,
+  fields: {
+    text: {
+      type: 'string',
+      required: true,
+    },
+    done: {
+      type: 'boolean',
+      default: () => false,
+    },
+  },
+} as const;
+export type SchemaTypeTask = typeof kSchemaTask;
+
+// Register the schema with the default Schema Manager
+export function registerSchemas(
+  manager: SchemaManager = SchemaManager.default,
+): void {
+  manager.register(kSchemaTask);
+}
+```
+
+## 3. Create the React Components
+
+Your app will consist of several React components. Each component uses GoatDB
+React hooks to interact with the database.
+
+### 3.1 Header Component
+
+The `Header` component provides an input for new tasks and a button to add them.
+It uses the `useDB` hook to access the database and create new task items.
+
+```tsx
+// app/Header.tsx
+// @deno-types="@types/react"
+import React, { useRef } from 'react';
+import { useDB } from '@goatdb/goatdb/react';
+import { kSchemaTask } from '../schema.ts';
+
+export function Header() {
+  const db = useDB();
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <div>
+      <input type='text' ref={ref} />
+      <button
+        onClick={() => {
+          // Create a new task in the /data/tasks repository.
+          // This automatically triggers updates in the task list.
+          db.create('/data/tasks', kSchemaTask, {
+            text: ref.current!.value,
+          });
+        }}
+      >
+        Add
+      </button>
+    </div>
+  );
+}
+```
+
+### 3.2 TaskItem Component
+
+The `TaskItem` component displays and manages an individual task. It uses the
+`useItem` hook to subscribe to changes on a specific task, allowing for
+real-time updates and seamless state management.
+
+```tsx
+// app/TaskItem.tsx
+// @deno-types="@types/react"
+import React from 'react';
+import { useItem } from '@goatdb/goatdb/react';
+import { SchemaTypeTask } from '../schema.ts';
+
+export type TaskItemProps = {
+  path: string;
+};
+
+export function TaskItem({ path }: TaskItemProps) {
+  // Subscribe to updates for the specific task.
+  const task = useItem<SchemaTypeTask>(path);
+  return (
+    <div>
+      <input
+        type='checkbox'
+        checked={task.get('done')}
+        onChange={(event) => task.set('done', event.target.checked)}
+      />
+      <input
+        type='text'
+        value={task.get('text')}
+        onChange={(event) => task.set('text', event.target.value)}
+      />
+      <button
+        onClick={() => {
+          // Mark the task for deletion.
+          task.isDeleted = true;
+        }}
+      >
+        Delete
+      </button>
+      <button onClick={() => task.downloadDebugGraph()}>
+        Download Commit Graph
+      </button>
+    </div>
+  );
+}
+```
+
+### 3.3 Contents Component
+
+The `Contents` component manages the list of tasks. It uses the `useQuery` hook
+to fetch and sort tasks from the `/data/tasks` repository. A local state
+variable is used to control whether completed tasks should be shown.
+
+```tsx
+// Contents.tsx
+// @deno-types="@types/react"
+import React, { useState } from 'react';
+import { useQuery } from '@goatdb/goatdb/react';
+import { kSchemaTask } from '../schema.ts';
+import { Header } from './Header.tsx';
+import { TaskItem } from './TaskItem.tsx';
+
 export function Contents() {
+  const [showChecked, setShowChecked] = useState(true);
+  // Create a query to fetch and sort tasks alphabetically by their text.
   const query = useQuery({
     schema: kSchemaTask,
     source: '/data/tasks',
+    sortDescriptor: ({ left, right }) =>
+      left.get('text').localeCompare(right.get('text')),
+    // Filter tasks based on their "done" status and the local state.
+    predicate: ({ item, ctx }) => !item.get('done') || ctx.showChecked,
+    showIntermittentResults: true,
+    ctx: {
+      showChecked,
+    },
   });
-
   return (
     <div>
+      <Header />
+      <div>
+        <span>Show Checked</span>
+        <input
+          type='checkbox'
+          checked={showChecked}
+          onChange={(event) => setShowChecked(event.target.checked)}
+        />
+      </div>
       {query.results().map(({ path }) => (
         <div key={path}>
           <TaskItem path={path} />
@@ -168,15 +224,73 @@ export function Contents() {
 }
 ```
 
-### How It Works:
+### 3.4 App Component
 
-- **`useQuery`**: Opens an [incremental query](/query) with the provided
-  configuration.
-  - **`schema`**: Defines the schema of the items to query.
-  - **`source`**: Specifies the repository (`/data/tasks` in this case).
-- Items are automatically upgraded to the latest schema version during queries.
-- The hook re-renders the component whenever the repository changes, whether by
-  local or remote updates.
+The `App` component is the root of your application. It uses the `useDBReady`
+hook to manage the initial loading state. Once GoatDB is ready, the main
+contents of the app are rendered.
 
-**Real-time Collaboration:** GoatDB synchronizes changes between users up to
-three times per second, enabling seamless collaboration.
+```tsx
+// App.tsx
+// @deno-types="@types/react"
+import React from 'react';
+import { useDBReady } from '@goatdb/goatdb/react';
+import { Contents } from './Contents.tsx';
+
+export function App() {
+  const ready = useDBReady();
+  // Display a loading screen or error message as needed.
+  if (ready === 'loading') {
+    return <div>Loading...</div>;
+  }
+  if (ready === 'error') {
+    return <div>Error! Please reload the page.</div>;
+  }
+  return <Contents />;
+}
+```
+
+## 4. Running the Application
+
+```bash
+deno task debug
+```
+
+Will start a live-reload local server that listens at http://localhost:8080 and
+stores all data at `./server-data`
+
+## 5. Building the Server
+
+```bash
+deno task build
+```
+
+Will build a self contained executable including both the server and client
+code. Under the hood it uses [ESBuild](https://esbuild.github.io/) and
+[esbuild_deno_loader](https://github.com/lucacasonato/esbuild_deno_loader).
+
+## Conclusion
+
+This Todo List app showcases the robust capabilities of GoatDB’s architecture:
+
+- **Edge-Native Design:** GoatDB shifts computational and synchronization tasks
+  to edge nodes while a central server manages overall authority. This design
+  allows your application to function efficiently even in offline or partially
+  connected environments.
+- **Version Control-Inspired Data Management:** With an append-only commit graph
+  and versioned schemas, GoatDB offers a built-in audit trail and conflict
+  resolution mechanism reminiscent of distributed version control systems.
+- **Real-Time Synchronization:** Through background commits and a probabilistic
+  synchronization protocol, the app achieves near-real-time updates, ensuring
+  that both local and remote changes are quickly propagated.
+- **Seamless Integration with React:** GoatDB’s React hooks (`useDB`,
+  `useDBReady`, `useQuery`, and `useItem`) abstract away the complexities of
+  state management and data synchronization, allowing you to focus on
+  application logic.
+
+By leveraging these architectural principles, the app not only maintains a
+consistent and resilient state but also provides a scalable foundation for
+building modern, edge-native applications. Enjoy building and extending your
+GoatDB-powered applications!
+
+---

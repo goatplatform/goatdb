@@ -99,7 +99,13 @@ export const kSchemeMessageV2 = {
     },
   },
 } as const;
-SchemaManager.default.register(kSchemeMessageV2);
+
+export function registerSchemas(
+  manager: SchemaManager = SchemaManager.default,
+): void {
+  // Previous schema versions go in here
+  SchemaManager.default.register(kSchemeMessageV2);
+}
 ```
 
 ### The Upgrade Function
