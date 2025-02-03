@@ -36,7 +36,7 @@ const gitignoreScaffold = `node_modules
 server-data
 build`;
 
-const appTsxScaffold = `// @deno-types="npm:@types/react"
+const appTsxScaffold = `// @deno-types="@types/react"
 import React from 'react';
 import { useDBReady } from '@goatdb/goatdb/react';
 
@@ -345,6 +345,7 @@ async function bootstrapProject(): Promise<void> {
   await installDependency('npm:react@19.0.0');
   await installDependency('npm:react-dom@19.0.0/client');
   await installDependency('npm:yargs@17.7.2');
+  await installDependency('npm:@types/react@19.0.8');
   console.log('Done');
 }
 
