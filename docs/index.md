@@ -27,7 +27,7 @@ the following commands inside your project's directory.
 1. `deno add jsr:@goatdb/goatdb`
 2. `deno run -A jsr:@goatdb/goatdb/init`
 
-👉 Head over to the [Tutorial](/turorial) page for the full instructions.
+👉 Head over to the [Tutorial](/tutorial) page for the full instructions.
 
 ## Status
 
