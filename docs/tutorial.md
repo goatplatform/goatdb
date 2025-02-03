@@ -97,7 +97,7 @@ The `Header` component provides an input for new tasks and a button to add them.
 It uses the `useDB` hook to access the database and create new task items.
 
 ```tsx
-// app/Header.tsx
+// src/Header.tsx
 // @deno-types="@types/react"
 import React, { useRef } from 'react';
 import { useDB } from '@goatdb/goatdb/react';
@@ -132,7 +132,7 @@ The `TaskItem` component displays and manages an individual task. It uses the
 real-time updates and seamless state management.
 
 ```tsx
-// app/TaskItem.tsx
+// src/TaskItem.tsx
 // @deno-types="@types/react"
 import React from 'react';
 import { useItem } from '@goatdb/goatdb/react';
@@ -180,7 +180,7 @@ to fetch and sort tasks from the `/data/tasks` repository. A local state
 variable is used to control whether completed tasks should be shown.
 
 ```tsx
-// Contents.tsx
+// src/Contents.tsx
 // @deno-types="@types/react"
 import React, { useState } from 'react';
 import { useQuery } from '@goatdb/goatdb/react';
@@ -231,7 +231,7 @@ hook to manage the initial loading state. Once GoatDB is ready, the main
 contents of the app are rendered.
 
 ```tsx
-// App.tsx
+// src/App.tsx
 // @deno-types="@types/react"
 import React from 'react';
 import { useDBReady } from '@goatdb/goatdb/react';
