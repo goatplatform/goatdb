@@ -1,6 +1,6 @@
 import * as path from '@std/path';
 import { prettyJSON } from '../base/common.ts';
-import { JSONObject } from '../base/interfaces.ts';
+import type { JSONObject } from '../base/interfaces.ts';
 import { coreValueEquals } from '../base/core-types/equals.ts';
 
 const cssScaffold = ``;
@@ -158,10 +158,9 @@ export function registerSchemas(
 
 const serverSkaffold = `import yargs from "yargs";
 import * as path from "@std/path";
-import { Server, staticAssetsFromJS } from "@goatdb/goatdb/server";
+import { BuildInfo, Server, staticAssetsFromJS } from "@goatdb/goatdb/server";
 import { prettyJSON } from "@goatdb/goatdb";
 import { registerSchemas } from "./schema.ts";
-import { BuildInfo } from "../goatdb/server/build-info.ts";
 // These imported files will be automatically generated during compilation
 import encodedStaticAsses from "./build/staticAssets.json" with {
   type: "json",

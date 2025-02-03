@@ -14,8 +14,9 @@ import { Repository } from './repo/repo.ts';
 import { ManagedItem } from './db/managed-item.ts';
 import { Item } from './cfds/base/item.ts';
 import { prettyJSON } from './base/common.ts';
+import type { BuildInfo } from './server/build-info.ts';
 
-export type { AppConfig, Schema };
+export type { AppConfig, BuildInfo, Schema };
 export {
   GoatDB,
   Item,
