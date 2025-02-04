@@ -86,6 +86,7 @@ const denoJsonScaffold = {
   tasks: {
     debug: 'deno run -A debug-server.ts',
     build: 'deno run -A build.ts',
+    clean: 'rm -r server-data',
   },
   version: '0.0.1',
 };
