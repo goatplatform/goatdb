@@ -1,4 +1,8 @@
-import type { Schema, SchemaDataType } from '../cfds/base/schema.ts';
+import {
+  kNullSchema,
+  type Schema,
+  type SchemaDataType,
+} from '../cfds/base/schema.ts';
 import type { Commit } from '../repo/commit.ts';
 import type { Repository } from '../repo/repo.ts';
 import { itemPathGetPart, itemPathGetRepoId } from './path.ts';
@@ -74,6 +78,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
       this._item = this._item.clone();
     }
     if (this._item.upgradeSchema(s)) {
+      this.onChange(['__schema', true, null]);
       this._commitDelayTimer.schedule();
     }
   }
