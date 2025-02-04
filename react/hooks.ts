@@ -34,21 +34,21 @@ export type UseItemOpts = {
 
 export function useItem<S extends Schema>(
   ...pathCompsOrOpts: string[]
-): ManagedItem<S>;
+): ManagedItem<S> | undefined;
 
 export function useItem<S extends Schema>(
   opts: UseItemOpts,
   ...pathCompsOrOpts: string[]
-): ManagedItem<S>;
+): ManagedItem<S> | undefined;
 
 export function useItem<S extends Schema>(
   path: string,
   opts: UseItemOpts,
-): ManagedItem<S>;
+): ManagedItem<S> | undefined;
 
 export function useItem<S extends Schema>(
   ...pathCompsOrOpts: (string | UseItemOpts)[]
-): ManagedItem<S> {
+): ManagedItem<S> | undefined {
   const db = useDB();
   // Options object may appear either at the beginning or at the end
   let opts: UseItemOpts | undefined;
@@ -77,7 +77,7 @@ export function useItem<S extends Schema>(
   );
   const getSnapshot = useCallback(() => item.age, [item]);
   useSyncExternalStore(subscribe, getSnapshot);
-  return item;
+  return item.schema.ns === null ? undefined : item;
 }
 
 /**

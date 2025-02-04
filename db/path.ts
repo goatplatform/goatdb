@@ -52,6 +52,10 @@ export function itemPathGetPart<T extends string>(
     while (start < path.length && path[start] !== '/') {
       ++start;
     }
+    // Component not found, path is too short
+    if (start >= path.length) {
+      return undefined;
+    }
     if (path[start] === '/') {
       ++start;
     }

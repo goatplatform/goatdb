@@ -310,17 +310,25 @@ export class GoatDB {
    * creating items in it. Newly created items become immediately available for
    * use and will get committed to the underlying repo after open completes.
    *
-   * @param repoPath Path to the repository in which to create the item/
-   * @param schema   The schema to create the item with.
-   * @param data     The initial data to populate the item with.
-   * @returns        The newly created managed item.
+   * @param path    If a full path is provided, the item will be created with
+   *                the provided key. If a repository path is provided, a
+   *                unique item key will be automatically generated.
+   *
+   * @param schema  The schema to create the item with.
+   *
+   * @param data    The initial data to populate the item with.
+   *
+   * @returns       The newly created managed item.
    */
   create<S extends Schema>(
-    repoPath: string,
+    path: string,
     schema: S,
     data: Partial<SchemaDataType<S>>,
   ): ManagedItem<S> {
-    const item = this.item<S>(...Repository.parseId(repoPath), uniqueId());
+    if (itemPathGetPart(path, 'item') === undefined) {
+      path = itemPathJoin(path, uniqueId());
+    }
+    const item = this.item<S>(path);
     if (item.schema.ns === null) {
       item.schema = schema;
       item.setMulti(data);
