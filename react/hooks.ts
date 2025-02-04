@@ -62,7 +62,11 @@ export function useItem<S extends Schema>(
     (onStoreChange: () => void) =>
       item.attach('change', (mutations: MutationPack) => {
         // Skip unneeded updates if a specific set of keys was provided
-        if (opts?.keys !== undefined) {
+        if (
+          opts?.keys !== undefined &&
+          // Always notify on schema change
+          !mutationPackHasField(mutations, '__schema')
+        ) {
           if (typeof opts.keys === 'string') {
             if (!mutationPackHasField(mutations, opts.keys)) {
               return;
