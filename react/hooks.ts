@@ -1,7 +1,8 @@
+// @deno-types="@types/react"
 import React, { useCallback, useContext, useSyncExternalStore } from 'react';
 import { GoatDB } from '../db/db.ts';
 import type { Schema } from '../cfds/base/schema.ts';
-import type { ManagedItem } from '../db/managed-item.ts';
+import { ManagedItem } from '../db/managed-item.ts';
 import { type MutationPack, mutationPackHasField } from '../db/mutations.ts';
 import type { ReadonlyJSONValue } from '../base/interfaces.ts';
 import type { Query, QueryConfig } from '../repo/query.ts';
@@ -42,14 +43,52 @@ export function useItem<S extends Schema>(
 ): ManagedItem<S> | undefined;
 
 export function useItem<S extends Schema>(
-  path: string,
+  path: string | undefined,
   opts: UseItemOpts,
 ): ManagedItem<S> | undefined;
 
 export function useItem<S extends Schema>(
-  ...pathCompsOrOpts: (string | UseItemOpts)[]
+  path: undefined,
+  opts: UseItemOpts,
+): undefined;
+
+export function useItem<S extends Schema>(
+  path: string | undefined,
+): ManagedItem<S> | undefined;
+
+export function useItem<S extends Schema>(
+  path: undefined,
+): undefined;
+
+export function useItem<S extends Schema>(
+  path: ManagedItem<S> | undefined,
+  opts: UseItemOpts,
+): ManagedItem<S> | undefined;
+
+export function useItem<S extends Schema>(
+  path: ManagedItem<S> | undefined,
+): ManagedItem<S> | undefined;
+
+export function useItem<S extends Schema>(
+  path: ManagedItem<S>,
+  opts: UseItemOpts,
+): ManagedItem<S>;
+
+export function useItem<S extends Schema>(
+  path: ManagedItem<S>,
+): ManagedItem<S>;
+
+export function useItem<S extends Schema>(
+  ...pathCompsOrOpts: (ManagedItem | string | UseItemOpts | undefined)[]
 ): ManagedItem<S> | undefined {
   const db = useDB();
+  if (pathCompsOrOpts[0] === undefined) {
+    return undefined;
+  }
+  // Handle ManagedItem as first argument
+  if (pathCompsOrOpts[0] instanceof ManagedItem) {
+    pathCompsOrOpts[0] = pathCompsOrOpts[0].path;
+  }
   // Options object may appear either at the beginning or at the end
   let opts: UseItemOpts | undefined;
   if (typeof pathCompsOrOpts[0] !== 'string') {
@@ -57,10 +96,12 @@ export function useItem<S extends Schema>(
   } else if (typeof pathCompsOrOpts[pathCompsOrOpts.length - 1] !== 'string') {
     opts = pathCompsOrOpts.pop() as UseItemOpts;
   }
-  const item = db.item<S>(...(pathCompsOrOpts as string[]));
+  const item = pathCompsOrOpts[0] === undefined
+    ? undefined
+    : db.item<S>(...(pathCompsOrOpts as string[]));
   const subscribe = useCallback(
     (onStoreChange: () => void) =>
-      item.attach('change', (mutations: MutationPack) => {
+      item?.attach('change', (mutations: MutationPack) => {
         // Skip unneeded updates if a specific set of keys was provided
         if (
           opts?.keys !== undefined &&
@@ -76,12 +117,12 @@ export function useItem<S extends Schema>(
           }
         }
         onStoreChange();
-      }),
+      }) || (() => {}),
     [item],
   );
-  const getSnapshot = useCallback(() => item.age, [item]);
+  const getSnapshot = useCallback(() => item?.age, [item]);
   useSyncExternalStore(subscribe, getSnapshot);
-  return item.schema.ns === null ? undefined : item;
+  return typeof item?.schema.ns !== 'string' ? undefined : item;
 }
 
 /**

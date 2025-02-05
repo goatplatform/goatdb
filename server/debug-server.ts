@@ -96,11 +96,13 @@ export type DebugServerOptions =
 export async function startDebugServer(
   options: DebugServerOptions,
 ): Promise<never> {
+  const buildInfo = await generateBuildInfo(
+    options.denoJson || path.join(Deno.cwd(), 'deno.json'),
+  );
+  buildInfo.debugBuild = true;
   const server = new Server({
     ...options,
-    buildInfo: await generateBuildInfo(
-      options.denoJson || path.join(Deno.cwd(), 'deno.json'),
-    ),
+    buildInfo,
   });
   console.log('Building client code...');
   await writeWorkerSkaffold(options);

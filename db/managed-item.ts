@@ -15,7 +15,7 @@ import { assert } from '../base/error.ts';
 
 export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
   private readonly _commitDelayTimer: Timer;
-  private __head?: Commit;
+  private _head?: Commit;
   private _item!: Item<S>;
   private _commitPromise?: Promise<void>;
   private _detachHandler?: () => void;
@@ -37,13 +37,11 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
     }
   }
 
-  get _head(): Commit | undefined {
-    return this.__head;
-  }
-
-  set _head(h: Commit | undefined) {
-    assert(h !== undefined);
-    this.__head = h;
+  /**
+   * Returns the key of this item within its repository.
+   */
+  get key(): string {
+    return itemPathGetPart(this.path, 'item');
   }
 
   /**

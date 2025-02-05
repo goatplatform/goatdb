@@ -1,7 +1,7 @@
 import * as path from '@std/path';
-import { Session, sessionFromItem, TrustPool } from './session.ts';
-import { Repository, RepositoryConfig } from '../repo/repo.ts';
-import { DBSettings, DBSettingsProvider } from './settings/settings.ts';
+import { type Session, sessionFromItem, TrustPool } from './session.ts';
+import { Repository, type RepositoryConfig } from '../repo/repo.ts';
+import type { DBSettings, DBSettingsProvider } from './settings/settings.ts';
 import { FileSettings } from './settings/file.ts';
 import { Commit } from '../repo/commit.ts';
 import { RepoClient } from '../net/client.ts';
@@ -10,20 +10,22 @@ import { SyncScheduler } from '../net/sync-scheduler.ts';
 import { QueryPersistence } from '../repo/query-persistance.ts';
 import { QueryPersistenceFile } from './persistance/query-file.ts';
 import { ManagedItem } from './managed-item.ts';
-import { Schema, SchemaTypeSession } from '../cfds/base/schema.ts';
+import type {
+  Schema,
+  SchemaTypeSession,
+  SchemaTypeUser,
+} from '../cfds/base/schema.ts';
 import {
-  itemPath,
   itemPathGetPart,
   itemPathGetRepoId,
   itemPathJoin,
   itemPathNormalize,
-  ItemPathPart,
 } from './path.ts';
 import { isBrowser, mapIterable, uniqueId } from '../base/common.ts';
-import { SchemaDataType } from '../cfds/base/schema.ts';
+import type { SchemaDataType } from '../cfds/base/schema.ts';
 import { Item } from '../cfds/base/item.ts';
 import {
-  JSONLogFile,
+  type JSONLogFile,
   JSONLogFileAppend,
   JSONLogFileClose,
   JSONLogFileFlush,
@@ -41,7 +43,7 @@ import {
   generateQueryId,
   Query,
   type QueryConfig,
-  QuerySource,
+  type QuerySource,
 } from '../repo/query.ts';
 import { sendLoginEmail } from '../net/rest-api.ts';
 import { normalizeEmail } from '../base/string.ts';
@@ -164,14 +166,6 @@ export class GoatDB {
   }
 
   /**
-   * Returns whether this DB instance is ready to receive commands or is it
-   * still performing the initial load.
-   */
-  get ready(): boolean {
-    return this._ready;
-  }
-
-  /**
    * Returns the settings object of this DB instance.
    */
   get settings(): DBSettings {
@@ -184,6 +178,36 @@ export class GoatDB {
    */
   get loggedIn(): boolean {
     return this._trustPool?.currentSession.owner !== undefined;
+  }
+
+  /**
+   * Returns the current user item or undefined if the current session is
+   * anonymous.
+   */
+  get currentUser(): ManagedItem<SchemaTypeUser> | undefined {
+    const userId = this._trustPool?.currentSession.owner;
+    return userId ? this.item('sys', 'users', userId) : undefined;
+  }
+
+  /**
+   * Returns the current session.
+   * @throws This method throws if called before db.ready returns true.
+   */
+  get currentSession(): ManagedItem<SchemaTypeSession> {
+    const sessionId = this._trustPool?.currentSession.id;
+    assert(
+      sessionId !== undefined,
+      'Session not available yet. Wait for db.ready before accessing the current session.',
+    );
+    return this.item('sys', 'sessions', sessionId);
+  }
+
+  /**
+   * Returns whether this DB instance is ready to receive commands or is it
+   * still performing the initial load.
+   */
+  get ready(): boolean {
+    return this._ready;
   }
 
   /**

@@ -1,5 +1,5 @@
 import { GoatDB } from './db/db.ts';
-import type { Schema } from './cfds/base/schema.ts';
+import type { Schema, SchemaDataType } from './cfds/base/schema.ts';
 import { Query } from './repo/query.ts';
 import type { AppConfig } from './server/app-config.ts';
 import { SchemaManager } from './cfds/base/schema-manager.ts';
@@ -16,7 +16,7 @@ import { Item } from './cfds/base/item.ts';
 import { prettyJSON } from './base/common.ts';
 import type { BuildInfo } from './server/build-info.ts';
 
-export type { AppConfig, BuildInfo, Schema };
+export type { AppConfig, BuildInfo, Schema, SchemaDataType };
 export {
   GoatDB,
   Item,

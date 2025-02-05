@@ -1,10 +1,9 @@
 import {
   decodeSignature,
-  EncodedSession,
-  encodedSessionFromItem,
+  type EncodedSession,
   encodeSession,
-  OwnedSession,
-  Session,
+  type OwnedSession,
+  type Session,
   SESSION_CRYPTO_KEY_GEN_PARAMS,
   sessionIdFromSignature,
   sessionToItem,
@@ -16,8 +15,8 @@ import { uniqueId } from '../../base/common.ts';
 import { deserializeDate, kDayMs, kSecondMs } from '../../base/date.ts';
 import { assert } from '../../base/error.ts';
 import { Item } from '../../cfds/base/item.ts';
-import { HTTPMethod } from '../../logging/metrics.ts';
-import { Endpoint, ServerServices } from './server.ts';
+import type { HTTPMethod } from '../../logging/metrics.ts';
+import type { Endpoint, ServerServices } from './server.ts';
 import { getBaseURL, getRequestPath } from './utils.ts';
 // import { ResetPasswordEmail } from '../../emails/reset-password.tsx';
 import { kSchemaUser, SchemaTypeUser } from '../../cfds/base/schema.ts';
@@ -26,7 +25,6 @@ import { ReadonlyJSONObject } from '../../base/interfaces.ts';
 import { accessDenied } from '../../cfds/base/errors.ts';
 import { copyToClipboard } from '../../base/development.ts';
 import { sleep } from '../../base/time.ts';
-import { isDevelopmentBuild } from '../../base/development.ts';
 import { GoatDB } from '../../db/db.ts';
 import { coreValueCompare } from '../../base/core-types/comparable.ts';
 import { bsearch_idx } from '../../base/algorithms.ts';
@@ -135,9 +133,9 @@ export class AuthEndpoint implements Endpoint {
     };
     await persistSession(services, session);
     const encodedSession = await encodeSession(session);
-    // Let updates time to propagate to our replicas
-    if (!isDevelopmentBuild()) {
-      await sleep(2 * kSecondMs);
+    // Let updates time to propagate to replicas
+    if (services.buildInfo.debugBuild !== true) {
+      await sleep(1 * kSecondMs);
     }
     const resp = new Response(
       JSON.stringify({
@@ -204,11 +202,11 @@ export class AuthEndpoint implements Endpoint {
       },
     );
     const clickURL = `${getBaseURL(services)}/auth/temp-login?t=${signedToken}`;
-    if (isDevelopmentBuild()) {
-      // console.log(`****** ${clickURL} ******`);
-      if (await copyToClipboard(clickURL)) {
-        console.log(`Login URL copied to clipboard`);
-      }
+    if (services.buildInfo.debugBuild) {
+      const copied = await copyToClipboard(clickURL);
+      console.log(
+        `Login URL: ${clickURL}${copied ? ' (copied to clipboard)' : ''}`,
+      );
     }
     // Only send the mail if a user really exists. We send the email
     // asynchronously both for speed and to avoid timing attacks.
@@ -275,8 +273,8 @@ export class AuthEndpoint implements Endpoint {
         sessionsRepo.headForKey(session.id),
       );
       // Let the updated session time to replicate
-      if (!isDevelopmentBuild()) {
-        await sleep(3 * kSecondMs);
+      if (services.buildInfo.debugBuild !== true) {
+        await sleep(1 * kSecondMs);
       }
       // userRecord.set('lastLoggedIn', new Date());
       // repo.setValueForKey(userKey, userRecord);
@@ -335,8 +333,9 @@ async function fetchUserByEmail(
   });
   await query.loadingFinished();
   const results = query.results();
-  const userIdx = bsearch_idx(results.length, (idx) =>
-    coreValueCompare(results[idx].get('email'), email),
+  const userIdx = bsearch_idx(
+    results.length,
+    (idx) => coreValueCompare(results[idx].get('email'), email),
   );
   if (userIdx >= 0) {
     return results[userIdx];
@@ -397,10 +396,9 @@ export async function requireSignedUser(
     userSession: Session,
   ]
 > {
-  const signature =
-    typeof requestOrSignature === 'string'
-      ? requestOrSignature
-      : requestOrSignature.headers.get('x-goat-sig');
+  const signature = typeof requestOrSignature === 'string'
+    ? requestOrSignature
+    : requestOrSignature.headers.get('x-goat-sig');
 
   if (!signature) {
     throw accessDenied();

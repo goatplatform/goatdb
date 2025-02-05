@@ -2,6 +2,10 @@ import * as path from '@std/path';
 import type { JSONObject } from '../base/interfaces.ts';
 import { notReached } from '../base/error.ts';
 
+/**
+ * This interface encodes details about the build process used when compiling
+ * the app bundle. Used for internal configuration and later inspection.
+ */
 export interface BuildInfo extends JSONObject {
   /**
    * When was the binary created.
@@ -29,6 +33,11 @@ export interface BuildInfo extends JSONObject {
    * Tells the server where the json-log-worker file was embedded.
    */
   jsonLogWorkerPath: string;
+  /**
+   * If true, indicates this is a debug build which turns off optimizations and
+   * turns on a debugging aids.
+   */
+  debugBuild?: boolean;
 }
 
 export async function generateBuildInfo(

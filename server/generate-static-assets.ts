@@ -59,6 +59,7 @@ export async function buildAssets(
           'empty-import-meta': 'silent',
         },
         minify: appConfig.minify,
+        jsx: 'automatic',
       }),
     ));
 

@@ -13,6 +13,14 @@ export type ItemPathPart = (typeof kItemPathParts)[number];
 //   Embed = 3,
 // }
 
+/**
+ * Given the path parts, composes them into a GoatDB path.
+ * @param type Type of the repository, e.g "sys" / "user" / "data".
+ * @param repo The id of the repository.
+ * @param item The key of the item within the repository.
+ * @param embed An optional embedded item within the main item.
+ * @returns A full GoatDB path.
+ */
 export function itemPath<T extends RepoType>(
   type: T,
   repo: string,
