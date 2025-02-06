@@ -1,17 +1,21 @@
 import { Repository } from '../repo/repo.ts';
 
+/**
+ * The type of a repository creates an internal hierarchy within the repository.
+ * It enables grouping of related repositories for easier management.
+ * Common repository types: "sys", "user", "data", "events".
+ */
 export type RepoType = string;
 
+/**
+ * The different components that make up a DB path.
+ */
 export const kItemPathParts = ['type', 'repo', 'item', 'embed'] as const;
 
+/**
+ * A specific component within a DB path.
+ */
 export type ItemPathPart = (typeof kItemPathParts)[number];
-
-// export enum ItemPathPart {
-//   Type = 0,
-//   Repository = 1,
-//   Item = 2,
-//   Embed = 3,
-// }
 
 /**
  * Given the path parts, composes them into a GoatDB path.
@@ -45,6 +49,15 @@ export function itemPathGetPart<T extends string>(
   part: ItemPathPart,
 ): T | undefined;
 
+/**
+ * Given a DB path and a path component, this function returns the relevant
+ * portion of the path.
+ *
+ * @param path The full DB path.
+ * @param part The desired part to extract.
+ * @returns The requested part or undefined if it doesn't exist in the given
+ *          path.
+ */
 export function itemPathGetPart<T extends string>(
   path: string | undefined,
   part: ItemPathPart,
@@ -78,6 +91,12 @@ export function itemPathGetPart<T extends string>(
   return path.substring(start, end) as T;
 }
 
+/**
+ * Given a DB path, return just the repository prefix of it.
+ *
+ * @param path The full DB path.
+ * @returns Path to the repository of the given path.
+ */
 export function itemPathGetRepoId(path: string): string {
   return Repository.path(
     itemPathGetPart(path, 'type'),
@@ -85,6 +104,12 @@ export function itemPathGetRepoId(path: string): string {
   );
 }
 
+/**
+ * Normalizes the given path ensuring it has the correct number of parts
+ * and no trailing separator.
+ * @param path The path to normalize.
+ * @returns A normalized path.
+ */
 export function itemPathNormalize(path: string): string {
   let valid = true;
   if (path[0] === '/' && path[path.length - 1] !== '/') {
@@ -110,6 +135,12 @@ export function itemPathNormalize(path: string): string {
   );
 }
 
+/**
+ * Joins the given prefix and suffix into a single path.
+ * @param prefix Path prefix.
+ * @param suffix Path suffix.
+ * @returns A single path.
+ */
 export function itemPathJoin(prefix: string, suffix: string): string {
   if (prefix.endsWith('/')) {
     prefix = prefix.substring(0, prefix.length - 1);

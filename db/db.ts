@@ -161,6 +161,10 @@ export class GoatDB {
     this._trustPoolPromise = this._getTrustPoolImpl();
   }
 
+  /**
+   * Returns the directory under which this DB instance stores all data.
+   * Repositories are sub-directories within this directory.
+   */
   get path(): string {
     return this._path || this._basePath;
   }
@@ -536,6 +540,14 @@ export class GoatDB {
     return this._trustPool!;
   }
 
+  /**
+   * Returns the associated RepoClient instances for the given repository.
+   * Each client instance handles synchronization with a different server
+   * endpoint, enabling client-side load-balancing.
+   *
+   * @param pathComps Repository path.
+   * @returns RepoClient instances for the given repository.
+   */
   clientsForRepo(...pathComps: string[]): Iterable<RepoClient> {
     const repoId = Repository.normalizePath(pathComps.join('/'));
     return this._repoClients?.get(repoId) || [];
