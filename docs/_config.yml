@@ -53,6 +53,11 @@ nav_external_links:
     hide_icon: false # set to true to hide the external link icon - defaults to false
     opens_in_new_tab: false # set to true to open this link in a new tab - defaults to false
 
+# Google Analytics Tracking (optional)
+# Supports a CSV of tracking ID strings (eg. "UA-1234567-89,G-1AB234CDE5")
+ga_tracking: G-27ES13ZKRG
+ga_tracking_anonymize_ip: true # Use GDPR compliant Google Analytics settings (true/nil by default)
+
 # Exclude from processing.
 # The following items will not be processed, by default.
 # Any item listed under the `exclude:` key here will be automatically added to
