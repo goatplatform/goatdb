@@ -39,8 +39,8 @@
  * SchemaManager.default.register(taskSchema);
  *
  * // Initialize GoatDB
- * const db = await GoatDB.create({
- *   serverUrl: 'http://localhost:8080'
+ * const db = new GoatDB({
+ *   path: '/home/my-app',
  * });
  *
  * // Create a new task
