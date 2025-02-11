@@ -11,7 +11,7 @@ export async function buildSysAssets(): Promise<void> {
   const result = await esbuild.build({
     entryPoints: [
       {
-        in: path.join(repoPath, 'base', 'json-log', 'json-log-worker.ts'),
+        in: path.join(repoPath, 'base', 'json-log', 'json-log-worker-entry.ts'),
         out: 'json-log-worker',
       },
     ],
