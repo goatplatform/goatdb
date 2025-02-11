@@ -1,8 +1,13 @@
 import { assert } from '../../base/error.ts';
-import { kNullSchema, Schema, SchemaDataType, SchemaEquals } from './schema.ts';
+import {
+  kNullSchema,
+  type Schema,
+  type SchemaDataType,
+  SchemaEquals,
+} from './schema.ts';
 import {
   clone,
-  DataChanges,
+  type DataChanges,
   deserialize,
   diff as objectDiff,
   diffKeys,
@@ -13,29 +18,27 @@ import {
   serialize,
 } from './object.ts';
 import {
-  ConstructorDecoderConfig,
-  Decoder,
+  type ConstructorDecoderConfig,
+  type Decoder,
   isDecoderConfig,
-  ReadonlyDecodedObject,
+  type ReadonlyDecodedObject,
 } from '../../base/core-types/encoding/index.ts';
 import {
   JSONCyclicalDecoder,
   JSONCyclicalEncoder,
 } from '../../base/core-types/encoding/json.ts';
 import {
-  ChecksumEncoderOpts,
-  MD5Checksum,
+  type ChecksumEncoderOpts,
   Murmur3Checksum,
 } from '../../base/core-types/encoding/checksum.ts';
-import { ReadonlyJSONObject } from '../../base/interfaces.ts';
-import {
+import type { ReadonlyJSONObject } from '../../base/interfaces.ts';
+import type {
   CoreValue,
-  coreValueEquals,
   Encodable,
   Encoder,
 } from '../../base/core-types/index.ts';
 import { SchemaGetFieldDef } from './schema.ts';
-import { Readwrite } from '../../base/types.ts';
+import type { Readwrite } from '../../base/types.ts';
 import { SchemaManager } from './schema-manager.ts';
 
 export interface ReadonlyItem<S extends Schema> {
@@ -87,6 +90,15 @@ export class Item<S extends Schema = Schema>
   private _normalized = false;
   private _locked = false;
 
+  /**
+   * Creates a new Item instance.
+   *
+   * @param config Either an ItemConfig object containing the schema and data,
+   *               or a ConstructorDecoderConfig for deserializing an encoded
+   *               item
+   * @param schemaManager Optional schema manager to use. If not provided, the
+   *                      default schema manager will be used
+   */
   constructor(
     config: ItemConfig<S> | ConstructorDecoderConfig<EncodedItem>,
     schemaManager?: SchemaManager,
@@ -99,8 +111,6 @@ export class Item<S extends Schema = Schema>
       this._data = config.data as SchemaDataType<S>;
       this._normalized = config.normalized === true;
     }
-    // this.normalize();
-    // this.assertValidData();
   }
 
   private static _kNullDocument: Item<typeof kNullSchema> | undefined;
@@ -302,6 +312,14 @@ export class Item<S extends Schema = Schema>
     return false;
   }
 
+  /**
+   * Compares this item with another item for equality.
+   * Two items are considered equal if they have the same schema and their data
+   * is equal after normalization.
+   *
+   * @param other The item to compare against
+   * @returns true if the items are equal, false otherwise
+   */
   isEqual(other: Item<S>): boolean {
     if (this === other) {
       return true;
@@ -323,6 +341,13 @@ export class Item<S extends Schema = Schema>
     });
   }
 
+  /**
+   * Clones the current item.
+   *
+   * This method creates a new Item instance with the same schema and data as
+   * the current item. The new item is a deep copy of the current item,
+   * including all nested objects and arrays.
+   */
   clone(): Item<S> {
     const schema = this._schema;
     const result = new Item({
@@ -334,12 +359,29 @@ export class Item<S extends Schema = Schema>
     return result;
   }
 
+  /**
+   * Creates a deep copy of the item's data.
+   *
+   * @param onlyFields Optional array of field names to copy. If provided, only
+   *                   the specified fields will be cloned.
+   * @returns A deep copy of the item's data, or a partial copy if onlyFields
+   *          is specified.
+   */
   cloneData(
     onlyFields?: (keyof SchemaDataType<S>)[],
   ): Readwrite<SchemaDataType<S>> {
     return clone(this._schema, this._data, onlyFields);
   }
 
+  /**
+   * Copies data from another item into this one.
+   *
+   * This method replaces the current item's schema and data with a deep copy
+   * of the source item's schema and data. The source item remains unchanged.
+   *
+   * @param doc The source item to copy from.
+   * @throws {AssertionError} If this item is locked.
+   */
   copyFrom(doc: ReadonlyItem<S> | Item<S>): void {
     assert(!this._locked);
     this._schema = doc.schema;
@@ -347,6 +389,22 @@ export class Item<S extends Schema = Schema>
     this.invalidateCaches();
   }
 
+  /**
+   * Computes the differences between this item and another item.
+   *
+   * This method compares the data of this item with another item of the same schema
+   * and returns an object describing the differences between them.
+   *
+   * @param other The item to compare against
+   *
+   * @param byCharacter If true, rich text differences will be computed at the
+   *                    character level rather than at the paragraph/element
+   *                    level.
+   *
+   * @returns An object describing the differences between the two items
+   *
+   * @throws {AssertionError} If the other item is not an Item instance
+   */
   diff(other: Item<S>, byCharacter?: boolean): DataChanges {
     assert(other instanceof Item);
     this.normalize();
@@ -358,6 +416,16 @@ export class Item<S extends Schema = Schema>
     });
   }
 
+  /**
+   * Applies changes to this item's data.
+   *
+   * This method takes a DataChanges object (typically produced by the diff()
+   * method) and applies those changes to this item's data. The item's data
+   * will be modified in place.
+   *
+   * @param changes The changes to apply to this item's data
+   * @throws {AssertionError} If this item is locked
+   */
   patch(changes: DataChanges): void {
     assert(!this._locked);
     const schema = this.schema;
@@ -366,6 +434,20 @@ export class Item<S extends Schema = Schema>
     this.normalize();
   }
 
+  /**
+   * Returns an array of field keys that differ between this item and another
+   * item.
+   *
+   * This method compares the data of this item with another item of the same
+   * schema and returns an array of field keys where the values differ.
+   *
+   * This is a much faster check than a full diff computation.
+   *
+   * @param other The item to compare against
+   * @param local If true, compare local fields. If false, ignores local fields
+   * @returns Array of field keys that have different values between the items
+   * @throws {AssertionError} If the other item is not an Item instance
+   */
   diffKeys(other: Item<S>, local: boolean): string[] {
     this.normalize();
     other.normalize();
@@ -374,6 +456,21 @@ export class Item<S extends Schema = Schema>
     });
   }
 
+  /**
+   * Upgrades this item's data to a newer schema version.
+   *
+   * This method takes an optional target schema and attempts to upgrade the
+   * item's data to match that schema. If no target schema is provided, it will
+   * upgrade to the latest schema version available for this namespace.
+   *
+   * The upgrade process is performed by applying the upgrade functions defined
+   * in each schema version between the current and target versions. The upgrade
+   * will fail if any intermediate schema versions are missing.
+   *
+   * @param newSchema Optional target schema to upgrade to
+   * @returns true if the data was upgraded, false if no upgrade was needed
+   * @throws {AssertionError} If this item is locked or if the upgrade fails
+   */
   upgradeSchema(newSchema?: Schema): boolean {
     assert(!this._locked);
     const res = this.schemaManager.upgrade(this._data, this._schema, newSchema);
@@ -388,22 +485,16 @@ export class Item<S extends Schema = Schema>
     return false;
   }
 
-  upgradeSchemaToLatest(): boolean {
-    assert(!this._locked);
-    if (this.schema.ns === null) {
-      return false;
-    }
-    const latestSchema = this.schemaManager.get(this.schema.ns);
-    if (
-      latestSchema !== undefined &&
-      latestSchema.version > this.schema.version
-    ) {
-      this.upgradeSchema();
-      return true;
-    }
-    return false;
-  }
-
+  /**
+   * Checks if this item needs a schema upgrade.
+   *
+   * This method checks if there is a newer schema version available for this
+   * item's  namespace. It compares the item's current schema version with the
+   * latest schema version registered in the schema manager.
+   *
+   * @returns true if a newer schema version exists and the item needs an
+   *          upgrade, false otherwise
+   */
   needsSchemaUpgrade(): boolean {
     if (this.schema.ns === null) {
       return false;
@@ -418,6 +509,19 @@ export class Item<S extends Schema = Schema>
     return false;
   }
 
+  /**
+   * Normalizes the item's data according to its schema.
+   *
+   * This method ensures that all fields in the item's data conform to the
+   * schema's requirements by applying normalization rules. For example, it may:
+   * - Convert field values to their proper types
+   * - Apply default values for missing required fields
+   * - Remove fields not defined in the schema
+   *
+   * The normalization is only performed once - subsequent calls will have no
+   * effect. Null items (those with a null schema) are always normalized by
+   * definition.
+   */
   normalize(): void {
     if (this._normalized || this.isNull) {
       return;
@@ -427,6 +531,18 @@ export class Item<S extends Schema = Schema>
     this._normalized = true;
   }
 
+  /**
+   * Serializes the item into an encoded format.
+   *
+   * This method encodes the item's schema, data, normalization status and
+   * checksum into a format that can be stored or transmitted. The item is
+   * automatically normalized before serialization.
+   *
+   * @param encoder The encoder to use for serialization
+   * @param options Serialization options
+   * @param options.local If true, serialization includes local data. If false,
+   *                      local data is skipped.
+   */
   serialize(
     encoder: Encoder<string, CoreValue>,
     options = { local: false },
@@ -439,11 +555,19 @@ export class Item<S extends Schema = Schema>
     });
     encoder.set('d', dataEncoder.getOutput());
     encoder.set('n', this._normalized);
-    // if (this._checksum) {
     encoder.set('cs', this.checksum);
-    // }
   }
 
+  /**
+   * Deserializes an encoded item into this instance.
+   *
+   * This method decodes the item's schema, data, normalization status and
+   * checksum from an encoded format and updates this instance's state
+   * accordingly. The item is automatically normalized after deserialization.
+   *
+   * @param decoder The decoder containing the encoded item data
+   * @throws {AssertionError} If the item is locked or if the schema is unknown
+   */
   deserialize(decoder: Decoder): void {
     assert(!this._locked);
     const schema = this.schemaManager.decode(decoder.get<string>('s')!);
@@ -464,12 +588,25 @@ export class Item<S extends Schema = Schema>
     this._checksum = decoder.get('cs');
   }
 
+  /**
+   * Serializes this item to a JSON-compatible object.
+   *
+   * @param local If true, serialization includes local data. If false,
+   *              local data is skipped.
+   * @returns A JSON object representing this item's serialized state.
+   */
   toJS(local = false): ReadonlyJSONObject {
     const encoder = new JSONCyclicalEncoder();
     this.serialize(encoder, { local });
     return encoder.getOutput() as ReadonlyJSONObject;
   }
 
+  /**
+   * Deserializes a JSON-compatible object into an Item instance.
+   *
+   * @param obj The JSON object to deserialize
+   * @returns An Item instance representing the deserialized data
+   */
   static fromJS<S extends Schema>(obj: ReadonlyJSONObject): Item<S> {
     const decoder = JSONCyclicalDecoder.get(obj);
     const record = new this({ decoder });
@@ -477,25 +614,64 @@ export class Item<S extends Schema = Schema>
     return record as unknown as Item<S>;
   }
 
+  /**
+   * Asserts that the item's data is valid according to its schema.
+   *
+   * This method checks if the item's data conforms to the schema's
+   * requirements. If the data is invalid, it throws an assertion error with
+   * the corresponding error message.
+   *
+   * @throws {AssertionError} If the item's data is invalid
+   */
   assertValidData(): void {
     const [valid, msg] = isValidData(this.schema, this._data);
     assert(valid as boolean, msg as string);
   }
 
-  invalidateCaches(): void {
+  /**
+   * Invalidates internal caches used by the item.
+   *
+   * This private method resets the cached checksum and normalization state,
+   * forcing them to be recalculated when next accessed. Called internally
+   * when the item's data changes.
+   */
+  private invalidateCaches(): void {
     this._checksum = undefined;
     this._normalized = false;
   }
 
+  /**
+   * Returns whether this item is locked or not. Locked items cannot be
+   * modified. Items are locked when they represent a specific version in
+   * history.
+   */
   get isLocked(): boolean {
     return this._locked;
   }
 
+  /**
+   * Locks this item, preventing any further modifications.
+   *
+   * When an item is locked, attempts to modify its data will throw errors.
+   * The checksum is calculated and cached before locking to ensure consistency.
+   * Items are typically locked when they represent a specific version in
+   * history.
+   */
   lock(): void {
     this.checksum; // Force calculate our checksum
     this._locked = true;
   }
 
+  /**
+   * Unlocks this item, allowing modifications.
+   *
+   * When an item is unlocked, its data can be modified. This reverses the
+   * effect of calling lock().
+   *
+   * WARNING: Unlocking items is dangerous and should never be needed in normal
+   * usage. Unlocking can corrupt historical versions and lead to serious data
+   * inconsistencies.
+   */
   unlock(): void {
     this._locked = false;
   }
