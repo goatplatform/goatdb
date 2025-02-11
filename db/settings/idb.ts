@@ -1,9 +1,12 @@
-import { openDB, DBSchema, OpenDBCallbacks } from 'https://esm.sh/idb@7.1.1';
-import { DBSettings, DBSettingsProvider } from './settings.ts';
+import {
+  type DBSchema,
+  openDB,
+  type OpenDBCallbacks,
+} from 'https://esm.sh/idb@7.1.1';
+import type { DBSettings, DBSettingsProvider } from './settings.ts';
 import { SerialScheduler } from '../../base/serial-scheduler.ts';
-import { OwnedSession, generateKeyPair, generateSession } from '../session.ts';
+import { generateKeyPair, generateSession } from '../session.ts';
 import { createNewSession } from '../../net/rest-api.ts';
-import { assert } from '../../base/error.ts';
 
 const K_DB_VERSION = 1;
 const K_DB_NAME = 'sessions';

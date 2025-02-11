@@ -1,12 +1,12 @@
 import * as path from '@std/path';
 import {
-  type OwnedSession,
-  type EncodedSession,
   decodeSession,
-  generateSession,
+  type EncodedSession,
   encodeSession,
-  type Session,
   generateKeyPair,
+  generateSession,
+  type OwnedSession,
+  type Session,
 } from '../session.ts';
 import { prettyJSON } from '../../base/common.ts';
 import {
@@ -20,6 +20,7 @@ import { readTextFile, writeTextFile } from '../../base/json-log/json-log.ts';
 import { createNewSession } from '../../net/rest-api.ts';
 import { serviceUnavailable } from '../../cfds/base/errors.ts';
 import { SimpleTimer } from '../../base/timer.ts';
+import { retry } from '../../base/time.ts';
 
 export type FileSettingsMode = 'server' | 'client';
 
@@ -33,7 +34,10 @@ export class FileSettings implements DBSettingsProvider {
     let updatedSettings = false;
     let roots: Session[] = [];
     const trustedSessions: Session[] = [];
-    const text = await readTextFile(this.filePath);
+    const text = await retry(
+      async () => await readTextFile(this.filePath),
+      5 * kSecondMs,
+    );
     if (text) {
       try {
         const decoder = new JSONDecoder(JSON.parse(text));

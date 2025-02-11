@@ -11,13 +11,12 @@ This tutorial walks you through building a full-featured Todo List app with
 GoatDB using React. It demonstrates how to leverage GoatDB’s distributed,
 edge-native architecture and real-time synchronization features.
 
-In this tutorial, you’ll build a Todo List app with GoatDB. You’ll learn how to:
-
-- **Set up a GoatDB project**
-- **Define versioned schemas for your data**
-- **Create React components that leverage real-time synchronization**
-- **Test real-time sync and conflict resolution**
-- **Run an edge-native application using GoatDB’s distributed architecture**
+GoatDB is a distributed, edge‑native database that shifts data processing to
+client nodes while maintaining centralized authority. In GoatDB, items are the
+basic data units (like rows or documents) defined by versioned schemas and
+organized within repositories. Each item is uniquely identified by a path
+(following the format /type/repo/item), which distinguishes system, application,
+and user data, enabling efficient synchronization and conflict resolution.
 
 ## Prerequisites
 
@@ -86,13 +85,18 @@ export function registerSchemas(
 
 ## 3. Create the React Components
 
-Your app will consist of several React components. Each component uses GoatDB
-React hooks to interact with the database.
+GoatDB provides a set of [React hooks](/react)—`useDB()`, `useDBReady()`,
+`useQuery()`, and `useItem()`—that simplify state management and data
+synchronization. Your app will consist of several React components. Each
+component uses GoatDB React hooks to interact with the database.
 
 ### 3.1 Header Component
 
-The `Header` component provides an input for new tasks and a button to add them.
+The `Header` component renders an input field and a button for adding new tasks.
 It uses the `useDB` hook to access the database and create new task items.
+
+When a new task is created, it is stored under a repository associated with the
+current user, which triggers real‑time updates elsewhere in the app.
 
 ```tsx
 // src/Header.tsx
@@ -106,12 +110,12 @@ export function Header() {
   const ref = useRef<HTMLInputElement>(null);
   return (
     <div>
-      <input type='text' ref={ref} />
+      <input type='text' ref={ref}></input>
       <button
         onClick={() => {
-          // Create a new task in the /data/tasks repository.
+          // Create a new task at the user's personal repository.
           // This automatically triggers updates in the task list.
-          db.create('/data/tasks', kSchemaTask, {
+          db.create(`/data/${db.currentUser!.key}`, kSchemaTask, {
             text: ref.current!.value,
           });
         }}
@@ -125,9 +129,9 @@ export function Header() {
 
 ### 3.2 TaskItem Component
 
-The `TaskItem` component displays and manages an individual task. It uses the
-`useItem` hook to subscribe to changes on a specific task, allowing for
-real-time updates and seamless state management.
+The `TaskItem` component displays an individual task. By using the `useItem()`
+hook, it subscribes to changes on a specific task so that any modification
+triggers a re-render.
 
 ```tsx
 // src/TaskItem.tsx
@@ -178,28 +182,29 @@ export function TaskItem({ path }: TaskItemProps) {
 
 ### 3.3 Contents Component
 
-The `Contents` component manages the list of tasks. It uses the `useQuery` hook
-to fetch and sort tasks from the `/data/tasks` repository. A local state
-variable is used to control whether completed tasks should be shown.
+The `Contents` component ties everything together by querying and displaying the
+list of tasks. It uses the `useQuery()` hook to fetch tasks from the user’s
+repository, sorting and filtering them as needed. A local state variable is used
+to control whether completed tasks should be shown.
 
 ```tsx
 // src/Contents.tsx
 // @deno-types="@types/react"
 import React, { useState } from 'react';
-import { useQuery } from '@goatdb/goatdb/react';
+import { useDB, useQuery } from '@goatdb/goatdb/react';
 import { kSchemaTask } from '../schema.ts';
 import { Header } from './Header.tsx';
 import { TaskItem } from './TaskItem.tsx';
 
 export function Contents() {
+  const db = useDB();
   const [showChecked, setShowChecked] = useState(true);
-  // Create a query to fetch and sort tasks alphabetically by their text.
+  // Open a query to fetch all tasks sorted by their text.
   const query = useQuery({
     schema: kSchemaTask,
-    source: '/data/tasks',
+    source: `/data/${db.currentUser!.key}`,
     sortDescriptor: ({ left, right }) =>
       left.get('text').localeCompare(right.get('text')),
-    // Filter tasks based on their "done" status and the local state.
     predicate: ({ item, ctx }) => !item.get('done') || ctx.showChecked,
     showIntermittentResults: true,
     ctx: {
@@ -227,29 +232,72 @@ export function Contents() {
 }
 ```
 
-### 3.4 App Component
+### 3.4 Login Component
 
-The `App` component is the root of your application. It uses the `useDBReady`
-hook to manage the initial loading state. Once GoatDB is ready, the main
-contents of the app are rendered.
+The `Login` component provides a simple email-based login using a magic link.
+Once the user is authenticated, the app displays the task list. GoatDB includes
+built in authentication and authorization tools that tie into the
+[signed commit graph](/commit-graph).
+
+```tsx
+// src/Login.tsx
+// @deno-types="@types/react"
+import React, { useRef, useState } from 'react';
+import { useDB } from '@goatdb/goatdb/react';
+
+export function Login() {
+  const db = useDB();
+  const ref = useRef<HTMLInputElement>(null);
+  const [emailSent, setEmailSent] = useState(false);
+  const [sendError, setSendError] = useState(false);
+  return (
+    <div>
+      <label htmlFor='LoginEmail'>Email:</label>
+      <input type='text' ref={ref} id='LoginEmail'></input>
+      <button
+        onClick={async () => {
+          if (await db.loginWithMagicLinkEmail(ref.current!.value)) {
+            setEmailSent(true);
+            setSendError(false);
+          } else {
+            setEmailSent(false);
+            setSendError(true);
+          }
+        }}
+      >
+        Login
+      </button>
+      {emailSent && <span>Email Sent. Check your inbox</span>}
+      {sendError && <span>Error sending email. Try again later.</span>}
+    </div>
+  );
+}
+```
+
+### 3.5 App Component
+
+The `App` component is the root of your application. It uses the `useDBReady()`
+hook to manage the initial loading state. Depending on whether the user is
+logged in, it displays either the login screen or the task list.
 
 ```tsx
 // src/App.tsx
 // @deno-types="@types/react"
 import React from 'react';
-import { useDBReady } from '@goatdb/goatdb/react';
+import { useDB, useDBReady } from '@goatdb/goatdb/react';
 import { Contents } from './Contents.tsx';
+import { Login } from './Login.tsx';
 
 export function App() {
+  const db = useDB();
   const ready = useDBReady();
-  // Display a loading screen or error message as needed.
   if (ready === 'loading') {
     return <div>Loading...</div>;
   }
   if (ready === 'error') {
     return <div>Error! Please reload the page.</div>;
   }
-  return <Contents />;
+  return db.loggedIn ? <Contents /> : <Login />;
 }
 ```
 

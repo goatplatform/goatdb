@@ -205,6 +205,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
       this._detachHandler();
       this._detachHandler = undefined;
     }
+    this._commitDelayTimer.unschedule();
   }
 
   private onChange(
@@ -251,7 +252,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
         this._head = entry[1];
         // Auto upgrade the schema so the app is guaranteed to see the latest
         // version
-        if (this._item.upgradeSchemaToLatest()) {
+        if (this._item.upgradeSchema()) {
           // Commit after schema upgrade
           this._commitDelayTimer.schedule();
         }

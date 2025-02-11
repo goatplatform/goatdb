@@ -1,3 +1,9 @@
+/**
+ * This is a CLI used to initialize a new GoatDB project skaffold.
+ * Check out https://goatdb.dev for additional docs.
+ *
+ * @module GoatDB/Init
+ */
 import * as path from '@std/path';
 import { prettyJSON } from '../base/common.ts';
 import type { JSONObject } from '../base/interfaces.ts';

@@ -18,18 +18,22 @@ import { Item } from '../../cfds/base/item.ts';
 import type { HTTPMethod } from '../../logging/metrics.ts';
 import type { Endpoint, ServerServices } from './server.ts';
 import { getBaseURL, getRequestPath } from './utils.ts';
-// import { ResetPasswordEmail } from '../../emails/reset-password.tsx';
-import { kSchemaUser, SchemaTypeUser } from '../../cfds/base/schema.ts';
+import {
+  kSchemaUser,
+  kSchemaUserStats,
+  type SchemaTypeUser,
+  SchemaTypeUserStats,
+} from '../../cfds/base/schema.ts';
 import { normalizeEmail } from '../../base/string.ts';
-import { ReadonlyJSONObject } from '../../base/interfaces.ts';
+import type { ReadonlyJSONObject } from '../../base/interfaces.ts';
 import { accessDenied } from '../../cfds/base/errors.ts';
 import { copyToClipboard } from '../../base/development.ts';
 import { sleep } from '../../base/time.ts';
-import { GoatDB } from '../../db/db.ts';
+import type { GoatDB } from '../../db/db.ts';
 import { coreValueCompare } from '../../base/core-types/comparable.ts';
 import { bsearch_idx } from '../../base/algorithms.ts';
 import { itemPathGetPart } from '../../db/path.ts';
-import { ManagedItem } from '../../db/managed-item.ts';
+import type { ManagedItem } from '../../db/managed-item.ts';
 
 export const kAuthEndpointPaths = [
   '/auth/session',
@@ -188,6 +192,9 @@ export class AuthEndpoint implements Endpoint {
 
     const userItem = await fetchUserByEmail(services, email);
     // TODO (ofri): Rate limit this call
+    if (!userItem) {
+      return responseForError('AccessDenied');
+    }
 
     // Unconditionally generate the signed token so this call isn't vulnerable
     // to timing attacks.
@@ -205,7 +212,7 @@ export class AuthEndpoint implements Endpoint {
     if (services.buildInfo.debugBuild) {
       const copied = await copyToClipboard(clickURL);
       console.log(
-        `Login URL: ${clickURL}${copied ? ' (copied to clipboard)' : ''}`,
+        `Login URL${copied ? ' (copied to clipboard)' : ''}: ${clickURL}`,
       );
     }
     // Only send the mail if a user really exists. We send the email
@@ -239,9 +246,11 @@ export class AuthEndpoint implements Endpoint {
     try {
       const signature = decodeSignature<TemporaryLoginToken>(encodedToken);
       const signerId = signature.sessionId;
+      // Verify we have a signer
       if (!signerId) {
         return this.redirectHome(services);
       }
+      // Verify that root signed this request and that the signature is valid
       const signerSession = await fetchSessionById(services, signerId);
       if (
         !signerSession ||
@@ -250,12 +259,14 @@ export class AuthEndpoint implements Endpoint {
       ) {
         return this.redirectHome(services);
       }
+      // Make sure this is a known user
       const userKey = signature.data.u;
       const usersRepo = await services.db.open('/sys/users');
-      const user = usersRepo.valueForKey(userKey);
-      if (!user || user[0].isNull) {
+      const entry = usersRepo.valueForKey(userKey);
+      if (!entry || entry[0].isNull) {
         return this.redirectHome(services);
       }
+      // Find the session item and make sure it exists
       const sessionsRepo = await services.db.open('/sys/sessions');
       const session = (await services.db.getTrustPool()).getSession(
         signature.data.s,
@@ -263,21 +274,38 @@ export class AuthEndpoint implements Endpoint {
       if (!session) {
         return this.redirectHome(services);
       }
+      // Ensure this session isn't already attached to a user
       if (session.owner !== undefined) {
         return this.redirectHome(services);
       }
+      // Link the session to its new owner
       session.owner = userKey;
       sessionsRepo.setValueForKey(
         session.id,
         await sessionToItem(session),
         sessionsRepo.headForKey(session.id),
       );
-      // Let the updated session time to replicate
+      // Update user stats
+      const statsRepo = await services.db.open('/sys/stats');
+      const statsEntry = statsRepo.valueForKey<
+        SchemaTypeUserStats
+      >(userKey);
+      const statsItem = statsEntry
+        ? statsEntry[0].clone()
+        : new Item<SchemaTypeUserStats>({
+          schema: kSchemaUserStats,
+          data: {},
+        });
+      const now = new Date();
+      statsItem.set('lastLoggedIn', now);
+      if (!statsItem.has('firstLoggedIn')) {
+        statsItem.set('firstLoggedIn', now);
+      }
+      statsRepo.setValueForKey(userKey, statsItem, statsEntry && statsEntry[1]);
+      // Let the updated data time to replicate
       if (services.buildInfo.debugBuild !== true) {
         await sleep(1 * kSecondMs);
       }
-      // userRecord.set('lastLoggedIn', new Date());
-      // repo.setValueForKey(userKey, userRecord);
       return this.redirectHome(services);
     } catch (_: unknown) {
       return this.redirectHome(services);
@@ -357,9 +385,6 @@ export async function fetchSessionById(
 ): Promise<Session | undefined> {
   const tp = await services.db.getTrustPool();
   const session = tp.getSession(sessionId);
-  if (!session) {
-    debugger;
-  }
   return session;
 }
 

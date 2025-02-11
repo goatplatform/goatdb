@@ -8,4 +8,5 @@ export interface FileImpl<T> {
   write(handle: T, buf: Uint8Array): Promise<void>;
   close(handle: T): Promise<void>;
   flush(handle: T): Promise<void>;
+  remove(path: string): Promise<boolean>;
 }

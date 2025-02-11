@@ -10,7 +10,7 @@ import { notReached } from '../base/error.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { writeWorkerSkaffold } from '../cli/compile.ts';
 import { generateBuildInfo } from './build-info.ts';
-import { AppConfig } from '../mod.ts';
+import type { AppConfig } from '../mod.ts';
 
 function incrementBuildNumber(version: VersionNumber): VersionNumber {
   return tuple4Set(version, 0, tuple4Get(version, 0) + 1);
@@ -83,7 +83,7 @@ export type LiveReloadOptions = {
 };
 
 export type DebugServerOptions =
-  & Omit<ServerOptions, 'staticAssets' | 'buildInfo'>
+  & Omit<ServerOptions, 'staticAssets' | 'buildInfo' | 'resolveDomain'>
   & LiveReloadOptions
   & AppConfig;
 
@@ -103,6 +103,7 @@ export async function startDebugServer(
   const server = new Server({
     ...options,
     buildInfo,
+    resolveDomain: () => 'http://localhost:8080',
   });
   console.log('Building client code...');
   await writeWorkerSkaffold(options);

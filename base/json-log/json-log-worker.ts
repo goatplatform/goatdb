@@ -5,6 +5,7 @@
 import { assert } from '../error.ts';
 import type { ReadonlyJSONObject } from '../interfaces.ts';
 import type {
+  WorkerErrorResp,
   WorkerFileReq,
   WorkerFileRespAppend,
   WorkerFileRespClose,
@@ -13,6 +14,7 @@ import type {
   WorkerFileRespOpen,
   WorkerFileRespScan,
   WorkerReadTextFileResp,
+  WorkerRemoveResp,
   WorkerWriteTextFileResp,
 } from './json-log-worker-req.ts';
 import type { FileImpl } from './file-impl-interface.ts';
@@ -391,6 +393,26 @@ export function jsonLogWorkerMain(): void {
           type: 'writeTextFile',
           id: event.data.id,
           success: await writeTextFile(event.data.path, event.data.text),
+        };
+        postMessage(JSON.stringify(resp));
+        break;
+      }
+
+      case 'remove': {
+        const resp: WorkerRemoveResp = {
+          type: 'remove',
+          id: event.data.id,
+          success: await FileImplGet().remove(event.data.path),
+        };
+        postMessage(JSON.stringify(resp));
+        break;
+      }
+
+      default: {
+        const resp: WorkerErrorResp = {
+          type: 'error',
+          id: (event.data as WorkerFileReq).id,
+          error: 'UnknownCommand',
         };
         postMessage(JSON.stringify(resp));
         break;

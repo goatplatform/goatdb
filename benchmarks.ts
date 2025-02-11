@@ -23,7 +23,7 @@ export const kSchemeNote = {
   },
 } as const;
 type SchemeNoteType = typeof kSchemeNote;
-SchemaManager.default.register(kSchemeNote);
+SchemaManager.default.registerSchema(kSchemeNote);
 
 const kWords = [
   'lorem',
@@ -153,11 +153,7 @@ export async function testsMain(): Promise<void> {
   console.log(
     `Done. Open took ${
       (performance.now() - openStart) / 1000
-    } sec.\n# Commits = ${repo
-      .numberOfCommits()
-      .toLocaleString()}\n# Keys = ${repo.storage
-      .numberOfKeys()
-      .toLocaleString()}`,
+    } sec.\n# Commits = ${repo.numberOfCommits().toLocaleString()}\n# Keys = ${repo.storage.numberOfKeys().toLocaleString()}`,
   );
 
   if (repo.numberOfCommits() === 0) {

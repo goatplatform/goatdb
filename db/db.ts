@@ -1,5 +1,5 @@
 import * as path from '@std/path';
-import { type Session, sessionFromItem, TrustPool } from './session.ts';
+import { sessionFromItem, TrustPool } from './session.ts';
 import { Repository, type RepositoryConfig } from '../repo/repo.ts';
 import type { DBSettings, DBSettingsProvider } from './settings/settings.ts';
 import { FileSettings } from './settings/file.ts';
@@ -32,6 +32,7 @@ import {
   JSONLogFileOpen,
   JSONLogFileScan,
   JSONLogFileStartCursor,
+  remove,
   startJSONLogWorkerIfNeeded,
 } from '../base/json-log/json-log.ts';
 import type {
@@ -51,54 +52,14 @@ import { FileImplGet } from '../base/json-log/file-impl.ts';
 import { FileImplOPFS } from '../base/json-log/file-impl-opfs.ts';
 import { assert } from '../base/error.ts';
 import { SchemaManager } from '../cfds/base/schema-manager.ts';
-
-/**
- * Denotes the type of the requested operation.
- */
-export type AuthOp = 'read' | 'write';
-
-/**
- * A function that implements access control rules for a given repository or
- * group of repositories.
- *
- * Note that this method gets called repeatedly on every access attempt so it
- * must be very efficient.
- *
- * @param db       The main DB instance.
- * @param repoPath Path to the repository being accessed.
- * @param itemKey  The key being accessed.
- * @param session  The session requesting access.
- * @param op       The access type being made.
- *
- * @returns true if access is granted, false otherwise.
- */
-export type AuthRule = (
-  db: GoatDB,
-  repoPath: string,
-  itemKey: string,
-  session: Session,
-  op: AuthOp,
-) => boolean;
-
-/**
- * An array of authentication rules for the full DB. The DB scans these rules
- * and will use the first one that matches the repository's path.
- */
-export type AuthConfig = {
-  path: RegExp | string;
-  rule: AuthRule;
-}[];
+import { Emitter } from '../base/emitter.ts';
+// import { remove } from '../base/json-log/json-log.ts';
 
 export interface DBConfig {
   /**
    * Absolute path to the directory that'll store the DB's data.
    */
   path: string;
-  /**
-   * Authorization rules for this DB instance. If not provided, all data is
-   * considered public.
-   */
-  authRules?: AuthConfig;
   /**
    * Optional organization id used to sandbox the data of a specific
    * organization in a multi-tenant deployment. Defaults to "localhost".
@@ -116,9 +77,21 @@ export interface DBConfig {
   schemaManager?: SchemaManager;
 }
 
+/**
+ * Options for opening a repository. These match the options exposed by the
+ * repository itself, except some fields that are automatically filled.
+ */
 export type OpenOptions = Omit<RepositoryConfig, 'storage' | 'authorizer'>;
 
-export class GoatDB {
+/**
+ * Emitted by GoatDB whenever the current user changes.
+ */
+export type EventUserChanged = 'UserChanged';
+
+/**
+ * Main entry class for GoatDB - The Edge-Native Database.
+ */
+export class GoatDB extends Emitter<EventUserChanged> {
   readonly orgId: string;
   readonly schemaManager: SchemaManager;
   private readonly _basePath: string;
@@ -132,7 +105,6 @@ export class GoatDB {
     string,
     Query<Schema, Schema, ReadonlyJSONValue>
   >();
-  private readonly _authConfig: AuthConfig;
   private _path: string | undefined;
   private _settingsProvider: DBSettingsProvider | undefined;
   queryPersistence?: QueryPersistence;
@@ -142,11 +114,11 @@ export class GoatDB {
   private _ready: boolean = false;
 
   constructor(config: DBConfig) {
+    super();
     startJSONLogWorkerIfNeeded();
     this._basePath = config.path;
     this.schemaManager = config.schemaManager || SchemaManager.default;
     this.orgId = config?.orgId || 'localhost';
-    this._authConfig = config.authRules || [];
     this._repositories = new Map();
     this._openPromises = new Map();
     this._files = new Map();
@@ -249,6 +221,23 @@ export class GoatDB {
   }
 
   /**
+   * Logs out the current user, closing all open repositories and clearing
+   * local data. On browsers, this method will also reload the page to ensure
+   * a clean state.
+   *
+   * @throws ServiceUnavailable if the operation fails.
+   */
+  async logout(): Promise<void> {
+    for (const repoPath of this._repositories.keys()) {
+      await this.close(repoPath);
+    }
+    await remove(this._basePath);
+    if (isBrowser()) {
+      location.reload();
+    }
+  }
+
+  /**
    * Opens the given repository, loading all its items to memory.
    * This method does nothing if the repository is already open.
    *
@@ -290,6 +279,16 @@ export class GoatDB {
     const repo = this.repository(repoId);
     if (!repo) {
       return;
+    }
+    const deletedKeys = new Set<string>();
+    for (const [itemPath, item] of this._items) {
+      if (item.repository === repo) {
+        deletedKeys.add(itemPath);
+        item.detachAll();
+      }
+    }
+    for (const k of deletedKeys) {
+      this._items.delete(k);
     }
     await this.flush(path);
     for (const client of this._repoClients?.get(repoId) || []) {
@@ -562,7 +561,7 @@ export class GoatDB {
       )
       : this._basePath;
     this._settingsProvider = new FileSettings(
-      this._path,
+      this._basePath,
       isBrowser() ? 'client' : 'server',
     );
     this.queryPersistence = new QueryPersistence(
@@ -571,11 +570,22 @@ export class GoatDB {
 
     await this._settingsProvider.load();
     const settings = this._settingsProvider.settings;
+    let currentUserId = this._trustPool?.currentSession.owner;
     this._trustPool = new TrustPool(
       this.orgId,
       settings.currentSession,
       settings.roots,
       settings.trustedSessions,
+      () => {
+        if (this._trustPool) {
+          this._settingsProvider?.update(this._trustPool);
+          const userId = this._trustPool?.currentSession.owner;
+          if (userId !== currentUserId) {
+            currentUserId = userId;
+            this.emit('UserChanged');
+          }
+        }
+      },
     );
     if (this._peerURLs) {
       const syncConfig = isBrowser() ? kSyncConfigClient : kSyncConfigServer;
@@ -608,7 +618,7 @@ export class GoatDB {
     }
     const repo = new Repository(this, repoId, trustPool, {
       ...opts,
-      authorizer: authRuleForRepo(repoId, this._authConfig),
+      authorizer: this.schemaManager.authRuleForRepo(repoId),
     });
     this._repositories.set(repoId, repo);
     const file = await JSONLogFileOpen(
@@ -683,63 +693,6 @@ export class GoatDB {
 function relativePathForRepo(repoId: string): string {
   const [storage, id] = Repository.parseId(Repository.normalizePath(repoId));
   return path.join(storage, id + '.jsonl');
-}
-
-const kBuiltinAuthRules: AuthConfig = [
-  {
-    path: '/sys/users',
-    rule: (_db, _repoPath, itemKey, session, op) => {
-      if (session.owner === 'root') {
-        return true;
-      }
-      if (session.owner === itemKey) {
-        return true;
-      }
-      return op === 'read';
-    },
-  },
-  {
-    path: '/sys/sessions',
-    rule: (_db, _repoPath, _itemKey, session, op) => {
-      if (session.owner === 'root') {
-        return true;
-      }
-      return op === 'read';
-    },
-  },
-  // Reserving /sys/* for the system's use
-  {
-    path: /[/]sys[/]\S*/g,
-    rule: (_db, _repoPath, _itemKey, session, _op) => {
-      return session.owner === 'root';
-    },
-  },
-] as const;
-
-function authRuleForRepo(
-  repoPath: string,
-  config: AuthConfig,
-): AuthRule | undefined {
-  const id = Repository.normalizePath(repoPath);
-  // Builtin rules override user-provided ones
-  for (const { path, rule } of kBuiltinAuthRules) {
-    if (path === id) {
-      return rule;
-    }
-  }
-  // Look for a user-provided rule
-  for (const { path, rule } of config) {
-    if (typeof path === 'string') {
-      if (Repository.normalizePath(path) === id) {
-        return rule;
-      }
-    } else {
-      path.lastIndex = 0;
-      if (path.test(repoPath)) {
-        return rule;
-      }
-    }
-  }
 }
 
 let gSelectedInstanceNumber = -1;

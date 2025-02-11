@@ -1,13 +1,12 @@
 import { Emitter } from '../base/emitter.ts';
 // import { BloomFilter } from '../base/bloom.ts';
 import {
-  Session,
+  type Session,
   sessionFromItem,
   signCommit,
-  TrustPool,
+  type TrustPool,
 } from '../db/session.ts';
 import * as ArrayUtils from '../base/array.ts';
-import { Dictionary } from '../base/collections/dict.ts';
 import { filterIterable, mapIterable } from '../base/common.ts';
 import { coreValueCompare, coreValueEquals } from '../base/core-types/index.ts';
 import { assert } from '../base/error.ts';
@@ -19,30 +18,54 @@ import { Item } from '../cfds/base/item.ts';
 import {
   kNullSchema,
   kSchemaSession,
-  Schema,
+  type Schema,
   SchemaEquals,
-  SchemaTypeSession,
+  type SchemaTypeSession,
 } from '../cfds/base/schema.ts';
-import { Commit, commitContentsIsDocument, DeltaContents } from './commit.ts';
+import {
+  Commit,
+  commitContentsIsDocument,
+  type DeltaContents,
+} from './commit.ts';
 import { AdjacencyList } from '../base/adj-list.ts';
 import { RendezvousHash } from '../base/rendezvous-hash.ts';
 import { kSecondMs } from '../base/date.ts';
 import { randomInt } from '../base/math.ts';
-import { JSONObject, ReadonlyJSONObject } from '../base/interfaces.ts';
+import type { JSONObject, ReadonlyJSONObject } from '../base/interfaces.ts';
 import { downloadJSON } from '../base/browser.ts';
 import { CoroutineScheduler } from '../base/coroutine.ts';
 import { SchedulerPriority } from '../base/coroutine.ts';
 import { CONNECTION_ID } from './commit.ts';
 import { compareStrings } from '../base/string.ts';
 import { RedBlackTree } from '@std/data-structures';
-import { AuthRule, GoatDB } from '../db/db.ts';
+import type { GoatDB } from '../db/db.ts';
 import { BloomFilter } from '../base/bloom.ts';
 // import { BloomFilter } from '../cpp/bloom_filter.ts';
 import { itemPathJoin } from '../db/path.ts';
+import { AuthRule } from '../cfds/base/schema-manager.ts';
 
+/**
+ * Fired when the value of a document changes (the head of the commit graph
+ * changed).
+ */
 export type EventDocumentChanged = 'DocumentChanged';
+/**
+ * Fired when a new commit is added to this repository. A lot of these events
+ * won't actually affect the value of the document since their historical
+ * commits that don't change the graph's head.
+ *
+ * This event is being fired in a coroutine as to not block the main thread.
+ */
 export type EventNewCommit = 'NewCommit';
+/**
+ * The same as EventNewCommit, except fired immediately and not in a coroutine.
+ * Be very careful when attaching to this event as it'll easily block the UI
+ * thread.
+ */
 export type EventNewCommitSync = 'NewCommitSync';
+/**
+ * A union type of all the events Repository instances emits.
+ */
 export type RepositoryEvent =
   | EventDocumentChanged
   | EventNewCommit
@@ -201,8 +224,8 @@ export class Repository<
 
   *commits(session?: Session): Generator<Commit> {
     const { authorizer } = this;
-    const checkAuth =
-      session && session.id !== this.trustPool.currentSession.id && authorizer;
+    const checkAuth = session &&
+      session.id !== this.trustPool.currentSession.id && authorizer;
     let resultIds: Iterable<string>;
     if (!checkAuth) {
       resultIds = this.storage.allCommitsIds();
@@ -211,8 +234,9 @@ export class Repository<
       let cachedCommits = this._cachedCommitsPerUser.get(uid);
       if (!cachedCommits) {
         cachedCommits = Array.from(
-          filterIterable(this.storage.allCommitsIds(), (id) =>
-            authorizer(this.db, this.path, id, session, 'read'),
+          filterIterable(
+            this.storage.allCommitsIds(),
+            (id) => authorizer(this.db, this.path, id, session, 'read'),
           ),
         );
         this._cachedCommitsPerUser.set(uid, cachedCommits);
@@ -350,16 +374,18 @@ export class Repository<
       session.id !== this.trustPool.currentSession.id &&
       authorizer
     ) {
-      return filterIterable(this.storage.allKeys(), (key) =>
-        authorizer(this.db, this.path, key, session, 'read'),
+      return filterIterable(
+        this.storage.allKeys(),
+        (key) => authorizer(this.db, this.path, key, session, 'read'),
       );
     }
     return this.storage.allKeys();
   }
 
   paths(session?: Session): Iterable<string> {
-    return mapIterable(this.keys(session), (key) =>
-      itemPathJoin(this.path, key),
+    return mapIterable(
+      this.keys(session),
+      (key) => itemPathJoin(this.path, key),
     );
   }
 
@@ -884,8 +910,9 @@ export class Repository<
       scheme = this.itemForCommit(commitsToMerge[0]).schema || kNullSchema;
       foundRoot = false;
     } else {
-      [commitsToMerge, lca, scheme, foundRoot] =
-        this.findMergeBase(commitsToMerge);
+      [commitsToMerge, lca, scheme, foundRoot] = this.findMergeBase(
+        commitsToMerge,
+      );
     }
     if (commitsToMerge.length === 0 && !foundRoot && roots.length === 0) {
       return [Item.nullItem(), undefined];
@@ -1284,10 +1311,12 @@ export class Repository<
     const authorizer = this.authorizer;
     commits = Array.from(commits).sort((c1, c2) => c1.timestamp - c2.timestamp);
     const result: Commit[] = [];
-    for (const batch of ArrayUtils.slices(
-      commits,
-      navigator.hardwareConcurrency,
-    )) {
+    for (
+      const batch of ArrayUtils.slices(
+        commits,
+        navigator.hardwareConcurrency,
+      )
+    ) {
       const promises: Promise<void>[] = [];
       for (const c of batch) {
         promises.push(
@@ -1362,9 +1391,11 @@ export class Repository<
       }
       batch.push(c);
       if (batch.length >= 500) {
-        for (const persisted of await this._persistCommitsBatchToStorage(
-          batch,
-        )) {
+        for (
+          const persisted of await this._persistCommitsBatchToStorage(
+            batch,
+          )
+        ) {
           result.push(persisted);
         }
         for (const c of batch) {
@@ -1483,9 +1514,11 @@ export class Repository<
       nodes.push({
         data: {
           id: commit.id,
-          name: `${commit.connectionId}-${new Date(
-            commit.timestamp,
-          ).toLocaleString()}`,
+          name: `${commit.connectionId}-${
+            new Date(
+              commit.timestamp,
+            ).toLocaleString()
+          }`,
           session: commit.session,
           connectionId: commit.connectionId,
           ts: commit.timestamp,

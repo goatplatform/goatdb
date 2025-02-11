@@ -55,4 +55,13 @@ export const FileImplDeno: FileImpl<Deno.FsFile> = {
   flush(handle) {
     return handle.sync();
   },
+
+  async remove(path: string): Promise<boolean> {
+    try {
+      await Deno.remove(path, { recursive: true });
+      return true;
+    } catch (_: unknown) {
+      return false;
+    }
+  },
 };

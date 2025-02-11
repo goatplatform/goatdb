@@ -30,6 +30,10 @@ async function getDir(dirPath: string): Promise<FileSystemDirectoryHandle> {
   return parent;
 }
 
+type SyncHandle = {
+  createSyncAccessHandle: () => Promise<FileSystemSyncAccessHandle>;
+};
+
 export const FileImplOPFS: FileImpl<OPFSFile> = {
   async open(filePath, write) {
     const dir = await getDir(path.dirname(filePath));
@@ -38,7 +42,7 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
     });
     return {
       handle,
-      file: await handle.createSyncAccessHandle(),
+      file: await (handle as unknown as SyncHandle).createSyncAccessHandle(),
       pos: 0,
     };
   },
@@ -95,5 +99,16 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
   flush(handle) {
     handle.file.flush();
     return Promise.resolve();
+  },
+
+  async remove(targetPath: string): Promise<boolean> {
+    debugger;
+    try {
+      const dir = await getDir(path.dirname(targetPath));
+      await dir.removeEntry(path.basename(targetPath), { recursive: true });
+      return true;
+    } catch (_: unknown) {
+      return false;
+    }
   },
 };

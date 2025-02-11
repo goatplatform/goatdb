@@ -177,8 +177,9 @@ export async function verifyData<T extends JSONValue>(
   if (!signature) {
     return false;
   }
-  const sig =
-    typeof signature === 'string' ? decodeSignature(signature) : signature;
+  const sig = typeof signature === 'string'
+    ? decodeSignature(signature)
+    : signature;
   if (!sig || !sig.sessionId || sig.sessionId !== expectedSigner.id) {
     return false;
   }
@@ -609,6 +610,7 @@ export class TrustPool {
       }
     }
     if (
+      updated &&
       s.id === this.currentSession.id &&
       ((s.owner && !this.currentSession.owner) ||
         s.expiration.getTime() > this.currentSession.expiration.getTime())

@@ -1,28 +1,23 @@
-import { Dictionary } from '../../base/collections/dict.ts';
-import { CoreValue, ReadonlyCoreObject } from '../../base/core-types/base.ts';
-import { coreValueClone } from '../../base/core-types/clone.ts';
-import { CoreObject } from '../../base/core-types/index.ts';
-import { assert, notReached } from '../../base/error.ts';
-import { RichText } from '../richtext/tree.ts';
-import { ValueType } from './types/index.ts';
+import type { Dictionary } from '../../base/collections/dict.ts';
+import type {
+  CoreValue,
+  ReadonlyCoreObject,
+} from '../../base/core-types/base.ts';
+import type { CoreObject } from '../../base/core-types/index.ts';
+import { notReached } from '../../base/error.ts';
+import type { RichText } from '../richtext/tree.ts';
+import type { ValueType } from './types/index.ts';
 
 /**
  * A mapping between a schema type and its native variable type.
  */
-export type FieldValue<T extends ValueType> = T extends 'string'
-  ? string
-  : T extends 'number'
-  ? number
-  : T extends 'boolean'
-  ? boolean
-  : T extends 'date'
-  ? Date
-  : T extends 'set'
-  ? Set<CoreValue>
-  : T extends 'map'
-  ? Dictionary<string, CoreValue>
-  : T extends 'richtext'
-  ? RichText
+export type FieldValue<T extends ValueType> = T extends 'string' ? string
+  : T extends 'number' ? number
+  : T extends 'boolean' ? boolean
+  : T extends 'date' ? Date
+  : T extends 'set' ? Set<CoreValue>
+  : T extends 'map' ? Dictionary<string, CoreValue>
+  : T extends 'richtext' ? RichText
   : CoreValue;
 
 /**
@@ -121,10 +116,9 @@ export type SchemaRequiredFields<
   T extends Schema,
   K extends keyof T['fields'] = keyof T['fields'],
 > = T['fields'][K]['required'] extends true
-  ? // deno-lint-ignore ban-types
-    T['fields'][K]['default'] extends Function
-    ? never
-    : K
+  // deno-lint-ignore ban-types
+  ? T['fields'][K]['default'] extends Function ? never
+  : K
   : never;
 
 /**
@@ -144,8 +138,8 @@ export type SchemaValueWithOptional<
   R extends boolean | undefined,
   // deno-lint-ignore ban-types
   D extends Function | undefined,
-  // deno-lint-ignore ban-types
-> = R extends true ? T : D extends Function ? T : undefined | T;
+> // deno-lint-ignore ban-types
+ = R extends true ? T : D extends Function ? T : undefined | T;
 
 /**
  * Given a schema, extracts the type of its data.
@@ -222,6 +216,23 @@ export const kSchemaUser = {
   },
 } as const;
 export type SchemaTypeUser = typeof kSchemaUser;
+
+/**
+ * Internally collected user statistics.
+ */
+export const kSchemaUserStats = {
+  ns: 'user-stats',
+  version: 1,
+  fields: {
+    firstLoggedIn: {
+      type: 'date',
+    },
+    lastLoggedIn: {
+      type: 'date',
+    },
+  },
+} as const;
+export type SchemaTypeUserStats = typeof kSchemaUserStats;
 
 const gCachedSchemaFields = new WeakMap<
   Schema,

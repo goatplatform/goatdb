@@ -57,3 +57,11 @@ Stores user-specific items, including public profile information and metadata.
 
 - Each user has full read and write access to their own item.
 - Read-only access is granted to other users.
+
+### /sys/stats
+
+Stores user-specific usage statistics.
+
+**Access Rules:**
+
+- Private. Accessible only with root access.

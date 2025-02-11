@@ -98,6 +98,7 @@ export function itemPathGetPart<T extends string>(
  * @returns Path to the repository of the given path.
  */
 export function itemPathGetRepoId(path: string): string {
+  path = itemPathNormalize(path);
   return Repository.path(
     itemPathGetPart(path, 'type'),
     itemPathGetPart(path, 'repo'),

@@ -31,6 +31,18 @@ export interface ServerOptions extends DBConfig {
    */
   buildInfo: BuildInfo;
   /**
+   * Given an organization id, this function is responsible for resolving it
+   * to the correct URL. It enables a single server instance to serve multiple
+   * organizations in a multi-tenant deployment.
+   *
+   * A typical easy implementation is to place each organization under its own
+   * sub-path or sub-domain of the main service.
+   *
+   * @param orgId The organization id to resolve.
+   * @returns A fully qualified URL for this organization.
+   */
+  resolveDomain: (orgId: string) => string;
+  /**
    * The port the server will listen to. Defaults to 8080.
    */
   port?: number;

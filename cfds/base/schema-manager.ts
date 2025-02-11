@@ -1,12 +1,52 @@
 import type { CoreObject } from '../../base/core-types/base.ts';
 import { coreValueClone } from '../../base/core-types/clone.ts';
 import { assert } from '../../base/error.ts';
+import type { Session } from '../../db/session.ts';
+import { type GoatDB, itemPathGetRepoId, Repository } from '../../mod.ts';
 import {
-  type Schema,
+  kNullSchema,
   kSchemaSession,
   kSchemaUser,
-  kNullSchema,
+  kSchemaUserStats,
+  type Schema,
 } from './schema.ts';
+
+/**
+ * Denotes the type of the requested operation.
+ */
+export type AuthOp = 'read' | 'write';
+
+/**
+ * A function that implements access control rules for a given repository or
+ * group of repositories.
+ *
+ * Note that this method gets called repeatedly on every access attempt so it
+ * must be very efficient.
+ *
+ * @param db       The main DB instance.
+ * @param repoPath Path to the repository being accessed.
+ * @param itemKey  The key being accessed.
+ * @param session  The session requesting access.
+ * @param op       The access type being made.
+ *
+ * @returns true if access is granted, false otherwise.
+ */
+export type AuthRule = (
+  db: GoatDB,
+  repoPath: string,
+  itemKey: string,
+  session: Session,
+  op: AuthOp,
+) => boolean;
+
+/**
+ * An array of authentication rules for the full DB. The DB scans these rules
+ * and will use the first one that matches the repository's path.
+ */
+export type AuthConfig = {
+  rulePath: RegExp | string;
+  rule: AuthRule;
+}[];
 
 /**
  * The schemaManager acts as a registry of known schemas for a given GoatDB
@@ -18,6 +58,7 @@ import {
  */
 export class SchemaManager {
   private readonly _schemas: Map<string, Schema[]>;
+  private _authRules: AuthConfig;
 
   /**
    * The default manager. Unless explicitly specified, GoatDB will default to
@@ -27,17 +68,14 @@ export class SchemaManager {
 
   /**
    * Initialize a new schemaManager.
-   * @param schemas An optional list of schemas to register.
    */
-  constructor(schemas?: Iterable<Schema>) {
+  constructor() {
     this._schemas = new Map();
-    this.register(kSchemaSession);
-    this.register(kSchemaUser);
-    if (schemas) {
-      for (const s of schemas) {
-        this.register(s);
-      }
-    }
+    this._authRules = [];
+    // Builtin schemas
+    this.registerSchema(kSchemaSession);
+    this.registerSchema(kSchemaUser);
+    this.registerSchema(kSchemaUserStats);
   }
 
   /**
@@ -46,7 +84,7 @@ export class SchemaManager {
    *
    * @param schema The schema to register.
    */
-  register(schema: Schema): void {
+  registerSchema(schema: Schema): void {
     assert(schema.ns !== null);
     let arr = this._schemas.get(schema.ns);
     if (!arr) {
@@ -57,6 +95,27 @@ export class SchemaManager {
       arr.push(schema);
       arr.sort((s1, s2) => s2.version - s1.version);
     }
+  }
+
+  /**
+   * Registers an authorization rule with this manager. If not provided, all
+   * data is considered public.
+   *
+   * @param path Path to a repository or a {@link RegExp} instance.
+   * @param rule A function responsible for authorizing single items within
+   *             repositories that match the given path.
+   */
+  registerAuthRule(path: RegExp | string, rule: AuthRule): void {
+    if (typeof path === 'string') {
+      path = itemPathGetRepoId(path);
+    }
+    for (const { rulePath: p } of this._authRules) {
+      assert(
+        p === path,
+        'Attempting to register multiple rules for the same path',
+      );
+    }
+    this._authRules.push({ rulePath: path, rule });
   }
 
   /**
@@ -166,4 +225,72 @@ export class SchemaManager {
     // }
     return undefined;
   }
+
+  /**
+   * Finds the authorization rule for the provided path.
+   *
+   * @param inputPath The path to search for.
+   * @returns An {@link AuthRule} or undefined.
+   */
+  authRuleForRepo(
+    inputPath: string,
+  ): AuthRule | undefined {
+    const repoId = itemPathGetRepoId(inputPath);
+    // Builtin rules override user-provided ones
+    for (const { rulePath, rule } of kBuiltinAuthRules) {
+      if (rulePath === repoId) {
+        return rule;
+      }
+    }
+    // Look for a user-provided rule
+    for (const { rulePath, rule } of this._authRules) {
+      if (typeof rulePath === 'string') {
+        if (Repository.normalizePath(rulePath) === repoId) {
+          return rule;
+        }
+      } else {
+        rulePath.lastIndex = 0;
+        if (rulePath.test(inputPath)) {
+          return rule;
+        }
+      }
+    }
+  }
 }
+
+const kBuiltinAuthRules: AuthConfig = [
+  {
+    rulePath: '/sys/users',
+    rule: (_db, _repoPath, itemKey, session, op) => {
+      if (session.owner === 'root') {
+        return true;
+      }
+      if (session.owner === itemKey) {
+        return true;
+      }
+      return op === 'read';
+    },
+  },
+  {
+    rulePath: '/sys/sessions',
+    rule: (_db, _repoPath, _itemKey, session, op) => {
+      if (session.owner === 'root') {
+        return true;
+      }
+      return op === 'read';
+    },
+  },
+  {
+    rulePath: '/sys/stats',
+    rule: (_db, _repoPath, _itemKey, session, op) => {
+      return session.owner === 'root';
+    },
+  },
+  // Reserving /sys/* for the system's use
+  {
+    rulePath: /[/]sys[/]\S*/g,
+    rule: (_db, _repoPath, _itemKey, session, _op) => {
+      return session.owner === 'root';
+    },
+  },
+] as const;

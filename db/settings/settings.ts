@@ -1,4 +1,4 @@
-import { OwnedSession, Session } from '../session.ts';
+import type { OwnedSession, Session } from '../session.ts';
 
 export interface DBSettings {
   currentSession: OwnedSession;
