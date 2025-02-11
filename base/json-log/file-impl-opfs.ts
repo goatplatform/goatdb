@@ -1,5 +1,5 @@
 import * as path from '@std/path';
-import { FileImpl } from './file-impl-interface.ts';
+import type { FileImpl } from './file-impl-interface.ts';
 
 interface FileSystemSyncAccessHandle {
   close(): void;
@@ -102,7 +102,6 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
   },
 
   async remove(targetPath: string): Promise<boolean> {
-    debugger;
     try {
       const dir = await getDir(path.dirname(targetPath));
       await dir.removeEntry(path.basename(targetPath), { recursive: true });
