@@ -3,6 +3,61 @@
  * Check out https://goatdb.dev for additional docs.
  *
  * @module GoatDB
+ *
+ * @example
+ * ```typescript
+ * import { GoatDB, SchemaManager } from '@goatdb/goatdb';
+ *
+ * // Define a schema for tasks
+ * const taskSchema = {
+ *   ns: 'task',
+ *   version: 1,
+ *   fields: {
+ *     text: {
+ *       type: 'string',
+ *       required: true,
+ *     },
+ *     done: {
+ *       type: 'boolean',
+ *       default: () => false,
+ *     }
+ *   }
+ * } as const;
+ *
+ * // Register the schema
+ * SchemaManager.default.register(taskSchema);
+ *
+ * // Initialize GoatDB
+ * const db = await GoatDB.create({
+ *   serverUrl: 'http://localhost:8080'
+ * });
+ *
+ * // Create a new task
+ * await db.create('/data/user123', taskSchema, {
+ *   text: 'Learn GoatDB'
+ * });
+ *
+ * // Query tasks
+ * const query = db.query({
+ *   source: '/data/user123',
+ *   schema: taskSchema,
+ *   // Find incomplete tasks
+ *   predicate: ({ item }) => !item.get('done'),
+ *   // Sort by text alphabetically
+ *   sortDescriptor: ({ left, right }) =>
+ *     left.get('text').localeCompare(right.get('text')),
+ *   // Optional context passed to predicate and sort functions
+ *   ctx: { showCompleted: false }
+ * });
+ *
+ * // Get live results that update automatically
+ * const tasks = query.results();
+ *
+ * // Listen for changes
+ * query.onResultsChanged(() => {
+ *   console.log('Tasks updated:', query.results());
+ * });
+ * ```
  */
 import { GoatDB } from './db/db.ts';
 import type { Schema, SchemaDataType } from './cfds/base/schema.ts';
