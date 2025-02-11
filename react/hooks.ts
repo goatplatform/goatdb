@@ -1,3 +1,11 @@
+/**
+ * This module exposes high level React hooks that act as a full state
+ * management package on top of GoatDB.
+ *
+ * Check out https://goatdb.dev for additional docs.
+ *
+ * @module GoatDB/React
+ */
 // @deno-types="@types/react"
 import React, { useCallback, useContext, useSyncExternalStore } from 'react';
 import { GoatDB } from '../db/db.ts';
@@ -19,6 +27,8 @@ const GoatDBContext = React.createContext<GoatDBCtxProps>({});
  * as a react context. All future calls return the already opened DB rather than
  * opening it again.
  *
+ * This hook will trigger a re-render whenever the current user changes.
+ *
  * @returns A DB instance.
  */
 export function useDB(): GoatDB {
@@ -26,56 +36,226 @@ export function useDB(): GoatDB {
   if (!ctx.db) {
     ctx.db = new GoatDB({ path: '/data/db', peers: getBaseURL() });
   }
+  let changeCount = 0;
+  const subscribe = useCallback(
+    (onStoreChange: () => void) =>
+      ctx.db?.attach('UserChanged', () => {
+        ++changeCount;
+        onStoreChange();
+      }) || (() => {}),
+    [ctx.db],
+  );
+  const getSnapshot = useCallback(() => changeCount, [ctx.db]);
+  useSyncExternalStore(subscribe, getSnapshot);
   return ctx.db;
 }
 
+/**
+ * Options for the {@link useItem} hook.
+ */
 export type UseItemOpts = {
+  /**
+   * An optional array of field names to monitor, or single field name.
+   * If provided, the {@link useItem} hook will monitor only changes to these
+   * fields and ignore other changes.
+   *
+   * Use this to reduce unneeded re-rendering events.
+   */
   keys?: string | string[];
 };
 
+/**
+ * This hook monitors changes to a specific item, triggering a re-render
+ * whenever the item's state changes. It returns a mutable {@link ManagedItem}
+ * instance that allows direct editing. Any changes to the item are
+ * automatically queued for background commit and synchronization with the
+ * server. Similar to the {@link useQuery} hook, {@link useItem} reacts to both
+ * local and remote updates.
+ *
+ * @param pathComps A full item path or separate path components.
+ *
+ * @returns A {@link ManagedItem} instance or undefined if the item doesn't
+ *          exist or it's repository hadn't finished loading yet. In the latter
+ *          case, the hook will automatically trigger a re-render when the
+ *          repository finished loading and the item becomes available.
+ */
 export function useItem<S extends Schema>(
-  ...pathCompsOrOpts: string[]
+  ...pathComps: string[]
 ): ManagedItem<S> | undefined;
 
+/**
+ * This hook monitors changes to a specific item, triggering a re-render
+ * whenever the item's state changes. It returns a mutable {@link ManagedItem}
+ * instance that allows direct editing. Any changes to the item are
+ * automatically queued for background commit and synchronization with the
+ * server. Similar to the {@link useQuery} hook, {@link useItem} reacts to both
+ * local and remote updates.
+ *
+ * @param opts      Options object for configuring this hook.
+ * @param pathComps A full item path or separate path components.
+ *
+ * @returns A {@link ManagedItem} instance or undefined if the item doesn't
+ *          exist or it's repository hadn't finished loading yet. In the latter
+ *          case, the hook will automatically trigger a re-render when the
+ *          repository finished loading and the item becomes available.
+ */
 export function useItem<S extends Schema>(
   opts: UseItemOpts,
   ...pathCompsOrOpts: string[]
 ): ManagedItem<S> | undefined;
 
+/**
+ * This hook monitors changes to a specific item, triggering a re-render
+ * whenever the item's state changes. It returns a mutable {@link ManagedItem}
+ * instance that allows direct editing. Any changes to the item are
+ * automatically queued for background commit and synchronization with the
+ * server. Similar to the {@link useQuery} hook, {@link useItem} reacts to both
+ * local and remote updates.
+ *
+ * @param path A full item path. If the path is undefined, the returned item
+ *             will also be undefined.
+ * @param opts Options object for configuring this hook.
+ *
+ * @returns A {@link ManagedItem} instance or undefined if the item doesn't
+ *          exist or it's repository hadn't finished loading yet. In the latter
+ *          case, the hook will automatically trigger a re-render when the
+ *          repository finished loading and the item becomes available.
+ */
 export function useItem<S extends Schema>(
   path: string | undefined,
   opts: UseItemOpts,
 ): ManagedItem<S> | undefined;
 
+/**
+ * This hook monitors changes to a specific item, triggering a re-render
+ * whenever the item's state changes. It returns a mutable {@link ManagedItem}
+ * instance that allows direct editing. Any changes to the item are
+ * automatically queued for background commit and synchronization with the
+ * server. Similar to the {@link useQuery} hook, {@link useItem} reacts to both
+ * local and remote updates.
+ *
+ * @param path A full item path. If the path is undefined, the returned item
+ *             will also be undefined.
+ * @param opts Options object for configuring this hook.
+ *
+ * @returns A {@link ManagedItem} instance or undefined if the item doesn't
+ *          exist or it's repository hadn't finished loading yet. In the latter
+ *          case, the hook will automatically trigger a re-render when the
+ *          repository finished loading and the item becomes available.
+ */
 export function useItem<S extends Schema>(
   path: undefined,
   opts: UseItemOpts,
 ): undefined;
 
+/**
+ * This hook monitors changes to a specific item, triggering a re-render
+ * whenever the item's state changes. It returns a mutable {@link ManagedItem}
+ * instance that allows direct editing. Any changes to the item are
+ * automatically queued for background commit and synchronization with the
+ * server. Similar to the {@link useQuery} hook, {@link useItem} reacts to both
+ * local and remote updates.
+ *
+ * @param path A full item path. If the path is undefined, the returned item
+ *             will also be undefined.
+ *
+ * @returns A {@link ManagedItem} instance or undefined if the item doesn't
+ *          exist or it's repository hadn't finished loading yet. In the latter
+ *          case, the hook will automatically trigger a re-render when the
+ *          repository finished loading and the item becomes available.
+ */
 export function useItem<S extends Schema>(
   path: string | undefined,
 ): ManagedItem<S> | undefined;
 
+/**
+ * This hook monitors changes to a specific item, triggering a re-render
+ * whenever the item's state changes. It returns a mutable {@link ManagedItem}
+ * instance that allows direct editing. Any changes to the item are
+ * automatically queued for background commit and synchronization with the
+ * server. Similar to the {@link useQuery} hook, {@link useItem} reacts to both
+ * local and remote updates.
+ *
+ * @param path A full item path. If the path is undefined, the returned item
+ *             will also be undefined.
+ *
+ * @returns A {@link ManagedItem} instance or undefined if the item doesn't
+ *          exist or it's repository hadn't finished loading yet. In the latter
+ *          case, the hook will automatically trigger a re-render when the
+ *          repository finished loading and the item becomes available.
+ */
 export function useItem<S extends Schema>(
   path: undefined,
 ): undefined;
 
+/**
+ * This hook monitors changes to a specific item, triggering a re-render
+ * whenever the item's state changes. It returns a mutable {@link ManagedItem}
+ * instance that allows direct editing. Any changes to the item are
+ * automatically queued for background commit and synchronization with the
+ * server. Similar to the {@link useQuery} hook, {@link useItem} reacts to both
+ * local and remote updates.
+ *
+ * @param item The item to monitor. If undefined, the returned item will also
+ *             be undefined.
+ * @param opts Options object for configuring this hook.
+ *
+ * @returns The given {@link ManagedItem} instance.
+ */
 export function useItem<S extends Schema>(
-  path: ManagedItem<S> | undefined,
+  item: ManagedItem<S> | undefined,
   opts: UseItemOpts,
 ): ManagedItem<S> | undefined;
 
+/**
+ * This hook monitors changes to a specific item, triggering a re-render
+ * whenever the item's state changes. It returns a mutable {@link ManagedItem}
+ * instance that allows direct editing. Any changes to the item are
+ * automatically queued for background commit and synchronization with the
+ * server. Similar to the {@link useQuery} hook, {@link useItem} reacts to both
+ * local and remote updates.
+ *
+ * @param item The item to monitor. If undefined, the returned item will also
+ *             be undefined.
+ *
+ * @returns The given {@link ManagedItem} instance.
+ */
 export function useItem<S extends Schema>(
-  path: ManagedItem<S> | undefined,
+  item: ManagedItem<S> | undefined,
 ): ManagedItem<S> | undefined;
 
+/**
+ * This hook monitors changes to a specific item, triggering a re-render
+ * whenever the item's state changes. It returns a mutable {@link ManagedItem}
+ * instance that allows direct editing. Any changes to the item are
+ * automatically queued for background commit and synchronization with the
+ * server. Similar to the {@link useQuery} hook, {@link useItem} reacts to both
+ * local and remote updates.
+ *
+ * @param item The item to monitor.
+ * @param opts Options object for configuring this hook.
+ *
+ * @returns The given {@link ManagedItem} instance.
+ */
 export function useItem<S extends Schema>(
-  path: ManagedItem<S>,
+  item: ManagedItem<S>,
   opts: UseItemOpts,
 ): ManagedItem<S>;
 
+/**
+ * This hook monitors changes to a specific item, triggering a re-render
+ * whenever the item's state changes. It returns a mutable {@link ManagedItem}
+ * instance that allows direct editing. Any changes to the item are
+ * automatically queued for background commit and synchronization with the
+ * server. Similar to the {@link useQuery} hook, {@link useItem} reacts to both
+ * local and remote updates.
+ *
+ * @param item The item to monitor.
+ *
+ * @returns The given {@link ManagedItem} instance.
+ */
 export function useItem<S extends Schema>(
-  path: ManagedItem<S>,
+  item: ManagedItem<S>,
 ): ManagedItem<S>;
 
 export function useItem<S extends Schema>(
@@ -173,17 +353,37 @@ export function useDBReady(): DBReadyState {
   return useSyncExternalStore(subscribe, getSnapshot);
 }
 
+/**
+ * Options for the {@link useQuery} hook.
+ */
 export interface UseQueryOpts<
   IS extends Schema,
   CTX extends ReadonlyJSONValue,
   OS extends IS = IS,
 > extends Omit<QueryConfig<IS, OS, CTX>, 'db'> {
-  // If set to true, the hook will trigger with intermittent results while the
-  // initial scan executes. This results in more frequent UI updates which can
-  // lead to more responsive UI.
+  /**
+   * If `true`, updates UI during the initial scan. If `false`, waits until
+   * scanning is complete.
+   */
   showIntermittentResults?: boolean;
 }
 
+/**
+ * Creates a new query or retrieves an existing one. On first access, GoatDB
+ * automatically loads the source repository either from the local disk or by
+ * fetching it from the server. The hook triggers UI re-rendering whenever the
+ * query results are updated, regardless of whether the changes originate from
+ * local or remote edits.
+ *
+ * When a query is first opened, it performs a linear scan of its source using a
+ * {@link Coroutine} without blocking the main thread. During and after this
+ * initial scan, the query caches its results to disk, allowing subsequent runs
+ * to resume execution from the cached state.
+ * For additional details, refer to the {@link https://goatdb.dev/query|query mechanism documentation}.
+ *
+ * @param config Configuration of the desired query.
+ * @returns A live {@link Query} instance.
+ */
 export function useQuery<
   IS extends Schema,
   CTX extends ReadonlyJSONValue,
@@ -200,6 +400,9 @@ export function useQuery<
   return query;
 }
 
+/**
+ * Convenience props type for components that accept a DB path as input.
+ */
 export type PropsWithPath = {
   path: string;
 };

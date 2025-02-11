@@ -1,3 +1,9 @@
+/**
+ * This module exposes the main GoatDB interface.
+ * Check out https://goatdb.dev for additional docs.
+ *
+ * @module GoatDB
+ */
 import { GoatDB } from './db/db.ts';
 import type { Schema, SchemaDataType } from './cfds/base/schema.ts';
 import { Query } from './repo/query.ts';

@@ -1,3 +1,12 @@
+/**
+ * This module exposes APIs for controlling the GoatDB server. It includes
+ * functions for running the interactive debug server and for compiling a
+ * standalone server executable.
+ *
+ * Check out https://goatdb.dev for additional docs.
+ *
+ * @module GoatDB/Server
+ */
 import {
   compile,
   type CompileOptions,
