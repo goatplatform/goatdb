@@ -1,5 +1,16 @@
 /**
- * This module exposes the main GoatDB interface.
+ * GoatDB: The Edge-Native Database
+ *
+ * GoatDB is a real-time, distributed Version Control Database (VCDB) that runs
+ * seamlessly on the client-side (edge). It combines the principles of
+ * distributed version control with real-time data synchronization, offering:
+ *
+ * - Real-time data synchronization across devices
+ * - Offline-first functionality
+ * - Built-in conflict resolution
+ * - Privacy-focused data handling
+ * - Schema-based data organization
+ *
  * Check out https://goatdb.dev for additional docs.
  *
  * @module GoatDB
