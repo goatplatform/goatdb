@@ -49,6 +49,75 @@ GoatDB supports chaining queries—using the results of one query as the input t
 another. This enables dependent queries to scan smaller subsets of data,
 effectively acting as lightweight indexing.
 
+For example:
+
+```typescript
+// Chain queries to find recent important todos
+const importantTodos = new Query({
+  source: repo,
+  predicate: ({ item }) => item.get('important'),
+});
+
+const recentImportant = new Query({
+  source: importantTodos,
+  predicate: ({ item }) => isRecent(item.get('date')),
+});
+```
+
+### Sorting and Indexing
+
+Queries can be sorted either by a field name or using a custom sort function:
+
+```typescript
+// Sort by field name
+const usersByEmail = new Query({
+  source: '/sys/users',
+  schema: kSchemaUser,
+  sortBy: 'email', // Will sort by email field values
+});
+
+// Custom sort function
+const usersByLastFirst = new Query({
+  source: '/sys/users',
+  schema: kSchemaUser,
+  sortBy: ({ left, right }) => {
+    const lastNameCompare = left.get('lastName').localeCompare(
+      right.get('lastName'),
+    );
+    if (lastNameCompare !== 0) return lastNameCompare;
+    return left.get('firstName').localeCompare(right.get('firstName'));
+  },
+});
+```
+
+When sorted by a field, queries act as efficient indexes enabling O(log n)
+lookups:
+
+```typescript
+// Create an index over user emails
+const usersByEmail = new Query({
+  source: '/sys/users',
+  schema: kSchemaUser,
+  sortBy: 'email',
+});
+
+// O(log n) lookup by email after index is built
+await usersByEmail.loadingFinished();
+const user = usersByEmail.find('email', 'user@example.com');
+```
+
+### Query Performance and Caching
+
+Queries maintain several performance optimizations:
+
+- **Bloom Filters**: Used to efficiently track included paths and minimize false
+  positives
+- **Result Caching**: Query results are cached and only recomputed when
+  necessary
+- **Incremental Updates**: Only changed items are re-evaluated rather than
+  rescanning everything
+- **Persistent Storage**: Results are cached to disk for faster resumption
+
 ### Consistency
 
 This strategy ensures a fully consistent view for queries while enabling
@@ -82,13 +151,13 @@ improving the perceived performance of the application. For example:
 #### Leveraging React Hooks
 
 GoatDB integrates seamlessly with React's declarative paradigm. By combining
-GoatDB’s real-time queries with custom hooks, developers can build components
+GoatDB's real-time queries with custom hooks, developers can build components
 that automatically update as query results change:
 
 ```javascript
 function ItemList() {
   const { query } = useQuery({
-    scheme: kSchemeTask,
+    schema: kSchemeTask,
     source: '/data/tasks',
     predicate: ({ item }) => item.get('text').startsWith('lorem'),
   });
@@ -99,9 +168,8 @@ function ItemList() {
 
   return (
     <ul>
-      {query.results().map(({ key, item }) => (
-        <li key={key}>{item.get('text')}</li>
-      ))}
+      {query.results().map((item) => <li key={item.path}>{item.get('text')}
+      </li>)}
     </ul>
   );
 }
