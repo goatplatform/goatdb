@@ -166,7 +166,7 @@ export class SimpleTimer extends BaseTimer {
     return performance.now() + this._intervalMs;
   }
 
-  protected run(): boolean {
+  protected override run(): boolean {
     const result = super.run();
     return this._repeat || result;
   }
@@ -243,15 +243,15 @@ export abstract class BaseDynamicTimer extends BaseTimer {
     }
   }
 
-  schedule(): BaseDynamicTimer {
+  override schedule(): BaseDynamicTimer {
     return super.schedule() as BaseDynamicTimer;
   }
 
-  unschedule(): BaseDynamicTimer {
+  override unschedule(): BaseDynamicTimer {
     return super.unschedule() as BaseDynamicTimer;
   }
 
-  protected run(): boolean {
+  protected override run(): boolean {
     const { durationMs, lastResetTime } = this;
     const now = performance.now();
     if (!this.repeat && now - lastResetTime > durationMs) {

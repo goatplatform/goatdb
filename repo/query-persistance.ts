@@ -1,9 +1,9 @@
-import { JSONObject, ReadonlyJSONValue } from '../base/interfaces.ts';
-import { Query } from './query.ts';
-import { Repository, RepoStorage, MemRepoStorage } from './repo.ts';
-import { SimpleTimer, Timer } from '../base/timer.ts';
+import type { JSONObject, ReadonlyJSONValue } from '../base/interfaces.ts';
+import type { Query } from './query.ts';
+import { Repository } from './repo.ts';
+import { SimpleTimer, type Timer } from '../base/timer.ts';
 import { kSecondMs } from '../base/date.ts';
-import { Schema } from '../cfds/base/schema.ts';
+import type { Schema } from '../cfds/base/schema.ts';
 
 const QUERY_CACHE_VERSION = 1;
 

@@ -43,9 +43,22 @@ export function bsearch<T>(
   return comparator(value, arr[start]) > 0 ? start + 1 : start;
 }
 
+/**
+ * Performs a binary search over a range of indices.
+ * @param length The length of the range to search (0 to length-1).
+ * @param comparator Function receiving an index and returning a number.
+ *                  It must return zero if the index is the target,
+ *                  a positive value if the target is after this index,
+ *                  and a negative value if the target is before this index.
+ *
+ * @returns The index closest to where the target would be. You should
+ *          test whether the comparator returns 0 for the returned index
+ *          to determine if the target was actually found. Returns -1 if
+ *          length is 0 or if the target was not found.
+ */
 export function bsearch_idx(
   length: number,
-  comparator: (idx: number) => number = (idx) => {
+  comparator: (idx: number) => number = (_idx) => {
     throw new Error('Bad comparator');
   },
 ): number {
@@ -67,5 +80,6 @@ export function bsearch_idx(
       start = mid + 1;
     }
   }
-  return start;
+  const res = comparator(start) > 0 ? start + 1 : start;
+  return res < length ? res : -1;
 }

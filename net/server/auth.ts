@@ -22,7 +22,7 @@ import {
   kSchemaUser,
   kSchemaUserStats,
   type SchemaTypeUser,
-  SchemaTypeUserStats,
+  type SchemaTypeUserStats,
 } from '../../cfds/base/schema.ts';
 import { normalizeEmail } from '../../base/string.ts';
 import type { ReadonlyJSONObject } from '../../base/interfaces.ts';
@@ -353,28 +353,30 @@ async function fetchUserByEmail(
   email: string,
 ): Promise<ManagedItem<SchemaTypeUser> | undefined> {
   email = normalizeEmail(email);
+  // This query acts as a persistent index over user emails:
+  // 1. It maintains a sorted list of all users by email
+  // 2. The query stays active and automatically updates as users are
+  //    added/modified
+  // 3. Results are cached and immediately available after initial load
+  // 4. Since email is the sort field, binary search is used for O(log n)
+  //    lookups
+  // 5. Query caching allows efficient resume after suspend/close
   const query = services.db.query({
     schema: kSchemaUser,
     source: '/sys/users',
-    sortDescriptor: ({ left, right }) =>
-      coreValueCompare(left.get('email'), right.get('email')),
+    sortBy: 'email',
   });
+  // Wait for the query to finish loading
   await query.loadingFinished();
-  const results = query.results();
-  const userIdx = bsearch_idx(
-    results.length,
-    (idx) => coreValueCompare(results[idx].get('email'), email),
-  );
-  if (userIdx >= 0) {
-    return results[userIdx];
+  const user = query.find('email', email);
+  if (user) {
+    return user;
   }
   // Lazily create operator users
   if (services.operatorEmails?.includes(email)) {
-    const item = services.db.create('/sys/users', kSchemaUser, {
+    return services.db.create('/sys/users', kSchemaUser, {
       email: email,
     });
-    const key = itemPathGetPart(item.path, 'item');
-    return services.db.item('/sys/users', key);
   }
   return undefined;
 }

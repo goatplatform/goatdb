@@ -228,7 +228,7 @@ export async function testsMain(): Promise<void> {
       source: repoPath,
       schema: kSchemeNote,
       predicate: ({ item, ctx }) => item.get('text').startsWith(ctx.word),
-      sortDescriptor: ({ left, right }) =>
+      sortBy: ({ left, right }) =>
         coreValueCompare(left.get('text'), right.get('text')),
       ctx: {
         word: 'lorem',

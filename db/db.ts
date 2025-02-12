@@ -443,7 +443,7 @@ export class GoatDB extends Emitter<EventUserChanged> {
       id = generateQueryId(
         config.source as QuerySource,
         config.predicate,
-        config.sortDescriptor,
+        config.sortBy,
         config.ctx,
         config.schema?.ns,
       );
