@@ -10,6 +10,10 @@
 
 # The Edge-Native Database
 
+GoatDB empowers you to build and deploy complex, scalable, and secure applications 
+in under 20 minutes—without requiring backend expertise. 
+It's the fastest and easiest way to create modern apps, tailored for today’s developer needs.
+
 GoatDB is a real-time, distributed Version Control Database (VCDB). By running
 tasks like reading and writing on the client side, it ensures fast performance
 and offline functionality. With causal consistency and an edge-native design,
