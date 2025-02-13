@@ -460,5 +460,12 @@ This Todo List app showcases the robust capabilities of GoatDB's architecture:
 - **Real-Time Synchronization & Conflict Resolution:** Through background
   commits and a probabilistic synchronization protocol, the app achieves
   near-real-time updates while gracefully handling concurrent modifications.
-- **Seamless Integration with React:** GoatDB's React hooks (`useDB`,
-  `useDBReady`, `
+- **Seamless Integration with React:** GoatDB’s React hooks (`useDB`,
+  `useDBReady`, `useQuery`, and `useItem`) abstract away the complexities of
+  state management and data synchronization, allowing you to focus on
+  application logic.
+
+By leveraging these architectural principles, the app not only maintains a
+consistent and resilient state but also provides a scalable foundation for
+building modern, edge-native applications. Enjoy building and extending your
+GoatDB-powered applications!

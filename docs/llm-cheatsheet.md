@@ -31,8 +31,6 @@ Based on the above, generate a React component that displays a list of tasks wit
 - Sort by creation date
 ```
 
----
-
 ## Why GoatDB Improves AI Code Generation
 
 ### Optimized for Large Language Models
@@ -66,8 +64,6 @@ try {
 } catch (err) { ... }
 ```
 
----
-
 #### **2. AI-Friendly Code Patterns for Better LLM Output**
 
 - **Reduced Error Handling Complexity**: Status checks replace try/catch logic.
@@ -84,8 +80,6 @@ removing redundant decision points. This enables AI models to produce:
 - **Cleaner, more readable code**
 - **Fewer logic errors**
 - **Optimized, high-performance components**
-
----
 
 ## LLM Code Generation Workflow with GoatDB
 

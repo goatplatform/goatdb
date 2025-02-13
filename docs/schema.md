@@ -2,7 +2,7 @@
 permalink: /schema/
 layout: default
 title: Schema
-nav_order: 5
+nav_order: 6
 ---
 
 # GoatDB Schemas
