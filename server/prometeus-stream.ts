@@ -2,11 +2,11 @@ import * as promClient from 'https://deno.land/x/ts_prometheus@v0.3.0/mod.ts';
 import { BaseLogEntry, NormalizedLogEntry } from '../logging/entry.ts';
 import { LogStream } from '../logging/log.ts';
 import {
-  ServerMetricName,
-  MetricType,
-  MetricName,
   kServerMetricNames,
   logEntryIsMetric,
+  MetricName,
+  MetricType,
+  ServerMetricName,
 } from '../logging/metrics.ts';
 import { notReached } from '../base/error.ts';
 
@@ -21,7 +21,6 @@ export const kMetricTypes: Record<ServerMetricName, MetricType> = {
   InternalServerError: 'Count',
   EmailSent: 'Count',
   OperatorLogsQuery: 'Count',
-  DBError: 'Count',
 };
 
 export class PrometheusLogStream implements LogStream {
@@ -68,7 +67,7 @@ export class PrometheusLogStream implements LogStream {
           break;
         default:
           notReached(
-            `Unsupported metric type for ${metricName}: ${metricType}`
+            `Unsupported metric type for ${metricName}: ${metricType}`,
           );
           break;
       }
@@ -100,7 +99,7 @@ export class PrometheusLogStream implements LogStream {
           case 'Histogram':
             if (e.value !== undefined) {
               (this.metrics[metricName] as promClient.Histogram).observe(
-                e.value
+                e.value,
               );
             }
             break;
@@ -112,7 +111,7 @@ export class PrometheusLogStream implements LogStream {
           default:
             // Handle unsupported metric types
             notReached(
-              `Unsupported metric type for ${metricName}: ${metricType}`
+              `Unsupported metric type for ${metricName}: ${metricType}`,
             );
             break;
         }

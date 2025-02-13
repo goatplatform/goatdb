@@ -1,5 +1,19 @@
-import { BaseLogEntry, NormalizedLogEntry, Severity } from './entry.ts';
+import type { BaseLogEntry, NormalizedLogEntry, Severity } from './entry.ts';
 
+/**
+ * List of server-side metric names that can be logged.
+ *
+ * - PeerResponseTime: Time taken for a peer to respond to a request (ms)
+ * - CommitsPersistTime: Time taken to persist commits to storage (ms)
+ * - CommitsPersistCount: Number of commits persisted in a batch
+ * - DeltaFormatSavings: Bytes saved by using delta format vs full content
+ * - ServerStarted: Timestamp when server started
+ * - HttpStatusCode: HTTP response status code
+ * - IncompatibleProtocolVersion: Count of incompatible protocol version errors
+ * - InternalServerError: Count of internal server errors
+ * - EmailSent: Count of emails sent by type
+ * - OperatorLogsQuery: Time taken to execute operator logs queries (ms)
+ */
 export const kServerMetricNames = [
   'PeerResponseTime',
   'CommitsPersistTime',
@@ -11,9 +25,16 @@ export const kServerMetricNames = [
   'InternalServerError',
   'EmailSent',
   'OperatorLogsQuery',
-  'DBError',
 ] as const;
 
+/**
+ * List of client-side metric names that can be logged.
+ *
+ * - QueryFired: Count of search queries initiated by the user
+ * - QueryCancelled: Count of search queries cancelled before completion
+ * - QueryCompleted: Count of search queries that completed successfully
+ * - FullTextIndexingTime: Time taken to index document text for search (ms)
+ */
 export const kClientMetricNames = [
   'QueryFired',
   'QueryCancelled',
@@ -21,6 +42,10 @@ export const kClientMetricNames = [
   'FullTextIndexingTime',
 ] as const;
 
+/**
+ * Combined list of all metric names that can be logged, including both
+ * server-side and client-side metrics.
+ */
 export const kMetricNames = [...kServerMetricNames, ...kClientMetricNames];
 
 export type ServerMetricName = (typeof kServerMetricNames)[number];
@@ -61,7 +86,8 @@ export type MetricLogWithURL<
 };
 
 export type MetricLogWithHTTP<T extends MetricLogWithURL = MetricLogWithURL> =
-  T & {
+  & T
+  & {
     method?: HTTPMethod;
   };
 
@@ -93,23 +119,17 @@ export type MetricLogWithPath<
   path: string;
 };
 
-export type MetricLogEntryType<N extends MetricName> =
-  N extends 'PeerResponseTime'
-    ? MetricLogWithURL
-    : N extends 'HttpStatusCode'
-    ? MetricLogWithHTTP
-    : N extends 'InternalServerError'
-    ? Required<MetricLogWithError<BaseMetricLogEntry<'ERROR'>>> &
-        MetricLogWithHTTP<BaseMetricLogEntry<'ERROR'>>
-    : N extends 'EmailSent'
-    ? MetricLogWithType<EmailType>
-    : N extends 'OperatorLogsQuery'
-    ? MetricLogWithQuery<MetricLogWithError>
-    : N extends 'DBError'
-    ? MetricLogWithPath
-    : N extends 'CommitsPersistTime' | 'CommitsPersistCount'
-    ? MetricLogWithPath
-    : BaseMetricLogEntry;
+export type MetricLogEntryType<N extends MetricName> = N extends
+  'PeerResponseTime' ? MetricLogWithURL
+  : N extends 'HttpStatusCode' ? MetricLogWithHTTP
+  : N extends 'InternalServerError' ?
+      & Required<MetricLogWithError<BaseMetricLogEntry<'ERROR'>>>
+      & MetricLogWithHTTP<BaseMetricLogEntry<'ERROR'>>
+  : N extends 'EmailSent' ? MetricLogWithType<EmailType>
+  : N extends 'OperatorLogsQuery' ? MetricLogWithQuery<MetricLogWithError>
+  : N extends 'DBError' ? MetricLogWithPath
+  : N extends 'CommitsPersistTime' | 'CommitsPersistCount' ? MetricLogWithPath
+  : BaseMetricLogEntry;
 
 export type MetricLogEntry = MetricLogEntryType<`${MetricName}`>;
 

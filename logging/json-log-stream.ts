@@ -1,24 +1,38 @@
-import { LogEntry, LogStream } from './log.ts';
-import { JSONLogFile } from '../base/json-log.ts';
-import { NormalizedLogEntry } from './entry.ts';
+import type { LogEntry, LogStream } from './log.ts';
+import {
+  type JSONLogFile,
+  JSONLogFileAppend,
+  JSONLogFileOpen,
+} from '../base/json-log/json-log.ts';
+
+import type { NormalizedLogEntry } from './entry.ts';
 import { randomInt } from '../base/math.ts';
 
+/**
+ * A LogStream implementation that writes log entries to a JSON file.
+ * Supports optional throttling to reduce the number of entries written.
+ */
 export class JSONLogStream implements LogStream {
-  private readonly _log: JSONLogFile;
+  /** Promise resolving to the underlying JSON log file */
+  private readonly _log: Promise<JSONLogFile>;
 
-  constructor(path: string) {
-    const file = new JSONLogFile(path, true);
-    this._log = file;
-    for (const _x of file.open()) {
-      // Wind the log file to its end, trimming any corrupted tail.
-      // TODO: Run the fixup process from the end of the file rather than the
-      // start.
-    }
+  /**
+   * Creates a new JSONLogStream
+   * @param path Path to the JSON log file
+   * @param throttleRate Optional throttling rate - only 1/throttleRate entries
+   *                     will be written. Default is 1 (no throttling).
+   */
+  constructor(path: string, readonly throttleRate: number = 1) {
+    this._log = JSONLogFileOpen(path, true);
   }
 
-  appendEntry(e: NormalizedLogEntry<LogEntry>): void {
-    if (randomInt(0, 10) === 0) {
-      this._log.append([e]);
+  /**
+   * Appends a log entry to the JSON file, respecting the throttle rate
+   * @param e The normalized log entry to append
+   */
+  async appendEntry(e: NormalizedLogEntry<LogEntry>): Promise<void> {
+    if (this.throttleRate <= 1 || randomInt(0, this.throttleRate) === 0) {
+      await JSONLogFileAppend(await this._log, [e]);
     }
   }
 }
