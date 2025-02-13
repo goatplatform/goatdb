@@ -1,17 +1,17 @@
-import {
+import type {
   LogEntryDeveloperError,
   OperationalErrorLogEntry,
   SystemErrorLogEntry,
 } from './errors.ts';
 import {
-  GenericLogEntry,
-  NormalizedLogEntry,
+  type GenericLogEntry,
+  type NormalizedLogEntry,
   normalizeLogEntry,
-  Severity,
+  type Severity,
   SeverityCodes,
 } from './entry.ts';
-import { MetricLogEntry } from './metrics.ts';
-import { ClientEventEntry } from './client-events.ts';
+import type { MetricLogEntry } from './metrics.ts';
+import type { ClientEventEntry } from './client-events.ts';
 import { ConsoleLogStream } from './console-stream.ts';
 
 /**
@@ -50,7 +50,7 @@ export function setGlobalLoggerSeverity(level: Severity): void {
 
 export function log(
   entry: LogEntry,
-  outputStreams: readonly LogStream[] | undefined = gLogStreams
+  outputStreams: readonly LogStream[] | undefined = gLogStreams,
 ): void {
   if (!outputStreams) {
     outputStreams = gLogStreams;
