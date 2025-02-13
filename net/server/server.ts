@@ -2,7 +2,9 @@ import * as path from '@std/path';
 import type { Dictionary } from '../../base/collections/dict.ts';
 import {
   log,
+  type Logger,
   type LogStream,
+  newLogger,
   setGlobalLoggerStreams,
 } from '../../logging/log.ts';
 import type { HTTPMethod } from '../../logging/metrics.ts';
@@ -21,6 +23,7 @@ import type { DBConfig } from '../../db/db.ts';
 import { normalizeEmail } from '../../base/string.ts';
 import type { BuildInfo } from '../../server/build-info.ts';
 import { startJSONLogWorkerIfNeeded } from '../../base/json-log/json-log.ts';
+import { type EmailConfig, EmailService } from './email.ts';
 
 /**
  * A server represents a logical DB with some additional configuration options.
@@ -65,6 +68,40 @@ export interface ServerOptions extends DBConfig {
    * Path to deno.json. Defaults to 'deno.json' inside the current directory.
    */
   denoJson?: string;
+  /**
+   * Configuration for the email service. Can use either SMTP or AWS SES via
+   * {@link https://nodemailer.com/|NodeMailer}.
+   *
+   * Example SMTP configuration (see {@link https://nodemailer.com/smtp/}):
+   * ```ts
+   * {
+   *   host: "smtp.gmail.com",
+   *   port: 587,
+   *   secure: true,
+   *   auth: {
+   *     user: "user@gmail.com",
+   *     pass: "app-specific-password"
+   *   },
+   *   debugEmails: true, // Enable email sending in development
+   *   from: "system@my.domain.com",
+   * }
+   * ```
+   *
+   * Example Amazon SES configuration (see {@link https://nodemailer.com/ses/}):
+   * ```ts
+   * import { SendRawEmailCommand, SES } from "npm:@aws-sdk/client-ses";
+   *
+   * {
+   *   SES: {
+   *     ses: new SES({ region: "us-east-1" }),
+   *     aws: { SendRawEmailCommand },
+   *   },
+   *   debugEmails: true, // Enable email sending in development
+   *   from: "system@my.domain.com",
+   * }
+   * ```
+   */
+  emailConfig?: EmailConfig;
 }
 
 /**
@@ -78,6 +115,8 @@ export interface ServerOptions extends DBConfig {
 export interface ServerServices extends ServerOptions {
   readonly orgId: string;
   readonly db: GoatDB;
+  readonly logger: Logger;
+  readonly email: EmailService;
 }
 
 /**
@@ -152,6 +191,7 @@ export class Server {
   private readonly _middlewares: Middleware[];
   private readonly _baseOptions: ServerOptions;
   private readonly _servicesByOrg: Dictionary<string, ServerServices>;
+
   private _abortController: AbortController | undefined;
   private _httpServer?: Deno.HttpServer;
 
@@ -214,10 +254,13 @@ export class Server {
         path: dir,
         orgId,
         db: new GoatDB({ ...this._baseOptions, orgId, path: dir }),
+        logger: newLogger(this._baseOptions.logStreams || []),
+        email: new EmailService(this._baseOptions.emailConfig),
       };
 
       // Setup all services in the correct order of dependencies
       // Add any new service.setup() calls here
+      await services.email.setup(services);
       // <<< End Services Setup >>>
       this._servicesByOrg.set(orgId, services);
     }
@@ -280,9 +323,8 @@ export class Server {
             }
           }
           return resp;
-        } catch (e: any) {
+        } catch (e: unknown) {
           if (e instanceof ServerError) {
-            if (e.code === 500) debugger;
             log({
               severity: 'ERROR',
               name: 'HttpStatusCode',
@@ -298,7 +340,6 @@ export class Server {
               status: e.code,
             });
           }
-          debugger;
           log({
             severity: 'ERROR',
             name: 'InternalServerError',
@@ -306,8 +347,8 @@ export class Server {
             value: 500,
             url: req.url,
             method: req.method as HTTPMethod,
-            error: String(e),
-            trace: e.stack,
+            error: e instanceof Error ? e.message : String(e),
+            trace: e instanceof Error ? e.stack : undefined,
             orgId,
           });
           return new Response(null, {

@@ -12,6 +12,7 @@ import type { EmailType } from './metrics.ts';
  *               impossible
  * - FailedAssertion: Used when an assertion check fails
  * - UncaughtServerError: Used for unhandled exceptions on the server
+ * - MissingConfiguration: Used when required configuration options are missing
  */
 export type DeveloperError =
   | 'NotImplemented'
@@ -65,7 +66,8 @@ export type OperationalError =
   | 'AttachmentDownloadFailed'
   | 'DuplicateFailed'
   | 'SessionError'
-  | 'EmailSendFailed';
+  | 'EmailSendFailed'
+  | 'MissingConfiguration';
 
 /**
  * Interface for log entries that represent operational errors. Extends
@@ -81,7 +83,7 @@ export type OperationalError =
  * @property type - Optional email type for email-related errors
  */
 export interface OperationalErrorLogEntry extends BaseErrorLogEntry {
-  severity: 'INFO';
+  severity: 'INFO' | 'ERROR' | 'WARNING';
   error: OperationalError;
   url?: string;
   key?: string;

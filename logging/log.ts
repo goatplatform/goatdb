@@ -26,7 +26,7 @@ export type LogEntry =
   | ClientEventEntry;
 
 export interface LogStream {
-  appendEntry(e: NormalizedLogEntry<LogEntry>): void;
+  appendEntry(e: NormalizedLogEntry<LogEntry>): void | Promise<void>;
 }
 
 // TODO: Capture anonymous logs on client and sync them with the server

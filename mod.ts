@@ -87,9 +87,13 @@ import { ManagedItem } from './db/managed-item.ts';
 import { Item } from './cfds/base/item.ts';
 import { prettyJSON } from './base/common.ts';
 import type { BuildInfo } from './server/build-info.ts';
+import { ConsoleLogStream } from './logging/console-stream.ts';
+import type { LogStream } from './logging/log.ts';
+import { JSONLogStream } from './logging/json-log-stream.ts';
 
-export type { AppConfig, BuildInfo, Schema, SchemaDataType };
+export type { AppConfig, BuildInfo, LogStream, Schema, SchemaDataType };
 export {
+  ConsoleLogStream,
   GoatDB,
   Item,
   itemPath,
@@ -97,6 +101,7 @@ export {
   itemPathGetRepoId,
   itemPathJoin,
   itemPathNormalize,
+  JSONLogStream,
   ManagedItem,
   prettyJSON,
   Query,

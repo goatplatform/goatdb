@@ -30,8 +30,6 @@ import { accessDenied } from '../../cfds/base/errors.ts';
 import { copyToClipboard } from '../../base/development.ts';
 import { sleep } from '../../base/time.ts';
 import type { GoatDB } from '../../db/db.ts';
-import { coreValueCompare } from '../../base/core-types/comparable.ts';
-import { bsearch_idx } from '../../base/algorithms.ts';
 import { itemPathGetPart } from '../../db/path.ts';
 import type { ManagedItem } from '../../db/managed-item.ts';
 
@@ -57,9 +55,9 @@ export interface TemporaryLoginToken extends ReadonlyJSONObject {
 
 export class AuthEndpoint implements Endpoint {
   filter(
-    services: ServerServices,
+    _services: ServerServices,
     req: Request,
-    info: Deno.ServeHandlerInfo,
+    _info: Deno.ServeHandlerInfo,
   ): boolean {
     const path = getRequestPath<AuthEndpointPath>(req);
     if (!kAuthEndpointPaths.includes(path)) {
@@ -79,10 +77,10 @@ export class AuthEndpoint implements Endpoint {
     return false;
   }
 
-  async processRequest(
+  processRequest(
     services: ServerServices,
     req: Request,
-    info: Deno.ServeHandlerInfo,
+    _info: Deno.ServeHandlerInfo,
   ): Promise<Response> {
     const path = getRequestPath<AuthEndpointPath>(req);
     const method = req.method as HTTPMethod;
@@ -100,9 +98,11 @@ export class AuthEndpoint implements Endpoint {
         return this.loginWithToken(services, req);
     }
 
-    return new Response('Unknown request', {
-      status: 400,
-    });
+    return Promise.resolve(
+      new Response('Unknown request', {
+        status: 400,
+      }),
+    );
   }
 
   private async createNewSession(
@@ -123,7 +123,7 @@ export class AuthEndpoint implements Endpoint {
         true,
         ['verify'],
       );
-    } catch (e: any) {
+    } catch (_e: unknown) {
       return responseForError('InvalidPublicKey');
     }
     if (!publicKey) {
@@ -155,7 +155,6 @@ export class AuthEndpoint implements Endpoint {
     services: ServerServices,
     req: Request,
   ): Promise<Response> {
-    // const smtp = services.email;
     const body = await req.json();
     const email = normalizeEmail(body.email);
     if (typeof email !== 'string') {
@@ -191,13 +190,10 @@ export class AuthEndpoint implements Endpoint {
     }
 
     const userItem = await fetchUserByEmail(services, email);
-    // TODO (ofri): Rate limit this call
-    if (!userItem) {
-      return responseForError('AccessDenied');
-    }
 
     // Unconditionally generate the signed token so this call isn't vulnerable
     // to timing attacks.
+    // TODO (ofri): Rate limit this call
     const signedToken = await signData(
       services.db.settings.currentSession,
       undefined,
@@ -208,6 +204,11 @@ export class AuthEndpoint implements Endpoint {
         sl: uniqueId(),
       },
     );
+
+    if (!userItem || userItem.isDeleted || userItem.get('email') !== email) {
+      return responseForError('AccessDenied');
+    }
+
     const clickURL = `${getBaseURL(services)}/auth/temp-login?t=${signedToken}`;
     if (services.buildInfo.debugBuild) {
       const copied = await copyToClipboard(clickURL);
@@ -218,19 +219,11 @@ export class AuthEndpoint implements Endpoint {
     // Only send the mail if a user really exists. We send the email
     // asynchronously both for speed and to avoid timing attacks.
     if (userItem !== undefined) {
-      // smtp.send({
-      //   type: 'Login',
-      //   to: email,
-      //   subject: 'Login to Ovvio',
-      //   plaintext: `Click on this link to login to Ovvio: ${clickURL}`,
-      //   // html: ResetPasswordEmail({
-      //   //   clickURL,
-      //   //   baseUrl: getBaseURL(services),
-      //   //   username: userRecord.get('name') || 'Anonymous',
-      //   //   orgname: services.organizationId,
-      //   // }),
-      //   html: `<html><body><div>Click on this link to login to Ovvio: <a href="${clickURL}">here</a></body></html>`,
-      // });
+      services.email.send({
+        type: 'Login',
+        magicLink: clickURL,
+        to: email,
+      });
     }
     return new Response('OK', { status: 200 });
   }
