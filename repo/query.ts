@@ -792,7 +792,10 @@ export function generateQueryId<
 >(
   source: QuerySource,
   predicate: Predicate<IS, CTX> | undefined,
-  sortDescriptor: SortDescriptor<OS, CTX> | undefined,
+  sortDescriptor:
+    | keyof SchemaDataType<OS>
+    | SortDescriptor<OS, CTX>
+    | undefined,
   ctx: CTX | undefined,
   ns: string | null | undefined,
 ): string {
