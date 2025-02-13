@@ -14,6 +14,7 @@ import {
   type ExecutableOptions,
   type TargetOS,
 } from '../cli/compile.ts';
+import { EmailBuilder, EmailInfo } from '../db/emails.ts';
 import { Server } from '../net/server/server.ts';
 import { staticAssetsFromJS } from '../net/server/static-assets.ts';
 import type { AppConfig } from './app-config.ts';
@@ -28,6 +29,8 @@ export type {
   CompileOptions,
   CPUArch,
   DebugServerOptions,
+  EmailBuilder,
+  EmailInfo,
   ExecutableOptions,
   LiveReloadOptions,
   TargetOS,

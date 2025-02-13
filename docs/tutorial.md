@@ -8,7 +8,7 @@ nav_order: 1
 # Building a Todo List App with GoatDB
 
 This tutorial walks you through building a full-featured Todo List app with
-GoatDB using React. It demonstrates how to leverage GoatDB’s distributed,
+GoatDB using React. It demonstrates how to leverage GoatDB's distributed,
 edge-native architecture and real-time synchronization features.
 
 GoatDB is a distributed, edge‑native database that shifts data processing to
@@ -49,15 +49,57 @@ Follow these steps to set up a new GoatDB project:
 These steps install GoatDB and set up the underlying infrastructure for your
 application.
 
-## 2. Define the Task Schema
+## 2. Define the Task Schema and Authorization Rules
 
-Create a file named `schema.ts` that defines the structure of your task items.
-In GoatDB, schemas are plain JavaScript objects that define the versioned
-structure of your data.
+Before we dive into the code, let's understand how GoatDB organizes data:
+
+### Understanding Repositories & Sharding
+
+GoatDB uses repositories to organize and shard data. A repository is a
+collection of items that:
+
+- Syncs independently from other repositories
+- Can contain items with different schemas
+- Has a path format of `/type/repo/item`
+
+Best practice is to shard by user ID or domain-specific identifiers. Here are
+two common examples:
+
+1. **User-specific data** (like in our todo app):
+
+```typescript
+// ✅ Good: Each user has their own repository
+/data/${userId}/task123
+
+// ❌ Bad: All users share one repository
+/data/tasks/task123
+```
+
+2. **Chat application** (like Slack):
+
+```typescript
+// ✅ Good: Each channel has its own repository
+/data/${channelId}/message123
+
+// ✅ Good: Each DM conversation has its own repository
+/data/dm_${user1Id}_${user2Id}/message456
+
+// ❌ Bad: All messages in one repository
+/data/messages/message789
+```
+
+These patterns:
+
+- Enable independent syncing of each repository's data
+- Create natural access control boundaries
+- Improve scalability as your application grows
+- Make it easier to manage data lifecycles
+
+Now, let's implement this pattern in our todo app:
 
 ```typescript
 // schema.ts
-import { SchemaManager } from '@goatdb/goatdb';
+import { itemPathGetPart, SchemaManager } from '@goatdb/goatdb';
 
 export const kSchemaTask = {
   ns: 'task',
@@ -75,13 +117,28 @@ export const kSchemaTask = {
 } as const;
 export type SchemaTypeTask = typeof kSchemaTask;
 
-// Register the schema with the default Schema Manager
+// Register both the schema and authorization rules
 export function registerSchemas(
   manager: SchemaManager = SchemaManager.default,
 ): void {
-  manager.register(kSchemaTask);
+  // Register the task schema
+  manager.registerSchema(kSchemaTask);
+
+  // Register an authorization rule that only allows users to access their own repositories
+  manager.registerAuthRule(
+    /\/data\/\w+/, // Matches all repositories under /data/<user-id>
+    (_db, repoPath, _itemKey, session, _op) =>
+      // Only allow access if the repository matches the user's ID
+      itemPathGetPart(repoPath, 'repo') === session.owner,
+  );
 }
 ```
+
+This authorization rule ensures that:
+
+- Each user can only read and write to their own repository
+- Users cannot access other users' tasks
+- The rule applies to all operations (create, read, update, delete)
 
 ## 3. Create the React Components
 
@@ -183,7 +240,7 @@ export function TaskItem({ path }: TaskItemProps) {
 ### 3.3 Contents Component
 
 The `Contents` component ties everything together by querying and displaying the
-list of tasks. It uses the `useQuery()` hook to fetch tasks from the user’s
+list of tasks. It uses the `useQuery()` hook to fetch tasks from the user's
 repository, sorting and filtering them as needed. A local state variable is used
 to control whether completed tasks should be shown.
 
@@ -232,12 +289,11 @@ export function Contents() {
 }
 ```
 
-### 3.4 Login Component
+### 3.4 Login Component with Custom Email
 
-The `Login` component provides a simple email-based login using a magic link.
-Once the user is authenticated, the app displays the task list. GoatDB includes
-built in authentication and authorization tools that tie into the
-[signed commit graph](/commit-graph).
+The `Login` component provides email-based authentication using magic links. You
+can customize the appearance of these emails by configuring the email builder on
+your server.
 
 ```tsx
 // src/Login.tsx
@@ -273,6 +329,34 @@ export function Login() {
   );
 }
 ```
+
+On your server, customize the email appearance by providing a custom email
+builder. The builder receives email information and server configuration to
+generate the email template:
+
+```typescript
+// server/email-builder.ts
+import { EmailBuilder, EmailInfo, ServerOptions } from '@goatdb/goatdb/server';
+
+export const customEmailBuilder: EmailBuilder = (
+  info: EmailInfo,
+  config: ServerOptions,
+): EmailMessage => {
+  switch (info.type) {
+    case 'Login':
+      return {
+        subject: `Login to ${config.buildInfo.appName}`,
+        text: `Click on this link to login to your account: ${info.magicLink}`,
+        html:
+          `<html><body><div>Click on this link to login to your account: <a href="${info.magicLink}">here</a></div></body></html>`,
+        to: info.to,
+      };
+  }
+};
+```
+
+Then modify your debug-server.ts and server.ts files in your project's skaffold
+directory to use the custom email builder:
 
 ### 3.5 App Component
 
@@ -315,7 +399,7 @@ This command will start a live-reload local server that listens at
 
 ## 5. Testing Real-Time Sync & Conflict Resolution
 
-One of GoatDB’s powerful features is real-time synchronization combined with
+One of GoatDB's powerful features is real-time synchronization combined with
 robust conflict resolution. Follow these steps to observe these features in
 action:
 
@@ -334,8 +418,8 @@ action:
 3. **Simulate a Conflict:**
 
    - In both tabs, locate the same task item.
-   - Edit the task’s text in both tabs simultaneously.
-   - Observe how GoatDB’s built-in conflict resolution mechanism handles the
+   - Edit the task's text in both tabs simultaneously.
+   - Observe how GoatDB's built-in conflict resolution mechanism handles the
      simultaneous updates. Typically, the system resolves conflicts based on the
      commit graph and version control-inspired logic. You can also click the
      **Download Commit Graph** button to inspect the underlying commit history
@@ -364,7 +448,7 @@ the hood.
 
 ## Conclusion
 
-This Todo List app showcases the robust capabilities of GoatDB’s architecture:
+This Todo List app showcases the robust capabilities of GoatDB's architecture:
 
 - **Edge-Native Design:** GoatDB shifts computational and synchronization tasks
   to edge nodes while a central server manages overall authority. This design
@@ -376,12 +460,5 @@ This Todo List app showcases the robust capabilities of GoatDB’s architecture:
 - **Real-Time Synchronization & Conflict Resolution:** Through background
   commits and a probabilistic synchronization protocol, the app achieves
   near-real-time updates while gracefully handling concurrent modifications.
-- **Seamless Integration with React:** GoatDB’s React hooks (`useDB`,
-  `useDBReady`, `useQuery`, and `useItem`) abstract away the complexities of
-  state management and data synchronization, allowing you to focus on
-  application logic.
-
-By leveraging these architectural principles, the app not only maintains a
-consistent and resilient state but also provides a scalable foundation for
-building modern, edge-native applications. Enjoy building and extending your
-GoatDB-powered applications!
+- **Seamless Integration with React:** GoatDB's React hooks (`useDB`,
+  `useDBReady`, `
