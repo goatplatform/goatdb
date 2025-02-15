@@ -237,7 +237,7 @@ export class SchemaManager {
   ): AuthRule | undefined {
     const repoId = itemPathGetRepoId(inputPath);
     // Builtin rules override user-provided ones
-    for (const { rulePath, rule } of kBuiltinAuthRules) {
+    for (const { rulePath, rule } of kBuiltinAuthRulesEnforced) {
       if (rulePath === repoId) {
         return rule;
       }
@@ -255,35 +255,39 @@ export class SchemaManager {
         }
       }
     }
+    // If no rule was found, use the optional system rules
+    for (const { rulePath, rule } of kBuiltinAuthRulesOptional) {
+      if (rulePath === repoId) {
+        return rule;
+      }
+    }
   }
 }
 
-const kBuiltinAuthRules: AuthConfig = [
-  {
-    rulePath: '/sys/users',
-    rule: (_db, _repoPath, itemKey, session, op) => {
-      if (session.owner === 'root') {
-        return true;
-      }
-      if (session.owner === itemKey) {
-        return true;
-      }
-      return op === 'read';
-    },
-  },
+const kBuiltinAuthRulesEnforced: AuthConfig = [
   {
     rulePath: '/sys/sessions',
     rule: (_db, _repoPath, _itemKey, session, op) => {
-      if (session.owner === 'root') {
-        return true;
-      }
       return op === 'read';
     },
   },
   {
     rulePath: '/sys/stats',
     rule: (_db, _repoPath, _itemKey, session, op) => {
-      return session.owner === 'root';
+      return false;
+    },
+  },
+] as const;
+
+const kBuiltinAuthRulesOptional: AuthConfig = [
+  // By default users can see other users but only edit themselves.
+  {
+    rulePath: '/sys/users',
+    rule: (_db, _repoPath, itemKey, session, op) => {
+      if (session.owner === itemKey) {
+        return true;
+      }
+      return op === 'read';
     },
   },
   // Reserving /sys/* for the system's use
