@@ -5,8 +5,8 @@ import { BaseService } from './service.ts';
 import type { EmailType } from '../../logging/metrics.ts';
 import {
   DefaultEmailBuilder,
-  EmailBuilder,
-  EmailInfo,
+  type EmailBuilder,
+  type EmailInfo,
 } from '../../db/emails.ts';
 
 /**

@@ -385,6 +385,46 @@ export function App() {
 }
 ```
 
+### 3.6 Opening Public User Registration
+
+By default, GoatDB requires users to be pre-registered before they can log in.
+To support environment-specific user registration, you can modify both your
+`server.ts` and `debug-server.ts` files. For example, you might enable public
+registration during development while enforcing restrictions in production.
+
+For production, you could adjust your server.ts file as follows:
+
+```typescript
+// server.ts
+const server = new Server({
+  staticAssets: staticAssetsFromJS(encodedStaticAsses),
+  path: args.path || path.join(Deno.cwd(), 'server-data'),
+  buildInfo,
+  resolveDomain: () => 'production-domain.com',
+  autoCreateUser: (info: AutoCreateUserInfo) => {
+    // In production, restrict registration to approved domains (e.g., company emails)
+    return info.email ? info.email.endsWith('@company.com') : false;
+  },
+});
+```
+
+In contrast, for development and debugging purposes, you might configure
+`debug-server.ts` like this:
+
+```typescript
+// debug-server.ts
+const server = new Server({
+  staticAssets: staticAssetsFromJS(encodedStaticAsses),
+  path: args.path || path.join(Deno.cwd(), 'server-data'),
+  buildInfo,
+  resolveDomain: () => 'localhost',
+  autoCreateUser: () => true, // Enable public registration during development
+});
+```
+
+Editing these files differently lets you tailor registration behavior: public
+registration on dev runs and restricted registration on production builds.
+
 ## 4. Running the Application
 
 Run the development server with:

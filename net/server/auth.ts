@@ -365,8 +365,8 @@ async function fetchUserByEmail(
   if (user) {
     return user;
   }
-  // Lazily create operator users
-  if (services.operatorEmails?.includes(email)) {
+  // Lazily create users when needed
+  if (services.autoCreateUser && services.autoCreateUser({ email })) {
     return services.db.create('/sys/users', kSchemaUser, {
       email: email,
     });
@@ -403,7 +403,7 @@ function responseForError(err: AuthError): Response {
   });
 }
 
-export type Role = 'operator' | 'anonymous';
+export type Role = 'user' | 'anonymous';
 
 export async function requireSignedUser(
   services: ServerServices,
@@ -450,15 +450,6 @@ export async function requireSignedUser(
   }
   if (userItem.isDeleted) {
     throw accessDenied();
-  }
-  if (role === 'operator') {
-    const email = userItem.get('email');
-    if (email === undefined || email.length <= 0) {
-      throw accessDenied();
-    }
-    if (!services.operatorEmails?.includes(email)) {
-      throw accessDenied();
-    }
   }
   return [userId, userItem, signerSession];
 }

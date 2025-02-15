@@ -13,7 +13,7 @@ keywords: LLM, AI code generation, Large Language Models, React, GoatDB, AI-assi
 
 This cheatsheet is designed to help Large Language Models (LLMs) generate
 high-quality, efficient code for GoatDB-powered React applications. By
-leveraging GoatDB’s synchronous API, LLMs can produce more predictable and
+leveraging GoatDB's synchronous API, LLMs can produce more predictable and
 optimized code with minimal complexity.
 
 ### How to Use This Cheatsheet for LLM Code Generation
@@ -327,4 +327,66 @@ GoatDBCheatsheet:
       Example:
       // @deno-types="@types/react"
       import React from 'react';
+
+  AuthenticationAndUserManagement:
+    login_process:
+      magic_link_flow: |
+        1. User enters email
+        2. System sends magic link email
+        3. User clicks link to complete login
+        4. Session automatically attaches to user account
+      code_example: |
+        // Login.tsx
+        function Login() {
+          const db = useDB();
+          const [emailSent, setEmailSent] = useState(false);
+
+          const handleLogin = async (email) => {
+            if (await db.loginWithMagicLinkEmail(email)) {
+              setEmailSent(true);
+            }
+          };
+        }
+
+    logout_process:
+      description: 'Clears local data and reloads page on browsers.'
+      code_example: |
+        const handleLogout = async () => {
+          await db.logout();
+          // Browser auto-reloads after logout
+        };
+
+    user_registration:
+      server_configuration: |
+        // server.ts
+        const server = new Server({
+          // ... other config ...
+          autoCreateUser: (info) => {
+            // Examples:
+
+            // Allow all registrations:
+            return true;
+
+            // Restrict to company domain:
+            return info.email?.endsWith('@company.com') ?? false;
+
+            // Restrict to allowlist:
+            const allowedEmails = ['user1@example.com', 'user2@example.com'];
+            return info.email ? allowedEmails.includes(info.email) : false;
+          },
+        });
+
+    session_management:
+      check_login_status: 'db.loggedIn returns true if user is authenticated.'
+      get_current_user: 'db.currentUser returns the user item if logged in.'
+      get_current_session: 'db.currentSession returns the active session.'
+      code_example: |
+        function AuthGuard({ children }) {
+          const db = useDB();
+          const ready = useDBReady();
+
+          if (ready === 'loading') return <LoadingScreen />;
+          if (!db.loggedIn) return <Login />;
+          return children;
+        }
 ```

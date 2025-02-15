@@ -1,14 +1,13 @@
 import {
   decodeSession,
-  EncodedSession,
+  type EncodedSession,
   generateRequestSignature,
-  OwnedSession,
-  Session,
+  type OwnedSession,
+  type Session,
   signData,
 } from '../db/session.ts';
 import { kSecondMs } from '../base/date.ts';
-import { JSONValue, ReadonlyJSONObject } from '../base/interfaces.ts';
-import { randomInt } from '../base/math.ts';
+import type { JSONValue, ReadonlyJSONObject } from '../base/interfaces.ts';
 import { sleep } from '../base/time.ts';
 import { timeout } from '../cfds/base/errors.ts';
 import { getGoatConfig } from '../server/config.ts';

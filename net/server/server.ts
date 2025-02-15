@@ -20,10 +20,22 @@ import { organizationIdFromURL } from '../rest-api.ts';
 import { GoatDB } from '../../db/db.ts';
 import { SyncEndpoint } from './sync.ts';
 import type { DBConfig } from '../../db/db.ts';
-import { normalizeEmail } from '../../base/string.ts';
 import type { BuildInfo } from '../../server/build-info.ts';
 import { startJSONLogWorkerIfNeeded } from '../../base/json-log/json-log.ts';
 import { type EmailConfig, EmailService } from './email.ts';
+
+/**
+ * Information about a user attempting to log in for the first time.
+ * Used by the autoCreateUser function to determine if a new account should be
+ * created.
+ */
+export type AutoCreateUserInfo = {
+  /**
+   * The email address provided during login attempt.
+   * Optional since some login flows may not require an email.
+   */
+  email?: string;
+};
 
 /**
  * A server represents a logical DB with some additional configuration options.
@@ -59,11 +71,22 @@ export interface ServerOptions extends DBConfig {
    */
   staticAssets?: StaticAssets;
   /**
-   * An array of email addresses of system operators. These user accounts will
-   * be automatically created with operator permissions inside every
-   * organization of this server.
+   * A function that determines whether a user should be automatically created
+   * on first login attempt. If this function returns true, a new user account
+   * will be created when an unrecognized email attempts to log in. This can
+   * be used to:
+   *
+   * - Enable public registration by returning true for all emails
+   * - Enforce organization policies by checking email domains
+   * - Restrict registration to specific email patterns or lists
+   *
+   * If not provided or if the function returns false, only pre-existing users
+   * will be able to log in.
+   *
+   * @param info Information about the user attempting to log in
+   * @returns true to allow creating a new user account, false to deny
    */
-  operatorEmails?: string[];
+  autoCreateUser?: (info: AutoCreateUserInfo) => boolean;
   /**
    * Path to deno.json. Defaults to 'deno.json' inside the current directory.
    */
@@ -216,11 +239,6 @@ export class Server {
     }
     if (!options.orgId) {
       options.orgId = 'localhost';
-    }
-    if (options.operatorEmails) {
-      options.operatorEmails = options.operatorEmails.map((e) =>
-        normalizeEmail(e)
-      );
     }
     this._baseOptions = options;
     // Monitoring
