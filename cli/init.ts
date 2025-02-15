@@ -159,7 +159,7 @@ export type SchemaMyItem = typeof kSchemaMyItem;
 export function registerSchemas(
   manager: SchemaManager = SchemaManager.default,
 ): void {
-  manager.register(kSchemaMyItem);
+  manager.registerSchema(kSchemaMyItem);
 }
 `;
 
