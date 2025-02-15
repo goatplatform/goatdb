@@ -8,12 +8,12 @@ import {
 } from '../db/session.ts';
 import * as ArrayUtils from '../base/array.ts';
 import { filterIterable, mapIterable } from '../base/common.ts';
-import { coreValueCompare, coreValueEquals } from '../base/core-types/index.ts';
+import { coreValueCompare } from '../base/core-types/index.ts';
 import { assert } from '../base/error.ts';
 import * as SetUtils from '../base/set.ts';
 import { Edit } from '../cfds/base/edit.ts';
 import { Code, ServerError, serviceUnavailable } from '../cfds/base/errors.ts';
-import { concatChanges, DataChanges } from '../cfds/base/object.ts';
+import { concatChanges, type DataChanges } from '../cfds/base/object.ts';
 import { Item } from '../cfds/base/item.ts';
 import {
   kNullSchema,
@@ -42,7 +42,7 @@ import type { GoatDB } from '../db/db.ts';
 import { BloomFilter } from '../base/bloom.ts';
 // import { BloomFilter } from '../cpp/bloom_filter.ts';
 import { itemPathJoin } from '../db/path.ts';
-import { AuthRule } from '../cfds/base/schema-manager.ts';
+import type { AuthRule } from '../cfds/base/schema-manager.ts';
 
 /**
  * Fired when the value of a document changes (the head of the commit graph
@@ -189,6 +189,7 @@ export class Repository<
     if (
       session &&
       session.id !== this.trustPool.currentSession.id &&
+      session.owner !== 'root' &&
       authorizer
     ) {
       let count = 0;
@@ -209,6 +210,7 @@ export class Repository<
     if (
       session &&
       session.id !== this.trustPool.currentSession.id &&
+      session.owner !== 'root' &&
       authorizer
     ) {
       if (!authorizer(this.db, this.path, c.key, session, 'read')) {
@@ -225,7 +227,8 @@ export class Repository<
   *commits(session?: Session): Generator<Commit> {
     const { authorizer } = this;
     const checkAuth = session &&
-      session.id !== this.trustPool.currentSession.id && authorizer;
+      session.id !== this.trustPool.currentSession.id &&
+      session.owner !== 'root' && authorizer;
     let resultIds: Iterable<string>;
     if (!checkAuth) {
       resultIds = this.storage.allCommitsIds();
@@ -255,6 +258,7 @@ export class Repository<
       if (
         !session ||
         session.id === this.trustPool.currentSession.id ||
+        session.owner === 'root' ||
         !authorizer ||
         authorizer(this.db, this.path, c.key, session, 'read')
       ) {
@@ -372,6 +376,7 @@ export class Repository<
     if (
       session &&
       session.id !== this.trustPool.currentSession.id &&
+      session.owner !== 'root' &&
       authorizer
     ) {
       return filterIterable(
@@ -430,7 +435,7 @@ export class Repository<
       if (!this.hasItemForCommit(c)) {
         continue;
       }
-      let [newBase, foundRoot] = this._findLCAMergeBase(result, c);
+      const [newBase, foundRoot] = this._findLCAMergeBase(result, c);
       reachedRoot = reachedRoot || foundRoot;
       // if (!newBase) {
       //   [newBase, foundRoot] = this._findChronologicalMergeBase(result, c);
@@ -1327,7 +1332,10 @@ export class Repository<
                 if (!session) {
                   return;
                 }
-                if (authorizer(this.db, this.path, c.key, session, 'write')) {
+                if (
+                  session.owner === 'root' ||
+                  authorizer(this.db, this.path, c.key, session, 'write')
+                ) {
                   result.push(c);
                 } else {
                   // debugger;
@@ -1794,17 +1802,6 @@ export class MemRepoStorage implements RepoStorage<MemRepoStorage> {
   // }
 
   close(): void {}
-}
-
-function pickLatestCommitBySession(commits: Commit[]): Commit[] {
-  const commitBySession = new Map<string, Commit>();
-  for (const c of commits) {
-    const existing = commitBySession.get(c.session);
-    if (!existing || existing.timestamp < c.timestamp) {
-      commitBySession.set(c.session, c);
-    }
-  }
-  return Array.from(commitBySession.values());
 }
 
 const gFirstSeenCommit = new Map<string, number>();
