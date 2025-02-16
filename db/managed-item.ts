@@ -1,8 +1,4 @@
-import {
-  kNullSchema,
-  type Schema,
-  type SchemaDataType,
-} from '../cfds/base/schema.ts';
+import type { Schema, SchemaDataType } from '../cfds/base/schema.ts';
 import type { Commit } from '../repo/commit.ts';
 import type { Repository } from '../repo/repo.ts';
 import { itemPathGetPart, itemPathGetRepoId } from './path.ts';
@@ -79,6 +75,16 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
       this.onChange(['__schema', true, null]);
       this._commitDelayTimer.schedule();
     }
+  }
+
+  /**
+   * Returns whether this item exists in the repository.
+   * An item exists if it has a non-null schema namespace.
+   * Items with a null schema cannot be persisted and act as temporary
+   * in-memory representations before being properly created with a schema.
+   */
+  get exists(): boolean {
+    return this.schema.ns !== null;
   }
 
   /**

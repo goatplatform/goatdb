@@ -130,7 +130,7 @@ export class Item<S extends Schema = Schema>
    * empty and has no fields and no values.
    */
   get isNull(): boolean {
-    return this.schema.ns === 'null';
+    return this.schema.ns === null;
   }
 
   /**
@@ -214,14 +214,20 @@ export class Item<S extends Schema = Schema>
   /**
    * Returns the value for the given field or undefined.
    *
+   * If this is a null item (has no schema), returns undefined for all fields.
+   * Otherwise, returns the field's value, or undefined if not set.
+   *
    * @param key The field's name.
    * @returns   The field's value or undefined.
    * @throws    Throws if attempting to access a field not defined by this
-   *            item's schema.
+   *            item's schema (unless this is a null item).
    */
   get<T extends keyof SchemaDataType<S>>(
     key: string & T,
   ): SchemaDataType<S>[T] {
+    if (this.isNull) {
+      return undefined as SchemaDataType<S>[T];
+    }
     const fieldDef = SchemaGetFieldDef(this.schema, key);
     assert(
       fieldDef !== undefined,
