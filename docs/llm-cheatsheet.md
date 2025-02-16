@@ -143,7 +143,7 @@ GoatDBCheatsheet:
         schema: 'Schema definition.'
         source: "Repository path (e.g., '/data/tasks')."
         predicate: 'Optional filter function.'
-        sortDescriptor: 'Optional sort function.'
+        sortBy: 'Optional sort function.'
         ctx: 'Extra context.'
         limit: 'Result handling.'
         showIntermittentResults: 'Result handling.'
@@ -151,7 +151,7 @@ GoatDBCheatsheet:
         const tasksQuery = useQuery({
           schema: taskSchema,
           source: '/data/tasks',
-          sortDescriptor: (a, b) => a.get('text').localeCompare(b.get('text')),
+          sortBy: (a, b) => a.get('text').localeCompare(b.get('text')),
           predicate: (item) => !item.get('done'),
           showIntermittentResults: true,
         });
@@ -172,12 +172,22 @@ GoatDBCheatsheet:
       // schema.ts
       import { SchemaManager } from '@goatdb/goatdb';
 
+      // Supported field types:
+      // - string: Text values
+      // - number: Numeric values
+      // - boolean: True/false values
+      // - date: DateTime values
+      // - set: Unordered collection of unique values
+      // - map: Key-value pairs
+      // - richtext: Formatted text content
+      // Note: Arrays are not supported - use Set instead
       export const kSchemaTask = {
         ns: 'task',
         version: 1,
         fields: {
           text: { type: 'string', required: true },
           done: { type: 'boolean', default: () => false },
+          metadata: { type: 'map', default: () => new Map() },
         },
       } as const;
 
@@ -271,7 +281,7 @@ GoatDBCheatsheet:
           const query = useQuery({
             schema: kSchemaTask,
             source: '/data/tasks',
-            sortDescriptor: ({ left, right }) =>
+            sortBy: ({ left, right }) =>
               left.get('text').localeCompare(right.get('text')),
             predicate: ({ item, ctx }) => !item.get('done') || ctx.showChecked,
             showIntermittentResults: true,
@@ -389,4 +399,34 @@ GoatDBCheatsheet:
           if (!db.loggedIn) return <Login />;
           return children;
         }
+
+  AuthRulesQuickReference:
+    basic_pattern: |
+      // Register auth rules using path patterns and rule functions
+      schemaManager.registerAuthRule('/data/todos', (db, repoPath, itemKey, session, op) => {
+        // Return true to allow access, false to deny
+        return session.owner === itemKey || op === 'read';
+      });
+
+    common_patterns:
+      owner_only: |
+        // Only allow access to item owner
+        (db, repoPath, itemKey, session) => session.owner === itemKey
+
+      read_public_write_owner: |
+        // Public read, owner-only write
+        (db, repoPath, itemKey, session, op) => op === 'read' || session.owner === itemKey
+
+      team_access: |
+        // Team-based access using metadata
+        (db, repoPath, itemKey, session) => {
+          const item = db.get(repoPath, itemKey);
+          return item?.get('teamId') === session.get('teamId');
+        }
+
+    path_matching:
+      exact_path: "'/data/todos'"
+      regex_pattern: '/^\/data\/teams\/[^/]+\/items\//g'
+
+    rule_execution: 'Rules are evaluated in registration order. First matching rule determines access.'
 ```
