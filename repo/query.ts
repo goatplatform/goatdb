@@ -131,6 +131,8 @@ export type QueryConfig<
    * If a field name is provided, results will be sorted by that field's values
    * using standard comparison rules. */
   sortBy?: SortDescriptor<OS, CTX> | keyof SchemaDataType<OS>;
+  /** Optional flag that if true, flips the natural order of the sortBy */
+  sortDescending?: boolean;
   /** Optional schema to restrict query results to */
   schema?: IS;
   /** Optional unique identifier for this query */
@@ -224,6 +226,7 @@ export class Query<
   private _sortInfo?: SortInfo<OS, CTX>;
   private readonly _sortField?: keyof SchemaDataType<OS> & string;
   private readonly sortDescriptor: SortDescriptor<OS, CTX> | undefined;
+  private readonly sortDescending: boolean;
   private readonly _headIdForKey: Map<string, string>; // Key -> Commit ID
   private readonly _includedPaths: string[];
   private _loadingFinished = false;
@@ -258,6 +261,7 @@ export class Query<
     source,
     predicate,
     sortBy,
+    sortDescending,
     ctx,
     schema,
     limit,
@@ -273,7 +277,9 @@ export class Query<
         coreValueCompare(
           left.get(this._sortField!),
           right.get(this._sortField!),
-        );
+        ) * (sortDescending ? -1 : 1);
+    } else if (typeof sortBy === 'function' && sortDescending) {
+      sortBy = (info) => (sortBy as SortDescriptor<OS, CTX>)(info) * -1;
     }
     this.id = id ||
       generateQueryId(
@@ -289,6 +295,7 @@ export class Query<
     this.limit = limit || 0;
     this.predicate = predicate;
     this.sortDescriptor = sortBy;
+    this.sortDescending = sortDescending ?? false;
     this._headIdForKey = new Map();
     // this._includedKeys = new Set();
     this._includedPaths = [];
@@ -518,7 +525,11 @@ export class Query<
     if (fieldName === this._sortField) {
       const userIdx = bsearch_idx(
         results.length,
-        (idx) => coreValueCompare(value, results[idx].get(fieldName as string)),
+        (idx) =>
+          coreValueCompare(
+            value,
+            results[idx].get(fieldName as string),
+          ) * (this.sortDescending ? -1 : 1),
       );
       if (
         userIdx >= 0 && userIdx < results.length &&
