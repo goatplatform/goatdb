@@ -8,7 +8,6 @@ import { buildAssets } from '../server/generate-static-assets.ts';
 import { getGoatConfig } from '../server/config.ts';
 import { generateBuildInfo, getDependencyURL } from '../server/build-info.ts';
 import { notReached } from '../base/error.ts';
-import type { ServerOptions } from '../net/server/server.ts';
 
 export type TargetOS = 'mac' | 'linux' | 'windows';
 export type CPUArch = 'x64' | 'aar64';
@@ -36,7 +35,6 @@ export type ExecutableOptions = {
 };
 
 export type CompileOptions =
-  & Omit<ServerOptions, 'buildInfo' | 'path'>
   & ExecutableOptions
   & AppConfig;
 
