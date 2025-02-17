@@ -211,21 +211,18 @@ async function JSONLogFileAppend(
   entries: readonly ReadonlyJSONObject[],
 ): Promise<void> {
   assert(file.write, 'Attempting to write to a readonly log');
-  // if (file.writePromise) {
-  //   await file.writePromise;
-  //   const promise = delay<void>(0, async () => {
-  //     await JSONLogFileAppend(file, entries);
-  //     if (file.writePromise === promise) {
-  //       file.writePromise = undefined;
-  //     }
-  //   });
-  //   file.writePromise = promise;
-  //   return;
-  // }
-  assert(
-    file.didScan === true,
-    'Attempting to append to log before initial scan completed',
-  );
+  // Hack: Wind the log to the end so any broken tail will be chopped off.
+  // TODO: Read the file in reverse and apply truncate if needed.
+  if (!file.didScan) {
+    const cursor = await JSONLogFileStartCursor(file);
+    while (!(await JSONLogFileScan(cursor))[1]) {
+      // Wind the log file to the end
+    }
+  }
+  // assert(
+  //   file.didScan === true,
+  //   'Attempting to append to log before initial scan completed',
+  // );
   const filteredEntries: ReadonlyJSONObject[] = [];
   for (const e of entries) {
     if (typeof e.id === 'string' && !file.knownIds.has(e.id)) {
