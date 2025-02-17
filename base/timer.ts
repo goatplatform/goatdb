@@ -43,19 +43,44 @@ function stopTimerTickerIfNeeded() {
   }
 }
 
+/**
+ * A callback function that is executed when a timer fires.
+ *
+ * @param timer The timer that fired and triggered this callback
+ * @returns
+ * - `true` to reschedule the timer immediately
+ * - `undefined` or `void` to let the timer handle rescheduling based on its
+ *   configuration
+ * - `Promise<void|undefined>` for async callbacks, same semantics as sync
+ *   returns
+ */
 export interface TimerCallback {
   (timer: Timer): boolean | undefined | void | Promise<void | undefined>;
 }
 
+/**
+ * Interface for a timer that can be scheduled and unscheduled.
+ */
 export interface Timer {
+  /**
+   * Schedules this timer to fire based on its configuration.
+   * If the timer is already scheduled, this is a no-op.
+   * @returns This timer instance for chaining
+   */
   schedule(): Timer;
+
+  /**
+   * Unschedules this timer if it is currently scheduled.
+   * If the timer is not scheduled, this is a no-op.
+   * @returns This timer instance for chaining
+   */
   unschedule(): Timer;
 }
 
 /**
  * An application level timer that internally uses a single setTimeout.
  * This enables holding thousands of active timers without overloading the
- * browser's event loop.
+ * JS event loop.
  */
 export abstract class BaseTimer implements Timer {
   readonly label: string | undefined;
@@ -64,6 +89,11 @@ export abstract class BaseTimer implements Timer {
   private _nextFireTimestamp: number;
   private _isScheduled: boolean;
 
+  /**
+   * Creates a new timer instance.
+   * @param callback The function to call when the timer fires
+   * @param label Optional label for debugging/logging purposes
+   */
   constructor(callback: TimerCallback, label?: string | undefined) {
     this.label = label;
     this._callback = callback;
@@ -72,16 +102,43 @@ export abstract class BaseTimer implements Timer {
     this._isScheduled = false;
   }
 
+  /**
+   * Returns the timestamp in milliseconds when this timer will next fire.
+   * If the timer is not scheduled, returns the last fire timestamp.
+   */
   get nextFireTimestamp(): number {
     return this._nextFireTimestamp;
   }
 
+  /**
+   * Returns whether this timer is currently scheduled to fire.
+   * A timer becomes scheduled when schedule() is called and unscheduled
+   * when either unschedule() is called or it fires and doesn't reschedule.
+   */
   get isScheduled(): boolean {
     return this._isScheduled;
   }
 
+  /**
+   * Calculates the next timestamp in milliseconds when this timer should fire.
+   * This is called internally by schedule() to determine when to fire the
+   * timer.
+   *
+   * @returns The next fire timestamp in milliseconds since epoch
+   * @override Subclasses must implement this method to define their timing
+   *           behavior
+   */
   protected abstract calcNextFireDate(): number;
 
+  /**
+   * Compares this timer with another timer to determine their relative order.
+   * Used for sorting timers in the scheduler queue.
+   *
+   * @param other The timer to compare against
+   * @returns A negative number if this timer should fire before the other
+   *          timer, zero if they are the same timer, or a positive number if
+   *          this timer should fire after the other timer
+   */
   compare(other: BaseTimer): number {
     if (other === this) {
       return 0;
@@ -90,6 +147,11 @@ export abstract class BaseTimer implements Timer {
     return dt === 0 ? this._id - other._id : dt;
   }
 
+  /**
+   * Schedules this timer to fire at the next appropriate time.
+   * If the timer is already scheduled, this is a no-op.
+   * @returns This timer instance for chaining
+   */
   schedule(): Timer {
     if (gScheduledTimers.has(this)) {
       assert(this._isScheduled);
@@ -103,6 +165,11 @@ export abstract class BaseTimer implements Timer {
     return this;
   }
 
+  /**
+   * Unschedules this timer if it is currently scheduled.
+   * If the timer is not scheduled, this is a no-op.
+   * @returns This timer instance for chaining
+   */
   unschedule(): Timer {
     if (gScheduledTimers.delete(this)) {
       this._isScheduled = false;
@@ -111,6 +178,27 @@ export abstract class BaseTimer implements Timer {
     return this;
   }
 
+  /**
+   * Resets the timer to fire at the next appropriate time.
+   * If the timer is not currently scheduled, this is a no-op.
+   * @returns This timer instance for chaining
+   */
+  reset(): Timer {
+    if (this._isScheduled) {
+      this.unschedule();
+      this.schedule();
+    }
+    return this;
+  }
+
+  /**
+   * Fires the timer and handles rescheduling if necessary.
+   * This method is called internally by the timer system when the timer's
+   * scheduled time has elapsed.
+   *
+   * @warning This is an internal method and should not be called directly.
+   * Use schedule() and unschedule() to control timer execution.
+   */
   fire(): void {
     assert(this._isScheduled);
     this._isScheduled = false;
@@ -121,6 +209,10 @@ export abstract class BaseTimer implements Timer {
     }
   }
 
+  /**
+   * Executes the timer's callback and handles rescheduling if necessary.
+   * @returns `true` if the timer should be rescheduled, `false` otherwise
+   */
   protected run(): boolean {
     return this._callback(this) === true;
   }
@@ -232,7 +324,7 @@ export abstract class BaseDynamicTimer extends BaseTimer {
     this._repeat = flag;
   }
 
-  reset(): void {
+  override reset(): Timer {
     const scheduled = this.isScheduled;
     if (scheduled) {
       this.unschedule();
@@ -241,6 +333,7 @@ export abstract class BaseDynamicTimer extends BaseTimer {
     if (scheduled) {
       this.schedule();
     }
+    return this;
   }
 
   override schedule(): BaseDynamicTimer {
