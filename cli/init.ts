@@ -26,8 +26,8 @@ const htmlScaffold = `<!DOCTYPE html>
 const tsxScaffold = `// deno-lint-ignore no-unused-vars
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { App } from '../src/app.tsx';
-import { registerSchemas } from '../schema.ts';
+import { App } from './app.tsx';
+import { registerSchemas } from '../common/schema.ts';
 
 registerSchemas();
 
@@ -66,18 +66,18 @@ export function App() {
 
 const devSeverScaffold =
   `import { startDebugServer } from "@goatdb/goatdb/server";
-import { registerSchemas } from "./schema.ts";
+import { registerSchemas } from "../common/schema.ts";
 
 async function main(): Promise<void> {
   registerSchemas();
   await startDebugServer({
-    buildDir: "./build",
-    path: "./server-data",
-    jsPath: "./scaffold/index.tsx",
-    htmlPath: "./scaffold/index.html",
-    cssPath: "./scaffold/index.css",
-    assetsPath: "./assets",
-    watchDir: "./",
+    buildDir: "build",
+    path: "server-data",
+    jsPath: "client/index.tsx",
+    htmlPath: "client/index.html",
+    cssPath: "client/index.css",
+    assetsPath: "client/assets",
+    watchDir: ".",
   });
 }
 
@@ -90,8 +90,8 @@ const denoJsonScaffold = {
     jsx: 'precompile',
   },
   tasks: {
-    debug: 'deno run -A debug-server.ts',
-    build: 'deno run -A build.ts',
+    debug: 'deno run -A server/debug-server.ts',
+    build: 'deno run -A server/build.ts',
     clean: 'rm -r server-data',
   },
   version: '0.0.1',
@@ -167,7 +167,7 @@ const serverSkaffold = `import yargs from "yargs";
 import * as path from "@std/path";
 import { Server, staticAssetsFromJS } from "@goatdb/goatdb/server";
 import { BuildInfo, prettyJSON } from "@goatdb/goatdb";
-import { registerSchemas } from "./schema.ts";
+import { registerSchemas } from "../common/schema.ts";
 // These imported files will be automatically generated during compilation
 import encodedStaticAsses from "./build/staticAssets.json" with {
   type: "json",
@@ -223,12 +223,12 @@ const buildSkaffold = `import { compile } from "@goatdb/goatdb/server";
 
 async function main(): Promise<void> {
   await compile({
-    buildDir: "./build",
-    serverEntry: "./server.ts",
-    jsPath: "./scaffold/index.tsx",
-    htmlPath: "./scaffold/index.html",
-    cssPath: "./scaffold/index.css",
-    assetsPath: "./assets",
+    buildDir: "build",
+    serverEntry: "server/server.ts",
+    jsPath: "client/index.tsx",
+    htmlPath: "client/index.html",
+    cssPath: "client/index.css",
+    assetsPath: "client/assets",
     // Edit the following fields for cross compilation
     // os: "linux",
     // arch: "aar64",
@@ -308,42 +308,47 @@ async function bootstrapProject(): Promise<void> {
   // await Deno.mkdir(projectDir, { recursive: true });
   const projectDir = Deno.cwd();
   console.log(`Setting up project scaffold...`);
-  const scaffoldDir = path.join(projectDir, 'scaffold');
-  await Deno.mkdir(scaffoldDir, { recursive: true });
+  const clientDir = path.join(projectDir, 'client');
+  await Deno.mkdir(clientDir, { recursive: true });
   await writeTextFileIfNotExists(
-    path.join(scaffoldDir, 'index.css'),
+    path.join(clientDir, 'index.css'),
     cssScaffold,
   );
   await writeTextFileIfNotExists(
-    path.join(scaffoldDir, 'index.html'),
+    path.join(clientDir, 'index.html'),
     htmlScaffold,
   );
   await writeTextFileIfNotExists(
-    path.join(scaffoldDir, 'index.tsx'),
+    path.join(clientDir, 'index.tsx'),
     tsxScaffold,
   );
   await writeTextFileIfNotExists(
     path.join(projectDir, '.gitignore'),
     gitignoreScaffold,
   );
-  const srcDir = path.join(projectDir, 'src');
-  await Deno.mkdir(srcDir, { recursive: true });
-  await writeTextFileIfNotExists(path.join(srcDir, 'app.tsx'), appTsxScaffold);
   await writeTextFileIfNotExists(
-    path.join(projectDir, 'debug-server.ts'),
+    path.join(clientDir, 'app.tsx'),
+    appTsxScaffold,
+  );
+  const serverDir = path.join(projectDir, 'server');
+  await Deno.mkdir(serverDir, { recursive: true });
+  await writeTextFileIfNotExists(
+    path.join(serverDir, 'debug-server.ts'),
     devSeverScaffold,
   );
   await writeTextFileIfNotExists(
-    path.join(projectDir, 'schema.ts'),
-    schemaScaffold,
-  );
-  await writeTextFileIfNotExists(
-    path.join(projectDir, 'server.ts'),
+    path.join(serverDir, 'server.ts'),
     serverSkaffold,
   );
   await writeTextFileIfNotExists(
-    path.join(projectDir, 'build.ts'),
+    path.join(serverDir, 'build.ts'),
     buildSkaffold,
+  );
+  const commonDir = path.join(projectDir, 'common');
+  await Deno.mkdir(commonDir, { recursive: true });
+  await writeTextFileIfNotExists(
+    path.join(commonDir, 'schema.ts'),
+    schemaScaffold,
   );
   await mergeDenoJson(
     path.join(projectDir, 'deno.json'),
