@@ -30,16 +30,18 @@ export interface BuildInfo extends JSONObject {
    */
   appName?: string;
   /**
-   * Tells the server where the json-log-worker file was embedded.
-   */
-  jsonLogWorkerPath: string;
-  /**
    * If true, indicates this is a debug build which turns off optimizations and
    * turns on a debugging aids.
    */
   debugBuild?: boolean;
 }
 
+/**
+ * Generates build information for the current application.
+ *
+ * @param denoJsonPath Path to the deno.json configuration file
+ * @returns A BuildInfo object containing details about the build
+ */
 export async function generateBuildInfo(
   denoJsonPath: string,
 ): Promise<BuildInfo> {
@@ -71,51 +73,5 @@ export async function generateBuildInfo(
   } else {
     info.appName = path.basename(path.dirname(denoJsonPath));
   }
-  // Worker path
-  info.jsonLogWorkerPath = await getDependencyURL(denoJsonPath) +
-    'base/json-log/json-log-worker-entry.ts';
   return info as BuildInfo;
-}
-
-export type DenoInfoModule = {
-  kind: string;
-  local: string;
-  size: number;
-  mediaType: string;
-  specifier: string;
-};
-
-export type DenoInfoOutput = {
-  version: number;
-  roots: string[];
-  modules: DenoInfoModule[];
-};
-
-export async function getDependencyURL(denoJson?: string): Promise<string> {
-  const compileArgs = [
-    'info',
-    '--json',
-    'jsr:@goatdb/goatdb',
-  ];
-  if (denoJson) {
-    compileArgs.push(`--config=${denoJson}`);
-  }
-  const compileLocalCmd = new Deno.Command(Deno.execPath(), {
-    args: compileArgs,
-  });
-  const output = await compileLocalCmd.output();
-  const info: DenoInfoOutput = JSON.parse(
-    new TextDecoder().decode(output.stdout),
-  );
-  const prefix = 'https://jsr.io/@goatdb/goatdb/';
-  for (const module of info.modules) {
-    if (module.specifier.startsWith(prefix)) {
-      const suffix = module.specifier.substring(prefix.length);
-      const nextComp = suffix.indexOf('/');
-      if (nextComp > 0) {
-        return module.specifier.substring(0, prefix.length + nextComp + 1);
-      }
-    }
-  }
-  notReached('jsr:@goatdb/goatdb not found');
 }

@@ -2,8 +2,7 @@ import * as path from '@std/path';
 import * as esbuild from 'esbuild';
 import { denoPlugins } from '@luca/esbuild-deno-loader';
 import { getRepositoryPath } from '../base/development.ts';
-import type { StaticAssets } from '../net/server/static-assets.ts';
-import { staticAssetsToJS } from '../net/server/static-assets.ts';
+import { type StaticAssets, staticAssetsToJS } from './system-assets.ts';
 
 export async function buildSysAssets(): Promise<void> {
   const repoPath = await getRepositoryPath();

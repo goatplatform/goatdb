@@ -1,13 +1,11 @@
 import * as path from '@std/path';
 import type { AppConfig } from '../mod.ts';
-import {
-  APP_ENTRY_POINT,
-  staticAssetsToJS,
-} from '../net/server/static-assets.ts';
+import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { buildAssets } from '../server/generate-static-assets.ts';
 import { getGoatConfig } from '../server/config.ts';
-import { generateBuildInfo, getDependencyURL } from '../server/build-info.ts';
+import { generateBuildInfo } from '../server/build-info.ts';
 import { notReached } from '../base/error.ts';
+import { staticAssetsToJS } from '../system-assets/system-assets.ts';
 
 export type TargetOS = 'mac' | 'linux' | 'windows';
 export type CPUArch = 'x64' | 'aar64';
@@ -43,7 +41,8 @@ export async function compile(options: CompileOptions): Promise<void> {
   console.log(
     `Starting compilation for ${targetOsArch}`,
   );
-  console.log(`Bundling assets...`);
+  console.log(`Bundling client code...`);
+  const bundlingStart = performance.now();
   const entryPoints = [
     {
       in: path.resolve(options.jsPath),
@@ -80,6 +79,13 @@ export async function compile(options: CompileOptions): Promise<void> {
       ),
     ),
   );
+  console.log(
+    `Done. Bundling took ${
+      ((performance.now() - bundlingStart) / 1000).toFixed(2)
+    }sec`,
+  );
+  console.log(`Compiling server executable...`);
+  const compileStart = performance.now();
   // const workerTsPath = path.join(buildDir, 'file-worker.ts');
   // await Deno.writeTextFile(workerTsPath, kFileWorkerCode);
   // console.log(`Compiling...`);
@@ -91,10 +97,12 @@ export async function compile(options: CompileOptions): Promise<void> {
     'compile',
     '-A',
     '--no-check',
-    `--include=${
-      await getDependencyURL(options.denoJson) +
-      'base/json-log/json-log-worker-entry.ts'
-    }`,
+    // `--include=${
+    //   path.join(
+    //     await getDependencyURL(options.denoJson),
+    //     'base/json-log/json-log-worker-entry.ts',
+    //   )
+    // }`,
     `--output=${outputFile}`,
   ];
   if (options.arch || options.os) {
@@ -108,22 +116,6 @@ export async function compile(options: CompileOptions): Promise<void> {
     args: compileArgs,
   });
   const output = await compileLocalCmd.output();
-  // Cleanup
-  // try {
-  //   await Deno.remove(assetsJsonPath);
-  // } catch (_: unknown) {
-  //   // Skip
-  // }
-  // try {
-  //   await Deno.remove(buildInfoJsonPath);
-  // } catch (_: unknown) {
-  //   // Skip
-  // }
-  // try {
-  //   await Deno.remove(workerTsPath);
-  // } catch (_: unknown) {
-  //   // Skip
-  // }
   // Report result
   if (!output.success) {
     console.log('Compilation failed');
@@ -131,7 +123,11 @@ export async function compile(options: CompileOptions): Promise<void> {
     console.error(new TextDecoder().decode(output.stdout));
     return;
   }
-  console.log(`Done. Binary placed at ${outputFile}`);
+  console.log(
+    `Done. Compilation took ${
+      ((performance.now() - compileStart) / 1000).toFixed(2)
+    }sec. Binary placed at ${outputFile}`,
+  );
 }
 
 export function targetFromOSArch(os?: TargetOS, arch?: CPUArch): OSArchTarget {
@@ -177,16 +173,4 @@ export function denoTarget(os?: TargetOS, arch?: CPUArch): string {
     case 'windows-aar64':
       notReached(`Unsupported target: ${target}`);
   }
-}
-
-const kFileWorkerCode =
-  `import { jsonLogWorkerMain } from "@goatdb/goatdb/server";
-jsonLogWorkerMain();
-`;
-
-export async function writeWorkerSkaffold(options: AppConfig): Promise<void> {
-  const buildDir = path.resolve(options.buildDir);
-  await Deno.mkdir(buildDir, { recursive: true });
-  const workerTsPath = path.join(buildDir, 'file-worker.ts');
-  await Deno.writeTextFile(workerTsPath, kFileWorkerCode);
 }

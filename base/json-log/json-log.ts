@@ -11,6 +11,8 @@
  * operations and the Origin Private File System (OPFS) API, allowing the same
  * code to work seamlessly in both environments.
  */
+import { encodeBase64 } from '@std/encoding/base64';
+import { kStaticAssetsSystem } from '../../system-assets/system-assets.ts';
 import { assert } from '../error.ts';
 import type { ReadonlyJSONObject } from '../interfaces.ts';
 import type {
@@ -32,35 +34,40 @@ import type {
 let gWorker: Worker | undefined;
 
 /**
- * Starts the JSON log worker if it hasn't been started yet.
+ * Starts the JSON log worker if it hasn't been started yet. The worker is used
+ * to handle file operations in a background thread, improving performance when
+ * prefetching scan operations.
  *
- * In Deno environments, a workerPath must be provided to locate the worker
- * script.
- * In browser environments, the worker script is loaded from
- * /system-assets/json-log-worker.js.
+ * The worker code is loaded from the system assets bundle. When making changes
+ * to the worker code, run `deno run -A system-assets/build-system-assets.ts` to
+ * rebuild the bundle.
  *
- * The worker handles all JSON log file operations in a background thread to
- * improve performance.
- *
- * @param workerPath Optional URL or string path to the worker script (required
- *                   in Deno)
- * @returns The Worker instance
+ * @returns The Worker instance, either newly created or existing
  */
-export function startJSONLogWorkerIfNeeded(workerPath?: URL | string): Worker {
+export function startJSONLogWorkerIfNeeded(): Worker {
   if (gWorker === undefined) {
+    const workerJs = new TextDecoder().decode(
+      kStaticAssetsSystem['/system-assets/json-log-worker.js'].data,
+    );
     if (self.Deno !== undefined) {
-      assert(workerPath !== undefined);
+      const dataUrl = `data:text/javascript;base64,${encodeBase64(workerJs)}`;
+      gWorker = new Worker(import.meta.resolve(dataUrl), {
+        type: 'module',
+      });
+    } else {
       gWorker = new Worker(
-        // new URL('build/json-log-worker.ts', import.meta.url),
-        workerPath,
+        URL.createObjectURL(
+          new Blob(
+            [workerJs],
+            {
+              type: 'application/javascript',
+            },
+          ),
+        ),
         {
           type: 'module',
         },
       );
-    } else {
-      gWorker = new Worker('/system-assets/json-log-worker.js', {
-        type: 'module',
-      });
     }
     gWorker.onmessage = handleResponse;
     gWorker.onerror = (event) => {

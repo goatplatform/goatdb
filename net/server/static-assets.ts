@@ -2,28 +2,15 @@ import { exists, walk } from '@std/fs';
 import { extname } from '@std/path';
 import type { Endpoint, ServerServices } from './server.ts';
 import { getRequestPath } from './utils.ts';
-import type { JSONObject, ReadonlyJSONObject } from '../../base/interfaces.ts';
-import { decodeBase64, encodeBase64 } from '@std/encoding';
-import kEncodedSystemAssets from '../../system-assets/assets.json' with {
-  type: 'json',
-};
-
-const kSystemAssets = staticAssetsFromJS(kEncodedSystemAssets);
-
-const STATIC_ASSETS_CACHE_DURATION_SEC = 86400;
+import {
+  type Asset,
+  type ContentType,
+  kStaticAssetsSystem,
+} from '../../system-assets/system-assets.ts';
 
 export const APP_ENTRY_POINT = 'web-app';
 
-export type ContentType =
-  | 'image/svg+xml'
-  | 'image/png'
-  | 'image/jpeg'
-  | 'image/jpeg'
-  | 'application/json'
-  | 'text/javascript'
-  | 'text/html'
-  | 'text/css'
-  | 'application/wasm';
+const STATIC_ASSETS_CACHE_DURATION_SEC = 86400;
 
 const ContentTypeMapping: Record<string, ContentType> = {
   svg: 'image/svg+xml',
@@ -37,13 +24,6 @@ const ContentTypeMapping: Record<string, ContentType> = {
   css: 'text/css',
   wasm: 'application/wasm',
 };
-
-export interface Asset {
-  data: Uint8Array;
-  contentType: ContentType;
-}
-
-export type StaticAssets = Record<string, Asset>;
 
 export class StaticAssetsEndpoint implements Endpoint {
   filter(
@@ -63,7 +43,8 @@ export class StaticAssetsEndpoint implements Endpoint {
       return Promise.resolve(new Response(null, { status: 404 }));
     }
     const path = getRequestPath(req);
-    const asset = kSystemAssets[path as keyof typeof kSystemAssets] ||
+    const asset =
+      kStaticAssetsSystem[path as keyof typeof kStaticAssetsSystem] ||
       services.staticAssets[path] || services.staticAssets['/index.html'];
 
     if (!asset) {
@@ -122,28 +103,4 @@ export async function compileAssetsDirectory(
     };
   }
   return result;
-}
-
-export function staticAssetsToJS(assets: StaticAssets): ReadonlyJSONObject {
-  const result: JSONObject = {};
-  for (const [path, asset] of Object.entries(assets)) {
-    result[path] = {
-      data: encodeBase64(asset.data),
-      contentType: asset.contentType,
-    };
-  }
-  return result;
-}
-
-export function staticAssetsFromJS(
-  encodedAssets: ReadonlyJSONObject,
-): StaticAssets {
-  const result: StaticAssets = {};
-  for (const [path, asset] of Object.entries(encodedAssets)) {
-    result[path] = {
-      data: decodeBase64((asset as ReadonlyJSONObject).data as string),
-      contentType: (asset as ReadonlyJSONObject).contentType as ContentType,
-    };
-  }
-  return result as StaticAssets;
 }
