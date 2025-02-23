@@ -8,17 +8,21 @@
 
 ---
 
-# The Edge-Native Database
+# GoatDB: Lightweight NoDB for Deno & React
 
-GoatDB empowers you to build and deploy complex, scalable, and secure
-applications in under 20 minutes—without requiring backend expertise. It's the
-fastest and easiest way to create modern apps, tailored for today's developer
-needs.
+GoatDB is a real-time, version-controlled database for
+**[Deno](https://deno.com/)**, **[React](https://react.dev/)**, and low-friction
+deployments. It’s ideal for **prototyping**, **self-hosting**, **single-tenant**
+apps, as well as **ultra light multi-tenant** setups without heavy backends or
+complex DBs.
 
-GoatDB is a real-time, distributed Version Control Database (VCDB). By running
-tasks like reading and writing on the client side, it ensures fast performance
-and offline functionality. With causal consistency and an edge-native design,
-GoatDB simplifies development and supports scalable, modern workloads.
+- **No Dedicated Infra**: Run the entire DB client-side, with incremental
+  queries that remove the need for server-side indexing.
+
+- **Resilience & Offline-First**: If the server goes down, clients keep working
+  and can restore server state on reboot.
+
+- **Edge-Native**: Speed, simplicity, and easy scalability are built in.
 
 👉 If you like what we're building, please star ⭐️ our project. We really
 appreciate it! 🙏
@@ -29,43 +33,58 @@ appreciate it! 🙏
 
 ## Installation
 
-1. **Navigate to your project directory:**
-
-   ```bash
-   cd /path/to/project
-   ```
-
-2. **Add GoatDB to your project:**
+1. **Add GoatDB to your project:**
 
    ```bash
    deno add jsr:@goatdb/goatdb
    ```
 
-3. **Initialize GoatDB:**
+2. **Initialize the React Skaffold:**
 
    ```bash
    deno run -A jsr:@goatdb/goatdb/init
    ```
+   > **Note**: This step is only needed for Single Page Applications (SPAs). The
+   > initialization command installs React dependencies and creates a project
+   > skaffold that includes both client-side and server-side code structure. If
+   > you're not building a SPA or already have your React setup, you can skip
+   > this step.
 
-These steps install GoatDB and set up the underlying a project skaffold for your
-application.
+GoatDB makes it easy to set up a cluster of servers by specifying replica
+locations in the `peers` field during initialization. Each server will
+automatically synchronize with its replicas at the provided URLs, using the same
+efficient sync protocol that clients use to stay in sync with servers. This
+means you can easily scale out your deployment by adding more replicas without
+changing any code or protocols - the servers will seamlessly coordinate using
+the built-in sync mechanism.
 
-## Quick Start
+## Basic Usage
 
-### Using React Hooks (Recommended)
+```tsx
+import { GoatDB } from '@goatdb/goatdb';
+
+const db = new GoatDB({ path: './server-data' peers: ['http://10.0.0.1'] });
+const item = db.create('/todos', { text: 'Hello, GoatDB!', done: false });
+
+// Update in memory; auto-commits in background
+item.set('done', true);
+
+console.log(item.get('text'), item.get('done'));
+// Output: "Hello, GoatDB!" true
+```
+
+## Using React Hooks
+
+GoatDB's React hooks provide a complete state management solution with mutable
+state that you can edit synchronously. When you make changes (like
+`task.set('done', true)`), they're applied immediately in memory while GoatDB
+handles computing diffs, committing to local storage, syncing with the server,
+and resolving conflicts automatically in the background. This gives you simple
+local state management with automatic cross-client synchronization and server
+persistence. Here's how the hooks work in practice:
 
 ```tsx
 import { useDB, useItem, useQuery } from '@goatdb/goatdb/react';
-
-// Define your schema
-const kSchemaTask = {
-  ns: 'task',
-  version: 1,
-  fields: {
-    text: { type: 'string', required: true },
-    done: { type: 'boolean', default: () => false },
-  },
-} as const;
 
 // Use hooks in your components
 function TaskList() {
@@ -107,123 +126,76 @@ function TaskItem({ path }) {
 }
 ```
 
-### Using Lower Level DB API
+## Running the Interactive Server
 
-```typescript
-import { GoatDB } from '@goatdb/goatdb';
-
-// Initialize DB
-const db = new GoatDB({
-  path: '/data/db',
-  peers: 'https://api.example.com',
-});
-
-// Create a new task
-const task = db.create('/data/user123', kSchemaTask, {
-  text: 'Buy groceries',
-  done: false,
-});
-
-// Update task
-task.set('done', true);
-
-// Query tasks
-const query = db.query({
-  schema: kSchemaTask,
-  source: '/data/user123',
-  predicate: ({ item }) => !item.get('done'),
-});
-
-// Subscribe to query updates
-query.on('ResultsChanged', () => {
-  console.log('Active tasks:', query.results());
-});
+```bash
+deno task debug
 ```
 
-## Runtime Support
+Starts an interactive debug server that listens on http://localhost:8080.
 
-GoatDB currently runs on Deno and we're actively working on supporting
-additional JavaScript runtimes including:
+## Compiling a Server Binary
 
-- Node.js
-- Bun
-- Cloudflare Workers
-- Other edge runtimes
+```bash
+deno task build
+```
 
-Stay tuned for updates as we expand runtime compatibility!
+Builds a self-contained executable that bundles the server, database and client
+code together with no external dependencies or containers needed, making it
+cloud agnostic and easy to self-host on any server you wish.
 
-## UI Framework Support
+That’s it! GoatDB keeps your app running even if the server fails, with clients
+seamlessly backing up and restoring data. No complex indexing required, thanks
+to incremental queries.
 
-GoatDB currently provides first-class support for React through our React hooks
-API. We're actively working on supporting additional UI frameworks to make
-GoatDB accessible to more developers.
+## Benchmarks
 
-## GoatDB Use Cases
+Here are some benchmark results from running on a 2018 MacBook Pro:
 
-GoatDB is designed to address a variety of scenarios, making it a versatile
-solution for modern applications. Below are the primary use cases:
+- Writing: ~0.25ms / item
+- Reading: < 0.001ms / item
+- Querying: ~100ms to filter ~3k items from a set of 100k
+- Opening a Repository: < 1.5 sec / 100k commits
 
-### 1. **Data Synchronization** 🔄
+Both client and server work against a synchronous in-memory snapshot that gets
+synchronized in the background several times per second. This architecture
+combines the performance benefits of in-memory databases with the reliability of
+persistence and replication, allowing these benchmarks to remain consistent
+across client and server.
 
-Synchronize data across multiple devices in real-time, ensuring consistency and
-seamless user experience.
+## Security
 
-### 2. **Multi-Agent Communication** 🤖
+GoatDB employs a robust security model where each node maintains its own
+public-private key pair. The private key never leaves the local machine,
+ensuring secure commit signing, while the public key enables other nodes to
+verify changes. Every commit is digitally signed by its originating node,
+creating an immutable chain of custody. When commits are received, nodes verify
+both the authenticity and integrity using the public key, automatically
+rejecting any unauthorized or tampered changes.
 
-Enable reliable communication and state synchronization between autonomous
-agents in multi-agent systems, with built-in conflict resolution and eventual
-consistency guarantees.
+The system also includes customizable application-level authorization rules that
+enforce business policies, such as restricting users to only edit their own
+data. This dual-layer approach combines cryptographic verification with flexible
+access controls to create a comprehensive security model that protects data
+integrity at both the protocol and application levels. Any mutations that
+violate either the cryptographic signatures or authorization policies are
+rejected, maintaining consistency and security across the network.
 
-### 3. **Hallucination-Safe Enclaves** 🔒
+## Conflict Resolution
 
-Create secure data sandboxes to validate LLM outputs and prevent hallucinations,
-allowing safe experimentation with AI models without compromising the main
-dataset.
+GoatDB resolves conflicts by performing a three-way merge whenever it finds more
+than one differing value on the leaves of its commit graph. Internally, it
+transforms the base version of the data into a temporary CRDT, applies the
+changes from each branch, and then captures the final merged output before
+discarding the CRDT. This approach provides the advantages of CRDTs—simple,
+automatic resolution of concurrent edits—without forcing every node to maintain
+the entire editing history.
 
-### 4. **Vector Search** 🔍 (Coming Soon)
-
-Support for vector embeddings and similarity search is in development
-([tracking issue](https://github.com/goatplatform/goatdb/issues/15)), enabling
-semantic search and AI-powered features.
-
-### 5. **ETL Pipeline** 🔄
-
-Serve as a lightweight, self-contained ETL (Extract, Transform, Load) pipeline,
-leveraging GoatDB's schema validation and distributed processing capabilities to
-efficiently transform and migrate data between systems.
-
-### 6. **Database Migration** 🔄
-
-Facilitate smooth transitions between different database systems by using GoatDB
-as an intermediary layer, allowing gradual migration of data and functionality
-while maintaining application stability.
-
-### 7. **Offline Operation** 🛠️
-
-Enable continuous functionality even during server downtime, ensuring your
-application remains reliable and responsive.
-
-### 8. **Privacy-First Backup** 🔐
-
-Move data end-to-end between clients, ensuring that sensitive information is
-never exposed to the central server.
-
-### 9. **Collaborative Editing** 👥
-
-Allow multiple users to collaboratively edit and share the same data, perfect
-for teamwork and shared workflows.
-
-### 10. **Rapid Prototyping** ⚡
-
-Support fast product iteration cycles with flexible compatibility for frequent
-schema or structural changes.
-
-### 11. **Data Integrity Auditing** 📈
-
-Protect against fraudulent data manipulation and maintain trust by preventing
-unauthorized modifications.
-
-### 12. **Read-Heavy Optimization** 📊
-
-Optimize for cost and performance in read-intensive workloads, making your
-application more efficient.
+To handle indexing conflicts efficiently, GoatDB takes inspiration from Logoot
+by assigning continuous identifiers to each element in the data, ensuring
+insertions and deletions won’t interfere with each other. When multiple edits
+occur at the same location, GoatDB merges them using a globally agreed-upon
+order of commits, resolving differences by either choosing one change, combining
+both, or merging them (e.g., “cat” + “hat” → “chat”). This ensures predictable
+conflict handling at scale, making GoatDB well-suited for hackathon projects and
+quick prototypes where ease of collaboration and simplicity are key.
