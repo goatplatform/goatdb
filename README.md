@@ -27,7 +27,7 @@ complex DBs.
 👉 If you like what we're building, please star ⭐️ our project. We really
 appreciate it! 🙏
 
-- [Getting Started](https://goatdb.dev/getting-started)
+- [Tutorial](https://goatdb.dev/tutorial)
 - [Documentation](https://goatdb.dev)
 - [FAQ](https://goatdb.dev/faq)
 
