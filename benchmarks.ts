@@ -140,7 +140,9 @@ export async function testsMain(): Promise<void> {
   try {
     await Deno.readFile(REPO_FILE_PATH);
     console.log(`File read in ${(performance.now() - fileStart) / 1000} sec`);
-  } catch (_: unknown) {}
+  } catch (_: unknown) {
+    // Pass
+  }
   // await BloomFilter.initNativeFunctions();
   const db = new GoatDB({
     path: DB_PATH,
