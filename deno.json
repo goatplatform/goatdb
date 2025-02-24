@@ -10,7 +10,7 @@
     "singleQuote": true
   },
   "name": "@goatdb/goatdb",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "license": "AGPL/ELV2",
   "exports": {
     ".": "./mod.ts",
@@ -19,7 +19,7 @@
     "./init": "./cli/init.ts"
   },
   "tasks": {
-    "build": "deno run -A packaging/build-sys-assets.ts"
+    "build": "deno run -A system-assets/build-sys-assets.ts"
   },
   "imports": {
     "@luca/esbuild-deno-loader": "jsr:@luca/esbuild-deno-loader@^0.11.1",
