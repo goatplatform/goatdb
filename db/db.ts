@@ -33,7 +33,6 @@ import {
   JSONLogFileScan,
   JSONLogFileStartCursor,
   remove,
-  startJSONLogWorkerIfNeeded,
 } from '../base/json-log/json-log.ts';
 import type {
   ReadonlyJSONObject,
@@ -53,6 +52,7 @@ import { FileImplOPFS } from '../base/json-log/file-impl-opfs.ts';
 import { assert } from '../base/error.ts';
 import { SchemaManager } from '../cfds/base/schema-manager.ts';
 import { Emitter } from '../base/emitter.ts';
+import { getGoatConfig } from '../server/config.ts';
 // import { remove } from '../base/json-log/json-log.ts';
 
 export interface DBConfig {
@@ -115,10 +115,9 @@ export class GoatDB extends Emitter<EventUserChanged> {
 
   constructor(config: DBConfig) {
     super();
-    startJSONLogWorkerIfNeeded();
     this._basePath = config.path;
     this.schemaManager = config.schemaManager || SchemaManager.default;
-    this.orgId = config?.orgId || 'localhost';
+    this.orgId = config?.orgId || getGoatConfig().orgId;
     this._repositories = new Map();
     this._openPromises = new Map();
     this._files = new Map();
@@ -662,6 +661,13 @@ export class GoatDB extends Emitter<EventUserChanged> {
       await repo.mergeIfNeeded(c.key);
       const item = this._items.get(itemPathJoin(repo.path, c.key));
       item?.rebase();
+      // Bump the adaptive timer back to max speed
+      const clients = this._repoClients?.get(repoId);
+      if (clients) {
+        for (const client of clients) {
+          client.touch();
+        }
+      }
     });
     if (this._syncSchedulers) {
       const clients: RepoClient[] = [];

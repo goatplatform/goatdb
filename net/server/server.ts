@@ -8,7 +8,7 @@ import {
   setGlobalLoggerStreams,
 } from '../../logging/log.ts';
 import type { HTTPMethod } from '../../logging/metrics.ts';
-import { type StaticAssets, StaticAssetsEndpoint } from './static-assets.ts';
+import { StaticAssetsEndpoint } from './static-assets.ts';
 import { AuthEndpoint } from './auth.ts';
 import { HealthCheckEndpoint } from './health.ts';
 import { MetricsMiddleware } from './metrics.ts';
@@ -16,13 +16,12 @@ import { BaseService } from './service.ts';
 import { CORSEndpoint, CORSMiddleware } from './cors.ts';
 import { ServerError } from '../../cfds/base/errors.ts';
 import { getGoatConfig } from '../../server/config.ts';
-import { organizationIdFromURL } from '../rest-api.ts';
 import { GoatDB } from '../../db/db.ts';
 import { SyncEndpoint } from './sync.ts';
 import type { DBConfig } from '../../db/db.ts';
 import type { BuildInfo } from '../../server/build-info.ts';
-import { startJSONLogWorkerIfNeeded } from '../../base/json-log/json-log.ts';
 import { type EmailConfig, EmailService } from './email.ts';
+import type { StaticAssets } from '../../system-assets/system-assets.ts';
 
 /**
  * Information about a user attempting to log in for the first time.
@@ -37,14 +36,7 @@ export type AutoCreateUserInfo = {
   email?: string;
 };
 
-/**
- * A server represents a logical DB with some additional configuration options.
- */
-export interface ServerOptions extends DBConfig {
-  /**
-   * Info about the build process.
-   */
-  buildInfo: BuildInfo;
+export type DomainConfig = {
   /**
    * Given an organization id, this function is responsible for resolving it
    * to the correct URL. It enables a single server instance to serve multiple
@@ -56,7 +48,37 @@ export interface ServerOptions extends DBConfig {
    * @param orgId The organization id to resolve.
    * @returns A fully qualified URL for this organization.
    */
-  resolveDomain: (orgId: string) => string;
+  resolveOrg: (orgId: string) => string;
+  /**
+   * Given a domain name, this function is responsible for extracting the
+   * organization id. This is the reverse operation of resolveDomain - it takes
+   * a fully qualified domain and returns the organization id that would have
+   * generated that domain.
+   *
+   * @param domain The domain name to parse
+   * @returns The organization id embedded in this domain
+   */
+  resolveDomain: (domain: string) => string;
+};
+
+/**
+ * A server represents a logical DB with some additional configuration options.
+ */
+export interface ServerOptions extends DBConfig {
+  /**
+   * Info about the build process.
+   */
+  buildInfo: BuildInfo;
+  /**
+   * Configuration for mapping custom domains to organizations and vice versa.
+   * This enables multi-tenant deployments where each organization can have its
+   * own domain or subdomain. For example:
+   * - org1.example.com -> maps to organization "org1"
+   * - org2.example.com -> maps to organization "org2"
+   * The mapping is bidirectional - domains can be resolved to org IDs and
+   * org IDs can be resolved to their domains.
+   */
+  domain: DomainConfig;
   /**
    * The port the server will listen to. Defaults to 8080.
    */
@@ -219,16 +241,6 @@ export class Server {
   private _httpServer?: Deno.HttpServer;
 
   constructor(options: ServerOptions) {
-    // if (options.buildInfo) {
-    // }
-    startJSONLogWorkerIfNeeded(
-      // '/' + options.buildInfo.logWorkerPath,
-      new URL(
-        // '../../base/json-log/json-log-worker-entry.ts',
-        options.buildInfo.jsonLogWorkerPath,
-        import.meta.url,
-      ),
-    );
     this._endpoints = [];
     this._middlewares = [];
     getGoatConfig().serverData = this;
@@ -293,6 +305,17 @@ export class Server {
     this._middlewares.push(mid as Middleware);
   }
 
+  orgIds(): Iterable<string> {
+    return this._servicesByOrg.keys();
+  }
+
+  updateStaticAssets(assets: StaticAssets): void {
+    this._baseOptions.staticAssets = assets;
+    for (const services of this._servicesByOrg.values()) {
+      services.staticAssets = assets;
+    }
+  }
+
   async processRequest(
     req: Request,
     info: Deno.ServeHandlerInfo,
@@ -300,7 +323,7 @@ export class Server {
     if (req.url === 'http://AWSALB/healthy') {
       return new Response(null, { status: 200 });
     }
-    const orgId = req.headers.get('x-org-id') || organizationIdFromURL(req.url);
+    const orgId = this._baseOptions.domain.resolveDomain(req.url);
     if (!orgId) {
       log({
         severity: 'METRIC',
@@ -386,26 +409,6 @@ export class Server {
     return resp;
   }
 
-  // async runBenchmark(): Promise<BenchmarkResults> {
-  //   for (const services of this._servicesByOrg.values()) {
-  //     for (const v of Object.values(services)) {
-  //       if (v instanceof BaseService) {
-  //         v.start();
-  //       }
-  //     }
-  //   }
-  //   const services = await this.servicesForOrganization('benchmark');
-  //   const result = await runBenchmarks(services);
-  //   for (const services of this._servicesByOrg.values()) {
-  //     for (const v of Object.values(services)) {
-  //       if (v instanceof BaseService) {
-  //         v.stop();
-  //       }
-  //     }
-  //   }
-  //   return result;
-  // }
-
   async start(): Promise<void> {
     if (this._abortController) {
       return Promise.resolve();
@@ -443,22 +446,4 @@ export class Server {
     });
     return result;
   }
-}
-
-function parsePoolConfig(
-  config: string | undefined,
-): [idx: number, count: number] {
-  if (!config) {
-    return [0, 1];
-  }
-  const comps = config.split(':');
-  if (comps.length !== 2) {
-    return [0, 1];
-  }
-  const idx = parseInt(comps[0]);
-  const count = parseInt(comps[1]);
-  if (idx >= count || idx < 0 || count < 0) {
-    return [0, 1];
-  }
-  return [idx, count];
 }

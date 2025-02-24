@@ -60,11 +60,7 @@ export function getBaseURL(): string {
 
 export function getOrganizationId(): string {
   const config = getGoatConfig();
-  if (!self.Deno && config.orgId) {
-    return config.orgId;
-  }
-  const serverURL = config.serverURL;
-  return organizationIdFromURL(serverURL || location.toString()) || 'localhost';
+  return config.orgId || 'localhost';
 }
 
 function urlForEndpoint(endpoint: string): string {
@@ -81,8 +77,6 @@ export function sendJSONToEndpoint(
 ): Promise<Response> {
   return sendJSONToURL(urlForEndpoint(endpoint), session, json);
 }
-
-let gAccessDeniedCount = 0;
 
 export async function sendJSONToURL(
   url: string,
@@ -120,86 +114,5 @@ export async function sendJSONToURL(
   if (aborted) {
     throw timeout();
   }
-  const resp = await fetchPromise;
-  if (resp.status === 403) {
-    // if (self.Deno === undefined && ++gAccessDeniedCount === 10) {
-    //   await IDBRepositoryBackup.logout();
-    // } else {
-    //   await sleep(kSecondMs);
-    // }
-  } else {
-    gAccessDeniedCount = 0;
-  }
-  return resp;
-}
-
-/**
- * WARNING: This function is used by the server to direct requests to the
- * appropriate organization, and thus must be secure. This seemingly trivial
- * function deals with data that arrives from anywhere in the internet. We must
- * treat it as potentially hostile and not assume we're running in a safe
- * browser environment.
- */
-export function organizationIdFromURL(url: string | URL): string | undefined {
-  if (typeof url === 'string') {
-    url = new URL(url);
-  }
-  const hostname = url.hostname.toLowerCase();
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'localhost';
-  }
-  const comps = url.hostname.split('.');
-  if (comps.length !== 3) {
-    return undefined;
-  }
-  const maybeId = comps[0];
-  if (isValidOrgId(maybeId)) {
-    return maybeId;
-  }
-  return undefined;
-}
-
-const RESERVED_ORG_IDS = [
-  'me',
-  'team',
-  'us',
-  'user',
-  'profile',
-  'ovvio',
-  'debug',
-  'localhost',
-];
-
-function isValidOrgId(id: string): boolean {
-  const len = id.length;
-  if (len < 3 || len > 32) {
-    return false;
-  }
-  if (RESERVED_ORG_IDS.includes(id)) {
-    return false;
-  }
-  for (let i = 0; i < len; ++i) {
-    const code = id.charCodeAt(i);
-    // Hyphens are allowed
-    if (code === 45) {
-      continue;
-    }
-    // [0 -
-    if (code < 48) {
-      return false;
-    }
-    // 9], [A -
-    if (code > 57 && code < 65) {
-      return false;
-    }
-    // Z], [a -
-    if (code > 90 && code < 97) {
-      return false;
-    }
-    // z]
-    if (code > 122) {
-      return false;
-    }
-  }
-  return true;
+  return await fetchPromise;
 }

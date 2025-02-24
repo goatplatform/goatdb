@@ -2,7 +2,6 @@ import * as path from '@std/path';
 import type { AppConfig } from '../mod.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { buildAssets } from '../server/generate-static-assets.ts';
-import { getGoatConfig } from '../server/config.ts';
 import { generateBuildInfo } from '../server/build-info.ts';
 import { notReached } from '../base/error.ts';
 import { staticAssetsToJS } from '../system-assets/system-assets.ts';
@@ -57,7 +56,6 @@ export async function compile(options: CompileOptions): Promise<void> {
     await buildAssets(
       undefined,
       entryPoints,
-      getGoatConfig().version,
       options,
     ),
   );

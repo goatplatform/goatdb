@@ -183,9 +183,6 @@ export async function verifyData<T extends JSONValue>(
   if (!sig || !sig.sessionId || sig.sessionId !== expectedSigner.id) {
     return false;
   }
-  // if (expectedSigner.expiration.getTime() - Date.now() <= 0) {
-  //   return false;
-  // }
   // Reject everything signed after the expiration of the signer.
   if (sig.timestamp > expectedSigner.expiration.getTime()) {
     return false;

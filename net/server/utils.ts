@@ -14,5 +14,5 @@ export function getBaseURL(services: ServerServices): string {
   if (services.buildInfo.debugBuild) {
     return 'http://localhost:8080';
   }
-  return services.resolveDomain(services.db.orgId);
+  return services.domain.resolveOrg(services.db.orgId);
 }

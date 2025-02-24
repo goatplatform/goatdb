@@ -11,40 +11,15 @@ import {
   APP_ENTRY_POINT,
   compileAssetsDirectory,
 } from '../net/server/static-assets.ts';
-import { getGoatConfig } from './config.ts';
 import type { AppConfig } from './app-config.ts';
 import type { StaticAssets } from '../system-assets/system-assets.ts';
-
-function generateConfigSnippet(
-  version: VersionNumber,
-  serverURL?: string,
-  orgId?: string,
-  debug?: boolean,
-): string {
-  const config = {
-    ...getGoatConfig(),
-    debug,
-    version,
-    orgId,
-  };
-  delete config.clientData;
-  delete config.serverData;
-  if (serverURL) {
-    config.serverURL = serverURL;
-  }
-  return `;\n\self.GoatConfig = ${JSON.stringify(config)};`;
-}
 
 export type EntryPoint = { in: string; out: string };
 
 export async function buildAssets(
   ctx: ReBuildContext | typeof esbuild | undefined,
   entryPoints: EntryPoint[],
-  version: VersionNumber,
   appConfig: AppConfig,
-  serverURL?: string,
-  orgId?: string,
-  debug?: boolean,
 ): Promise<StaticAssets> {
   if (!ctx) {
     ctx = esbuild;
@@ -88,9 +63,7 @@ export async function buildAssets(
       );
     }
     result['/app.js'] = {
-      data: textEncoder.encode(
-        generateConfigSnippet(version, serverURL, orgId, debug) + source,
-      ),
+      data: textEncoder.encode(source),
       contentType: 'text/javascript',
     };
     result['/app.js.map'] = {
@@ -125,9 +98,7 @@ export async function buildAssets(
     }
     const { source, map } = buildResults[ep];
     result[`/${ep}.js`] = {
-      data: textEncoder.encode(
-        generateConfigSnippet(version, serverURL, orgId, debug) + source,
-      ),
+      data: textEncoder.encode(source),
       contentType: 'text/javascript',
     };
     result[`/${ep}.js.map`] = {

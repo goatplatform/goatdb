@@ -2,13 +2,12 @@ import * as path from '@std/path';
 import { SimpleTimer } from '../base/timer.ts';
 import { tuple4Get, tuple4Set } from '../base/tuple.ts';
 import type { VersionNumber } from '../base/version-number.ts';
-import { createBuildContext } from '../build.ts';
+import { createBuildContext, type ReBuildContext } from '../build.ts';
 import { getGoatConfig } from './config.ts';
 import { Server, type ServerOptions } from '../net/server/server.ts';
-import { buildAssets } from './generate-static-assets.ts';
+import { buildAssets, type EntryPoint } from './generate-static-assets.ts';
 import { notReached } from '../base/error.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
-import { writeWorkerSkaffold } from '../cli/compile.ts';
 import { generateBuildInfo } from './build-info.ts';
 import type { AppConfig } from '../mod.ts';
 
@@ -38,7 +37,7 @@ function shouldRebuildAfterPathChange(p: string): boolean {
   return true;
 }
 
-async function openBrowser(): Promise<void> {
+async function openBrowser(url: string): Promise<void> {
   if (Deno.build.os !== 'darwin') {
     // TODO: Windows & Linux support
     return Promise.resolve();
@@ -49,7 +48,7 @@ async function openBrowser(): Promise<void> {
       'Google Chrome',
       '--args',
       '--incognito',
-      'http://localhost:8080',
+      url,
     ],
   });
   const { success, code } = await cmd.output();
@@ -80,10 +79,17 @@ export type LiveReloadOptions = {
    * @returns `true` for a rebuild to happen, `false` otherwise.
    */
   watchFilter?: (path: string) => boolean;
+  /**
+   * The organization id to use for the debug server. This allows you to locally
+   * simulate and debug a specific organization's environment by running the
+   * server as if it were handling requests for that organization.
+   */
+  orgId?: string;
 };
 
 export type DebugServerOptions =
-  & Omit<ServerOptions, 'staticAssets' | 'buildInfo' | 'resolveDomain'>
+  & Omit<ServerOptions, 'staticAssets' | 'buildInfo' | 'domain'>
+  & Partial<Pick<ServerOptions, 'domain'>>
   & LiveReloadOptions
   & AppConfig;
 
@@ -96,58 +102,68 @@ export type DebugServerOptions =
 export async function startDebugServer(
   options: DebugServerOptions,
 ): Promise<never> {
+  Deno.addSignalListener('SIGTERM', () => {
+    ctx.close();
+  });
   const buildInfo = await generateBuildInfo(
     options.denoJson || path.join(Deno.cwd(), 'deno.json'),
   );
   buildInfo.debugBuild = true;
+  if (typeof options.domain === 'undefined') {
+    options.domain = {
+      resolveOrg: () => 'http://localhost:8080',
+      resolveDomain: () => 'localhost',
+    };
+  }
   const server = new Server({
-    ...options,
+    ...(options as unknown as ServerOptions),
     buildInfo,
-    resolveDomain: () => 'http://localhost:8080',
   });
-  console.log('Building client code...');
-  await writeWorkerSkaffold(options);
+  console.log('Bundling client code...');
+  let bundlingStart = performance.now();
   const entryPoints = [
     {
       in: path.resolve(options.jsPath),
       out: APP_ENTRY_POINT,
     },
   ];
-
+  await server.servicesForOrganization(options.orgId || 'localhost');
   const ctx = await createBuildContext(entryPoints);
-  Deno.addSignalListener('SIGTERM', () => {
-    ctx.close();
-  });
+  server.updateStaticAssets(
+    await buildAssets(
+      ctx,
+      entryPoints,
+      options,
+    ),
+  );
+  await server.start();
+  openBrowser(options.domain.resolveOrg(options.orgId || 'localhost'));
+  console.log(
+    `Bundling took ${
+      ((performance.now() - bundlingStart) / 1000).toFixed(2)
+    }sec`,
+  );
   if (options.watchDir) {
     const watcher = Deno.watchFs(path.resolve(options.watchDir));
-    const orgId = 'localhost';
-    (await server.servicesForOrganization(orgId)).staticAssets =
-      await buildAssets(
-        ctx,
-        entryPoints,
-        getGoatConfig().version,
-        options,
-        undefined,
-        orgId,
-      );
-    await server.start();
-    openBrowser();
     const rebuildTimer = new SimpleTimer(300, false, async () => {
-      console.log('Rebuilding client code...');
+      console.log('Bundling client code...');
+      bundlingStart = performance.now();
       try {
         const config = getGoatConfig();
         const version = incrementBuildNumber(config.version);
-        (await server.servicesForOrganization(orgId)).staticAssets =
+        server.updateStaticAssets(
           await buildAssets(
             ctx,
             entryPoints,
-            version,
             options,
-            undefined,
-            orgId,
-          );
+          ),
+        );
         config.version = version;
-        console.log('Done');
+        console.log(
+          `Bundling took ${
+            ((performance.now() - bundlingStart) / 1000).toFixed(2)
+          }sec`,
+        );
       } catch (err: unknown) {
         console.error('Build failed. Will try again on next save.');
         console.error(err);

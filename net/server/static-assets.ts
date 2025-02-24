@@ -7,6 +7,8 @@ import {
   type ContentType,
   kStaticAssetsSystem,
 } from '../../system-assets/system-assets.ts';
+import { getGoatConfig } from '../../server/config.ts';
+import type { VersionNumber } from '../../base/version-number.ts';
 
 export const APP_ENTRY_POINT = 'web-app';
 
@@ -59,6 +61,23 @@ export class StaticAssetsEndpoint implements Endpoint {
         'cache-control'
       ] = `Cache-Control: public, max-age=${STATIC_ASSETS_CACHE_DURATION_SEC}`;
     }
+
+    // Dynamically inject the config into the main app bundle
+    if (path.endsWith('/app.js')) {
+      const js = new TextDecoder().decode(asset.data);
+      const config = generateConfigSnippet(
+        getGoatConfig().version,
+        services.domain.resolveOrg(services.orgId),
+        services.orgId,
+        getGoatConfig().debug,
+      );
+      return Promise.resolve(
+        new Response(js + config, {
+          headers,
+        }),
+      );
+    }
+
     return Promise.resolve(
       new Response(asset.data, {
         headers,
@@ -103,4 +122,24 @@ export async function compileAssetsDirectory(
     };
   }
   return result;
+}
+
+function generateConfigSnippet(
+  version: VersionNumber,
+  serverURL: string,
+  orgId: string,
+  debug: boolean,
+): string {
+  const config = {
+    ...getGoatConfig(),
+    debug,
+    version,
+    orgId,
+  };
+  delete config.clientData;
+  delete config.serverData;
+  if (serverURL) {
+    config.serverURL = serverURL;
+  }
+  return `;\n\self.GoatConfig = ${JSON.stringify(config)};`;
 }
