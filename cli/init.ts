@@ -87,7 +87,6 @@ if (import.meta.main) main();
 const denoJsonScaffold = {
   compilerOptions: {
     lib: ['dom', 'dom.iterable', 'dom.asynciterable', 'deno.ns'],
-    jsx: 'precompile',
   },
   tasks: {
     debug: 'deno run -A server/debug-server.ts',
