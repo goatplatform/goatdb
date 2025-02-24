@@ -8,6 +8,25 @@ and GoatDB adheres to
 
 ## [Unreleased]
 
+## [0.1.3] - 2025-02-17
+
+### Added
+
+- `BaseTimer.reset` to reset the timer and reschedule it
+
+### Changed
+
+- GoatDB is now licensed under Apache 2.0
+- `JSONLogFile.append` now automatically scans the log file rather than throw
+- `JSONLogFile` worker now uses the transpiled JS version both for the server
+  and the browser
+- Improved React SPA skaffold
+- `ServerOptions.domain` enables fine control over domain / organization mapping
+
+### Fixed
+
+- Configuration is now correctly injected into the app bundle
+
 ## [0.1.2] - 2025-02-16
 
 ### Added
@@ -46,7 +65,8 @@ and GoatDB adheres to
 
 - Initial release
 
-[Unreleased]: https://github.com/goatplatform/goatdb/releases/tag/v0.1.2...HEAD
+[Unreleased]: https://github.com/goatplatform/goatdb/releases/tag/v0.1.3...HEAD
+[0.1.3]: https://github.com/goatplatform/goatdb/releases/tag/v0.1.3
 [0.1.2]: https://github.com/goatplatform/goatdb/releases/tag/v0.1.2
 [0.1.1]: https://github.com/goatplatform/goatdb/releases/tag/v0.1.1
 [0.1.0]: https://github.com/goatplatform/goatdb/releases/tag/v0.1.0
