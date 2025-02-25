@@ -16,7 +16,8 @@
     ".": "./mod.ts",
     "./react": "./react/hooks.ts",
     "./server": "./server/mod.ts",
-    "./init": "./cli/init.ts"
+    "./init": "./cli/init.ts",
+    "./link": "./cli/link.ts"
   },
   "tasks": {
     "build": "deno run -A system-assets/build-sys-assets.ts"

@@ -46,6 +46,9 @@ Explore projects built with GoatDB:
   ChatGPT-like interface that runs completely in the browser, no network
   connection needed.
 
+- **[Ovvio](https://ovvio.io)**: A productivity suite that has been powered by
+  GoatDB in production since January 2024.
+
 ## Installation
 
 1. **Add GoatDB to your project:**
@@ -214,3 +217,33 @@ order of commits, resolving differences by either choosing one change, combining
 both, or merging them (e.g., “cat” + “hat” → “chat”). This ensures predictable
 conflict handling at scale, making GoatDB well-suited for hackathon projects and
 quick prototypes where ease of collaboration and simplicity are key.
+
+## Contributing
+
+To contribute to GoatDB, follow these steps:
+
+1. Fork the repository
+2. Create a branch for your changes
+3. Submit a pull request
+
+We strive to review all pull requests within a few business days.
+
+To work on GoatDB's code alongside a project that uses it, run:
+
+```bash
+deno run -A jsr:@goatdb/goatdb/link link ./path/to/goatdb
+```
+
+This will link the local GoatDB repo into your project, allowing you to make
+changes to the codebase and have them reflected in your project without having
+to reinstall GoatDB.
+
+To unlink GoatDB, run:
+
+```bash
+deno run -A jsr:@goatdb/goatdb/link unlink
+```
+
+## License
+
+GoatDB is licensed under the [Apache 2.0 License](LICENSE).
