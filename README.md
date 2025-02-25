@@ -31,6 +31,14 @@ appreciate it! 🙏
 - [Documentation](https://goatdb.dev)
 - [FAQ](https://goatdb.dev/faq)
 
+## Example Projects
+
+Explore projects built with GoatDB:
+- **Todo**: A minimalist, modern, todo list app designed for self hosting.  
+  [GitHub Repository](https://github.com/goatplatform/todo)
+- **EdgeChat**: Demonstrates running inference with SLM in the browser.  
+  [GitHub Repository](https://github.com/goatplatform/edge-chat)
+
 ## Installation
 
 1. **Add GoatDB to your project:**
