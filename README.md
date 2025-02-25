@@ -22,7 +22,11 @@ complex DBs.
 - **Resilience & Offline-First**: If the server goes down, clients keep working
   and can restore server state on reboot.
 
-- **Edge-Native**: Speed, simplicity, and easy scalability are built in.
+- **Edge-Native**: Most processing happens in the client, keeping servers light
+  and fast.
+
+- **Real-Time Collaboration**: Built-in sync automatically keeps client and
+  server state synchronized in real-time.
 
 👉 If you like what we're building, please star ⭐️ our project. We really
 appreciate it! 🙏
@@ -34,10 +38,13 @@ appreciate it! 🙏
 ## Example Projects
 
 Explore projects built with GoatDB:
-- **Todo**: A minimalist, modern, todo list app designed for self hosting.  
-  [GitHub Repository](https://github.com/goatplatform/todo)
-- **EdgeChat**: Demonstrates running inference with SLM in the browser.  
-  [GitHub Repository](https://github.com/goatplatform/edge-chat)
+
+- **[Todo](https://github.com/goatplatform/todo)**: A minimalist, modern, todo
+  list app specifically designed for self hosting.
+
+- **[EdgeChat](https://github.com/goatplatform/edge-chat)**: A demo of a
+  ChatGPT-like interface that runs completely in the browser, no network
+  connection needed.
 
 ## Installation
 
