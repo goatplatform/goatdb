@@ -105,6 +105,7 @@ export async function startDebugServer(
   Deno.addSignalListener('SIGTERM', () => {
     ctx.close();
   });
+  getGoatConfig().debug = true; // Turn on debug mode globally
   const buildInfo = await generateBuildInfo(
     options.denoJson || path.join(Deno.cwd(), 'deno.json'),
   );
