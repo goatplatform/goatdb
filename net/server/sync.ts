@@ -1,25 +1,21 @@
-import * as ArrayUtils from '../../base/array.ts';
 import { mapIterable } from '../../base/common.ts';
 import {
   JSONCyclicalDecoder,
   JSONCyclicalEncoder,
 } from '../../base/core-types/encoding/json.ts';
-import {
+import type {
   JSONArray,
   JSONObject,
   ReadonlyJSONObject,
 } from '../../base/interfaces.ts';
-import { Session } from '../../db/session.ts';
-import { log } from '../../logging/log.ts';
-import { Commit } from '../../repo/commit.ts';
-import { Repository } from '../../repo/repo.ts';
+import type { Session } from '../../db/session.ts';
+import type { Commit } from '../../repo/commit.ts';
 import { getGoatConfig } from '../../server/config.ts';
-import { RepoClient } from '../client.ts';
+import type { RepoClient } from '../client.ts';
 import { SyncMessage } from '../message.ts';
-import { sendJSONToURL } from '../rest-api.ts';
-import { syncConfigGetCycles, kSyncConfigServer } from '../sync-scheduler.ts';
+import { kSyncConfigServer, syncConfigGetCycles } from '../sync-scheduler.ts';
 import { requireSignedUser } from './auth.ts';
-import { Endpoint, ServerServices } from './server.ts';
+import type { Endpoint, ServerServices } from './server.ts';
 import { getRequestPath } from './utils.ts';
 
 export class SyncEndpoint implements Endpoint {
@@ -161,9 +157,4 @@ export class SyncEndpoint implements Endpoint {
     syncResp.filter.reuse();
     return encodedResp;
   }
-}
-
-function repoIdExcludingShardSuffix(id: string): string {
-  const [repoId, _shardId] = id.split('--');
-  return repoId;
 }
