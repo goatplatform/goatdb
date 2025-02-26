@@ -111,7 +111,7 @@ export class SchemaManager {
     }
     for (const { rulePath: p } of this._authRules) {
       assert(
-        p === path,
+        p !== path,
         'Attempting to register multiple rules for the same path',
       );
     }
