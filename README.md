@@ -68,14 +68,6 @@ Explore projects built with GoatDB:
    > you're not building a SPA or already have your React setup, you can skip
    > this step.
 
-GoatDB makes it easy to set up a cluster of servers by specifying replica
-locations in the `peers` field during initialization. Each server will
-automatically synchronize with its replicas at the provided URLs, using the same
-efficient sync protocol that clients use to stay in sync with servers. This
-means you can easily scale out your deployment by adding more replicas without
-changing any code or protocols - the servers will seamlessly coordinate using
-the built-in sync mechanism.
-
 ## Basic Usage
 
 ```tsx
@@ -90,6 +82,14 @@ item.set('done', true);
 console.log(item.get('text'), item.get('done'));
 // Output: "Hello, GoatDB!" true
 ```
+
+GoatDB makes it easy to set up a cluster of servers by specifying replica
+locations in the `peers` field during initialization. Each server will
+automatically synchronize with its replicas at the provided URLs, using the same
+efficient sync protocol that clients use to stay in sync with servers. This
+means you can easily scale out your deployment by adding more replicas without
+changing any code or protocols - the servers will seamlessly coordinate using
+the built-in sync mechanism.
 
 ## Using React Hooks
 
