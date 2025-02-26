@@ -110,4 +110,8 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
       return false;
     }
   },
+
+  getCWD() {
+    return '/';
+  },
 };

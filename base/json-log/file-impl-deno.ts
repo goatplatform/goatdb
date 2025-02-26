@@ -64,4 +64,8 @@ export const FileImplDeno: FileImpl<Deno.FsFile> = {
       return false;
     }
   },
+
+  getCWD() {
+    return Deno.cwd();
+  },
 };

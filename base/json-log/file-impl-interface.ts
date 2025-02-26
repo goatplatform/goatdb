@@ -9,4 +9,5 @@ export interface FileImpl<T> {
   close(handle: T): Promise<void>;
   flush(handle: T): Promise<void>;
   remove(path: string): Promise<boolean>;
+  getCWD(): string;
 }

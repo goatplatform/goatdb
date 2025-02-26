@@ -1,6 +1,10 @@
 import * as path from '@std/path';
-import { getCWD, readTextFile, remove, writeTextFile } from '../base/file.ts';
 import { prettyJSON } from '../base/common.ts';
+import {
+  FileImplGet,
+  readTextFile,
+  writeTextFile,
+} from '../base/json-log/file-impl.ts';
 
 /**
  * Adds the GoatDB link configuration file to .gitignore if not already present.
@@ -13,8 +17,8 @@ import { prettyJSON } from '../base/common.ts';
  * 4. Writes the updated content back to .gitignore
  */
 async function applyGitIgnoreChanges(): Promise<void> {
-  const ignorePath = path.join(getCWD(), '.gitignore');
-  let gitIgnore = await readTextFile(ignorePath);
+  const ignorePath = path.join(FileImplGet().getCWD(), '.gitignore');
+  let gitIgnore = await readTextFile(ignorePath) || '';
   for (const line of gitIgnore.split('\n')) {
     if (line.trim() === 'goat.link.json') {
       return;
@@ -34,12 +38,14 @@ async function applyGitIgnoreChanges(): Promise<void> {
  * 3. Writes the cleaned content back to .gitignore
  */
 async function revertGitIgnoreChanges(): Promise<void> {
-  const ignorePath = path.join(getCWD(), '.gitignore');
-  const lines = (await readTextFile(ignorePath)).split('\n').filter((line) => {
-    line = line.trim();
-    return !line.startsWith('# GoatDB') && line !== 'goat.link.json' &&
-      line !== 'deno.json';
-  });
+  const ignorePath = path.join(FileImplGet().getCWD(), '.gitignore');
+  const lines = (await readTextFile(ignorePath) || '').split('\n').filter(
+    (line) => {
+      line = line.trim();
+      return !line.startsWith('# GoatDB') && line !== 'goat.link.json' &&
+        line !== 'deno.json';
+    },
+  );
   await writeTextFile(ignorePath, lines.join('\n').trimEnd());
 }
 
@@ -76,14 +82,16 @@ type GoatLinkJson = {
 async function editDenoJsonForLocalPath(
   localGoatDBPath: string,
 ): Promise<void> {
-  const denoJsonPath = path.join(getCWD(), 'deno.json');
-  const denoJson = JSON.parse(await readTextFile(denoJsonPath)) as DenoJson;
+  const denoJsonPath = path.join(FileImplGet().getCWD(), 'deno.json');
+  const denoJson = JSON.parse(
+    await readTextFile(denoJsonPath) || '{}',
+  ) as DenoJson;
   // Find the GoatDB imports
   const originalProjectImports = denoJson['imports'];
   const projectImports = { ...originalProjectImports };
   // Load local GoatDB imports
   const goatDBDenoJson = JSON.parse(
-    await readTextFile(path.join(localGoatDBPath, 'deno.json')),
+    await readTextFile(path.join(localGoatDBPath, 'deno.json')) || '{}',
   ) as DenoJson;
   // Find imports that exist in both local project and local GoatDB
   const existingGoatDeps: Record<string, string> = {};
@@ -107,7 +115,7 @@ async function editDenoJsonForLocalPath(
   }
   // Write the backup file
   await writeTextFile(
-    path.join(getCWD(), 'goat.link.json'),
+    path.join(FileImplGet().getCWD(), 'goat.link.json'),
     JSON.stringify(
       {
         imports: originalProjectImports,
@@ -123,15 +131,17 @@ async function editDenoJsonForLocalPath(
 }
 
 async function reverseDenoJsonEdits(): Promise<void> {
-  const goatLinkJsonPath = path.join(getCWD(), 'goat.link.json');
+  const goatLinkJsonPath = path.join(FileImplGet().getCWD(), 'goat.link.json');
   const goatLinkJson = JSON.parse(
-    await readTextFile(goatLinkJsonPath),
+    await readTextFile(goatLinkJsonPath) || '{}',
   ) as GoatLinkJson;
-  const denoJsonPath = path.join(getCWD(), 'deno.json');
-  const denoJson = JSON.parse(await readTextFile(denoJsonPath)) as DenoJson;
+  const denoJsonPath = path.join(FileImplGet().getCWD(), 'deno.json');
+  const denoJson = JSON.parse(
+    await readTextFile(denoJsonPath) || '{}',
+  ) as DenoJson;
   denoJson.imports = goatLinkJson.imports;
   await writeTextFile(denoJsonPath, prettyJSON(denoJson) + '\n');
-  await remove(goatLinkJsonPath);
+  await FileImplGet().remove(goatLinkJsonPath);
 }
 
 async function linkGoatDB(localGoatDBPath: string): Promise<void> {

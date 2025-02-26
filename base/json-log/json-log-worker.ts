@@ -18,7 +18,7 @@ import type {
   WorkerWriteTextFileResp,
 } from './json-log-worker-req.ts';
 import type { FileImpl } from './file-impl-interface.ts';
-import { FileImplGet } from './file-impl.ts';
+import { FileImplGet, readTextFile, writeTextFile } from './file-impl.ts';
 
 const FILE_READ_BUF_SIZE_BYTES = 1024 * 1024; // 8KB
 const PAGE_SIZE = 1024;
@@ -245,44 +245,6 @@ const gOpenCursors = new Map<
   { cursor: JSONLogFileCursor; nextPromise?: Promise<ScanResult> }
 >();
 let gOpenCursorNum = 0;
-
-async function readFile(path: string): Promise<Uint8Array> {
-  const impl = FileImplGet();
-  const handle = await impl.open(path, false);
-  const fileLen = await impl.seek(handle, 0, 'end');
-  await impl.seek(handle, 0, 'start');
-  const buf = new Uint8Array(fileLen);
-  await impl.read(handle, buf);
-  await impl.close(handle);
-  return buf;
-}
-
-async function readTextFile(path: string): Promise<string | undefined> {
-  try {
-    const decoder = new TextDecoder();
-    return decoder.decode(await readFile(path));
-  } catch (_: unknown) {
-    return undefined;
-  }
-}
-
-async function writeFile(path: string, buf: Uint8Array): Promise<void> {
-  const impl = FileImplGet();
-  const handle = await impl.open(path, true);
-  await impl.write(handle, buf);
-  await impl.truncate(handle, buf.length);
-  await impl.close(handle);
-}
-
-async function writeTextFile(path: string, text: string): Promise<boolean> {
-  try {
-    const encoder = new TextEncoder();
-    await writeFile(path, encoder.encode(text));
-    return true;
-  } catch (_: unknown) {
-    return false;
-  }
-}
 
 export function jsonLogWorkerMain(): void {
   onmessage = async (event: MessageEvent<WorkerFileReq>) => {
