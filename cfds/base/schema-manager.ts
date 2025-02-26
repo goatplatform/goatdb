@@ -17,27 +17,30 @@ import {
 export type AuthOp = 'read' | 'write';
 
 /**
- * A function that implements access control rules for a given repository or
- * group of repositories.
- *
- * Note that this method gets called repeatedly on every access attempt so it
- * must be very efficient.
- *
- * @param db       The main DB instance.
- * @param repoPath Path to the repository being accessed.
- * @param itemKey  The key being accessed.
- * @param session  The session requesting access.
- * @param op       The access type being made.
- *
- * @returns true if access is granted, false otherwise.
+ * Information passed to authentication rules to determine if an operation
+ * is allowed.
  */
-export type AuthRule = (
-  db: GoatDB,
-  repoPath: string,
-  itemKey: string,
-  session: Session,
-  op: AuthOp,
-) => boolean;
+export type AuthRuleInfo = {
+  /** The database instance */
+  db: GoatDB;
+  /** Path to the repository being accessed */
+  repoPath: string;
+  /** Key of the item being accessed */
+  itemKey: string;
+  /** Current user session */
+  session: Session;
+  /** Type of operation being performed (read or write) */
+  op: AuthOp;
+};
+
+/**
+ * A function that determines whether a specific operation is authorized.
+ * Returns true if the operation is allowed, false otherwise.
+ *
+ * @param info Information about the operation being authorized
+ * @returns Whether the operation is allowed
+ */
+export type AuthRule = (info: AuthRuleInfo) => boolean;
 
 /**
  * An array of authentication rules for the full DB. The DB scans these rules
@@ -267,13 +270,13 @@ export class SchemaManager {
 const kBuiltinAuthRulesEnforced: AuthConfig = [
   {
     rulePath: '/sys/sessions',
-    rule: (_db, _repoPath, _itemKey, session, op) => {
+    rule: ({ op }) => {
       return op === 'read';
     },
   },
   {
     rulePath: '/sys/stats',
-    rule: (_db, _repoPath, _itemKey, session, op) => {
+    rule: () => {
       return false;
     },
   },
@@ -283,7 +286,7 @@ const kBuiltinAuthRulesOptional: AuthConfig = [
   // By default users can see other users but only edit themselves.
   {
     rulePath: '/sys/users',
-    rule: (_db, _repoPath, itemKey, session, op) => {
+    rule: ({ itemKey, session, op }) => {
       if (session.owner === itemKey) {
         return true;
       }
@@ -293,7 +296,7 @@ const kBuiltinAuthRulesOptional: AuthConfig = [
   // Reserving /sys/* for the system's use
   {
     rulePath: /[/]sys[/]\S*/g,
-    rule: (_db, _repoPath, _itemKey, session, _op) => {
+    rule: ({ session }) => {
       return session.owner === 'root';
     },
   },

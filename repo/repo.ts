@@ -42,7 +42,7 @@ import type { GoatDB } from '../db/db.ts';
 import { BloomFilter } from '../base/bloom.ts';
 // import { BloomFilter } from '../cpp/bloom_filter.ts';
 import { itemPathJoin } from '../db/path.ts';
-import type { AuthRule } from '../cfds/base/schema-manager.ts';
+import type { AuthRule, AuthRuleInfo } from '../cfds/base/schema-manager.ts';
 
 /**
  * Fired when the value of a document changes (the head of the commit graph
@@ -123,6 +123,7 @@ export class Repository<
   private readonly _commitIsCorruptedResult: Map<string, boolean>;
   private readonly _cachedCommitsWithRecord: Set<string>;
   private readonly _cachedLeavesForKey: Map<string, Commit[]>;
+  private readonly _authInfo: AuthRuleInfo;
 
   allowMerge = true;
 
@@ -153,6 +154,13 @@ export class Repository<
     this.priorityRepo = priorityRepo === true;
     this._cachedCommitsWithRecord = new Set();
     this._cachedLeavesForKey = new Map();
+    this._authInfo = {
+      db: this.db,
+      repoPath: this.path,
+      itemKey: '',
+      session: this.trustPool.currentSession,
+      op: 'read',
+    };
   }
 
   static path(storage: string, id: string): string {
@@ -213,7 +221,10 @@ export class Repository<
       session.owner !== 'root' &&
       authorizer
     ) {
-      if (!authorizer(this.db, this.path, c.key, session, 'read')) {
+      this._authInfo.itemKey = c.key;
+      this._authInfo.session = session;
+      this._authInfo.op = 'read';
+      if (!authorizer(this._authInfo)) {
         throw serviceUnavailable();
       }
     }
@@ -239,7 +250,12 @@ export class Repository<
         cachedCommits = Array.from(
           filterIterable(
             this.storage.allCommitsIds(),
-            (id) => authorizer(this.db, this.path, id, session, 'read'),
+            (id) => {
+              this._authInfo.itemKey = id;
+              this._authInfo.session = session;
+              this._authInfo.op = 'read';
+              return authorizer(this._authInfo);
+            },
           ),
         );
         this._cachedCommitsPerUser.set(uid, cachedCommits);
@@ -259,10 +275,17 @@ export class Repository<
         !session ||
         session.id === this.trustPool.currentSession.id ||
         session.owner === 'root' ||
-        !authorizer ||
-        authorizer(this.db, this.path, c.key, session, 'read')
+        !authorizer
       ) {
         yield c;
+      }
+      if (authorizer) {
+        this._authInfo.itemKey = c.key;
+        this._authInfo.session = session || this.trustPool.currentSession;
+        this._authInfo.op = 'read';
+        if (authorizer(this._authInfo)) {
+          yield c;
+        }
       }
     }
   }
@@ -381,7 +404,12 @@ export class Repository<
     ) {
       return filterIterable(
         this.storage.allKeys(),
-        (key) => authorizer(this.db, this.path, key, session, 'read'),
+        (key) => {
+          this._authInfo.itemKey = key;
+          this._authInfo.session = session;
+          this._authInfo.op = 'read';
+          return authorizer(this._authInfo);
+        },
       );
     }
     return this.storage.allKeys();
@@ -1332,9 +1360,12 @@ export class Repository<
                 if (!session) {
                   return;
                 }
+                this._authInfo.itemKey = c.key;
+                this._authInfo.session = session;
+                this._authInfo.op = 'write';
                 if (
                   session.owner === 'root' ||
-                  authorizer(this.db, this.path, c.key, session, 'write')
+                  authorizer(this._authInfo)
                 ) {
                   result.push(c);
                 } else {

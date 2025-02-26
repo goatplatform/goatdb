@@ -336,6 +336,10 @@ export class GoatDB extends Emitter<EventUserChanged> {
    * creating items in it. Newly created items become immediately available for
    * use and will get committed to the underlying repo after open completes.
    *
+   * Note: This method only initializes the item if it doesn't already exist.
+   * If the item already exists with a valid schema, this method will return
+   * the existing item without modifying it.
+   *
    * @param path    If a full path is provided, the item will be created with
    *                the provided key. If a repository path is provided, a
    *                unique item key will be automatically generated.
@@ -344,7 +348,8 @@ export class GoatDB extends Emitter<EventUserChanged> {
    *
    * @param data    The initial data to populate the item with.
    *
-   * @returns       The newly created managed item.
+   * @returns       The newly created managed item, or the existing item if it
+   *                already exists.
    */
   create<S extends Schema>(
     path: string,
@@ -651,7 +656,7 @@ export class GoatDB extends Emitter<EventUserChanged> {
     //   repo.valueForKey(k);
     // }
     repo.unmute();
-    repo.attach('NewCommitSync', async (c: Commit) => {
+    repo.attach('NewCommitSync', (c: Commit) => {
       // if (!commitIds.has(c.id)) {
       JSONLogFileAppend(file, [c.toJS()]);
       // commitIds.add(c.id);

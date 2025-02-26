@@ -76,7 +76,13 @@ import { GoatDB } from './db/db.ts';
 import type { Schema, SchemaDataType } from './cfds/base/schema.ts';
 import { Query } from './repo/query.ts';
 import type { AppConfig } from './server/app-config.ts';
-import { SchemaManager } from './cfds/base/schema-manager.ts';
+import {
+  type AuthConfig,
+  type AuthOp,
+  type AuthRule,
+  type AuthRuleInfo,
+  SchemaManager,
+} from './cfds/base/schema-manager.ts';
 import {
   itemPath,
   itemPathGetPart,
@@ -87,13 +93,23 @@ import {
 import { Repository } from './repo/repo.ts';
 import { ManagedItem } from './db/managed-item.ts';
 import { Item } from './cfds/base/item.ts';
-import { prettyJSON } from './base/common.ts';
+import { prettyJSON, uniqueId } from './base/common.ts';
 import type { BuildInfo } from './server/build-info.ts';
 import { ConsoleLogStream } from './logging/console-stream.ts';
 import type { LogStream } from './logging/log.ts';
 import { JSONLogStream } from './logging/json-log-stream.ts';
 
-export type { AppConfig, BuildInfo, LogStream, Schema, SchemaDataType };
+export type {
+  AppConfig,
+  AuthConfig,
+  AuthOp,
+  AuthRule,
+  AuthRuleInfo,
+  BuildInfo,
+  LogStream,
+  Schema,
+  SchemaDataType,
+};
 export {
   ConsoleLogStream,
   GoatDB,
@@ -109,4 +125,5 @@ export {
   Query,
   Repository,
   SchemaManager,
+  uniqueId,
 };

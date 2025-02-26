@@ -20,13 +20,30 @@ export function count<T = unknown>(iter: Iterable<T>): number {
   return count;
 }
 
+/**
+ * Generates a random ID string.
+ *
+ * The generated ID is URL-safe, using only lowercase letters and numbers.
+ * The default length of 24 characters provides a large enough space to
+ * ensure a very low probability of collisions for most applications.
+ *
+ * Note: This function uses Math.random() which is not cryptographically secure.
+ * Do not use for security-sensitive purposes.
+ *
+ * With 36 possible characters (a-z, 0-9) and a length of 24, there are
+ * 36^24 (approximately 2.24 * 10^37) possible unique IDs, making
+ * collisions extremely unlikely for most use cases.
+ *
+ * @param length - The length of the ID to generate (default: 24)
+ * @returns A random string of the specified length
+ */
 export function uniqueId(length = 24): string {
   // Alphanumeric characters
   // const chars =
   //   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
   // We're using lowercase characters only to be URL friendly. At the time of
-  // this writing (15/11/23), Deno enforces the entire URL to lowercase.
+  // this writing (15/11/23), Deno converts the entire URL to lowercase.
   // To compensate for the reduced space, we've increased the default length
   // from 20 to 24.
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
