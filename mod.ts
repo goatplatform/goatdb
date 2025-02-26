@@ -1,15 +1,16 @@
 /**
- * GoatDB: The Edge-Native Database
+ * GoatDB: Lightweight NoDB for Deno & React
  *
- * GoatDB is a real-time, distributed Version Control Database (VCDB) that runs
- * seamlessly on the client-side (edge). It combines the principles of
- * distributed version control with real-time data synchronization, offering:
+ * GoatDB is a real-time, version-controlled database for Deno, React, and
+ * low-friction deployments. It's ideal for prototyping, self-hosting,
+ * single-tenant apps, as well as ultra light multi-tenant setups without
+ * heavy backends or complex DBs.
  *
- * - Real-time data synchronization across devices
- * - Offline-first functionality
- * - Built-in conflict resolution
- * - Privacy-focused data handling
- * - Schema-based data organization
+ * Key Features:
+ * - No Dedicated Infra: Run the entire DB client-side, with incremental queries
+ * - Resilience & Offline-First: Clients keep working if server goes down
+ * - Edge-Native: Most processing happens in the client
+ * - Real-Time Collaboration: Built-in sync keeps state synchronized
  *
  * Check out https://goatdb.dev for additional docs.
  *
@@ -38,9 +39,10 @@
  * // Register the schema
  * SchemaManager.default.register(taskSchema);
  *
- * // Initialize GoatDB
+ * // Initialize GoatDB with optional peers for replication
  * const db = new GoatDB({
  *   path: '/home/my-app',
+ *   peers: ['http://10.0.0.1']
  * });
  *
  * // Create a new task
