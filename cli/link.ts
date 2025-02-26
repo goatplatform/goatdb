@@ -1,11 +1,16 @@
 /**
- * This module provides functionality for linking a local GoatDB development
- * environment. It handles configuration file management and Git integration for
- * local development.
+ * This is a CLI used to link a local GoatDB development environment.
+ * It handles configuration file management and Git integration for local
+ * development.
+ * Check out https://goatdb.dev for additional docs.
  *
+ * @module GoatDB/Link
+ *
+ * @description
  * The main responsibilities of this module are:
  *
- * 1. Managing the goat.link.json configuration file which contains local development settings
+ * 1. Managing the goat.link.json configuration file which contains local
+ *    development settings
  * 2. Handling .gitignore entries to prevent committing local config files
  * 3. Setting up proper file paths and configurations for local development
  *
@@ -14,13 +19,15 @@
  * - Maintain separate configurations between development and production
  * - Avoid accidentally committing development configurations
  *
- * The module is typically used through the GoatDB CLI's link commands for
- * setting up and managing local development environments.
+ * @example
  *
- * Usage:
- *
+ * Link a local GoatDB instance to a development project:
  * ```bash
  * deno run -A jsr:@goatdb/goatdb/link link <local-goatdb-path>
+ * ```
+ *
+ * Unlink a local GoatDB instance from a development project:
+ * ```bash
  * deno run -A jsr:@goatdb/goatdb/link unlink
  * ```
  */
