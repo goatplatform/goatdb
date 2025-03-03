@@ -21,13 +21,32 @@ complex DBs.
 - **Resilience & Offline-First**: If the server goes down, clients keep working
   and can restore server state on reboot.
 
-- **Edge-Native**: Speed, simplicity, and easy scalability are built in.
+- **Edge-Native**: Most processing happens in the client, keeping servers light
+  and fast.
 
-👉 Head over to the [Tutorial](/tutorial) page for the full instructions.
+- **Real-Time Collaboration**: Built-in sync automatically keeps client and
+  server state synchronized in real-time.
 
 If you like what we're building, please star ⭐️ our
 [GitHub project](https://github.com/goatplatform/goatdb). We really appreciate
 it! 🙏
+
+- [Tutorial](/tutorial)
+- [FAQ](/faq)
+
+## Example Projects
+
+Explore projects built with GoatDB:
+
+- **[Todo](https://github.com/goatplatform/todo)**: A minimalist, modern, todo
+  list app specifically designed for self hosting.
+
+- **[EdgeChat](https://github.com/goatplatform/edge-chat)**: A demo of a
+  ChatGPT-like interface that runs completely in the browser, no network
+  connection needed.
+
+- **[Ovvio](https://ovvio.io)**: A productivity suite that has been powered by
+  GoatDB in production since January 2024.
 
 ## Installation
 
@@ -48,20 +67,12 @@ it! 🙏
    > you're not building a SPA or already have your React setup, you can skip
    > this step.
 
-GoatDB makes it easy to set up a cluster of servers by specifying replica
-locations in the `peers` field during initialization. Each server will
-automatically synchronize with its replicas at the provided URLs, using the same
-efficient sync protocol that clients use to stay in sync with servers. This
-means you can easily scale out your deployment by adding more replicas without
-changing any code or protocols - the servers will seamlessly coordinate using
-the built-in sync mechanism.
-
 ## Basic Usage
 
 ```tsx
 import { GoatDB } from '@goatdb/goatdb';
 
-const db = new GoatDB({ path: './server-data' peers: ['http://10.0.0.1'] });
+const db = new GoatDB({ path: './server-data', peers: ['http://10.0.0.1'] });
 const item = db.create('/todos', { text: 'Hello, GoatDB!', done: false });
 
 // Update in memory; auto-commits in background
@@ -70,6 +81,14 @@ item.set('done', true);
 console.log(item.get('text'), item.get('done'));
 // Output: "Hello, GoatDB!" true
 ```
+
+GoatDB makes it easy to set up a cluster of servers by specifying replica
+locations in the `peers` field during initialization. Each server will
+automatically synchronize with its replicas at the provided URLs, using the same
+efficient sync protocol that clients use to stay in sync with servers. This
+means you can easily scale out your deployment by adding more replicas without
+changing any code or protocols - the servers will seamlessly coordinate using
+the built-in sync mechanism.
 
 ## Using React Hooks
 
@@ -148,12 +167,31 @@ to incremental queries.
 
 ## Benchmarks
 
-Here are some benchmark results from running on a 2018 MacBook Pro:
+To run the benchmarks yourself, use the following command:
 
-- Writing: ~0.25ms / item
-- Reading: < 0.001ms / item
-- Querying: ~100ms to filter ~3k items from a set of 100k
-- Opening a Repository: < 1.5 sec / 100k commits
+```bash
+deno task bench
+```
+
+**System Information:**
+
+- CPU: Intel(R) Core(TM) i7-8850H CPU @ 2.60GHz
+- Runtime: Deno 2.2.1 (x86_64-apple-darwin)
+
+| Benchmark                    | Average  | p75      | p99      | p995     |
+| ---------------------------- | -------- | -------- | -------- | -------- |
+| Create instance              | 5.0 ms   | 5.2 ms   | 9.8 ms   | 9.8 ms   |
+| Open repository (empty)      | 1.4 ms   | 1.5 ms   | 2.3 ms   | 2.3 ms   |
+| Open repository (100k items) | 1.1 s    | 1.1 s    | 1.4 s    | 1.4 s    |
+| Create single item           | 3.2 ms   | 3.6 ms   | 3.7 ms   | 3.7 ms   |
+| Read item by path            | 2.7 µs   | 2.9 µs   | 3.3 µs   | 3.3 µs   |
+| Update item                  | 2.3 ms   | 2.7 ms   | 3.5 ms   | 3.5 ms   |
+| Bulk create 100 items        | 85.4 ms  | 83.1 ms  | 139.7 ms | 139.7 ms |
+| Bulk read 100 items          | 560.5 µs | 494.1 µs | 1.5 ms   | 1.5 ms   |
+| Simple query                 | 426.8 µs | 445.0 µs | 468.3 µs | 468.3 µs |
+| Complex query with sort      | 455.2 µs | 469.2 µs | 636.5 µs | 636.5 µs |
+| Repository operations: count | 5.2 µs   | 5.4 µs   | 11.8 µs  | 11.8 µs  |
+| Repository operations: keys  | 7.8 µs   | 8.1 µs   | 9.9 µs   | 9.9 µs   |
 
 Both client and server work against a synchronous in-memory snapshot that gets
 synchronized in the background several times per second. This architecture
@@ -197,3 +235,42 @@ order of commits, resolving differences by either choosing one change, combining
 both, or merging them (e.g., “cat” + “hat” → “chat”). This ensures predictable
 conflict handling at scale, making GoatDB well-suited for hackathon projects and
 quick prototypes where ease of collaboration and simplicity are key.
+
+## Tests
+
+GoatDB has a test suite to ensure reliability and performance. While not yet
+comprehensive, we're working on expanding them. You can run the tests using:
+
+```bash
+deno task test
+```
+
+## Contributing
+
+To contribute to GoatDB, follow these steps:
+
+1. Fork the repository
+2. Create a branch for your changes
+3. Submit a pull request
+
+We strive to review all pull requests within a few business days.
+
+To work on GoatDB's code alongside a project that uses it, run:
+
+```bash
+deno run -A jsr:@goatdb/goatdb/link link ./path/to/goatdb
+```
+
+This will link the local GoatDB repo into your project, allowing you to make
+changes to the codebase and have them reflected in your project without having
+to reinstall GoatDB.
+
+To unlink GoatDB, run:
+
+```bash
+deno run -A jsr:@goatdb/goatdb/link unlink
+```
+
+## License
+
+GoatDB is licensed under the [Apache 2.0 License](LICENSE).
