@@ -41,7 +41,7 @@ import { RedBlackTree } from '@std/data-structures';
 import type { GoatDB } from '../db/db.ts';
 import { BloomFilter } from '../base/bloom.ts';
 // import { BloomFilter } from '../cpp/bloom_filter.ts';
-import { itemPathJoin } from '../db/path.ts';
+import { itemPathIsValid, itemPathJoin } from '../db/path.ts';
 import type { AuthRule, AuthRuleInfo } from '../cfds/base/schema-manager.ts';
 
 /**
@@ -1154,6 +1154,10 @@ export class Repository<
     value: Item<S>,
     parentCommit: string | Commit | undefined,
   ): Promise<Commit | undefined> {
+    assert(
+      itemPathIsValid(itemPathJoin(this.path, key)),
+      `Invalid key: ${key}`,
+    );
     if (this._pendingCommitPromises.has(key)) {
       // Refuse editing while an existing edit is in progress
       throw serviceUnavailable();
