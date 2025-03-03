@@ -1,6 +1,6 @@
 import { assert } from './error.ts';
 import { unionIter } from './set.ts';
-import { Dictionary } from './collections/dict.ts';
+import type { Dictionary } from './collections/dict.ts';
 import { HashSet } from './collections/hash-map.ts';
 
 export interface Edge {

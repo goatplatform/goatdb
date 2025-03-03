@@ -37,7 +37,7 @@ export function itemPath<T extends RepoType>(
 export function itemPathGetPart<T extends string>(
   path: string,
   part: ItemPathPart,
-): T;
+): T | undefined;
 
 export function itemPathGetPart<T extends string>(
   path: undefined,
@@ -100,8 +100,8 @@ export function itemPathGetPart<T extends string>(
 export function itemPathGetRepoId(path: string): string {
   path = itemPathNormalize(path);
   return Repository.path(
-    itemPathGetPart(path, 'type'),
-    itemPathGetPart(path, 'repo'),
+    itemPathGetPart(path, 'type')!,
+    itemPathGetPart(path, 'repo')!,
   );
 }
 
@@ -129,9 +129,9 @@ export function itemPathNormalize(path: string): string {
     return path;
   }
   return itemPath(
-    itemPathGetPart(path, 'type'),
-    itemPathGetPart(path, 'repo'),
-    itemPathGetPart(path, 'item'),
+    itemPathGetPart(path, 'type')!,
+    itemPathGetPart(path, 'repo')!,
+    itemPathGetPart(path, 'item') || '',
     itemPathGetPart(path, 'embed'),
   );
 }
@@ -150,4 +150,29 @@ export function itemPathJoin(prefix: string, suffix: string): string {
     suffix = suffix.substring(1);
   }
   return `${prefix}/${suffix}`;
+}
+
+const kValidItemPathChars = 'abcdefghijklmnopqrstuvwxyz0123456789-_';
+
+/**
+ * Checks if the given path is valid.
+ * Valid paths must contain lowercase letters, numbers, and the characters
+ * `-` and `_`. They must also contain at most 4 components separated by `/`
+ * characters.
+ *
+ * @param path The path to validate.
+ * @returns True if the path is valid, false otherwise.
+ */
+export function itemPathIsValid(path: string): boolean {
+  let sepCount = 0;
+  for (let i = 0; i < path.length; ++i) {
+    if (path[i] === '/') {
+      if (++sepCount > 4) {
+        return false;
+      }
+    } else if (!kValidItemPathChars.includes(path[i])) {
+      return false;
+    }
+  }
+  return true;
 }

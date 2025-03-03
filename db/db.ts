@@ -354,7 +354,7 @@ export class GoatDB extends Emitter<EventUserChanged> {
   create<S extends Schema>(
     path: string,
     schema: S,
-    data: Partial<SchemaDataType<S>>,
+    data?: Partial<SchemaDataType<S>>,
   ): ManagedItem<S> {
     if (itemPathGetPart(path, 'item') === undefined) {
       path = itemPathJoin(path, uniqueId());
@@ -362,7 +362,9 @@ export class GoatDB extends Emitter<EventUserChanged> {
     const item = this.item<S>(path);
     if (item.schema.ns === null) {
       item.schema = schema;
-      item.setMulti(data);
+      if (data) {
+        item.setMulti(data);
+      }
     }
     return item;
   }
@@ -386,7 +388,7 @@ export class GoatDB extends Emitter<EventUserChanged> {
   ): Promise<void> {
     const repo = await this.open(path);
     let key = itemPathGetPart(path, 'item');
-    if (key.length <= 0) {
+    if (!key || key.length <= 0) {
       key = uniqueId();
     }
     await repo.setValueForKey(
@@ -412,9 +414,9 @@ export class GoatDB extends Emitter<EventUserChanged> {
    * @returns    The number of items found or -1.
    */
   count(path: string): number {
-    path = itemPathNormalize(path);
     const repoId = itemPathGetRepoId(path);
-    return this.repository(repoId)?.storage.numberOfKeys() || -1;
+    const repo = this.repository(repoId);
+    return repo ? repo.storage.numberOfKeys() : -1;
   }
 
   /**

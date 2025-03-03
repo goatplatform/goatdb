@@ -20,11 +20,14 @@
     "./link": "./cli/link.ts"
   },
   "tasks": {
-    "build": "deno run -A system-assets/build-sys-assets.ts"
+    "build": "deno run -A system-assets/build-sys-assets.ts",
+    "test": "deno test -A --no-check"
   },
   "imports": {
     "@luca/esbuild-deno-loader": "jsr:@luca/esbuild-deno-loader@^0.11.1",
+    "@std/assert": "jsr:@std/assert@^1.0.11",
     "@std/data-structures": "jsr:@std/data-structures@^1.0.6",
+    "@std/expect": "jsr:@std/expect@^1.0.13",
     "@std/fs": "jsr:@std/fs@^1.0.9",
     "@std/path": "jsr:@std/path@^1.0.8",
     "@std/encoding": "jsr:@std/encoding@1.0.6",
