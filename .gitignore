@@ -4,3 +4,4 @@ test_data
 build
 _site
 .jekyll-cache
+temp_bench_*

@@ -21,7 +21,8 @@
   },
   "tasks": {
     "build": "deno run -A system-assets/build-sys-assets.ts",
-    "test": "deno test -A --no-check"
+    "test": "deno test -A --no-check",
+    "bench": "deno bench -A --no-check"
   },
   "imports": {
     "@luca/esbuild-deno-loader": "jsr:@luca/esbuild-deno-loader@^0.11.1",

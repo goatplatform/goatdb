@@ -168,12 +168,31 @@ to incremental queries.
 
 ## Benchmarks
 
-Here are some benchmark results from running on a 2018 MacBook Pro:
+To run the benchmarks yourself, use the following command:
 
-- Writing: ~0.25ms / item
-- Reading: < 0.001ms / item
-- Querying: ~100ms to filter ~3k items from a set of 100k
-- Opening a Repository: < 1.5 sec / 100k commits
+```bash
+deno task bench
+```
+
+**System Information:**
+
+- CPU: Intel(R) Core(TM) i7-8850H CPU @ 2.60GHz
+- Runtime: Deno 2.2.1 (x86_64-apple-darwin)
+
+| Benchmark                    | Average  | p75      | p99      | p995     |
+| ---------------------------- | -------- | -------- | -------- | -------- |
+| Create instance              | 5.0 ms   | 5.2 ms   | 9.8 ms   | 9.8 ms   |
+| Open repository (empty)      | 1.4 ms   | 1.5 ms   | 2.3 ms   | 2.3 ms   |
+| Open repository (100k items) | 1.1 s    | 1.1 s    | 1.4 s    | 1.4 s    |
+| Create single item           | 3.2 ms   | 3.6 ms   | 3.7 ms   | 3.7 ms   |
+| Read item by path            | 2.7 µs   | 2.9 µs   | 3.3 µs   | 3.3 µs   |
+| Update item                  | 2.3 ms   | 2.7 ms   | 3.5 ms   | 3.5 ms   |
+| Bulk create 100 items        | 85.4 ms  | 83.1 ms  | 139.7 ms | 139.7 ms |
+| Bulk read 100 items          | 560.5 µs | 494.1 µs | 1.5 ms   | 1.5 ms   |
+| Simple query                 | 426.8 µs | 445.0 µs | 468.3 µs | 468.3 µs |
+| Complex query with sort      | 455.2 µs | 469.2 µs | 636.5 µs | 636.5 µs |
+| Repository operations: count | 5.2 µs   | 5.4 µs   | 11.8 µs  | 11.8 µs  |
+| Repository operations: keys  | 7.8 µs   | 8.1 µs   | 9.9 µs   | 9.9 µs   |
 
 Both client and server work against a synchronous in-memory snapshot that gets
 synchronized in the background several times per second. This architecture
@@ -217,6 +236,15 @@ order of commits, resolving differences by either choosing one change, combining
 both, or merging them (e.g., “cat” + “hat” → “chat”). This ensures predictable
 conflict handling at scale, making GoatDB well-suited for hackathon projects and
 quick prototypes where ease of collaboration and simplicity are key.
+
+## Tests
+
+GoatDB has a test suite to ensure reliability and performance. While not yet
+comprehensive, we're working on expanding them. You can run the tests using:
+
+```bash
+deno task test
+```
 
 ## Contributing
 
