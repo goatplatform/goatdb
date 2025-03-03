@@ -73,7 +73,7 @@ Explore projects built with GoatDB:
 ```tsx
 import { GoatDB } from '@goatdb/goatdb';
 
-const db = new GoatDB({ path: './server-data' peers: ['http://10.0.0.1'] });
+const db = new GoatDB({ path: './server-data', peers: ['http://10.0.0.1'] });
 const item = db.create('/todos', { text: 'Hello, GoatDB!', done: false });
 
 // Update in memory; auto-commits in background
