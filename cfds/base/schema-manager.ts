@@ -2,7 +2,12 @@ import type { CoreObject } from '../../base/core-types/base.ts';
 import { coreValueClone } from '../../base/core-types/clone.ts';
 import { assert } from '../../base/error.ts';
 import type { Session } from '../../db/session.ts';
-import { type GoatDB, itemPathGetRepoId, Repository } from '../../mod.ts';
+import {
+  type GoatDB,
+  itemPathGetPart,
+  itemPathGetRepoId,
+  Repository,
+} from '../../mod.ts';
 import {
   kNullSchema,
   kSchemaSession,
@@ -295,9 +300,16 @@ const kBuiltinAuthRulesOptional: AuthConfig = [
   },
   // Reserving /sys/* for the system's use
   {
-    rulePath: /[/]sys[/]\S*/g,
+    rulePath: /\/sys\/\w+/g,
     rule: ({ session }) => {
       return session.owner === 'root';
+    },
+  },
+  // By default, /user/<user-id> is private to the specific user.
+  {
+    rulePath: /\/user\/\w+/g,
+    rule: ({ session, repoPath }) => {
+      return session.owner === itemPathGetPart(repoPath, 'repo');
     },
   },
 ] as const;
