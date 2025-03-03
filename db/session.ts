@@ -21,6 +21,7 @@ import {
   decodeBase32URLString,
   encodeBase32URL,
 } from '../base/string.ts';
+import { LRUCache } from '../base/lru-cache.ts';
 
 export const SESSION_CRYPTO_KEY_GEN_PARAMS: EcKeyGenParams = {
   name: 'ECDSA',
@@ -155,8 +156,7 @@ export async function signData(
   return encodeSignature(res);
 }
 
-let gCachedDataVerifications: Map<string, boolean> = new Map();
-setInterval(() => (gCachedDataVerifications = new Map()), 10 * kSecondMs);
+const gCachedDataVerifications: LRUCache<string, boolean> = new LRUCache(1000);
 
 /**
  * This is the lowest-level verification primitive. Given an expected signer,
@@ -441,12 +441,8 @@ export function generateRequestSignature(
     ts: Date.now(),
   });
 }
-let sessionIdsCache: Map<string, string> = new Map();
-let requestSigCache: Map<string, boolean> = new Map();
-setInterval(() => {
-  sessionIdsCache = new Map();
-  requestSigCache = new Map();
-}, 10 * kSecondMs);
+const sessionIdsCache: LRUCache<string, string> = new LRUCache(1000);
+const requestSigCache: LRUCache<string, boolean> = new LRUCache(1000);
 
 export async function verifyRequestSignature(
   session: Session,

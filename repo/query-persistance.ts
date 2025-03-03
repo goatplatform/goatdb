@@ -128,10 +128,11 @@ export class QueryPersistence {
     return map;
   }
 
-  private async flushAll(): Promise<void> {
+  async flushAll(): Promise<void> {
     for (const repoId of this._queries.keys()) {
       await this.flush(repoId);
     }
+    this._flushTimer.unschedule();
   }
 
   flush(repoId: string): Promise<void> {

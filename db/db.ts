@@ -478,9 +478,20 @@ export class GoatDB extends Emitter<EventUserChanged> {
    * @returns    A promise that resolves after all commits have been flushed to
    *             disk.
    */
-  flush(path: string): Promise<void> {
-    path = itemPathNormalize(path);
-    const fileEntry = this._files.get(itemPathGetRepoId(path));
+  async flush(path: string): Promise<void> {
+    const repoId = itemPathGetRepoId(itemPathNormalize(path));
+    path = repoId;
+    if (!path.endsWith('/')) {
+      path = path + '/';
+    }
+    const promises: Promise<void>[] = [];
+    for (const [itemPath, item] of this._items) {
+      if (itemPath.startsWith(path)) {
+        promises.push(item.commit());
+      }
+    }
+    await Promise.allSettled(promises);
+    const fileEntry = this._files.get(repoId);
     return fileEntry ? JSONLogFileFlush(fileEntry) : Promise.resolve();
   }
 
@@ -493,6 +504,7 @@ export class GoatDB extends Emitter<EventUserChanged> {
       (path) => this.flush(path),
     );
     await Promise.allSettled(promises);
+    await this.queryPersistence?.flushAll();
   }
 
   /**
