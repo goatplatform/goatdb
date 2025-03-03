@@ -271,7 +271,7 @@ export class Query<
     if (!predicate) {
       predicate = () => true;
     }
-    if (typeof sortBy !== 'function') {
+    if (sortBy !== undefined && typeof sortBy !== 'function') {
       this._sortField = sortBy as keyof SchemaDataType<OS> & string;
       sortBy = ({ left, right }) =>
         coreValueCompare(
