@@ -1,7 +1,7 @@
 import type { Schema, SchemaDataType } from '../cfds/base/schema.ts';
 import type { Commit } from '../repo/commit.ts';
 import type { Repository } from '../repo/repo.ts';
-import { itemPathGetPart, itemPathGetRepoId } from './path.ts';
+import { itemPathGetPart, itemPathGetRepoId, itemPathIsValid } from './path.ts';
 import { Item } from '../cfds/base/item.ts';
 import { Emitter } from '../base/emitter.ts';
 import { type MutationPack, mutationPackAppend } from './mutations.ts';
@@ -20,6 +20,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
 
   constructor(readonly db: GoatDB, readonly path: string) {
     super();
+    assert(itemPathIsValid(path), `Invalid item path: ${path}`);
     this.path = path;
     this._commitDelayTimer = new SimpleTimer(300, false, () => {
       this.commit();
@@ -250,6 +251,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
    */
   private loadInitialDoc(repo: Repository): void {
     const entry = repo.valueForKey<S>(itemPathGetPart(this.path, 'item'));
+
     if (this.schema.ns === null) {
       if (entry) {
         // If our contents are still null, replace them with the item and schema
