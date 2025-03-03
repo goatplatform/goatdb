@@ -63,7 +63,7 @@ Deno.test(
     if (deserializedFilter.has('banana')) {
       throw new Error("Deserialized empty filter should NOT contain 'banana'");
     }
-  }
+  },
 );
 
 Deno.test(
@@ -84,7 +84,7 @@ Deno.test(
     if (deserializedFilter.has('element-1001')) {
       throw new Error("Deserialized filter should NOT contain 'element-1001'");
     }
-  }
+  },
 );
 
 Deno.test('BloomFilter - False Positive Rate Validation', async () => {
