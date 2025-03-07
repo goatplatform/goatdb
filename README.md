@@ -181,18 +181,18 @@ deno task bench
 
 | Benchmark                    | Average  | p75      | p99      | p995     |
 | ---------------------------- | -------- | -------- | -------- | -------- |
-| Create instance              | 5.0 ms   | 5.2 ms   | 9.8 ms   | 9.8 ms   |
-| Open repository (empty)      | 1.4 ms   | 1.5 ms   | 2.3 ms   | 2.3 ms   |
-| Open repository (100k items) | 1.1 s    | 1.1 s    | 1.4 s    | 1.4 s    |
-| Create single item           | 3.2 ms   | 3.6 ms   | 3.7 ms   | 3.7 ms   |
-| Read item by path            | 2.7 µs   | 2.9 µs   | 3.3 µs   | 3.3 µs   |
-| Update item                  | 2.3 ms   | 2.7 ms   | 3.5 ms   | 3.5 ms   |
-| Bulk create 100 items        | 85.4 ms  | 83.1 ms  | 139.7 ms | 139.7 ms |
-| Bulk read 100 items          | 560.5 µs | 494.1 µs | 1.5 ms   | 1.5 ms   |
-| Simple query                 | 426.8 µs | 445.0 µs | 468.3 µs | 468.3 µs |
-| Complex query with sort      | 455.2 µs | 469.2 µs | 636.5 µs | 636.5 µs |
-| Repository operations: count | 5.2 µs   | 5.4 µs   | 11.8 µs  | 11.8 µs  |
-| Repository operations: keys  | 7.8 µs   | 8.1 µs   | 9.9 µs   | 9.9 µs   |
+| Create instance              | 5.0 ms   | 5.3 ms   | 9.2 ms   | 9.2 ms   |
+| Open repository (empty)      | 9.5 ms   | 1.7 ms   | 174.1 ms | 174.1 ms |
+| Open repository (100k items) | 978.3 ms | 983.0 ms | 1.0 s    | 1.0 s    |
+| Create single item           | 3.3 ms   | 3.5 ms   | 4.7 ms   | 4.7 ms   |
+| Read item by path            | 2.8 µs   | 3.0 µs   | 3.5 µs   | 3.5 µs   |
+| Update item                  | 1.8 ms   | 1.7 ms   | 3.4 ms   | 3.4 ms   |
+| Bulk create 100 items        | 80.1 ms  | 76.9 ms  | 132.7 ms | 132.7 ms |
+| Bulk read 100 items          | 413.0 µs | 415.0 µs | 517.6 µs | 517.6 µs |
+| Simple query                 | 260.3 µs | 274.1 µs | 327.9 µs | 327.9 µs |
+| Complex query with sort      | 150.6 µs | 160.7 µs | 264.8 µs | 264.8 µs |
+| Repository operations: count | 4.5 µs   | 4.7 µs   | 5.8 µs   | 5.8 µs   |
+| Repository operations: keys  | 7.3 µs   | 7.3 µs   | 8.6 µs   | 8.6 µs   |
 
 Both client and server work against a synchronous in-memory snapshot that gets
 synchronized in the background several times per second. This architecture
