@@ -3,19 +3,18 @@ import {
   deserializeDate,
   kDayMs,
   kMinuteMs,
-  kSecondMs,
   serializeDate,
 } from '../base/date.ts';
-import {
+import type {
   JSONObject,
   JSONValue,
   ReadonlyJSONObject,
 } from '../base/interfaces.ts';
 import { stableStringify } from '../base/json.ts';
-import { Commit, CommitSerializeOptions } from '../repo/commit.ts';
+import { Commit, type CommitSerializeOptions } from '../repo/commit.ts';
 import { uniqueId } from '../base/common.ts';
 import { Item } from '../cfds/base/item.ts';
-import { kSchemaSession, SchemaTypeSession } from '../cfds/base/schema.ts';
+import { kSchemaSession, type SchemaTypeSession } from '../cfds/base/schema.ts';
 import {
   decodeBase32URL,
   decodeBase32URLString,
