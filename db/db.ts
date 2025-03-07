@@ -493,6 +493,7 @@ export class GoatDB extends Emitter<EventUserChanged> {
       }
     }
     await Promise.allSettled(promises);
+    await this.queryPersistence?.flush(repoId);
     const fileEntry = this._files.get(repoId);
     return fileEntry ? JSONLogFileFlush(fileEntry) : Promise.resolve();
   }
