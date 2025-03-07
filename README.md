@@ -177,28 +177,25 @@ deno task bench
 **System Information:**
 
 - CPU: Intel(R) Core(TM) i7-8850H CPU @ 2.60GHz
-- Runtime: Deno 2.2.1 (x86_64-apple-darwin)
+- Runtime: Deno 2.2.3 (x86_64-apple-darwin)
 
 | Benchmark                    | Average  | p75      | p99      | p995     |
 | ---------------------------- | -------- | -------- | -------- | -------- |
-| Create instance              | 5.0 ms   | 5.3 ms   | 9.2 ms   | 9.2 ms   |
-| Open repository (empty)      | 9.5 ms   | 1.7 ms   | 174.1 ms | 174.1 ms |
-| Open repository (100k items) | 978.3 ms | 983.0 ms | 1.0 s    | 1.0 s    |
-| Create single item           | 3.3 ms   | 3.5 ms   | 4.7 ms   | 4.7 ms   |
-| Read item by path            | 2.8 µs   | 3.0 µs   | 3.5 µs   | 3.5 µs   |
-| Update item                  | 1.8 ms   | 1.7 ms   | 3.4 ms   | 3.4 ms   |
-| Bulk create 100 items        | 80.1 ms  | 76.9 ms  | 132.7 ms | 132.7 ms |
-| Bulk read 100 items          | 413.0 µs | 415.0 µs | 517.6 µs | 517.6 µs |
-| Simple query                 | 260.3 µs | 274.1 µs | 327.9 µs | 327.9 µs |
-| Complex query with sort      | 150.6 µs | 160.7 µs | 264.8 µs | 264.8 µs |
-| Repository operations: count | 4.5 µs   | 4.7 µs   | 5.8 µs   | 5.8 µs   |
-| Repository operations: keys  | 7.3 µs   | 7.3 µs   | 8.6 µs   | 8.6 µs   |
+| Create instance              | 5.1 ms   | 5.4 ms   | 9.1 ms   | 9.1 ms   |
+| Open repository (empty)      | 1.4 ms   | 1.5 ms   | 1.8 ms   | 1.8 ms   |
+| Open repository (100k items) | 969.1 ms | 973.6 ms | 980.6 ms | 980.6 ms |
+| Create single item           | 3.0 ms   | 3.2 ms   | 3.2 ms   | 3.2 ms   |
+| Read item by path            | 2.0 µs   | 2.0 µs   | 2.5 µs   | 2.5 µs   |
+| Update item                  | 1.8 ms   | 1.9 ms   | 2.2 ms   | 2.2 ms   |
+| Bulk create 100 items        | 98.1 ms  | 77.5 ms  | 402.4 ms | 402.4 ms |
+| Bulk read 100 items          | 421.8 µs | 443.9 µs | 487.5 µs | 487.5 µs |
+| Simple query                 | 264.1 µs | 264.1 µs | 1.3 ms   | 1.3 ms   |
+| Complex query with sort      | 144.1 µs | 157.3 µs | 215.2 µs | 215.2 µs |
+| Repository operations: count | 4.7 µs   | 4.8 µs   | 7.6 µs   | 7.6 µs   |
+| Repository operations: keys  | 7.9 µs   | 8.2 µs   | 9.2 µs   | 9.2 µs   |
 
-Both client and server work against a synchronous in-memory snapshot that gets
-synchronized in the background several times per second. This architecture
-combines the performance benefits of in-memory databases with the reliability of
-persistence and replication, allowing these benchmarks to remain consistent
-across client and server.
+Head over to the [benchmarks](https://goatdb.dev/benchmarks) page for more
+details.
 
 ## Security
 
@@ -247,6 +244,10 @@ deno task test
 ```
 
 ## Contributing
+
+**All contributions to this project are made under the Apache License, Version
+2.0. By submitting a Pull Request, you agree that your contributions are
+licensed under Apache-2.0.**
 
 To contribute to GoatDB, follow these steps:
 
