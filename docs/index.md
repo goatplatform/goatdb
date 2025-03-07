@@ -33,6 +33,7 @@ it! 🙏
 
 - [Tutorial](/tutorial)
 - [FAQ](/faq)
+- [Benchmarks](/benchmarks)
 
 ## Example Projects
 

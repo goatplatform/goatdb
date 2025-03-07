@@ -2,6 +2,7 @@
 permalink: /faq/
 layout: default
 title: FAQ
+nav_order: 8
 ---
 
 # GoatDB FAQ
