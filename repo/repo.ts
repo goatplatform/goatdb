@@ -216,6 +216,7 @@ export class Repository<
     }
     const { authorizer } = this;
     if (
+      !this.db.trusted &&
       session &&
       session.id !== this.trustPool.currentSession.id &&
       session.owner !== 'root' &&
@@ -237,7 +238,7 @@ export class Repository<
 
   *commits(session?: Session): Generator<Commit> {
     const { authorizer } = this;
-    const checkAuth = session &&
+    const checkAuth = !this.db.trusted && session &&
       session.id !== this.trustPool.currentSession.id &&
       session.owner !== 'root' && authorizer;
     let resultIds: Iterable<string>;
@@ -272,12 +273,16 @@ export class Repository<
     const commits = this.storage.commitsForKeyDesc(key);
     for (const c of commits) {
       if (
-        !session ||
-        session.id === this.trustPool.currentSession.id ||
-        session.owner === 'root' ||
-        !authorizer
+        this.db.trusted ||
+        (
+          !session ||
+          session.id === this.trustPool.currentSession.id ||
+          session.owner === 'root' ||
+          !authorizer
+        )
       ) {
         yield c;
+        continue;
       }
       if (authorizer) {
         this._authInfo.itemKey = c.key;
@@ -397,6 +402,7 @@ export class Repository<
   keys(session?: Session): Iterable<string> {
     const { authorizer } = this;
     if (
+      !this.db.trusted &&
       session &&
       session.id !== this.trustPool.currentSession.id &&
       session.owner !== 'root' &&
@@ -1216,7 +1222,9 @@ export class Repository<
       orgId: this.orgId,
     });
     commit = this.deltaCompressIfNeeded(commit);
-    const signedCommit = await signCommit(session, commit);
+    const signedCommit = this.db.trusted
+      ? commit
+      : await signCommit(session, commit);
     await this.persistVerifiedCommits([signedCommit]);
     this.invalidateCachesForKey(key);
     return (await this.mergeIfNeeded(key)) || signedCommit;
@@ -1345,6 +1353,9 @@ export class Repository<
   }
 
   async verifyCommits(commits: Iterable<Commit>): Promise<Commit[]> {
+    if (this.db.trusted) {
+      return Array.from(commits);
+    }
     const authorizer = this.authorizer;
     commits = Array.from(commits).sort((c1, c2) => c1.timestamp - c2.timestamp);
     const result: Commit[] = [];

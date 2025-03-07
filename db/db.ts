@@ -71,6 +71,12 @@ export interface DBConfig {
    */
   peers?: string | Iterable<string>;
   /**
+   * If true, all security mechanisms are bypassed in favor of speed.
+   * Set this to true when running purely in a trusted backend environment.
+   * Defaults to false.
+   */
+  trusted?: boolean;
+  /**
    * The schema manager to use for this DB instance.
    * Defaults to `SchemaManger.default`.
    */
@@ -94,6 +100,7 @@ export type EventUserChanged = 'UserChanged';
 export class GoatDB extends Emitter<EventUserChanged> {
   readonly orgId: string;
   readonly schemaManager: SchemaManager;
+  readonly trusted: boolean;
   private readonly _basePath: string;
   private readonly _repositories: Map<string, Repository>;
   private readonly _openPromises: Map<string, Promise<Repository>>;
@@ -123,6 +130,7 @@ export class GoatDB extends Emitter<EventUserChanged> {
     this._files = new Map();
     this._items = new Map();
     this._openQueries = new Map();
+    this.trusted = config.trusted ?? false;
     if (config?.peers !== undefined) {
       this._peerURLs = typeof config.peers === 'string'
         ? [config.peers]
