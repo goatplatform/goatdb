@@ -10,6 +10,15 @@
 
 # GoatDB: Lightweight NoDB for Deno & React
 
+<p align="center">
+
+[Tutorial](https://goatdb.dev/tutorial) • [Documentation](https://goatdb.dev) •
+[FAQ](https://goatdb.dev/faq) • [Benchmarks](https://goatdb.dev/benchmarks) •
+[Reddit](https://www.reddit.com/r/goatdb) •
+[Discord](https://discord.gg/S3QMZXKd)
+
+</p>
+
 GoatDB is a real-time, version-controlled database for
 **[Deno](https://deno.com/)**, **[React](https://react.dev/)**, and low-friction
 deployments. It’s ideal for **prototyping**, **self-hosting**, **single-tenant**
@@ -30,10 +39,6 @@ complex DBs.
 
 👉 If you like what we're building, please star ⭐️ our project. We really
 appreciate it! 🙏
-
-- [Tutorial](https://goatdb.dev/tutorial)
-- [Documentation](https://goatdb.dev)
-- [FAQ](https://goatdb.dev/faq)
 
 ## Example Projects
 
@@ -165,37 +170,6 @@ cloud agnostic and easy to self-host on any server you wish.
 That’s it! GoatDB keeps your app running even if the server fails, with clients
 seamlessly backing up and restoring data. No complex indexing required, thanks
 to incremental queries.
-
-## Benchmarks
-
-To run the benchmarks yourself, use the following command:
-
-```bash
-deno task bench
-```
-
-**System Information:**
-
-- CPU: Intel(R) Core(TM) i7-8850H CPU @ 2.60GHz
-- Runtime: Deno 2.2.3 (x86_64-apple-darwin)
-
-| Benchmark                    | Average  | p75      | p99      | p995     |
-| ---------------------------- | -------- | -------- | -------- | -------- |
-| Create instance              | 5.1 ms   | 5.4 ms   | 9.1 ms   | 9.1 ms   |
-| Open repository (empty)      | 1.4 ms   | 1.5 ms   | 1.8 ms   | 1.8 ms   |
-| Open repository (100k items) | 969.1 ms | 973.6 ms | 980.6 ms | 980.6 ms |
-| Create single item           | 3.0 ms   | 3.2 ms   | 3.2 ms   | 3.2 ms   |
-| Read item by path            | 2.0 µs   | 2.0 µs   | 2.5 µs   | 2.5 µs   |
-| Update item                  | 1.8 ms   | 1.9 ms   | 2.2 ms   | 2.2 ms   |
-| Bulk create 100 items        | 98.1 ms  | 77.5 ms  | 402.4 ms | 402.4 ms |
-| Bulk read 100 items          | 421.8 µs | 443.9 µs | 487.5 µs | 487.5 µs |
-| Simple query                 | 264.1 µs | 264.1 µs | 1.3 ms   | 1.3 ms   |
-| Complex query with sort      | 144.1 µs | 157.3 µs | 215.2 µs | 215.2 µs |
-| Repository operations: count | 4.7 µs   | 4.8 µs   | 7.6 µs   | 7.6 µs   |
-| Repository operations: keys  | 7.9 µs   | 8.2 µs   | 9.2 µs   | 9.2 µs   |
-
-Head over to the [benchmarks](https://goatdb.dev/benchmarks) page for more
-details.
 
 ## Security
 
