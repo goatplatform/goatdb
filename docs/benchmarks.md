@@ -11,6 +11,13 @@ GoatDB's benchmarks provide a performance comparison between GoatDB's different
 operational modes and SQLite. These benchmarks help understand the performance
 characteristics and tradeoffs of each approach.
 
+Replicating these benchmarks on your machine is easy. Just clone the
+[GoatDB repository](https://github.com/goatplatform/goatdb) and run:
+
+```bash
+deno task bench
+```
+
 All benchmarks were performed on the following configuration:
 
 - CPU: Intel(R) Core(TM) i7-8850H CPU @ 2.60GHz
@@ -38,11 +45,22 @@ SQLite:
 
 GoatDB is a memory-first database built on an append-only distributed commit
 graph stored as a log of commits on disk. This design currently requires the
-entire commit graph to be present in memory before any operations can be
-performed on it. This is why opening a repository takes time proportional to the
-number of commits it contains. Most of this time is spent on deserializing and
-constructing the in-memory representation of the commit graph. We're working on
-a zero-copy format that will skip most of this work (~90% of the).
+entire commit graph to be loaded into memory before any operations can be
+performed. Consequently, opening a repository takes time proportional to the
+number of commits it contains. Bringing the raw log data into memory is the
+least time-consuming part of the open routine (approximately 10% of the total
+time), while the majority is spent on deserializing and constructing the
+in-memory representation of the commit graph—a particularly challenging workload
+for modern JavaScript garbage collectors. To address this performance
+bottleneck, we are developing a zero-copy format that will significantly reduce
+this overhead.
+
+GoatDB uses a different scaling approach than traditional databases. Rather than
+growing a single large database, it employs application-level sharding with
+multiple medium-sized repositories that sync independently. Each user or data
+group has its own repository, enabling horizontal scaling and efficient
+client-server synchronization. This architecture provides natural scalability
+for multi-user applications without complex manual sharding.
 
 SQLite shines in query performance with its decades of battle-tested
 optimizations, though GoatDB's incremental queries perform competitively in
