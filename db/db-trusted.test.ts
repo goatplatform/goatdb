@@ -28,10 +28,11 @@ const TestSchema = {
 
 SchemaManager.default.registerSchema(TestSchema);
 
-Deno.test('Untrusted - initialization', async () => {
+Deno.test('Trusted - initialization', async () => {
   const db = new GoatDB({
     path: path.join(TEST_DIR, 'db-init'),
     orgId: 'test-org',
+    trusted: true,
   });
 
   try {
@@ -54,10 +55,11 @@ Deno.test('Untrusted - initialization', async () => {
   }
 });
 
-Deno.test('Untrusted - repository operations', async () => {
+Deno.test('Trusted - repository operations', async () => {
   const db = new GoatDB({
     path: path.join(TEST_DIR, 'db-repo'),
     orgId: 'test-org',
+    trusted: true,
   });
 
   try {
@@ -88,10 +90,11 @@ Deno.test('Untrusted - repository operations', async () => {
   }
 });
 
-Deno.test('Untrusted - item management', async () => {
+Deno.test('Trusted - item management', async () => {
   const db = new GoatDB({
     path: path.join(TEST_DIR, 'db-items'),
     orgId: 'test-org',
+    trusted: true,
   });
 
   try {
@@ -129,10 +132,11 @@ Deno.test('Untrusted - item management', async () => {
   }
 });
 
-Deno.test('Untrusted - bulk load', async () => {
+Deno.test('Trusted - bulk load', async () => {
   const db = new GoatDB({
     path: path.join(TEST_DIR, 'db-bulk'),
     orgId: 'test-org',
+    trusted: true,
   });
 
   try {
@@ -163,10 +167,11 @@ Deno.test('Untrusted - bulk load', async () => {
   }
 });
 
-Deno.test('Untrusted - query functionality', async () => {
+Deno.test('Trusted - query functionality', async () => {
   const db = new GoatDB({
     path: path.join(TEST_DIR, 'db-query'),
     orgId: 'test-org',
+    trusted: true,
   });
 
   try {
