@@ -17,6 +17,7 @@ and GoatDB adheres to
 
 - Auth rules now accept an info object like query predicate and sort descriptor
 - Added default auth rules for `/user/<userId>`
+- Improved repository open performance by ~25%
 
 ### Fixed
 
