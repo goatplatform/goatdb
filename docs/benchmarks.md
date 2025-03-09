@@ -2,7 +2,7 @@
 permalink: /benchmarks/
 layout: default
 title: Benchmarks
-nav_order: 9
+nav_order: 8
 ---
 
 # GoatDB Benchmarks
@@ -34,7 +34,7 @@ performance:
 | ---------------------------- | ---------------- | ---------------- | ------------ |
 | Create instance              | 5.1 ms           | 4.6 ms           | **203.2 µs** |
 | Open repository (empty)      | 1.4 ms           | 1.5 ms           | **1.1 ms**   |
-| Open repository (100k items) | 969.1 ms         | 1.1 s            | **186.3 µs** |
+| Open repository (100k items) | 738.4 ms         | 721.5 ms         | **186.3 µs** |
 | Create single item           | 3.0 ms           | 2.0 ms           | **815.6 µs** |
 | Read item by path            | **2.0 µs**       | **2.5 µs**       | 67.0 µs      |
 | Update item                  | 1.8 ms           | **327.5 µs**     | 780.6 µs     |
@@ -54,7 +54,7 @@ simply discard any incomplete writes.
 | ---------------------------- | ------------- | -------------------------- |
 | Create instance              | 5.5 ms        | **160.3 µs**               |
 | Open repository (empty)      | 1.4 ms        | **507.4 µs**               |
-| Open repository (100k items) | 960.2 ms      | **196.3 µs**               |
+| Open repository (100k items) | 717.1 ms      | **196.3 µs**               |
 | Create single item           | **91.3 µs**   | 701.4 µs                   |
 | Read item by path            | **2.6 µs**    | 63.9 µs                    |
 | Update item                  | **24.9 µs**   | 521.8 µs                   |
@@ -115,7 +115,7 @@ better performance.
 | ---------------------------- | -------- | -------- | -------- | -------- |
 | Create instance              | 5.1 ms   | 5.4 ms   | 9.1 ms   | 9.1 ms   |
 | Open repository (empty)      | 1.4 ms   | 1.5 ms   | 1.8 ms   | 1.8 ms   |
-| Open repository (100k items) | 969.1 ms | 973.6 ms | 980.6 ms | 980.6 ms |
+| Open repository (100k items) | 738.4 ms | 773.3 ms | 809.0 ms | 809.0 ms |
 | Create single item           | 3.0 ms   | 3.2 ms   | 3.2 ms   | 3.2 ms   |
 | Read item by path            | 2.0 µs   | 2.0 µs   | 2.5 µs   | 2.5 µs   |
 | Update item                  | 1.8 ms   | 1.9 ms   | 2.2 ms   | 2.2 ms   |
@@ -137,7 +137,7 @@ running in the cloud without direct client interaction.
 | ------------------------------------- | -------- | -------- | -------- | -------- |
 | Trusted: Create instance              | 4.6 ms   | 4.9 ms   | 7.7 ms   | 7.7 ms   |
 | Trusted: Open repository (empty)      | 1.5 ms   | 1.5 ms   | 4.2 ms   | 4.2 ms   |
-| Trusted: Open repository (100k items) | 1.1 s    | 1.1 s    | 1.7 s    | 1.7 s    |
+| Trusted: Open repository (100k items) | 721.5 ms | 712.1 ms | 837.5 ms | 837.5 ms |
 | Trusted: Create single item           | 2.0 ms   | 2.1 ms   | 2.5 ms   | 2.5 ms   |
 | Trusted: Read item by path            | 2.5 µs   | 2.7 µs   | 3.3 µs   | 3.3 µs   |
 | Trusted: Update item                  | 327.5 µs | 373.5 µs | 441.0 µs | 441.0 µs |
@@ -174,7 +174,7 @@ compromising data integrity, at the expense of decreased durability.
 | ---------------------------------- | -------- | -------- | -------- | -------- |
 | Fast: Create instance              | 5.5 ms   | 5.5 ms   | 14.7 ms  | 14.7 ms  |
 | Fast: Open repository (empty)      | 1.4 ms   | 1.5 ms   | 1.6 ms   | 1.6 ms   |
-| Fast: Open repository (100k items) | 960.2 ms | 972.6 ms | 1.1 s    | 1.1 s    |
+| Fast: Open repository (100k items) | 717.1 ms | 716.1 ms | 816.3 ms | 816.3 ms |
 | Fast: Create single item           | 91.3 µs  | 95.7 µs  | 132.3 µs | 132.3 µs |
 | Fast: Read item by path            | 2.6 µs   | 2.8 µs   | 3.2 µs   | 3.2 µs   |
 | Fast: Update item                  | 24.9 µs  | 24.7 µs  | 57.9 µs  | 57.9 µs  |
