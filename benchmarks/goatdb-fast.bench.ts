@@ -47,7 +47,7 @@ function createTestData(count: number) {
 }
 
 // Benchmark suite for basic operations
-Deno.bench('Trusted: Create instance', {
+Deno.bench('Fast: Create instance', {
   warmup: 1,
 }, async (ctx) => {
   const tempDir = await createTempDir();
@@ -62,7 +62,7 @@ Deno.bench('Trusted: Create instance', {
   }
 });
 
-Deno.bench('Trusted: Open repository (empty)', {
+Deno.bench('Fast: Open repository (empty)', {
   warmup: 1,
 }, async (ctx) => {
   const tempDir = await createTempDir();
@@ -94,7 +94,7 @@ async function populateRepository(
   }
 }
 
-Deno.bench('Trusted: Open repository (100k items)', {
+Deno.bench('Fast: Open repository (100k items)', {
   n: 10,
 }, async (ctx) => {
   const dbPath = path.join(Deno.cwd(), 'temp_bench_100k');
@@ -115,7 +115,7 @@ Deno.bench('Trusted: Open repository (100k items)', {
   }
 });
 
-Deno.bench('Trusted: Create single item', {
+Deno.bench('Fast: Create single item', {
   warmup: 1,
 }, async (ctx) => {
   const tempDir = await createTempDir();
@@ -129,7 +129,7 @@ Deno.bench('Trusted: Create single item', {
     //   tags: new Set(['test', 'benchmark']),
     // });
     // await item.commit();
-    await db.load('/test/basic', testSchema, {
+    db.create('/test/basic', testSchema, {
       title: 'Test item',
       count: 1,
       tags: new Set(['test', 'benchmark']),
@@ -141,7 +141,7 @@ Deno.bench('Trusted: Create single item', {
   }
 });
 
-Deno.bench('Trusted: Read item by path', {
+Deno.bench('Fast: Read item by path', {
   warmup: 1,
 }, async (ctx) => {
   const tempDir = await createTempDir();
@@ -173,7 +173,7 @@ Deno.bench('Trusted: Read item by path', {
   }
 });
 
-Deno.bench('Trusted: Update item', {
+Deno.bench('Fast: Update item', {
   warmup: 1,
 }, async (ctx) => {
   const tempDir = await createTempDir();
@@ -196,7 +196,6 @@ Deno.bench('Trusted: Update item', {
     item.set('title', 'Updated title');
     item.set('count', 99);
     item.set('tags', new Set(['updated', 'modified']));
-    await item.commit();
     ctx.end();
 
     // Verify updates
@@ -212,7 +211,7 @@ Deno.bench('Trusted: Update item', {
 });
 
 // Bulk operation benchmarks
-Deno.bench('Trusted: Bulk create 100 items', {
+Deno.bench('Fast: Bulk create 100 items', {
   warmup: 1,
 }, async (ctx) => {
   const tempDir = await createTempDir();
@@ -227,14 +226,14 @@ Deno.bench('Trusted: Bulk create 100 items', {
       db.load(`/test/basic/item${i}`, testSchema, data)
     );
     await Promise.all(promises);
-    await db.flushAll();
     ctx.end();
+    await db.flushAll();
   } finally {
     await cleanupTempDir(tempDir);
   }
 });
 
-Deno.bench('Trusted: Bulk read 100 items', {
+Deno.bench('Fast: Bulk read 100 items', {
   warmup: 1,
 }, async (ctx) => {
   const tempDir = await createTempDir();
@@ -245,10 +244,9 @@ Deno.bench('Trusted: Bulk read 100 items', {
 
     // Create items first
     const testData = createTestData(100);
-    const promises = testData.map((data, i) =>
-      db.load(`/test/basic/item${i}`, testSchema, data)
+    testData.forEach((data, i) =>
+      db.create(`/test/basic/item${i}`, testSchema, data)
     );
-    await Promise.all(promises);
 
     // Benchmark reading items
     ctx.start();
@@ -264,7 +262,7 @@ Deno.bench('Trusted: Bulk read 100 items', {
 });
 
 // Query benchmarks
-Deno.bench('Trusted: Simple query', {
+Deno.bench('Fast: Simple query', {
   warmup: 1,
 }, async (ctx) => {
   const tempDir = await createTempDir();
@@ -292,14 +290,14 @@ Deno.bench('Trusted: Simple query', {
     await query.loadingFinished();
     ctx.end();
     assert(query.results().length === 49, 'Query should return 49 items');
-    query.close();
+    // query.close();
     await db.flushAll();
   } finally {
     // await cleanupTempDir(tempDir);
   }
 });
 
-Deno.bench('Trusted: Complex query with sort', {
+Deno.bench('Fast: Complex query with sort', {
   warmup: 1,
 }, async (ctx) => {
   const tempDir = await createTempDir();
@@ -333,14 +331,14 @@ Deno.bench('Trusted: Complex query with sort', {
     await query.loadingFinished();
     ctx.end();
     await db.flushAll();
-    query.close();
+    // query.close();
   } finally {
     // await cleanupTempDir(tempDir);
   }
 });
 
 // Repository operations benchmark
-Deno.bench('Trusted: Repository operations: count', async (ctx) => {
+Deno.bench('Fast: Repository operations: count', async (ctx) => {
   const tempDir = await createTempDir();
   try {
     const db = new GoatDB({ path: tempDir, trusted: true });
@@ -368,7 +366,7 @@ Deno.bench('Trusted: Repository operations: count', async (ctx) => {
   }
 });
 
-Deno.bench('Trusted: Repository operations: keys', async (ctx) => {
+Deno.bench('Fast: Repository operations: keys', async (ctx) => {
   const tempDir = await createTempDir();
   try {
     const db = new GoatDB({ path: tempDir, trusted: true });

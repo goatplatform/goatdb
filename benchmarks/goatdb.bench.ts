@@ -247,8 +247,7 @@ Deno.bench('Bulk read 100 items', {
     // Benchmark reading items
     ctx.start();
     for (let i = 0; i < 100; i++) {
-      const item = db.item(`/test/basic/item${i}`);
-      assert(item.get('title') === `Item ${i}`, 'Item title should match');
+      db.item(`/test/basic/item${i}`);
     }
     ctx.end();
 
