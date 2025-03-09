@@ -91,7 +91,7 @@ async function JSONLogFileStartCursor(
 type ScanResult = [results: readonly ReadonlyJSONObject[], done: boolean];
 async function JSONLogFileScan(cursor: JSONLogFileCursor): Promise<ScanResult> {
   const pendingObjects: ReadonlyJSONObject[] = [];
-  while (pendingObjects.length <= 50) {
+  while (pendingObjects.length <= 100) {
     while (cursor.readBufLen <= 0) {
       const bytesRead = await cursor.file.impl.read(
         cursor.file.handle,
