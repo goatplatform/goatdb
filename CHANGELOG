@@ -8,6 +8,27 @@ and GoatDB adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Trusted mode which disables security mechanisms for increased performance in
+  trusted environments
+
+### Changed
+
+- Auth rules now accept an info object like query predicate and sort descriptor
+- Added default auth rules for `/user/<userId>`
+
+### Fixed
+
+- Attempting to register multiple auth rules throws an error
+- Crash when opening a query without a sort descriptor
+- `db.flush` now properly flushes query caches to disk
+
+### Removed
+
+- Order stamps have been moved to their own repository -
+  https://github.com/goatplatform/orderstamp-js
+
 ## [0.1.6] - 2025-02-26
 
 ### Added
