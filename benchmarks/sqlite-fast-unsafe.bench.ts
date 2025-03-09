@@ -118,6 +118,26 @@ Deno.bench('SQLite-fast-unsafe: Open database (100k items)', {
   }
 });
 
+Deno.bench('SQLite-fast-unsafe: Read 100k items', {
+  n: 10,
+}, async (ctx) => {
+  const dbPath = path.join(Deno.cwd(), 'temp_bench_sqlite_100k.db');
+  try {
+    await populateDatabase(dbPath, 100000);
+
+    ctx.start();
+    const db = new DatabaseSync(dbPath);
+    const res = db.prepare('SELECT * FROM test_items').all();
+    ctx.end();
+
+    assert(res.length === 100000, 'Database should have 100000 items');
+    db.close();
+  } finally {
+    // Not deleting large test database to allow for repeated benchmarks
+    // await cleanupTempDb(dbPath);
+  }
+});
+
 Deno.bench('SQLite-fast-unsafe: Create single item', {
   warmup: 1,
 }, async (ctx) => {

@@ -68,14 +68,23 @@ simply discard any incomplete writes.
 GoatDB is a memory-first database built on an append-only distributed commit
 graph stored as a log of commits on disk. This design currently requires the
 entire commit graph to be loaded into memory before any operations can be
-performed. Consequently, opening a repository takes time proportional to the
-number of commits it contains. Bringing the raw log data into memory is the
-least time-consuming part of the open routine (approximately 10% of the total
-time), while the majority is spent on deserializing and constructing the
+performed.
+
+Opening a repository takes time proportional to the number of commits it
+contains. While the benchmark shows GoatDB is significantly slower than SQLite
+when opening a repository with 100k items (721ms vs 186µs), it's important to
+note that if we actually read the entire table's contents into memory, GoatDB is
+only about 5x slower than SQLite's `SELECT *` operation (721ms vs 136ms).
+
+The performance breakdown of repository opening reveals that bringing the raw
+log data into memory is the least time-consuming part (approximately 10% of the
+total time). The majority is spent on deserializing and constructing the
 in-memory representation of the commit graph—a particularly challenging workload
-for modern JavaScript garbage collectors. To address this performance
-bottleneck, we are developing a zero-copy format that will significantly reduce
-this overhead.
+for modern JavaScript garbage collectors.
+
+To address this performance bottleneck, we are developing a zero-copy format
+that will significantly reduce this overhead and bring opening times much closer
+to SQLite's performance.
 
 GoatDB uses a different scaling approach than traditional databases. Rather than
 growing a single large database, it employs application-level sharding with
@@ -205,6 +214,7 @@ operations to provide a fair comparison:
 | SQLite: Create instance            | 203.2 µs | 195.5 µs | 396.0 µs | 506.9 µs |
 | SQLite: Create table               | 1.1 ms   | 1.1 ms   | 2.0 ms   | 2.2 ms   |
 | SQLite: Open database (100k items) | 186.3 µs | 199.9 µs | 332.2 µs | 342.4 µs |
+| SQLite: Read 100k items            | 138.7 ms | 139.7 ms | 153.3 ms | 153.3 ms |
 | SQLite: Create single item         | 815.6 µs | 889.9 µs | 1.2 ms   | 1.2 ms   |
 | SQLite: Read item by ID            | 67.0 µs  | 71.6 µs  | 121.7 µs | 126.0 µs |
 | SQLite: Update item                | 780.6 µs | 891.5 µs | 1.2 ms   | 1.3 ms   |
@@ -227,6 +237,7 @@ risking a corruption of the database in case of sudden system failure.
 | SQLite-fast-unsafe: Create instance       | 160.3 µs | 171.9 µs | 277.5 µs | 313.4 µs |
 | SQLite-fast-unsafe: Create table          | 507.4 µs | 526.2 µs | 871.4 µs | 982.0 µs |
 | SQLite-fast-unsafe: Open database (100k)  | 196.3 µs | 214.5 µs | 355.5 µs | 390.1 µs |
+| SQLite-fast-unsafe: Read 100k items       | 136.5 ms | 141.0 ms | 149.7 ms | 149.7 ms |
 | SQLite-fast-unsafe: Create single item    | 701.4 µs | 877.2 µs | 1.4 ms   | 1.4 ms   |
 | SQLite-fast-unsafe: Read item by ID       | 63.9 µs  | 67.2 µs  | 142.1 µs | 179.0 µs |
 | SQLite-fast-unsafe: Update item           | 521.8 µs | 534.5 µs | 1.3 ms   | 1.3 ms   |
