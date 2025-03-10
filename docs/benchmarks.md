@@ -118,13 +118,13 @@ for multi-user applications without complex manual sharding.
 
 SQLite shines in query performance with its decades of battle-tested
 optimizations, though GoatDB's incremental queries perform competitively in
-real-world scenarios despite their simpler implementation.
-
-It's worth noting that GoatDB is implemented in TypeScript for browser
-compatibility, while SQLite is written in C with decades of optimization. This
-difference in language and maturity explains some of the performance gaps.
-SQLite's superior performance in queries and database creation demonstrates its
-status as a highly optimized database engine refined since 2000.
+real-world scenarios despite their simpler implementation. While GoatDB is
+written in TypeScript and SQLite in C, the benchmark differences primarily stem
+from fundamentally different architectures rather than language choice, as
+modern JavaScript runtimes are quite competitive on raw performance. GoatDB
+prioritizes distributed operation and offline-first capabilities, while SQLite's
+B-tree implementation has been refined since 2000 for traditional database
+performance, reflecting their different design goals.
 
 ## Default Mode
 
