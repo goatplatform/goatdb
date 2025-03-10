@@ -7,9 +7,32 @@ nav_order: 8
 
 # GoatDB Benchmarks
 
+- [Summary](#summary)
+- [Default Mode](#default-mode)
+- [Trusted Mode](#trusted-mode)
+- [Fast Mode](#fast-mode)
+- [SQLite Comparison](#sqlite-comparison)
+  - [synchronous = OFF](#synchronous--off)
+
 GoatDB's benchmarks provide a performance comparison between GoatDB's different
 operational modes and SQLite. These benchmarks help understand the performance
 characteristics and tradeoffs of each approach.
+
+We're comparing GoatDB to SQLite because SQLite is widely considered the gold
+standard for embedded databases, offering an excellent balance of features,
+performance, and reliability.
+
+SQLite is built using classic RDBMS techniques and especially shines when
+complex queries on larger-than-memory datasets are needed. However, when
+implementing synchronization mechanisms and security controls for offline
+writes, GoatDB is able to offer competitive performance.
+
+The most basic trade-off between the two systems is that GoatDB first loads the
+entire dataset into memory before any operations can be performed. This comes
+with its own unique set of trade-offs. It's important to note that GoatDB isn't
+trying to replace SQLite, but rather carve its own niche for specific use cases
+where in-memory operations, offline capabilities, and cryptographic security are
+prioritized over handling larger-than-memory datasets.
 
 Replicating these benchmarks on your machine is easy. Just clone the
 [GoatDB repository](https://github.com/goatplatform/goatdb) and run:
@@ -99,26 +122,21 @@ real-world scenarios despite their simpler implementation.
 
 It's worth noting that GoatDB is implemented in TypeScript for browser
 compatibility, while SQLite is written in C with decades of optimization. This
-difference in language and maturity explains many performance gaps. SQLite's
-superior performance in queries and database creation demonstrates its status as
-a highly optimized database engine refined since 2000.
+difference in language and maturity explains some of the performance gaps.
+SQLite's superior performance in queries and database creation demonstrates its
+status as a highly optimized database engine refined since 2000.
 
 ## Default Mode
 
-GoatDB offers two operational modes: Default and Trusted. The benchmarks below
-show performance in Default mode, which includes all security and cryptographic
-controls. While these controls add some performance overhead, they enable
-critical features such as:
+The benchmarks below show performance in Default mode, which includes all
+security and cryptographic controls. While these controls add some performance
+overhead, they enable critical features such as:
 
 - Cryptographically verified data integrity
 - Secure multi-user collaboration
 - Ability for clients to securely restore a crashed server
 - Protection against unauthorized data modifications
 - Full audit trail of all changes
-
-For performance-critical applications where these security features aren't
-required, see the Trusted mode benchmarks below, which offer significantly
-better performance.
 
 | Benchmark                    | Average  | p75      | p99      | p995     |
 | ---------------------------- | -------- | -------- | -------- | -------- |
@@ -200,14 +218,6 @@ SQLite is currently the leading choice in embedded databases, known for its
 reliability and performance. While SQLite doesn't provide any security controls
 nor synchronizes across devices, its benchmark is provided here for reference
 purposes.
-
-GoatDB offers features like cryptographic verification, multi-device
-synchronization, and access controls that SQLite doesn't provide. However, it's
-useful to compare performance with this industry standard to understand the
-trade-offs between security features and raw performance.
-
-The following benchmarks were conducted using the same test data and similar
-operations to provide a fair comparison:
 
 | Benchmark                          | Average  | p75      | p99      | p995     |
 | ---------------------------------- | -------- | -------- | -------- | -------- |
