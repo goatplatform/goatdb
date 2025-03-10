@@ -134,9 +134,10 @@ overhead, they enable critical features such as:
 
 - Cryptographically verified data integrity
 - Secure multi-user collaboration
-- Ability for clients to securely restore a crashed server
-- Protection against unauthorized data modifications
-- Full audit trail of all changes
+- Clients act as active replicas automatically and securely restoring a crashed
+  server
+- Protection against unauthorized offline data modifications
+- Replicated tamper-proof audit trail of all changes
 
 | Benchmark                    | Average  | p75      | p99      | p995     |
 | ---------------------------- | -------- | -------- | -------- | -------- |
@@ -180,12 +181,11 @@ running in the cloud without direct client interaction.
 Fast mode is similar to trusted mode, but with one key difference: the code
 doesn't wait for updates to be persisted to local disk before acknowledging
 completion. Instead, GoatDB persists updates in the background, writing to both
-the local disk and remote server in concurrently. This mode is particularly
-useful for caching applications in backend environments or for trusted systems
-where performance is the highest priority while still maintaining eventual
-durability. Fast mode is ideal when you need maximum throughput for high-volume
-operations while accepting a small risk of data loss in case of sudden system
-failure.
+the local disk and remote server concurrently. This mode is particularly useful
+for caching applications in backend environments or for trusted systems where
+performance is the highest priority while still maintaining eventual durability.
+Fast mode is ideal when you need maximum throughput for high-volume operations
+while accepting a small risk of data loss in case of sudden system failure.
 
 Even in Fast mode, GoatDB maintains data integrity through its append-only
 commit graph architecture. This design provides inherent resistance to
