@@ -21,7 +21,7 @@
   },
   "tasks": {
     "build": "deno run -A system-assets/build-sys-assets.ts",
-    "test": "deno test -A --no-check",
+    "test": "deno run -A tests/run.ts",
     "bench": "deno bench -A --no-check"
   },
   "imports": {

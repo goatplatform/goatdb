@@ -1,20 +1,9 @@
-import { GoatDB } from './db.ts';
+import { GoatDB } from '../db/db.ts';
 import { SchemaManager } from '../cfds/base/schema-manager.ts';
-import * as path from '@std/path';
 import { assertEquals, assertExists } from '@std/assert';
 import { expect } from '@std/expect';
-
-// Create temporary test directory
-const TEST_DIR = await Deno.makeTempDir({ prefix: 'goatdb-test-' });
-
-// Clean up function to be called after tests
-async function cleanup() {
-  try {
-    await Deno.remove(TEST_DIR, { recursive: true });
-  } catch (e) {
-    console.error('Failed to clean up test directory:', e);
-  }
-}
+import { TEST } from './mod.ts';
+import { assertTrue } from './asserts.ts';
 
 // Define a test schema
 const TestSchema = {
@@ -26,19 +15,21 @@ const TestSchema = {
   },
 } as const;
 
-SchemaManager.default.registerSchema(TestSchema);
+const kSchemaManager = new SchemaManager();
+kSchemaManager.registerSchema(TestSchema);
 
-Deno.test('Trusted - initialization', async () => {
+TEST('Trusted', 'initialization', async (ctx) => {
   const db = new GoatDB({
-    path: path.join(TEST_DIR, 'db-init'),
+    path: await ctx.tempDir('db-init'),
     orgId: 'test-org',
     trusted: true,
+    schemaManager: kSchemaManager,
   });
 
   try {
     assertEquals(db.orgId, 'test-org');
-    assertEquals(db.path, path.join(TEST_DIR, 'db-init'));
-    assertEquals(db.schemaManager, SchemaManager.default);
+    assertEquals(db.path, await ctx.tempDir('db-init'));
+    assertEquals(db.schemaManager, kSchemaManager);
 
     // Should start not ready
     assertEquals(db.ready, false);
@@ -55,11 +46,12 @@ Deno.test('Trusted - initialization', async () => {
   }
 });
 
-Deno.test('Trusted - repository operations', async () => {
+TEST('Trusted', 'repository operations', async (ctx) => {
   const db = new GoatDB({
-    path: path.join(TEST_DIR, 'db-repo'),
+    path: await ctx.tempDir('db-repo'),
     orgId: 'test-org',
     trusted: true,
+    schemaManager: kSchemaManager,
   });
 
   try {
@@ -90,11 +82,12 @@ Deno.test('Trusted - repository operations', async () => {
   }
 });
 
-Deno.test('Trusted - item management', async () => {
+TEST('Trusted', 'item management', async (ctx) => {
   const db = new GoatDB({
-    path: path.join(TEST_DIR, 'db-items'),
+    path: await ctx.tempDir('db-items'),
     orgId: 'test-org',
     trusted: true,
+    schemaManager: kSchemaManager,
   });
 
   try {
@@ -103,7 +96,7 @@ Deno.test('Trusted - item management', async () => {
     // Create an item
     const item = db.create('/test/items', TestSchema, { name: 'Test Item' });
     assertExists(item);
-    assertEquals(item.schema, TestSchema);
+    assertTrue(item.schema === TestSchema);
     assertEquals(item.get('name'), 'Test Item');
     assertEquals(item.get('count'), 0); // Default value
 
@@ -132,11 +125,12 @@ Deno.test('Trusted - item management', async () => {
   }
 });
 
-Deno.test('Trusted - bulk load', async () => {
+TEST('Trusted', 'bulk load', async (ctx) => {
   const db = new GoatDB({
-    path: path.join(TEST_DIR, 'db-bulk'),
+    path: await ctx.tempDir('db-bulk'),
     orgId: 'test-org',
     trusted: true,
+    schemaManager: kSchemaManager,
   });
 
   try {
@@ -167,11 +161,12 @@ Deno.test('Trusted - bulk load', async () => {
   }
 });
 
-Deno.test('Trusted - query functionality', async () => {
+TEST('Trusted', 'query functionality', async (ctx) => {
   const db = new GoatDB({
-    path: path.join(TEST_DIR, 'db-query'),
+    path: await ctx.tempDir('db-query'),
     orgId: 'test-org',
     trusted: true,
+    schemaManager: kSchemaManager,
   });
 
   try {
@@ -207,14 +202,4 @@ Deno.test('Trusted - query functionality', async () => {
   } finally {
     await db.flushAll();
   }
-});
-
-// Run cleanup after all tests
-Deno.test({
-  name: 'Clean up test resources',
-  fn: async () => {
-    await cleanup();
-  },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
