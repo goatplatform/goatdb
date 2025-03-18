@@ -68,4 +68,17 @@ export const FileImplDeno: FileImpl<Deno.FsFile> = {
   getCWD() {
     return Deno.cwd();
   },
+
+  getTempDir() {
+    return Deno.makeTempDir();
+  },
+
+  async mkdir(path: string) {
+    try {
+      await Deno.mkdir(path, { recursive: true });
+      return true;
+    } catch (_: unknown) {
+      return false;
+    }
+  },
 };

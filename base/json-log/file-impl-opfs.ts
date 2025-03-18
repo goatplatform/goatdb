@@ -114,4 +114,13 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
   getCWD() {
     return '/';
   },
+
+  getTempDir() {
+    return Promise.resolve('/temp');
+  },
+
+  async mkdir(path: string) {
+    await getDir(path);
+    return true;
+  },
 };
