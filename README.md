@@ -8,7 +8,7 @@
 
 ---
 
-# GoatDB: Lightweight NoDB for Deno & React
+# GoatDB: Embedded, distributed, NoSQL database
 
 <p align="center">
 
@@ -19,23 +19,32 @@
 
 </p>
 
-GoatDB is a real-time, version-controlled database for
-**[Deno](https://deno.com/)**, **[React](https://react.dev/)**, and low-friction
-deployments. It’s ideal for **prototyping**, **self-hosting**, **single-tenant**
-apps, as well as **ultra light multi-tenant** setups without heavy backends or
-complex DBs.
+GoatDB is an embedded, distributed NoSQL database that prioritizes speed and
+developer experience. It excels at real-time collaboration and embedded caching
+applications.
 
-- **No Dedicated Infra**: Run the entire DB client-side, with incremental
-  queries that remove the need for server-side indexing.
+Instead of following traditional database design patterns, GoatDB leverages
+concepts refined over decades by distributed version control systems. These are
+enhanced with novel algorithms (bloom filter-based synchronization and ephemeral
+CRDTs) for efficient synchronization and automatic real-time conflict
+resolution.
 
-- **Resilience & Offline-First**: If the server goes down, clients keep working
-  and can restore server state on reboot.
+Currently optimized for JavaScript environments, GoatDB functions as a
+first-class citizen in both browsers and servers. It utilizes a document model
+with schemas, providing causal eventual consistency to simplify development
+while offering built-in optional cryptographic signing for the underlying commit
+graph.
 
-- **Edge-Native**: Most processing happens in the client, keeping servers light
-  and fast.
+GoatDB implements incremental local queries, leveraging its version control
+internals to efficiently process only changed documents.
 
-- **Real-Time Collaboration**: Built-in sync automatically keeps client and
-  server state synchronized in real-time.
+GoatDB employs a memory-first design and a different scaling approach than
+traditional databases. Rather than growing a single large database, it uses
+application-level sharding with multiple medium-sized repositories that sync
+independently. Each user or data group has its own repository, enabling
+horizontal scaling and efficient client-server synchronization. This
+architecture provides natural scalability for multi-user applications without
+complex manual sharding.
 
 👉 If you like what we're building, please star ⭐️ our project. We really
 appreciate it! 🙏
@@ -171,52 +180,6 @@ That’s it! GoatDB keeps your app running even if the server fails, with client
 seamlessly backing up and restoring data. No complex indexing required, thanks
 to incremental queries.
 
-## Security
-
-GoatDB employs a robust security model where each node maintains its own
-public-private key pair. The private key never leaves the local machine,
-ensuring secure commit signing, while the public key enables other nodes to
-verify changes. Every commit is digitally signed by its originating node,
-creating an immutable chain of custody. When commits are received, nodes verify
-both the authenticity and integrity using the public key, automatically
-rejecting any unauthorized or tampered changes.
-
-The system also includes customizable application-level authorization rules that
-enforce business policies, such as restricting users to only edit their own
-data. This dual-layer approach combines cryptographic verification with flexible
-access controls to create a comprehensive security model that protects data
-integrity at both the protocol and application levels. Any mutations that
-violate either the cryptographic signatures or authorization policies are
-rejected, maintaining consistency and security across the network.
-
-## Conflict Resolution
-
-GoatDB resolves conflicts by performing a three-way merge whenever it finds more
-than one differing value on the leaves of its commit graph. Internally, it
-transforms the base version of the data into a temporary CRDT, applies the
-changes from each branch, and then captures the final merged output before
-discarding the CRDT. This approach provides the advantages of CRDTs—simple,
-automatic resolution of concurrent edits—without forcing every node to maintain
-the entire editing history.
-
-To handle indexing conflicts efficiently, GoatDB takes inspiration from Logoot
-by assigning continuous identifiers to each element in the data, ensuring
-insertions and deletions won’t interfere with each other. When multiple edits
-occur at the same location, GoatDB merges them using a globally agreed-upon
-order of commits, resolving differences by either choosing one change, combining
-both, or merging them (e.g., “cat” + “hat” → “chat”). This ensures predictable
-conflict handling at scale, making GoatDB well-suited for hackathon projects and
-quick prototypes where ease of collaboration and simplicity are key.
-
-## Tests
-
-GoatDB has a test suite to ensure reliability and performance. While not yet
-comprehensive, we're working on expanding them. You can run the tests using:
-
-```bash
-deno task test
-```
-
 ## Contributing
 
 **All contributions to this project are made under the Apache License, Version
@@ -245,6 +208,20 @@ To unlink GoatDB, run:
 
 ```bash
 deno run -A jsr:@goatdb/goatdb/link unlink
+```
+
+GoatDB has a test suite to ensure reliability and performance. While not yet
+comprehensive, we're working on expanding them. You can run the tests using:
+
+```bash
+deno task test
+```
+
+GoatDB includes benchmarks to measure performance across various operations. To
+run the benchmarks:
+
+```bash
+deno task bench
 ```
 
 ## License
