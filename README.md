@@ -19,15 +19,17 @@
 
 </p>
 
-GoatDB is an embedded, distributed NoSQL database that prioritizes speed and
-developer experience. It excels at real-time collaboration and embedded caching
-applications.
+GoatDB is an embedded, distributed NoSQL database that prioritizes
+[speed](https://goatdb.dev/benchmarks) and
+[developer experience](https://goatdb.dev/tutorial/). It excels at real-time
+collaboration and embedded caching applications.
 
 Instead of following traditional database design patterns, GoatDB leverages
 concepts refined over decades by distributed version control systems. These are
-enhanced with novel algorithms (bloom filter-based synchronization and ephemeral
-CRDTs) for efficient synchronization and automatic real-time conflict
-resolution.
+enhanced with novel algorithms
+([bloom filter-based synchronization](https://goatdb.dev/sync/) and
+[ephemeral CRDTs](https://goatdb.dev/conflict-resolution)) for efficient
+synchronization and automatic real-time conflict resolution.
 
 Currently optimized for JavaScript environments, GoatDB functions as a
 first-class citizen in both browsers and servers. It utilizes a document model
