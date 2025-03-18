@@ -275,7 +275,7 @@ export class AuthEndpoint implements Endpoint {
       session.owner = userKey;
       sessionsRepo.setValueForKey(
         session.id,
-        await sessionToItem(session),
+        await sessionToItem(session, services.db.schemaManager),
         sessionsRepo.headForKey(session.id),
       );
       // Update user stats
@@ -320,7 +320,7 @@ export async function persistSession(
   session: Session | OwnedSession,
 ): Promise<void> {
   const repo = await services.db.open('/sys/sessions');
-  const record = await sessionToItem(session);
+  const record = await sessionToItem(session, services.db.schemaManager);
   await repo.setValueForKey(session.id, record, undefined);
   await services.db.flush('/sys/sessions');
 }
@@ -440,7 +440,7 @@ export async function requireSignedUser(
   // Anonymous access
   if (userId === undefined) {
     if (role === 'anonymous') {
-      return [null, Item.nullItem(), signerSession];
+      return [null, Item.nullItem(services.db.schemaManager), signerSession];
     }
     throw accessDenied();
   }

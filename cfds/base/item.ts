@@ -113,16 +113,23 @@ export class Item<S extends Schema = Schema>
     }
   }
 
-  private static _kNullDocument: Item<typeof kNullSchema> | undefined;
+  private static _kNullDocuments = new Map<
+    SchemaManager,
+    Item<typeof kNullSchema>
+  >();
   /**
    * @returns An item with the null schema.
    */
-  static nullItem<S extends Schema = typeof kNullSchema>(): Item<S> {
-    if (!this._kNullDocument) {
-      this._kNullDocument = new this({ schema: kNullSchema, data: {} });
-      this._kNullDocument.lock();
+  static nullItem<S extends Schema = typeof kNullSchema>(
+    schemaManager: SchemaManager,
+  ): Item<S> {
+    let doc = this._kNullDocuments.get(schemaManager);
+    if (!doc) {
+      doc = new this({ schema: kNullSchema, data: {} }, schemaManager);
+      doc.lock();
+      this._kNullDocuments.set(schemaManager, doc);
     }
-    return this._kNullDocument as unknown as Item<S>;
+    return doc as unknown as Item<S>;
   }
 
   /**
@@ -360,7 +367,7 @@ export class Item<S extends Schema = Schema>
       schema,
       data: clone(schema, this._data),
       normalized: this._normalized,
-    });
+    }, this.schemaManager);
     result._checksum = this._checksum;
     return result;
   }

@@ -26,7 +26,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
       this.commit();
     });
     const repo = db.repository(itemPathGetRepoId(path));
-    this._item = Item.nullItem();
+    this._item = Item.nullItem(db.schemaManager);
     if (!repo) {
       this.loadRepoAndDoc();
     } else {
@@ -38,7 +38,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
    * Returns the key of this item within its repository.
    */
   get key(): string {
-    return itemPathGetPart(this.path, 'item');
+    return itemPathGetPart(this.path, 'item')!;
   }
 
   /**
@@ -167,7 +167,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
       return;
     }
     const [doc, head] = repo.rebase(
-      itemPathGetPart(this.path, 'item'),
+      itemPathGetPart(this.path, 'item')!,
       this._item,
       this._head,
     );
@@ -190,7 +190,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
   }
 
   downloadDebugGraph(): void {
-    const key = itemPathGetPart(this.path, 'item');
+    const key = itemPathGetPart(this.path, 'item')!;
     this.repository?.downloadDebugNetworkForKey(key);
   }
 
@@ -228,7 +228,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
     this._commitInProgress = true;
     this._commitDelayTimer.unschedule();
     const currentDoc = this._item.clone();
-    const key = itemPathGetPart(this.path, 'item');
+    const key = itemPathGetPart(this.path, 'item')!;
     const repo = await this.db.open(itemPathGetRepoId(this.path));
     const newHead = await repo.setValueForKey(key, currentDoc, this._head);
     if (newHead) {
@@ -250,7 +250,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
    * @param repo The repository to load from.
    */
   private loadInitialDoc(repo: Repository): void {
-    const entry = repo.valueForKey<S>(itemPathGetPart(this.path, 'item'));
+    const entry = repo.valueForKey<S>(itemPathGetPart(this.path, 'item')!);
 
     if (this.schema.ns === null) {
       if (entry) {

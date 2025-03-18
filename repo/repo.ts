@@ -771,7 +771,7 @@ export class Repository<
             // No good parents are available. This key is effectively null.
             result = lastGoodCommit
               ? this.itemForCommit(lastGoodCommit)
-              : Item.nullItem();
+              : Item.nullItem(this.db.schemaManager);
           }
           // assert(result.checksum === contents.edit.srcChecksum);
           // result.patch(contents.edit.changes);
@@ -929,7 +929,7 @@ export class Repository<
       commitsToMerge,
     ).filter((c) => this.hasItemForCommit(c));
     if (!commitsToMerge.length) {
-      return [Item.nullItem(), undefined];
+      return [Item.nullItem(this.db.schemaManager), undefined];
     }
     const session = this.trustPool.currentSession.id;
     const roots = commitsToMerge
@@ -954,14 +954,14 @@ export class Repository<
       );
     }
     if (commitsToMerge.length === 0 && !foundRoot && roots.length === 0) {
-      return [Item.nullItem(), undefined];
+      return [Item.nullItem(this.db.schemaManager), undefined];
     }
     // If no LCA is found then we're dealing with concurrent writers who all
     // created of the same key unaware of each other.
     // Use the null record as a base in this case.
     const base = lca
       ? this.itemForCommit(lca).clone()
-      : Item.nullItem().clone();
+      : Item.nullItem(this.db.schemaManager).clone();
     // Upgrade base to merge scheme
     if (scheme.ns !== null) {
       base.upgradeSchema(scheme);
@@ -973,7 +973,7 @@ export class Repository<
     // Note that we start with these changes in order to let later changes
     // override them as concurrent root creation is likely a temporary
     // error.
-    const nullRecord = Item.nullItem();
+    const nullRecord = Item.nullItem(this.db.schemaManager);
     for (const c of roots) {
       const record = this.itemForCommit(c);
       if (record.isNull) {
@@ -1262,7 +1262,9 @@ export class Repository<
       return [record, headId instanceof Commit ? headId.id : undefined];
     }
     const baseRecord = (
-      headId ? this.itemForCommit<S>(headId) : (Item.nullItem() as Item<S>)
+      headId
+        ? this.itemForCommit<S>(headId)
+        : (Item.nullItem(this.db.schemaManager) as Item<S>)
     ).clone();
     if (
       !headRecord.isNull &&

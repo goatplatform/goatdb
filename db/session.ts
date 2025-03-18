@@ -21,6 +21,7 @@ import {
   encodeBase32URL,
 } from '../base/string.ts';
 import { LRUCache } from '../base/lru-cache.ts';
+import { SchemaManager } from '../cfds/base/schema-manager.ts';
 
 export const SESSION_CRYPTO_KEY_GEN_PARAMS: EcKeyGenParams = {
   name: 'ECDSA',
@@ -386,9 +387,10 @@ export async function decodeSession(
 
 export async function sessionToItem(
   session: Session,
+  schemaManager: SchemaManager,
 ): Promise<Item<SchemaTypeSession>> {
   const encodedSession = await encodeSession(session);
-  return encodedSessionToItem(encodedSession);
+  return encodedSessionToItem(encodedSession, schemaManager);
 }
 
 export async function sessionFromItem(
@@ -399,6 +401,7 @@ export async function sessionFromItem(
 
 export function encodedSessionToItem(
   encodedSession: EncodedSession,
+  schemaManager: SchemaManager,
 ): Item<SchemaTypeSession> {
   return new Item<SchemaTypeSession>({
     schema: kSchemaSession,
@@ -408,7 +411,7 @@ export function encodedSessionToItem(
       expiration: deserializeDate(encodedSession.expiration),
       publicKey: JSON.stringify(encodedSession.publicKey),
     },
-  });
+  }, schemaManager);
 }
 
 export function encodedSessionFromItem(
