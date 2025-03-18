@@ -8,7 +8,7 @@
 
 ---
 
-# GoatDB: Embedded, distributed, NoSQL database
+# GoatDB: Embedded, Distributed, NoSQL Database
 
 <p align="center">
 
