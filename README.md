@@ -48,6 +48,10 @@ horizontal scaling and efficient client-server synchronization. This
 architecture provides natural scalability for multi-user applications without
 complex manual sharding.
 
+Items in GoatDB are defined alongside their schema. Schemas dictate both the field
+types and their conflict resolution strategy. Schemas are themselves versioned,
+making rolling schema updates via branches a natural mechanism.​​​​​​​​​​​​​​​​
+
 👉 If you like what we're building, please star ⭐️ our project. We really
 appreciate it! 🙏
 
