@@ -8,7 +8,7 @@
 
 ---
 
-# GoatDB: An Embedded, Distributed, NoSQL Database
+# GoatDB: An Embedded, Distributed, Document Database
 
 <p align="center">
 
@@ -19,7 +19,7 @@
 
 </p>
 
-GoatDB is an embedded, distributed NoSQL database that prioritizes
+GoatDB is an embedded, distributed, document database that prioritizes
 [speed](https://goatdb.dev/benchmarks) and
 [developer experience](https://goatdb.dev/tutorial/). It excels at real-time
 collaboration and embedded caching applications.
