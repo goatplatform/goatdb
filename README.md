@@ -14,7 +14,6 @@
 
 [Tutorial](https://goatdb.dev/tutorial) • [Documentation](https://goatdb.dev) •
 [FAQ](https://goatdb.dev/faq) • [Benchmarks](https://goatdb.dev/benchmarks) •
-[Reddit](https://www.reddit.com/r/goatdb) •
 [Discord](https://discord.gg/SAt3cbUqxr)
 
 </p>
