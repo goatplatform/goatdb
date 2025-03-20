@@ -60,9 +60,9 @@ the underlying platform:
 
 - **Server and Native Clients**: Data is stored as an append-only log file on
   disk.
-- **Browsers**: When available, GoatDB uses the Origin Private File System
-  (OPFS) to maintain an append-only log structure. In environments lacking OPFS
-  support, it defaults to an IndexedDB-based implementation.
+- **Browsers**: GoatDB uses the Origin Private File System (OPFS) to maintain an
+  append-only log structure, providing efficient and reliable storage for
+  browser environments.
 
 ## Development and Deployment
 

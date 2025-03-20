@@ -45,8 +45,7 @@ requiring additional setup steps.
 
 - **Behavior:**
 
-  - Uses the Origin Private File System (OPFS) for storage if available; falls
-    back to IndexedDB otherwise.
+  - Uses the Origin Private File System (OPFS) for storage.
   - Synchronizes with the server in the background.
 
 - **Returns:** A `GoatDB` instance.
