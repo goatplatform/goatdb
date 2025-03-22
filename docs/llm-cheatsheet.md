@@ -1,11 +1,11 @@
----
+<!-- ---
 permalink: /llm-cheatsheet/
 layout: default
 title: LLM Cheatsheet
 nav_order: 4
 description: Optimize AI-generated code for GoatDB-powered React applications with this comprehensive Large Language Model (LLM) cheatsheet.
-keywords: LLM, AI code generation, Large Language Models, React, GoatDB, AI-assisted development, generative AI, synchronous API, AI programming
----
+keywords: ["LLM", "AI code generation", "Large Language Models", "React", "GoatDB", "AI-assisted development", "generative AI", "synchronous API", "AI programming"]
+--- -->
 
 # LLM Code Generation Cheatsheet for GoatDB
 

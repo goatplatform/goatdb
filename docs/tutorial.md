@@ -5,51 +5,50 @@ title: Tutorial
 nav_order: 1
 ---
 
+- [Building a Todo List App with GoatDB](#building-a-todo-list-app-with-goatdb)
+  - [Define the Task Schema and Authorization Rules](#define-the-task-schema-and-authorization-rules)
+    - [Understanding Repositories \& Sharding](#understanding-repositories--sharding)
+  - [Create the React Components](#create-the-react-components)
+    - [Header Component](#header-component)
+    - [TaskItem Component](#taskitem-component)
+    - [Contents Component](#contents-component)
+    - [Login Component with Custom Email](#login-component-with-custom-email)
+    - [App Component](#app-component)
+    - [Opening Public User Registration](#opening-public-user-registration)
+  - [Running the Application](#running-the-application)
+  - [Testing Real-Time Sync & Conflict Resolution](#testing-real-time-sync--conflict-resolution)
+  - [Building the Server](#building-the-server)
+  - [Conclusion](#conclusion)
+
 # Building a Todo List App with GoatDB
 
 This tutorial walks you through building a full-featured Todo List app with
 GoatDB using React. It demonstrates how to leverage GoatDB's distributed,
 edge-native architecture and real-time synchronization features.
 
-GoatDB is a distributed, edge‑native database that shifts data processing to
-client nodes while maintaining centralized authority. In GoatDB, items are the
-basic data units (like rows or documents) defined by versioned schemas and
-organized within repositories. Each item is uniquely identified by a path
-(following the format /type/repo/item), which distinguishes system, application,
-and user data, enabling efficient synchronization and conflict resolution.
+GoatDB is an embedded, distributed, document database that prioritizes speed and
+developer experience. It excels at real-time collaboration and embedded caching
+applications.
 
-## Prerequisites
+Instead of following traditional database design patterns, GoatDB leverages
+concepts refined over decades by distributed version control systems, enhanced
+with novel algorithms ([bloom filter-based synchronization](/sync) and
+[ephemeral CRDTs](/conflict-resolution)) for efficient synchronization and
+automatic real-time conflict resolution.
 
-- [Deno](https://deno.land/) installed on your machine.
-- Basic knowledge of React and TypeScript.
-- Familiarity with command-line operations.
+In GoatDB, items are the basic data units (like rows or documents) defined by
+versioned schemas and organized within repositories. Each item is uniquely
+identified by a path (following the format `/type/repo/item`), which
+distinguishes system, application, and user data, enabling efficient
+synchronization and conflict resolution.
 
-## 1. Initialize Your GoatDB Project
+GoatDB employs a memory-first design with application-level sharding. Rather
+than growing a single large database, it uses multiple medium-sized repositories
+that sync independently. Each user or data group has its own repository,
+enabling horizontal scaling and efficient client-server synchronization - a
+natural architecture for multi-user applications.
 
-Follow these steps to set up a new GoatDB project:
-
-1. **Navigate to your project directory:**
-
-   ```bash
-   cd /path/to/project
-   ```
-
-2. **Add GoatDB to your project:**
-
-   ```bash
-   deno add jsr:@goatdb/goatdb
-   ```
-
-3. **Initialize GoatDB:**
-
-   ```bash
-   deno run -A jsr:@goatdb/goatdb/init
-   ```
-
-These steps install GoatDB and set up the underlying infrastructure for your
-application.
-
-## 2. Define the Task Schema and Authorization Rules
+## Define the Task Schema and Authorization Rules
 
 Before we dive into the code, let's understand how GoatDB organizes data:
 
@@ -140,14 +139,14 @@ This authorization rule ensures that:
 - Users cannot access other users' tasks
 - The rule applies to all operations (create, read, update, delete)
 
-## 3. Create the React Components
+## Create the React Components
 
 GoatDB provides a set of [React hooks](/react)—`useDB()`, `useDBReady()`,
 `useQuery()`, and `useItem()`—that simplify state management and data
 synchronization. Your app will consist of several React components. Each
 component uses GoatDB React hooks to interact with the database.
 
-### 3.1 Header Component
+### Header Component
 
 The `Header` component renders an input field and a button for adding new tasks.
 It uses the `useDB` hook to access the database and create new task items.
@@ -184,7 +183,7 @@ export function Header() {
 }
 ```
 
-### 3.2 TaskItem Component
+### TaskItem Component
 
 The `TaskItem` component displays an individual task. By using the `useItem()`
 hook, it subscribes to changes on a specific task so that any modification
@@ -237,7 +236,7 @@ export function TaskItem({ path }: TaskItemProps) {
 }
 ```
 
-### 3.3 Contents Component
+### Contents Component
 
 The `Contents` component ties everything together by querying and displaying the
 list of tasks. It uses the `useQuery()` hook to fetch tasks from the user's
@@ -289,7 +288,7 @@ export function Contents() {
 }
 ```
 
-### 3.4 Login Component with Custom Email
+### Login Component with Custom Email
 
 The `Login` component provides email-based authentication using magic links. You
 can customize the appearance of these emails by configuring the email builder on
@@ -358,7 +357,7 @@ export const customEmailBuilder: EmailBuilder = (
 Then modify your debug-server.ts and server.ts files in your project's skaffold
 directory to use the custom email builder:
 
-### 3.5 App Component
+### App Component
 
 The `App` component is the root of your application. It uses the `useDBReady()`
 hook to manage the initial loading state. Depending on whether the user is
@@ -385,7 +384,7 @@ export function App() {
 }
 ```
 
-### 3.6 Opening Public User Registration
+### Opening Public User Registration
 
 By default, GoatDB requires users to be pre-registered before they can log in.
 To support environment-specific user registration, you can modify both your
@@ -425,7 +424,7 @@ const server = new Server({
 Editing these files differently lets you tailor registration behavior: public
 registration on dev runs and restricted registration on production builds.
 
-## 4. Running the Application
+## Running the Application
 
 Run the development server with:
 
@@ -437,7 +436,7 @@ This command will start a live-reload local server that listens at
 [http://localhost:8080](http://localhost:8080) and stores all data at
 `./server-data`.
 
-## 5. Testing Real-Time Sync & Conflict Resolution
+## Testing Real-Time Sync & Conflict Resolution
 
 One of GoatDB's powerful features is real-time synchronization combined with
 robust conflict resolution. Follow these steps to observe these features in
@@ -470,7 +469,7 @@ action:
 This interactive demo highlights how GoatDB ensures a consistent and resilient
 application state even when multiple sources make concurrent modifications.
 
-## 6. Building the Server
+## Building the Server
 
 To build a self-contained executable that includes both the server and client
 code, run:
@@ -500,12 +499,5 @@ This Todo List app showcases the robust capabilities of GoatDB's architecture:
 - **Real-Time Synchronization & Conflict Resolution:** Through background
   commits and a probabilistic synchronization protocol, the app achieves
   near-real-time updates while gracefully handling concurrent modifications.
-- **Seamless Integration with React:** GoatDB’s React hooks (`useDB`,
-  `useDBReady`, `useQuery`, and `useItem`) abstract away the complexities of
-  state management and data synchronization, allowing you to focus on
-  application logic.
-
-By leveraging these architectural principles, the app not only maintains a
-consistent and resilient state but also provides a scalable foundation for
-building modern, edge-native applications. Enjoy building and extending your
-GoatDB-powered applications!
+- **Seamless Integration with React:** GoatDB's React hooks (`useDB`,
+  `useDBReady`, `
