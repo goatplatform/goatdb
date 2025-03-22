@@ -117,6 +117,28 @@ export function runGC(): void {
   }
 }
 
+let kIsDeno: boolean = false;
+try {
+  kIsDeno = Deno !== undefined;
+} catch (_: unknown) {
+  // kIsDeno = false;
+}
+
+let kHasSelf: boolean = false;
+try {
+  kHasSelf = self !== undefined;
+} catch (_: unknown) {
+  // kHasSelf = false;
+}
+
 export function isBrowser(): boolean {
-  return typeof self.Deno === 'undefined';
+  return kHasSelf && !kIsDeno;
+}
+
+export function isDeno(): boolean {
+  return kIsDeno;
+}
+
+export function isNode(): boolean {
+  return !kIsDeno && !kHasSelf;
 }

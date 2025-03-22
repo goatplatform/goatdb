@@ -17,9 +17,13 @@
  * platforms while isolating platform-specific filesystem code into separate
  * modules.
  */
-import { FileImplDeno } from './file-impl-deno.ts';
+import { isBrowser, isDeno } from '../common.ts';
+// import { FileImplDeno } from './file-impl-deno.ts';
 import type { FileImpl } from './file-impl-interface.ts';
-import { FileImplOPFS } from './file-impl-opfs.ts';
+// import { FileImplNode } from './file-impl-node.ts';
+// import { FileImplOPFS } from './file-impl-opfs.ts';
+
+let gFileImpl: FileImpl<unknown> | undefined;
 
 /**
  * Returns the appropriate FileImpl implementation for the current runtime
@@ -32,8 +36,17 @@ import { FileImplOPFS } from './file-impl-opfs.ts';
  * @returns FileImpl<unknown> The filesystem implementation for the current
  *                            runtime
  */
-export function FileImplGet(): FileImpl<unknown> {
-  return self.Deno === undefined ? FileImplOPFS : FileImplDeno;
+export async function FileImplGet(): Promise<FileImpl<unknown>> {
+  if (gFileImpl === undefined) {
+    if (isBrowser()) {
+      gFileImpl = (await import('./file-impl-opfs.ts')).FileImplOPFS;
+    } else if (isDeno()) {
+      gFileImpl = (await import('./file-impl-deno.ts')).FileImplDeno;
+    } else {
+      gFileImpl = (await import('./file-impl-node.ts')).FileImplNode;
+    }
+  }
+  return gFileImpl;
 }
 
 /**
@@ -44,7 +57,7 @@ export function FileImplGet(): FileImpl<unknown> {
  * @throws Will throw an error if the file cannot be opened or read
  */
 export async function readFile(path: string): Promise<Uint8Array> {
-  const impl = FileImplGet();
+  const impl = await FileImplGet();
   const handle = await impl.open(path, false);
   const fileLen = await impl.seek(handle, 0, 'end');
   await impl.seek(handle, 0, 'start');
@@ -85,7 +98,7 @@ export async function readTextFile(path: string): Promise<string | undefined> {
  * @throws Will throw an error if the file cannot be opened or written
  */
 export async function writeFile(path: string, buf: Uint8Array): Promise<void> {
-  const impl = FileImplGet();
+  const impl = await FileImplGet();
   const handle = await impl.open(path, true);
   await impl.write(handle, buf);
   await impl.truncate(handle, buf.length);

@@ -54,14 +54,14 @@ export class TestSuite {
       }
     }
     if (this._tempDir) {
-      await FileImplGet().remove(this._tempDir);
+      await (await FileImplGet()).remove(this._tempDir);
     }
   }
 
   async tempDir(subPath?: string): Promise<string> {
     if (!this._tempDir) {
       this._tempDir = path.join(
-        await FileImplGet().getTempDir(),
+        await (await FileImplGet()).getTempDir(),
         'test-' + this.name,
       );
     }

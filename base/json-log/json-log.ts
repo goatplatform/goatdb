@@ -30,8 +30,28 @@ import type {
   WorkerRemoveReq,
   WorkerWriteTextFileReq,
 } from './json-log-worker-req.ts';
+import { isDeno, isNode } from '../common.ts';
 
-let gWorker: Worker | undefined;
+let gWorker: Worker | NodeWorker | undefined;
+
+type NodeWorker =
+  & NodeWorkerOnError
+  & NodeWorkerOnMessage
+  & NodeWorkerPostMessage;
+
+type NodeWorkerOnMessage = {
+  on: (
+    event: 'message',
+    handler: (event: MessageEvent<string>) => void,
+  ) => void;
+};
+type NodeWorkerOnError = {
+  on: (event: 'error', handler: (error: unknown) => void) => void;
+};
+
+type NodeWorkerPostMessage = {
+  postMessage: (message: unknown) => void;
+};
 
 /**
  * Starts the JSON log worker if it hasn't been started yet. The worker is used
@@ -44,35 +64,55 @@ let gWorker: Worker | undefined;
  *
  * @returns The Worker instance, either newly created or existing
  */
-export function startJSONLogWorkerIfNeeded(): Worker {
+export async function startJSONLogWorkerIfNeeded(): Promise<
+  Worker | NodeWorker
+> {
   if (gWorker === undefined) {
     const workerJs = new TextDecoder().decode(
       kStaticAssetsSystem['/system-assets/json-log-worker.js'].data,
     );
-    if (self.Deno !== undefined) {
+    if (isDeno()) {
       const dataUrl = `data:text/javascript;base64,${encodeBase64(workerJs)}`;
       gWorker = new Worker(import.meta.resolve(dataUrl), {
         type: 'module',
       });
     } else {
-      gWorker = new Worker(
-        URL.createObjectURL(
-          new Blob(
-            [workerJs],
-            {
-              type: 'application/javascript',
-            },
+      if (isNode()) {
+        const NodeWorker = (await import('node:worker_threads')).Worker;
+        gWorker = new NodeWorker!(
+          'data:' + workerJs,
+          {
+            eval: true,
+            name: 'json-log-worker',
+          },
+        );
+      } else {
+        gWorker = new Worker(
+          URL.createObjectURL(
+            new Blob(
+              [workerJs],
+              {
+                type: 'application/javascript',
+              },
+            ),
           ),
-        ),
-        {
-          type: 'module',
-        },
-      );
+          {
+            type: 'module',
+          },
+        );
+      }
     }
-    gWorker.onmessage = handleResponse;
-    gWorker.onerror = (event) => {
-      console.error(event.error);
-    };
+    if (isNode()) {
+      (gWorker as NodeWorker).on('message', handleResponse);
+      (gWorker as NodeWorker).on('error', (error: unknown) => {
+        console.error(error);
+      });
+    } else {
+      (gWorker as Worker).onmessage = handleResponse;
+      (gWorker as Worker).onmessageerror = (event) => {
+        console.error(event);
+      };
+    }
   }
   return gWorker;
 }
@@ -92,7 +132,7 @@ const gPendingResolveFuncs = new Map<
 >();
 let gReqId = 0;
 
-function sendRequest<T extends WorkerFileReq>(
+async function sendRequest<T extends WorkerFileReq>(
   req: Omit<T, 'id'>,
 ): Promise<WorkerFileRespForReq<T>> {
   let resolve!: (v: WorkerFileResp) => void;
@@ -106,7 +146,7 @@ function sendRequest<T extends WorkerFileReq>(
     resolve,
     reject,
   });
-  const worker = startJSONLogWorkerIfNeeded();
+  const worker = await startJSONLogWorkerIfNeeded();
   worker.postMessage({
     ...req,
     id,
@@ -114,8 +154,8 @@ function sendRequest<T extends WorkerFileReq>(
   return promise as Promise<WorkerFileRespForReq<T>>;
 }
 
-function handleResponse(event: MessageEvent<string>): void {
-  const resp = JSON.parse(event.data);
+function handleResponse(event: MessageEvent<string> | string): void {
+  const resp = JSON.parse(typeof event === 'string' ? event : event.data);
   const entry = gPendingResolveFuncs.get(resp.id);
   assert(entry !== undefined, 'Received unknown response from worker');
   gPendingResolveFuncs.delete(resp.id);

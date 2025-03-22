@@ -731,10 +731,10 @@ function relativePathForRepo(repoId: string): string {
 
 let gSelectedInstanceNumber = -1;
 
-function pickInstanceNumber(
+async function pickInstanceNumber(
   startIndex: number = 0,
 ): Promise<number | undefined> {
-  if (FileImplGet() === FileImplOPFS) {
+  if ((await FileImplGet()) === FileImplOPFS) {
     const { promise: indefinitePromise } = Promise.withResolvers();
     const { promise, resolve } = Promise.withResolvers<number | undefined>();
     if (gSelectedInstanceNumber >= 0) {

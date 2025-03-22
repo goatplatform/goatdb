@@ -72,7 +72,7 @@ export class StaticAssetsEndpoint implements Endpoint {
         getGoatConfig().debug,
       );
       return Promise.resolve(
-        new Response(js + config, {
+        new Response(config + js, {
           headers,
         }),
       );
@@ -141,5 +141,5 @@ function generateConfigSnippet(
   if (serverURL) {
     config.serverURL = serverURL;
   }
-  return `;\n\self.GoatConfig = ${JSON.stringify(config)};`;
+  return `;\n\GoatDBConfig = ${JSON.stringify(config)};\n;`;
 }

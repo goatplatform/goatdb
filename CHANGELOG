@@ -10,6 +10,7 @@ and GoatDB adheres to
 
 ### Added
 
+- Initial support for Node.js
 - Trusted mode which disables security mechanisms for increased performance in
   trusted environments
 

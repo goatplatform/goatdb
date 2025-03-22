@@ -1,10 +1,18 @@
-import { TestsRunner } from './mod.ts';
+import { nodeRun } from './node-run.ts';
 
-await import('./db-untrusted.test.ts');
-await import('./db-trusted.test.ts');
-
-await TestsRunner.default.run();
-
-if (typeof self.Deno !== 'undefined') {
-  self.Deno.exit(0);
+async function main(): Promise<void> {
+  console.log('=== 🦖 Running tests in Deno... ===');
+  const denoCmd = new Deno.Command('deno', {
+    args: ['run', '-A', './tests/tests-entry.ts'],
+    stdout: 'inherit',
+    stderr: 'inherit',
+  });
+  await denoCmd.output();
+  console.log('=== 🦖 Tests in Deno completed ===\n');
+  // Run tests in Node.js
+  console.log('=== ⚡️ Running tests in Node.js... ===');
+  await nodeRun('./tests/tests-entry.ts');
+  console.log('=== ⚡️ Tests in Node.js completed ===');
 }
+
+main();

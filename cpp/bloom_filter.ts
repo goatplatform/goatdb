@@ -1,5 +1,6 @@
 import { encodeBase64 } from '@std/encoding';
 import type { EmscriptenModule } from './emscripten.d.ts';
+import { isDeno } from '../base/common.ts';
 
 interface BloomFilterModule extends EmscriptenModule {
   ccall: <R = number | string | boolean | void>(
@@ -27,14 +28,12 @@ let moduleLoadPromise: Promise<void>;
 function initializeModule(): Promise<void> {
   if (!moduleLoadPromise) {
     moduleLoadPromise = (async () => {
-      const wasmUrl =
-        self.Deno === undefined
-          ? new URL('/system-assets/bloom_filter.wasm', self.location.href)
-          : new URL('../system-assets/bloom_filter.wasm', import.meta.url);
-      const jsUrl =
-        self.Deno === undefined
-          ? new URL('/system-assets/bloom_filter.js', self.location.href)
-          : new URL('../system-assets/bloom_filter.js', import.meta.url);
+      const wasmUrl = isDeno()
+        ? new URL('../system-assets/bloom_filter.wasm', import.meta.url)
+        : new URL('/system-assets/bloom_filter.wasm', self.location.href);
+      const jsUrl = isDeno()
+        ? new URL('../system-assets/bloom_filter.js', import.meta.url)
+        : new URL('/system-assets/bloom_filter.js', self.location.href);
 
       const wasmResponse = await fetch(wasmUrl);
       const wasmBinary = await wasmResponse.arrayBuffer();

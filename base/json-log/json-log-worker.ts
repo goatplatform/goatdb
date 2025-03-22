@@ -19,6 +19,7 @@ import type {
 } from './json-log-worker-req.ts';
 import type { FileImpl } from './file-impl-interface.ts';
 import { FileImplGet, readTextFile, writeTextFile } from './file-impl.ts';
+import { isNode } from '../common.ts';
 
 const FILE_READ_BUF_SIZE_BYTES = 1024 * 1024; // 8KB
 const PAGE_SIZE = 1024;
@@ -41,7 +42,7 @@ async function JSONLogFileOpen(
   path: string,
   write = false,
 ): Promise<JSONLogFile> {
-  const impl = FileImplGet();
+  const impl = await FileImplGet();
   return {
     path,
     write: write === true,
@@ -246,138 +247,156 @@ const gOpenCursors = new Map<
 >();
 let gOpenCursorNum = 0;
 
-export function jsonLogWorkerMain(): void {
-  onmessage = async (event: MessageEvent<WorkerFileReq>) => {
-    switch (event.data.type) {
-      case 'open': {
-        const handle = ++gFileHandleNum;
-        const file = await JSONLogFileOpen(event.data.path, event.data.write);
-        gOpenFiles.set(handle, file);
-        const resp: WorkerFileRespOpen = {
-          type: 'open',
-          id: event.data.id,
-          file: handle,
-        };
-        postMessage(JSON.stringify(resp));
-        break;
-      }
+type PostMessageFunc = (message: string) => void;
 
-      case 'close': {
-        const file = gOpenFiles.get(event.data.file);
-        if (file) {
-          gOpenFiles.delete(event.data.file);
-          await JSONLogFileClose(file);
-        }
-        const resp: WorkerFileRespClose = {
-          type: 'close',
-          id: event.data.id,
-          file: event.data.file,
-        };
-        postMessage(JSON.stringify(resp));
-        break;
-      }
+let gPostMessage: PostMessageFunc | undefined;
 
-      case 'cursor': {
-        const file = gOpenFiles.get(event.data.file);
-        assert(file !== undefined, 'File not found');
-        const cursor = await JSONLogFileStartCursor(file);
-        const cursorId = ++gOpenCursorNum;
-        const nextPromise = JSONLogFileScan(cursor);
-        gOpenCursors.set(cursorId, { cursor, nextPromise });
-        const resp: WorkerFileRespCursor = {
-          type: 'cursor',
-          id: event.data.id,
-          cursor: cursorId,
-        };
-        postMessage(JSON.stringify(resp));
-        break;
-      }
-
-      case 'scan': {
-        const entry = gOpenCursors.get(event.data.cursor);
-        assert(entry !== undefined, 'Cursor not found');
-        if (!entry.nextPromise) {
-          entry.nextPromise = JSONLogFileScan(entry.cursor);
-        }
-        const [values, done] = await entry.nextPromise;
-        entry.nextPromise = JSONLogFileScan(entry.cursor);
-        const resp: WorkerFileRespScan = {
-          type: 'scan',
-          id: event.data.id,
-          cursor: event.data.cursor,
-          values,
-          done,
-        };
-        postMessage(JSON.stringify(resp));
-        break;
-      }
-
-      case 'flush': {
-        const file = gOpenFiles.get(event.data.file);
-        assert(file !== undefined, 'File not found');
-        await JSONLogFileFlush(file);
-        const resp: WorkerFileRespFlush = {
-          type: 'flush',
-          id: event.data.id,
-          file: event.data.file,
-        };
-        postMessage(JSON.stringify(resp));
-        break;
-      }
-
-      case 'append': {
-        const file = gOpenFiles.get(event.data.file);
-        assert(file !== undefined, 'File not found');
-        await JSONLogFileAppend(file, event.data.values);
-        const resp: WorkerFileRespAppend = {
-          type: 'append',
-          id: event.data.id,
-        };
-        postMessage(JSON.stringify(resp));
-        break;
-      }
-
-      case 'readTextFile': {
-        const resp: WorkerReadTextFileResp = {
-          type: 'readTextFile',
-          id: event.data.id,
-          text: await readTextFile(event.data.path),
-        };
-        postMessage(JSON.stringify(resp));
-        break;
-      }
-
-      case 'writeTextFile': {
-        const resp: WorkerWriteTextFileResp = {
-          type: 'writeTextFile',
-          id: event.data.id,
-          success: await writeTextFile(event.data.path, event.data.text),
-        };
-        postMessage(JSON.stringify(resp));
-        break;
-      }
-
-      case 'remove': {
-        const resp: WorkerRemoveResp = {
-          type: 'remove',
-          id: event.data.id,
-          success: await FileImplGet().remove(event.data.path),
-        };
-        postMessage(JSON.stringify(resp));
-        break;
-      }
-
-      default: {
-        const resp: WorkerErrorResp = {
-          type: 'error',
-          id: (event.data as WorkerFileReq).id,
-          error: 'UnknownCommand',
-        };
-        postMessage(JSON.stringify(resp));
-        break;
-      }
+async function handleRequest(
+  event: MessageEvent<WorkerFileReq> | WorkerFileReq,
+): Promise<void> {
+  const req = isNode()
+    ? (event as WorkerFileReq)
+    : (event as MessageEvent<WorkerFileReq>).data;
+  switch (req.type) {
+    case 'open': {
+      const handle = ++gFileHandleNum;
+      const file = await JSONLogFileOpen(req.path, req.write);
+      gOpenFiles.set(handle, file);
+      const resp: WorkerFileRespOpen = {
+        type: 'open',
+        id: req.id,
+        file: handle,
+      };
+      gPostMessage!(JSON.stringify(resp));
+      break;
     }
-  };
+
+    case 'close': {
+      const file = gOpenFiles.get(req.file);
+      if (file) {
+        gOpenFiles.delete(req.file);
+        await JSONLogFileClose(file);
+      }
+      const resp: WorkerFileRespClose = {
+        type: 'close',
+        id: req.id,
+        file: req.file,
+      };
+      gPostMessage!(JSON.stringify(resp));
+      break;
+    }
+
+    case 'cursor': {
+      const file = gOpenFiles.get(req.file);
+      assert(file !== undefined, 'File not found');
+      const cursor = await JSONLogFileStartCursor(file);
+      const cursorId = ++gOpenCursorNum;
+      const nextPromise = JSONLogFileScan(cursor);
+      gOpenCursors.set(cursorId, { cursor, nextPromise });
+      const resp: WorkerFileRespCursor = {
+        type: 'cursor',
+        id: req.id,
+        cursor: cursorId,
+      };
+      gPostMessage!(JSON.stringify(resp));
+      break;
+    }
+
+    case 'scan': {
+      const entry = gOpenCursors.get(req.cursor);
+      assert(entry !== undefined, 'Cursor not found');
+      if (!entry.nextPromise) {
+        entry.nextPromise = JSONLogFileScan(entry.cursor);
+      }
+      const [values, done] = await entry.nextPromise;
+      entry.nextPromise = JSONLogFileScan(entry.cursor);
+      const resp: WorkerFileRespScan = {
+        type: 'scan',
+        id: req.id,
+        cursor: req.cursor,
+        values,
+        done,
+      };
+      gPostMessage!(JSON.stringify(resp));
+      break;
+    }
+
+    case 'flush': {
+      const file = gOpenFiles.get(req.file);
+      assert(file !== undefined, 'File not found');
+      await JSONLogFileFlush(file);
+      const resp: WorkerFileRespFlush = {
+        type: 'flush',
+        id: req.id,
+        file: req.file,
+      };
+      gPostMessage!(JSON.stringify(resp));
+      break;
+    }
+
+    case 'append': {
+      const file = gOpenFiles.get(req.file);
+      assert(file !== undefined, 'File not found');
+      await JSONLogFileAppend(file, req.values);
+      const resp: WorkerFileRespAppend = {
+        type: 'append',
+        id: req.id,
+      };
+      gPostMessage!(JSON.stringify(resp));
+      break;
+    }
+
+    case 'readTextFile': {
+      const resp: WorkerReadTextFileResp = {
+        type: 'readTextFile',
+        id: req.id,
+        text: await readTextFile(req.path),
+      };
+      gPostMessage!(JSON.stringify(resp));
+      break;
+    }
+
+    case 'writeTextFile': {
+      const resp: WorkerWriteTextFileResp = {
+        type: 'writeTextFile',
+        id: req.id,
+        success: await writeTextFile(req.path, req.text),
+      };
+      gPostMessage!(JSON.stringify(resp));
+      break;
+    }
+
+    case 'remove': {
+      const resp: WorkerRemoveResp = {
+        type: 'remove',
+        id: req.id,
+        success: await (await FileImplGet()).remove(req.path),
+      };
+      gPostMessage!(JSON.stringify(resp));
+      break;
+    }
+
+    default: {
+      const resp: WorkerErrorResp = {
+        type: 'error',
+        id: (req as WorkerFileReq).id,
+        error: 'UnknownCommand',
+      };
+      gPostMessage!(JSON.stringify(resp));
+      break;
+    }
+  }
+}
+
+export function jsonLogWorkerMain(): void {
+  if (isNode()) {
+    const parentPort = require('node:worker_threads').parentPort;
+    parentPort.on('message', handleRequest);
+    gPostMessage = parentPort.postMessage.bind(parentPort);
+  } else {
+    onmessage = handleRequest;
+    gPostMessage = postMessage;
+  }
 }
 
 // jsonLogWorkerMain();

@@ -2,14 +2,15 @@ import * as path from '@std/path';
 import { SimpleTimer } from '../base/timer.ts';
 import { tuple4Get, tuple4Set } from '../base/tuple.ts';
 import type { VersionNumber } from '../base/version-number.ts';
-import { createBuildContext, type ReBuildContext } from '../build.ts';
+import { createBuildContext } from '../build.ts';
 import { getGoatConfig } from './config.ts';
 import { Server, type ServerOptions } from '../net/server/server.ts';
-import { buildAssets, type EntryPoint } from './generate-static-assets.ts';
+import { buildAssets } from './generate-static-assets.ts';
 import { notReached } from '../base/error.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { generateBuildInfo } from './build-info.ts';
 import type { AppConfig } from '../mod.ts';
+import { isLinux, isMac, isWindows } from '../base/os.ts';
 
 function incrementBuildNumber(version: VersionNumber): VersionNumber {
   return tuple4Set(version, 0, tuple4Get(version, 0) + 1);
@@ -38,19 +39,35 @@ function shouldRebuildAfterPathChange(p: string): boolean {
 }
 
 async function openBrowser(url: string): Promise<void> {
-  if (Deno.build.os !== 'darwin') {
-    // TODO: Windows & Linux support
-    return Promise.resolve();
+  let cmd: Deno.Command;
+  if (isMac()) {
+    cmd = new Deno.Command('open', {
+      args: [
+        '-na',
+        'Google Chrome',
+        '--args',
+        '--incognito',
+        url,
+      ],
+    });
+  } else if (isLinux()) {
+    // TODO: Incognito mode
+    cmd = new Deno.Command('xdg-open', {
+      args: [
+        url,
+      ],
+    });
+  } else if (isWindows()) {
+    // TODO: Incognito mode
+    cmd = new Deno.Command('start', {
+      args: [
+        url,
+      ],
+    });
+  } else {
+    // Unsupported platform
+    return;
   }
-  const cmd = new Deno.Command('open', {
-    args: [
-      '-na',
-      'Google Chrome',
-      '--args',
-      '--incognito',
-      url,
-    ],
-  });
   const { success, code } = await cmd.output();
   if (!success) {
     console.error(`Failed opening google chrome. Code: ${code}`);
