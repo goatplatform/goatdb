@@ -1,17 +1,55 @@
-import { Dictionary } from './dict.ts';
+import type { Dictionary } from './dict.ts';
 
+/**
+ * A function that generates a string hash for a value.
+ * Used by HashSet and HashMap to determine where to store values.
+ *
+ * @template V - The type of value to hash
+ * @param value - The value to generate a hash for
+ * @returns A string hash representing the value
+ */
 export interface HashFunction<V> {
   (value: V): string;
 }
 
+/**
+ * A function that determines if two values are equal.
+ * Used by HashSet and HashMap for value comparison.
+ *
+ * Note: If two values are deemed equal by this function,
+ * they must also have equal hash values.
+ *
+ * @template V - The type of values to compare
+ * @param v1 - The first value to compare
+ * @param v2 - The second value to compare
+ * @returns True if the values are equal, false otherwise
+ */
 export interface EqualFunction<V> {
   (v1: V, v2: V): boolean;
 }
 
+/**
+ * A function that creates a deep copy of a value.
+ * Used by HashSet and HashMap when adding values to ensure
+ * the collection owns its own copy of the data.
+ *
+ * @template V - The type of value to clone
+ * @param v - The value to clone
+ * @returns A new copy of the value
+ */
 export interface CloneFunction<V> {
   (v: V): V;
 }
 
+/**
+ * Default clone function that simply returns the value unchanged.
+ * Used when no clone function is provided to HashSet or HashMap.
+ *
+ * @template T - The type of value
+ * @param v - The value to "clone"
+ * @returns The same value, unchanged
+ * @private
+ */
 function _noClone<T>(v: T): T {
   return v;
 }
