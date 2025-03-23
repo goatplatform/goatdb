@@ -207,8 +207,8 @@ export type SchemaTypeSession = typeof kSchemaSession;
  * anonymous session). The user item stores personal login information for this
  * user.
  */
-export const kSchemaUser = {
-  ns: 'users',
+export const kSchemaUserDefault = {
+  ns: 'user-default',
   version: 1,
   fields: {
     email: {
@@ -222,7 +222,7 @@ export const kSchemaUser = {
     },
   },
 } as const;
-export type SchemaTypeUser = typeof kSchemaUser;
+// export type SchemaTypeUser = typeof kSchemaUser;
 
 /**
  * Internally collected user statistics.

@@ -9,7 +9,8 @@ import { SimpleTimer, type Timer } from '../base/timer.ts';
 import type { GoatDB } from './db.ts';
 import { assert } from '../base/error.ts';
 
-export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
+export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
+  extends Emitter<'change'> {
   private readonly _commitDelayTimer: Timer;
   private _head?: Commit;
   private _item!: Item<S>;
@@ -18,7 +19,7 @@ export class ManagedItem<S extends Schema = Schema> extends Emitter<'change'> {
   private _age: number = 0;
   private _commitInProgress: boolean = false;
 
-  constructor(readonly db: GoatDB, readonly path: string) {
+  constructor(readonly db: GoatDB<US>, readonly path: string) {
     super();
     assert(itemPathIsValid(path), `Invalid item path: ${path}`);
     this.path = path;

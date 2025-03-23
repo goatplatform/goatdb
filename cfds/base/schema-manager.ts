@@ -11,7 +11,7 @@ import {
 import {
   kNullSchema,
   kSchemaSession,
-  kSchemaUser,
+  kSchemaUserDefault,
   kSchemaUserStats,
   type Schema,
 } from './schema.ts';
@@ -67,6 +67,7 @@ export type AuthConfig = {
 export class SchemaManager {
   private readonly _schemas: Map<string, Schema[]>;
   private _authRules: AuthConfig;
+  private _userSchema: Schema;
 
   /**
    * The default manager. Unless explicitly specified, GoatDB will default to
@@ -77,13 +78,37 @@ export class SchemaManager {
   /**
    * Initialize a new schemaManager.
    */
-  constructor() {
+  constructor(userSchema: Schema = kSchemaUserDefault) {
     this._schemas = new Map();
     this._authRules = [];
+    this._userSchema = userSchema;
     // Builtin schemas
     this.registerSchema(kSchemaSession);
-    this.registerSchema(kSchemaUser);
+    this.registerSchema(userSchema);
     this.registerSchema(kSchemaUserStats);
+  }
+
+  /**
+   * Returns the current user schema for this manager.
+   * This schema is used for all user objects in the system.
+   *
+   * @returns The current user schema
+   */
+  get userSchema(): Schema {
+    return this._userSchema;
+  }
+
+  /**
+   * Sets the user schema for this manager.
+   * This will replace the default user schema and register the new schema.
+   *
+   * @param schema The schema to use for users
+   */
+  set userSchema(schema: Schema) {
+    if (this._userSchema !== schema) {
+      this._userSchema = schema;
+      this.registerSchema(schema);
+    }
   }
 
   /**

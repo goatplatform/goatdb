@@ -19,9 +19,9 @@ import type { HTTPMethod } from '../../logging/metrics.ts';
 import type { Endpoint, ServerServices } from './server.ts';
 import { getBaseURL, getRequestPath } from './utils.ts';
 import {
-  kSchemaUser,
+  kSchemaUserDefault,
   kSchemaUserStats,
-  type SchemaTypeUser,
+  Schema,
   type SchemaTypeUserStats,
 } from '../../cfds/base/schema.ts';
 import { normalizeEmail } from '../../base/string.ts';
@@ -341,10 +341,10 @@ export async function fetchEncodedRootSessions(
   return result;
 }
 
-async function fetchUserByEmail(
+async function fetchUserByEmail<US extends Schema = typeof kSchemaUserDefault>(
   services: ServerServices,
   email: string,
-): Promise<ManagedItem<SchemaTypeUser> | undefined> {
+): Promise<ManagedItem<US> | undefined> {
   email = normalizeEmail(email);
   // This query acts as a persistent index over user emails:
   // 1. It maintains a sorted list of all users by email
@@ -355,7 +355,7 @@ async function fetchUserByEmail(
   //    lookups
   // 5. Query caching allows efficient resume after suspend/close
   const query = services.db.query({
-    schema: kSchemaUser,
+    schema: services.db.schemaManager.userSchema,
     source: '/sys/users',
     sortBy: 'email',
   });
@@ -363,13 +363,17 @@ async function fetchUserByEmail(
   await query.loadingFinished();
   const user = query.find('email', email);
   if (user) {
-    return user;
+    return user as unknown as ManagedItem<US>;
   }
   // Lazily create users when needed
   if (services.autoCreateUser && services.autoCreateUser({ email })) {
-    return services.db.create('/sys/users', kSchemaUser, {
-      email: email,
-    });
+    return services.db.create(
+      '/sys/users',
+      services.db.schemaManager.userSchema,
+      {
+        email: email,
+      },
+    ) as unknown as ManagedItem<US>;
   }
   return undefined;
 }
@@ -383,13 +387,13 @@ export async function fetchSessionById(
   return session;
 }
 
-export function fetchUserById(
+export function fetchUserById<US extends Schema = typeof kSchemaUserDefault>(
   services: ServerServices,
   userId: string,
-): Item<SchemaTypeUser> | undefined {
+): Item<US> | undefined {
   const entry = services.db
     .repository('/sys/users')!
-    .valueForKey<SchemaTypeUser>(userId);
+    .valueForKey<US>(userId);
   return entry && entry[0];
 }
 
@@ -405,14 +409,16 @@ function responseForError(err: AuthError): Response {
 
 export type Role = 'user' | 'anonymous';
 
-export async function requireSignedUser(
+export async function requireSignedUser<
+  US extends Schema = typeof kSchemaUserDefault,
+>(
   services: ServerServices,
   requestOrSignature: Request | string,
   role?: Role,
 ): Promise<
   [
     userId: string | null,
-    userItem: Item<SchemaTypeUser> | undefined,
+    userItem: Item<US> | undefined,
     userSession: Session,
   ]
 > {
@@ -444,7 +450,7 @@ export async function requireSignedUser(
     }
     throw accessDenied();
   }
-  const userItem = fetchUserById(services, userId);
+  const userItem = fetchUserById<US>(services, userId);
   if (userItem === undefined) {
     throw accessDenied();
   }

@@ -9,7 +9,7 @@
 // @deno-types="@types/react"
 import React, { useCallback, useContext, useSyncExternalStore } from 'react';
 import { GoatDB } from '../db/db.ts';
-import type { Schema } from '../cfds/base/schema.ts';
+import type { kSchemaUserDefault, Schema } from '../cfds/base/schema.ts';
 import { ManagedItem } from '../db/managed-item.ts';
 import { type MutationPack, mutationPackHasField } from '../db/mutations.ts';
 import type { ReadonlyJSONValue } from '../base/interfaces.ts';
@@ -31,7 +31,9 @@ const GoatDBContext = React.createContext<GoatDBCtxProps>({});
  *
  * @returns A DB instance.
  */
-export function useDB(): GoatDB {
+export function useDB<US extends Schema = typeof kSchemaUserDefault>(): GoatDB<
+  US
+> {
   const ctx = useContext(GoatDBContext);
   if (!ctx.db) {
     ctx.db = new GoatDB({ path: '/data/db', peers: getBaseURL() });
@@ -47,7 +49,7 @@ export function useDB(): GoatDB {
   );
   const getSnapshot = useCallback(() => changeCount, [ctx.db]);
   useSyncExternalStore(subscribe, getSnapshot);
-  return ctx.db;
+  return ctx.db as unknown as GoatDB<US>;
 }
 
 /**

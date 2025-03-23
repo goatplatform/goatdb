@@ -11,9 +11,9 @@ import { QueryPersistence } from '../repo/query-persistance.ts';
 import { QueryPersistenceFile } from './persistance/query-file.ts';
 import { ManagedItem } from './managed-item.ts';
 import type {
+  kSchemaUserDefault,
   Schema,
   SchemaTypeSession,
-  SchemaTypeUser,
 } from '../cfds/base/schema.ts';
 import {
   itemPathGetPart,
@@ -97,7 +97,8 @@ export type EventUserChanged = 'UserChanged';
 /**
  * Main entry class for GoatDB - The Edge-Native Database.
  */
-export class GoatDB extends Emitter<EventUserChanged> {
+export class GoatDB<US extends Schema = typeof kSchemaUserDefault>
+  extends Emitter<EventUserChanged> {
   readonly orgId: string;
   readonly schemaManager: SchemaManager;
   readonly trusted: boolean;
@@ -167,7 +168,7 @@ export class GoatDB extends Emitter<EventUserChanged> {
    * Returns the current user item or undefined if the current session is
    * anonymous.
    */
-  get currentUser(): ManagedItem<SchemaTypeUser> | undefined {
+  get currentUser(): ManagedItem<US> | undefined {
     const userId = this._trustPool?.currentSession.owner;
     return userId ? this.item('sys', 'users', userId) : undefined;
   }
@@ -464,7 +465,10 @@ export class GoatDB extends Emitter<EventUserChanged> {
     }
     let q = this._openQueries.get(id);
     if (!q) {
-      q = new Query({ ...config, db: this }) as unknown as Query<
+      q = new Query({
+        ...config,
+        db: this as unknown as GoatDB,
+      }) as unknown as Query<
         Schema,
         Schema,
         ReadonlyJSONValue
@@ -643,7 +647,7 @@ export class GoatDB extends Emitter<EventUserChanged> {
     } else {
       trustPool = await this.getTrustPool();
     }
-    const repo = new Repository(this, repoId, trustPool, {
+    const repo = new Repository(this as unknown as GoatDB, repoId, trustPool, {
       ...opts,
       authorizer: this.schemaManager.authRuleForRepo(repoId),
     });
