@@ -1,27 +1,31 @@
 import { assert } from '../../base/error.ts';
-import {
+import type {
   DecodedValue,
   Decoder,
   ReadonlyDecodedArray,
   ReadonlyDecodedObject,
 } from '../../base/core-types/encoding/index.ts';
 import {
-  Schema,
-  SchemaDataType,
+  type Schema,
+  type SchemaDataType,
   SchemaGetFieldDef,
   SchemaGetFields,
   SchemaGetRequiredFields,
 } from './schema.ts';
 import {
   getTypeOperations,
-  SerializeValueTypeOptions,
+  type SerializeValueTypeOptions,
   valueTypeEquals,
-  ValueTypeOptions,
+  type ValueTypeOptions,
 } from './types/index.ts';
-import { Change, EncodedChange } from '../change/index.ts';
-import { decodeChange } from '../change/decode.ts';
-import { CoreObject, CoreValue, Encoder } from '../../base/core-types/index.ts';
-import { log } from '../../logging/log.ts';
+import type { Change, EncodedChange } from '../change/index.ts';
+import * as decodeTs from '../change/decode.ts';
+import type {
+  CoreObject,
+  CoreValue,
+  Encoder,
+} from '../../base/core-types/index.ts';
+import * as logTs from '../../logging/log.ts';
 
 export function isValidData<S extends Schema = Schema>(
   scheme: S,
@@ -42,6 +46,9 @@ export function isValidData<S extends Schema = Schema>(
     const typeOP = getTypeOperations(def.type);
     if (!typeOP.validate(data[key])) {
       return [false, `Invalid value for field "${key}". Expected ${def.type}`];
+    }
+    if (def.validate && !def.validate(data)) {
+      return [false, `Field "${key}" failed custom schema validation`];
     }
   }
   return [true, ''];
@@ -72,12 +79,12 @@ export function serialize<S extends Schema>(
       try {
         overrides[type](encoder, key, data[key], options);
         continue;
-      } catch (e) {
-        log({
+      } catch (e: unknown) {
+        logTs.log({
           severity: 'INFO',
           error: 'SerializeError',
-          trace: e.stack,
-          message: e.message,
+          trace: e instanceof Error ? e.stack : undefined,
+          message: e instanceof Error ? e.message : String(e),
           key: key,
           valueType: type,
         });
@@ -119,12 +126,12 @@ export function deserialize<S extends Schema>(
           data[key] = value;
         }
         continue;
-      } catch (e) {
-        log({
+      } catch (e: unknown) {
+        logTs.log({
           severity: 'INFO',
           error: 'SerializeError',
-          trace: e.stack,
-          message: e.message,
+          trace: e instanceof Error ? e.stack : undefined,
+          message: e instanceof Error ? e.message : String(e),
           key,
           valueType: type,
         });
@@ -343,7 +350,7 @@ export function decodedDataChanges(dec: DecodedDataChange): DataChanges {
 
   for (const key in dec) {
     changes[key] = (dec[key] as ReadonlyDecodedArray).map((v) =>
-      decodeChange(v as Decoder),
+      decodeTs.decodeChange(v as Decoder)
     );
   }
 

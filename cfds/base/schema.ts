@@ -50,6 +50,13 @@ export type FieldDef<T extends ValueType> = {
    * @default false
    */
   required?: boolean;
+  /**
+   * A function that validates the field value.
+   *
+   * @param data The current value of the document.
+   * @returns true if the value is valid, false otherwise.
+   */
+  validate?: (data: ReadonlyCoreObject) => boolean;
 };
 
 /**
