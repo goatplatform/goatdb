@@ -48,7 +48,7 @@ export class SetTypeOperations extends CoreTypeOperations<
     return newValue.size > 0 ? newValue : undefined;
   }
 
-  fillRefs(refs: Set<string>, value: Set<ConcreteCoreValue>): void {
+  override fillRefs(refs: Set<string>, value: Set<ConcreteCoreValue>): void {
     if (this.isRef && value && value instanceof Set) {
       for (const val of value) {
         if (typeof val === 'string') {
@@ -58,7 +58,7 @@ export class SetTypeOperations extends CoreTypeOperations<
     }
   }
 
-  rewriteRefs(
+  override rewriteRefs(
     keyMapping: Map<string, string>,
     value: Set<ConcreteCoreValue>,
     deleteRefs?: Set<string>,
@@ -104,7 +104,7 @@ export class SetTypeOperations extends CoreTypeOperations<
     return value.size === 0;
   }
 
-  deserialize(value: DecodedValue, options?: ValueTypeOptions) {
+  override deserialize(value: DecodedValue, options?: ValueTypeOptions) {
     const desValue = super.deserialize(value, options);
     if (desValue instanceof Array) {
       //Backward compatibility from old deserialize that save as array of json

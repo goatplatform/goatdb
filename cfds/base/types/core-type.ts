@@ -12,9 +12,8 @@ import {
 } from '../../../base/core-types/index.ts';
 
 export abstract class CoreTypeOperations<
-  TValue extends ConcreteCoreValue = ConcreteCoreValue
-> implements IValueTypeOperations<TValue>
-{
+  TValue extends ConcreteCoreValue = ConcreteCoreValue,
+> implements IValueTypeOperations<TValue> {
   private _coreType: CoreType;
   private _valueType: ValueType;
 
@@ -49,7 +48,7 @@ export abstract class CoreTypeOperations<
     key: string,
     value: TValue,
     encoder: Encoder,
-    options?: ValueTypeOptions
+    options?: ValueTypeOptions,
   ): void {
     encoder.set(key, value);
   }
@@ -60,14 +59,14 @@ export abstract class CoreTypeOperations<
 
   valueAddedDiff(
     value2: TValue,
-    options?: ValueTypeOptions
+    options?: ValueTypeOptions,
   ): undefined | Change<EncodedChange> | Change<EncodedChange>[] {
     return FieldChange.insert(value2, this._valueType);
   }
 
   valueRemovedDiff(
     value1: TValue,
-    options?: ValueTypeOptions
+    options?: ValueTypeOptions,
   ): undefined | Change<EncodedChange> | Change<EncodedChange>[] {
     return FieldChange.delete(value1, this._valueType);
   }
@@ -83,7 +82,7 @@ export abstract class CoreTypeOperations<
   rewriteRefs(
     keyMapping: Map<string, string>,
     value: TValue,
-    deleteRefs?: Set<string>
+    deleteRefs?: Set<string>,
   ): TValue | undefined {
     if (deleteRefs && deleteRefs.has(value as string)) {
       return undefined;
@@ -94,13 +93,13 @@ export abstract class CoreTypeOperations<
   abstract valueChangedDiff(
     value1: TValue,
     value2: TValue,
-    options?: ValueTypeOptions
+    options?: ValueTypeOptions,
   ): Change<EncodedChange> | Change<EncodedChange>[] | undefined;
 
   abstract patch(
     curValue: TValue | undefined,
     changes: Change<EncodedChange>[],
-    options?: ValueTypeOptions
+    options?: ValueTypeOptions,
   ): TValue | undefined;
 
   abstract isEmpty(value: TValue): boolean;
