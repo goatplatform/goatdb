@@ -30,7 +30,7 @@ export function getGoatConfig(): GoatConfig {
       debug: false,
       orgId: 'localhost',
     };
-    GoatDBConfig = config;
+    (globalThis as GlobalThis).GoatDBConfig = config;
   }
   return config;
 }
