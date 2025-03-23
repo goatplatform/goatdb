@@ -301,23 +301,21 @@ export class Commit implements Encodable, Decodable, Equatable, Comparable {
 
   static fromJS(
     orgId: string,
-    obj: ReadonlyJSONObject,
+    decoder: Decoder,
     schemaManager: SchemaManager,
   ): Commit {
-    const id = obj.id as string;
+    const id = decoder.get('id') as string;
     let result = FROZEN_COMMITS.get(id);
     if (!result) {
-      const decoder = JSONCyclicalDecoder.get(obj);
       result = new Commit({ decoder, orgId }, schemaManager);
       result._frozen = true;
       FROZEN_COMMITS.set(id, result);
-      if (
-        ((obj.c as ReadonlyJSONObject).r as ReadonlyJSONObject | undefined)
-          ?.cs !== undefined
-      ) {
-        SERIALIZED_COMMITS.set(id, obj);
-      }
-      decoder.finalize();
+      // if (
+      //   ((decoder.c as ReadonlyJSONObject).r as ReadonlyJSONObject | undefined)
+      //     ?.cs !== undefined
+      // ) {
+      //   SERIALIZED_COMMITS.set(id, decoder);
+      // }
     }
     // assert(
     //   !result.orgId || result.orgId === orgId,

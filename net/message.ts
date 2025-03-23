@@ -193,12 +193,13 @@ export class SyncMessage implements Encodable, Decodable {
     this._size = decoder.get<number>('s')!;
     this._accessDenied = decoder.get('ad', []);
     const values: Commit[] = [];
-    for (const obj of decoder.get<ReadonlyDecodedArray>('c', [])!) {
+    const commits = decoder.get<ReadonlyDecodedArray>('c', [])!;
+    for (let i = 0; i < commits.length; ++i) {
       try {
         values.push(
           Commit.fromJS(
             this.orgId,
-            obj as ReadonlyJSONObject,
+            decoder.getDecoder('c', i),
             this.schemaManager,
           ),
         );
@@ -224,17 +225,17 @@ export class SyncMessage implements Encodable, Decodable {
     const values: Commit[] | undefined = !decoder.has('c')
       ? undefined
       : await CoroutineScheduler.sharedScheduler().map(
-          decoder.get<ReadonlyDecodedArray>('c', [])!,
-          (obj) =>
-            Commit.fromJS(
-              decoderConfig.orgId,
-              obj as ReadonlyJSONObject,
-              schemaManager,
-            ),
-          SchedulerPriority.Normal,
-          'SyncMessageDecode',
-          true,
-        );
+        decoder.get<ReadonlyDecodedArray>('c', [])!,
+        (obj, idx) =>
+          Commit.fromJS(
+            decoderConfig.orgId,
+            decoder.getDecoder('c', idx),
+            schemaManager,
+          ),
+        SchedulerPriority.Normal,
+        'SyncMessageDecode',
+        true,
+      );
     return new this(
       {
         filter,
@@ -276,12 +277,10 @@ export class SyncMessage implements Encodable, Decodable {
     //
     // Finally, a bloom filter with fpr >= 0.5 isn't very useful (more than 50%
     // false positives), so we cap the computed value at 0.5.
-    const fpr = lowAccuracy
-      ? 0.5
-      : Math.min(
-          0.5,
-          1 / Math.pow(numberOfEntries, 1 / (0.5 * expectedSyncCycles)),
-        );
+    const fpr = lowAccuracy ? 0.5 : Math.min(
+      0.5,
+      1 / Math.pow(numberOfEntries, 1 / (0.5 * expectedSyncCycles)),
+    );
     const localFilter = new BloomFilter({
       size: numberOfEntries,
       fpr,
@@ -336,12 +335,10 @@ export class SyncMessage implements Encodable, Decodable {
     //
     // Finally, a bloom filter with fpr >= 0.5 isn't very useful (more than 50%
     // false positives), so we cap the computed value at 0.5.
-    const fpr = lowAccuracy
-      ? 0.5
-      : Math.min(
-          0.5,
-          1 / Math.pow(numberOfEntries, 1 / (0.5 * expectedSyncCycles)),
-        );
+    const fpr = lowAccuracy ? 0.5 : Math.min(
+      0.5,
+      1 / Math.pow(numberOfEntries, 1 / (0.5 * expectedSyncCycles)),
+    );
     const localFilter = new BloomFilter({
       size: numberOfEntries,
       fpr,

@@ -254,7 +254,6 @@ export enum SchedulerPriority {
    * Default priority. Use for Coroutines that directly tie to user
    * interactions. Whenever a `Normal` Coroutine is scheduled, it temporarily
    * pauses all `Background` Coroutines.
-   *
    */
   Normal = 0,
   /**
@@ -353,8 +352,8 @@ export class CoroutineScheduler implements Scheduler {
     // an average execution time for all Coroutines that did something in this
     // cycle. While not the most accurate, it's good enough to provide a
     // relatively fair execution plan.
-    const avgRunningTime =
-      (getRelativeTimestamp() - startTime) / executedCoroutines.size;
+    const avgRunningTime = (getRelativeTimestamp() - startTime) /
+      executedCoroutines.size;
     for (const c of executedCoroutines) {
       c.appendExecutionTime(avgRunningTime);
     }
@@ -377,8 +376,8 @@ export class CoroutineScheduler implements Scheduler {
     const backgroundQueue =
       this._scheduledCoroutines[SchedulerPriority.Background];
     this._executeFromQueue(normalQueue, this._cycleTimeMs);
-    const backgroundRunTime =
-      this._cycleTimeMs - (getRelativeTimestamp() - normalStartTime);
+    const backgroundRunTime = this._cycleTimeMs -
+      (getRelativeTimestamp() - normalStartTime);
     if (backgroundRunTime > 0) {
       this._executeFromQueue(backgroundQueue, backgroundRunTime);
     }
@@ -427,7 +426,7 @@ export class CoroutineScheduler implements Scheduler {
    */
   map<T, O = T>(
     iter: Iterable<T>,
-    mapper: (v: T) => O,
+    mapper: (v: T, idx: number) => O,
     priority = SchedulerPriority.Normal,
     name?: string,
     skipErrors = false,
@@ -464,19 +463,21 @@ const kSharedScheduler = new CoroutineScheduler();
 
 function* mapGenerator<T, O = T>(
   iter: Iterable<T>,
-  mapper: (v: T) => O,
+  mapper: (v: T, idx: number) => O,
   skipErrors: boolean,
 ): Generator<O[], O[]> {
   const result: O[] = [];
+  let i = 0;
   for (const v of iter) {
     if (skipErrors) {
       try {
-        result.push(mapper(v));
+        result.push(mapper(v, i));
       } catch (_: unknown) {}
     } else {
-      result.push(mapper(v));
+      result.push(mapper(v, i));
     }
     yield result;
+    ++i;
   }
   return result;
 }
