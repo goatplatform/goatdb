@@ -102,6 +102,18 @@ export type LiveReloadOptions = {
    * server as if it were handling requests for that organization.
    */
   orgId?: string;
+  /**
+   * An optional function that is called before a build is triggered.
+   *
+   * This hook can be used to run additional build steps, for example,
+   * triggering a tailwindcss rebuild to generate updated CSS before
+   * the main application rebuild happens.
+   */
+  beforeBuild?: () => Promise<void>;
+  /**
+   * An optional function that is called after a build is triggered.
+   */
+  afterBuild?: () => Promise<void>;
 };
 
 export type DebugServerOptions =
@@ -146,6 +158,9 @@ export async function startDebugServer(
     },
   ];
   await server.servicesForOrganization(options.orgId || 'localhost');
+  if (options.beforeBuild) {
+    await options.beforeBuild();
+  }
   const ctx = await createBuildContext(entryPoints);
   server.updateStaticAssets(
     await buildAssets(
@@ -154,6 +169,9 @@ export async function startDebugServer(
       options,
     ),
   );
+  if (options.afterBuild) {
+    await options.afterBuild();
+  }
   await server.start();
   openBrowser(options.domain.resolveOrg(options.orgId || 'localhost'));
   console.log(
@@ -169,6 +187,9 @@ export async function startDebugServer(
       try {
         const config = getGoatConfig();
         const version = incrementBuildNumber(config.version);
+        if (options.beforeBuild) {
+          await options.beforeBuild();
+        }
         server.updateStaticAssets(
           await buildAssets(
             ctx,
@@ -176,6 +197,9 @@ export async function startDebugServer(
             options,
           ),
         );
+        if (options.afterBuild) {
+          await options.afterBuild();
+        }
         config.version = version;
         console.log(
           `Bundling took ${
