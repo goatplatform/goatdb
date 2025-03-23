@@ -264,23 +264,24 @@ export function useItem<S extends Schema>(
   ...pathCompsOrOpts: (ManagedItem | string | UseItemOpts | undefined)[]
 ): ManagedItem<S> | undefined {
   const db = useDB();
-  if (pathCompsOrOpts[0] === undefined) {
-    return undefined;
-  }
   // Handle ManagedItem as first argument
   if (pathCompsOrOpts[0] instanceof ManagedItem) {
     pathCompsOrOpts[0] = pathCompsOrOpts[0].path;
   }
   // Options object may appear either at the beginning or at the end
+  const lastArg = pathCompsOrOpts[pathCompsOrOpts.length - 1];
   let opts: UseItemOpts | undefined;
   if (typeof pathCompsOrOpts[0] !== 'string') {
     opts = pathCompsOrOpts.shift() as UseItemOpts;
-  } else if (typeof pathCompsOrOpts[pathCompsOrOpts.length - 1] !== 'string') {
+  } else if (lastArg !== undefined && typeof lastArg !== 'string') {
     opts = pathCompsOrOpts.pop() as UseItemOpts;
   }
-  const item = pathCompsOrOpts[0] === undefined
-    ? undefined
-    : db.item<S>(...(pathCompsOrOpts as string[]));
+  let item: ManagedItem<S> | undefined = undefined;
+  if (pathCompsOrOpts[0] instanceof ManagedItem) {
+    item = pathCompsOrOpts[0];
+  } else if (typeof pathCompsOrOpts[0] === 'string') {
+    item = db.item<S>(...(pathCompsOrOpts as string[]));
+  }
   const subscribe = useCallback(
     (onStoreChange: () => void) =>
       item?.attach('change', (mutations: MutationPack) => {
