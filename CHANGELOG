@@ -8,6 +8,13 @@ and GoatDB adheres to
 
 ## [Unreleased]
 
+### Added
+
+- FieldDef.validate enables custom field level validation
+- Before/After hooks for integrating with external build steps via
+  `LiveReloadOptions.beforeBuild` and `LiveReloadOptions.afterBuild`
+- CoreTypes are now exported by the top level `mod.ts`
+
 ## [0.2.0]
 
 ### Added
