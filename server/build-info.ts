@@ -25,11 +25,6 @@ export interface BuildInfo extends JSONObject {
    */
   appVersion?: string;
   /**
-   * Application name. Extracted from the "name" field of the project's
-   * deno.json.
-   */
-  appName?: string;
-  /**
    * If true, indicates this is a debug build which turns off optimizations and
    * turns on a debugging aids.
    */
@@ -67,11 +62,6 @@ export async function generateBuildInfo(
   const denoJson = JSON.parse(await Deno.readTextFile(denoJsonPath));
   if (typeof denoJson.version === 'string') {
     info.appVersion = denoJson.version;
-  }
-  if (typeof denoJson.name === 'string') {
-    info.appName = denoJson.name;
-  } else {
-    info.appName = path.basename(path.dirname(denoJsonPath));
   }
   return info as BuildInfo;
 }

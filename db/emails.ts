@@ -60,7 +60,7 @@ export function DefaultEmailBuilder(
   switch (info.type) {
     case 'Login':
       return {
-        subject: `Login to ${config.buildInfo.appName || 'GOAT App'}`,
+        subject: `Login to ${config.appName || 'GOAT App'}`,
         text: `Click on this link to login to your account: ${info.magicLink}`,
         html:
           `<html><body><div>Click on this link to login to your account: <a href="${info.magicLink}">here</a></div></body></html>`,

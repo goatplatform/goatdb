@@ -55,4 +55,9 @@ export type AppConfig = {
    * If set to true, the output code bundle will be minified.
    */
   minify?: boolean;
+  /**
+   * Application name. Extracted from the "name" field of the project's
+   * deno.json.
+   */
+  appName?: string;
 };
