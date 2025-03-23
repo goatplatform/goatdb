@@ -14,6 +14,12 @@ and GoatDB adheres to
 - Before/After hooks for integrating with external build steps via
   `LiveReloadOptions.beforeBuild` and `LiveReloadOptions.afterBuild`
 - CoreTypes are now exported by the top level `mod.ts`
+- It's now possible to set a custom user schema via `SchemaManager.userSchema`
+
+## Fixed
+
+- Live reload in debug server is now working again
+- Set types being deserialized incorrectly
 
 ## [0.2.0]
 
