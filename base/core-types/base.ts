@@ -1,4 +1,4 @@
-import { Dictionary } from '../collections/dict.ts';
+import type { Dictionary } from '../collections/dict.ts';
 
 export type ReadonlyCoreObject = {
   readonly [key: string]: CoreValue;
@@ -59,7 +59,7 @@ export type CoreClassObject = Comparable | Clonable | Equatable | Encodable;
 
 export type ObjFieldsFilterFunc = (
   key: string,
-  obj: ReadonlyCoreObject
+  obj: ReadonlyCoreObject,
 ) => boolean;
 
 export type IterableFilterFunc = (value: CoreValue) => boolean;
@@ -85,7 +85,7 @@ export interface CoreValueCloneOpts extends CoreOptions {
   fieldCloneOverride?: (
     obj: ReadonlyCoreObject | CoreDictionary,
     key: string,
-    opts?: CoreValueCloneOpts
+    opts?: CoreValueCloneOpts,
   ) => CoreValue;
   objectOverride?: (obj: CoreValue) => [boolean, CoreValue];
   notClonableExt?: <T extends Object>(obj: T) => T | undefined;
@@ -95,7 +95,7 @@ export interface Encoder<
   K = CoreKey,
   V = CoreValue,
   T = CoreValue,
-  OT = unknown
+  OT = unknown,
 > {
   set(key: K, value: V, options?: OT): void;
   getOutput(): T;
@@ -106,7 +106,7 @@ export interface Encodable<
   K = CoreKey,
   V = CoreValue,
   T = CoreValue,
-  OT = unknown
+  OT = unknown,
 > {
   serialize(encoder: Encoder<K, V, T>, options?: OT): void;
 }

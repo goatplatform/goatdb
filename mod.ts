@@ -99,6 +99,7 @@ import { ConsoleLogStream } from './logging/console-stream.ts';
 import type { LogStream } from './logging/log.ts';
 import { JSONLogStream } from './logging/json-log-stream.ts';
 
+export * from './base/core-types/base.ts';
 export type {
   AppConfig,
   AuthConfig,
