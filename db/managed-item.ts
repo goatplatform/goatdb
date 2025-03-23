@@ -151,6 +151,10 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
   }
 
   commit(): Promise<void> {
+    this._item.normalize();
+    if (!this._item.isValid) {
+      return Promise.resolve();
+    }
     if (!this._commitPromise) {
       const p = this._commitImpl().finally(() => {
         if (this._commitPromise === p) {
