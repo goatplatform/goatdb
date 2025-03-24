@@ -288,7 +288,12 @@ export class Server {
         ...this._baseOptions,
         path: dir,
         orgId,
-        db: new GoatDB({ ...this._baseOptions, orgId, path: dir }),
+        db: new GoatDB({
+          ...this._baseOptions,
+          orgId,
+          path: dir,
+          debug: this._baseOptions.buildInfo.debugBuild,
+        }),
         logger: newLogger(this._baseOptions.logStreams || []),
         email: new EmailService(this._baseOptions.emailConfig),
       };

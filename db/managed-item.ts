@@ -152,8 +152,16 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
 
   commit(): Promise<void> {
     this._item.normalize();
-    if (!this._item.isValid) {
-      return Promise.resolve();
+    const [valid, error] = this._item.validate();
+    if (this.db.debug) {
+      assert(
+        valid,
+        `Attempting to commit an invalid item at ${this.path}: ${error}`,
+      );
+    } else {
+      if (!valid) {
+        return Promise.resolve();
+      }
     }
     if (!this._commitPromise) {
       const p = this._commitImpl().finally(() => {

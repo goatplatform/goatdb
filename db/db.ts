@@ -81,6 +81,11 @@ export interface DBConfig {
    * Defaults to `SchemaManger.default`.
    */
   schemaManager?: SchemaManager;
+  /**
+   * If true, the DB will be in debug mode.
+   * Defaults to false.
+   */
+  debug?: boolean;
 }
 
 /**
@@ -102,6 +107,7 @@ export class GoatDB<US extends Schema = typeof kSchemaUserDefault>
   readonly orgId: string;
   readonly schemaManager: SchemaManager;
   readonly trusted: boolean;
+  readonly debug: boolean;
   private readonly _basePath: string;
   private readonly _repositories: Map<string, Repository>;
   private readonly _openPromises: Map<string, Promise<Repository>>;
@@ -132,6 +138,7 @@ export class GoatDB<US extends Schema = typeof kSchemaUserDefault>
     this._items = new Map();
     this._openQueries = new Map();
     this.trusted = config.trusted ?? false;
+    this.debug = config.debug ?? false;
     if (config?.peers !== undefined) {
       this._peerURLs = typeof config.peers === 'string'
         ? [config.peers]

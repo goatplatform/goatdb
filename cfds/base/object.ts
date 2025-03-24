@@ -27,10 +27,24 @@ import type {
 } from '../../base/core-types/index.ts';
 import * as logTs from '../../logging/log.ts';
 
+/**
+ * Validates data against a schema.
+ *
+ * @param scheme - The schema to validate against
+ * @param data - The data to validate
+ * @returns A tuple containing:
+ *   - valid: boolean indicating if the data is valid
+ *   - error: error message if validation failed, empty string otherwise
+ *
+ * Validation checks:
+ * 1. All required fields are present
+ * 2. All fields have correct types
+ * 3. All fields pass their custom validation functions (if defined)
+ */
 export function isValidData<S extends Schema = Schema>(
   scheme: S,
   data: SchemaDataType<S>,
-) {
+): [valid: boolean, error: string] {
   // Check missing required fields
   for (const field of SchemaGetRequiredFields(scheme)) {
     if (!Object.hasOwn(data, field)) {

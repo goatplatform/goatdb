@@ -157,6 +157,20 @@ export class Item<S extends Schema = Schema>
   }
 
   /**
+   * Validates the item's data against its schema.
+   *
+   * This method checks if the item's data conforms to the schema's
+   * requirements and returns the validation result.
+   *
+   * @returns A tuple containing:
+   *   - valid: boolean indicating if the data is valid
+   *   - error: error message if validation failed, empty string otherwise
+   */
+  validate(): [boolean, string] {
+    return isValidData(this.schema, this._data);
+  }
+
+  /**
    * Indicates whether this item had been deleted or not. Deleted items will
    * eventually be garbage collected, and receive special treatment by the
    * system.
