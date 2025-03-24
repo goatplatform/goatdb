@@ -203,26 +203,37 @@ export const kSchemaSession = {
 export type SchemaTypeSession = typeof kSchemaSession;
 
 /**
- * Each scheme is potentially linked to a specific user (unless it's an
- * anonymous session). The user item stores personal login information for this
- * user.
+ * The minimal user definition schema. This provides only the most basic user
+ * properties needed by the system.
+ *
+ * Applications should extend this schema to support their specific use cases
+ * by adding additional fields as needed, then register their extended schema
+ * with SchemaManager.userSchema.
+ *
+ * Example:
+ * ```
+ * const myUserSchema = {
+ *   ns: 'User',
+ *   version: 1,
+ *   fields: {
+ *     ...kSchemaUserDefault.fields,
+ *     displayName: { type: 'string' },
+ *     preferences: { type: 'object' }
+ *   }
+ * };
+ * schemaManager.userSchema = myUserSchema;
+ * ```
  */
 export const kSchemaUserDefault = {
-  ns: 'user-default',
+  ns: '_user-default',
   version: 1,
   fields: {
     email: {
       type: 'string',
     },
-    firstName: {
-      type: 'string',
-    },
-    lastName: {
-      type: 'string',
-    },
   },
 } as const;
-// export type SchemaTypeUser = typeof kSchemaUser;
+export type SchemaTypeUserDefault = typeof kSchemaUserDefault;
 
 /**
  * Internally collected user statistics.

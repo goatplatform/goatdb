@@ -367,13 +367,15 @@ async function fetchUserByEmail<US extends Schema = typeof kSchemaUserDefault>(
   }
   // Lazily create users when needed
   if (services.autoCreateUser && services.autoCreateUser({ email })) {
-    return services.db.create(
+    const result = services.db.create(
       '/sys/users',
       services.db.schemaManager.userSchema,
       {
         email: email,
       },
     ) as unknown as ManagedItem<US>;
+    await services.db.flush('/sys/users');
+    return result;
   }
   return undefined;
 }

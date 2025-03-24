@@ -73,7 +73,11 @@
  * ```
  */
 import { GoatDB } from './db/db.ts';
-import type { Schema, SchemaDataType } from './cfds/base/schema.ts';
+import {
+  kSchemaUserDefault,
+  type Schema,
+  type SchemaDataType,
+} from './cfds/base/schema.ts';
 import { Query } from './repo/query.ts';
 import type { AppConfig } from './server/app-config.ts';
 import {
@@ -121,6 +125,7 @@ export {
   itemPathJoin,
   itemPathNormalize,
   JSONLogStream,
+  kSchemaUserDefault,
   ManagedItem,
   prettyJSON,
   Query,
