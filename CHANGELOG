@@ -23,7 +23,7 @@ and GoatDB adheres to
 - Attempting to commit an item with an invalid data now throws with a detailed
   message when running in debug mode
 
-## Fixed
+### Fixed
 
 - Live reload in debug server is now working again
 - Set types being deserialized incorrectly
