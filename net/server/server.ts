@@ -148,8 +148,8 @@ export interface ServerOptions extends DBConfig {
    */
   emailConfig?: EmailConfig;
   /**
-   * Application name. Extracted from the "name" field of the project's
-   * deno.json.
+   * The application name to use in emails and other user-facing content.
+   * If not provided, a default name will be used.
    */
   appName?: string;
 }
