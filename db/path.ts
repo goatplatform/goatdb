@@ -31,6 +31,9 @@ export function itemPath<T extends RepoType>(
   item: string,
   embed?: string,
 ): string {
+  if (embed === '') {
+    embed = undefined;
+  }
   return `/${type}/${repo}/${item}${embed ? '/' + embed : ''}`;
 }
 
@@ -127,7 +130,7 @@ export function itemPathNormalize(path: string): string {
     }
   }
   if (valid) {
-    return path;
+    return path.endsWith('/') ? path.slice(0, -1) : path;
   }
   return itemPath(
     itemPathGetPart(path, 'type')!,
@@ -165,6 +168,12 @@ const kValidItemPathChars = 'abcdefghijklmnopqrstuvwxyz0123456789-_';
  * @returns True if the path is valid, false otherwise.
  */
 export function itemPathIsValid(path: string): boolean {
+  if (path.length === 0) {
+    return false;
+  }
+  if (path[0] !== '/') {
+    return false;
+  }
   let sepCount = 0;
   for (let i = 0; i < path.length; ++i) {
     if (path[i] === '/') {
