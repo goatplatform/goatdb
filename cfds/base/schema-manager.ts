@@ -1,25 +1,25 @@
-import type { CoreObject } from '../../base/core-types/base.ts';
-import { coreValueClone } from '../../base/core-types/clone.ts';
-import { assert } from '../../base/error.ts';
-import type { Session } from '../../db/session.ts';
+import type { CoreObject } from "../../base/core-types/base.ts";
+import { coreValueClone } from "../../base/core-types/clone.ts";
+import { assert } from "../../base/error.ts";
+import type { Session } from "../../db/session.ts";
 import {
   type GoatDB,
   itemPathGetPart,
   itemPathGetRepoId,
   Repository,
-} from '../../mod.ts';
+} from "../../mod.ts";
 import {
   kNullSchema,
   kSchemaSession,
   kSchemaUserDefault,
   kSchemaUserStats,
   type Schema,
-} from './schema.ts';
+} from "./schema.ts";
 
 /**
  * Denotes the type of the requested operation.
  */
-export type AuthOp = 'read' | 'write';
+export type AuthOp = "read" | "write";
 
 /**
  * Information passed to authentication rules to determine if an operation
@@ -139,13 +139,13 @@ export class SchemaManager {
    *             repositories that match the given path.
    */
   registerAuthRule(path: RegExp | string, rule: AuthRule): void {
-    if (typeof path === 'string') {
+    if (typeof path === "string") {
       path = itemPathGetRepoId(path);
     }
     for (const { rulePath: p } of this._authRules) {
       assert(
         p !== path,
-        'Attempting to register multiple rules for the same path',
+        "Attempting to register multiple rules for the same path",
       );
     }
     this._authRules.push({ rulePath: path, rule });
@@ -231,7 +231,7 @@ export class SchemaManager {
    */
   encode(schema: Schema): string {
     if (schema.ns === null) {
-      return 'null';
+      return "null";
     }
     return `${schema.ns}/${schema.version}`;
   }
@@ -244,11 +244,11 @@ export class SchemaManager {
    * @returns The registered schema or undefined if no such schema is found.
    */
   decode(str: string /*| Decoder*/): Schema | undefined {
-    if (str === 'null') {
+    if (str === "null") {
       return kNullSchema;
     }
-    if (typeof str === 'string') {
-      const [ns, ver] = str.split('/');
+    if (typeof str === "string") {
+      const [ns, ver] = str.split("/");
       return this.get(ns, parseInt(ver));
     }
     // if (str.has('ns') && str.has('version')) {
@@ -277,7 +277,7 @@ export class SchemaManager {
     }
     // Look for a user-provided rule
     for (const { rulePath, rule } of this._authRules) {
-      if (typeof rulePath === 'string') {
+      if (typeof rulePath === "string") {
         if (Repository.normalizePath(rulePath) === repoId) {
           return rule;
         }
@@ -299,13 +299,13 @@ export class SchemaManager {
 
 const kBuiltinAuthRulesEnforced: AuthConfig = [
   {
-    rulePath: '/sys/sessions',
+    rulePath: "/sys/sessions",
     rule: ({ op }) => {
-      return op === 'read';
+      return op === "read";
     },
   },
   {
-    rulePath: '/sys/stats',
+    rulePath: "/sys/stats",
     rule: () => {
       return false;
     },
@@ -315,26 +315,26 @@ const kBuiltinAuthRulesEnforced: AuthConfig = [
 const kBuiltinAuthRulesOptional: AuthConfig = [
   // By default users can see other users but only edit themselves.
   {
-    rulePath: '/sys/users',
+    rulePath: "/sys/users",
     rule: ({ itemKey, session, op }) => {
       if (session.owner === itemKey) {
         return true;
       }
-      return op === 'read';
+      return op === "read";
     },
   },
   // Reserving /sys/* for the system's use
   {
     rulePath: /\/sys\/\w+/g,
     rule: ({ session }) => {
-      return session.owner === 'root';
+      return session.owner === "root";
     },
   },
   // By default, /user/<user-id> is private to the specific user.
   {
     rulePath: /\/user\/\w+/g,
     rule: ({ session, repoPath }) => {
-      return session.owner === itemPathGetPart(repoPath, 'repo');
+      return session.owner === itemPathGetPart(repoPath, "repo");
     },
   },
 ] as const;
