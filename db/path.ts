@@ -112,8 +112,9 @@ export function itemPathGetRepoId(path: string): string {
  * @returns A normalized path.
  */
 export function itemPathNormalize(path: string): string {
-  let valid = true;
-  if (path[0] === '/' && path[path.length - 1] !== '/') {
+  // Avoid unnecessary allocations if passed a valid path
+  let valid = path[0] === '/';
+  if (valid && path[path.length - 1] !== '/') {
     let prevSep = -1;
     for (let i = 0; i < path.length; ++i) {
       if (path[i] === '/') {
