@@ -8,6 +8,10 @@ and GoatDB adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- FIXED: `itemPathNormalize` sometimes returns relative paths
+
 ## [0.2.1]
 
 ### Added
