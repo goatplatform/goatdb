@@ -1,3 +1,52 @@
+/**
+ * @module schema
+ *
+ * This module defines the schema system for GoatDB. Schemas define the
+ * structure of documents in the database, including field types, validation
+ * rules, and conflict resolution strategies.
+ *
+ * Schemas in GoatDB are versioned alongside the data they describe, making
+ * rolling schema updates via branches a natural mechanism. Each item in GoatDB
+ * is defined with its schema, which dictates both the field types and their
+ * conflict resolution strategy.
+ *
+ * The schema system supports various field types including primitive types
+ * (string, number, boolean), complex types (sets, maps), and specialized types
+ * like RichText. Each field can have default values, validation rules, and
+ * specific conflict resolution behaviors.
+ *
+ * ## Paths and Built-in System Repositories
+ *
+ * GoatDB organizes data using paths that follow a hierarchical structure.
+ * The system includes several built-in repositories under the `/sys/` path
+ * prefix:
+ *
+ * - `/sys/users/<user id>`: Stores public user information. The schema
+ *   typically includes fields for username, display name, creation date, and
+ *   public user preferences. Each user document has a unique ID that can be
+ *   referenced in other collections.
+ *
+ * - `/sys/auth/<user id>`: Contains sensitive authentication data separate
+ *   from the public user profile. The schema includes fields for email,
+ *   password hash, security questions, and account recovery information. This
+ *   and account recovery information. This separation ensures authentication
+ *   data is not publicly visible to other users.
+ *
+ * - `/sys/sessions/<session id>`: Manages active user sessions and
+ *   authentication tokens. The schema includes fields for session ID, user ID
+ *   reference, creation timestamp, expiration timestamp, and device
+ *   information.
+ *
+ * - `/sys/stats/<stat id>`: Contains system statistics and performance
+ *   metrics. The schema includes fields for timestamp, operation counts,
+ *   query performance metrics, storage usage, and other system health
+ *   indicators.
+ *
+ * These built-in repositories have predefined schemas and special handling
+ * within the system. Custom application data typically resides in separate
+ * repositories outside the `/sys/` namespace.
+ */
+
 import type { Dictionary } from '../../base/collections/dict.ts';
 import type {
   CoreValue,
