@@ -12,6 +12,11 @@ and GoatDB adheres to
 
 - FIXED: `itemPathNormalize` sometimes returns relative paths
 
+### Changed
+
+- Renamed `SchemaManager` to `DataRegistry`
+- Renamed `DBConfig` to `DBInstanceConfig`
+
 ## [0.2.1]
 
 ### Added

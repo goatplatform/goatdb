@@ -1,4 +1,4 @@
-import { EaseInExpoTimer, EaseInOutSineTimer } from '../base/timer.ts';
+import { EaseInExpoTimer, type EaseInOutSineTimer } from '../base/timer.ts';
 import type { BloomFilter } from '../base/bloom.ts';
 import { SyncMessage } from './message.ts';
 import { log } from '../logging/log.ts';
@@ -13,7 +13,7 @@ import type { Repository } from '../repo/repo.ts';
 import { randomInt } from '../base/math.ts';
 import { Emitter } from '../base/emitter.ts';
 import type { Commit } from '../repo/commit.ts';
-import { SchemaManager } from '../cfds/base/schema-manager.ts';
+import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { assert } from '../base/error.ts';
 import { getGoatConfig } from '../server/config.ts';
 
@@ -53,7 +53,7 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
     readonly syncConfig: SyncConfig,
     readonly scheduler: SyncScheduler,
     readonly orgId: string,
-    readonly schemaManager = SchemaManager.default,
+    readonly registry = DataRegistry.default,
   ) {
     super();
     this._timer = new EaseInExpoTimer(
@@ -154,7 +154,7 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
       this.previousServerSize,
       this.syncCycles,
       this.orgId,
-      this.schemaManager,
+      this.registry,
       includeMissing,
       lowAccuracy,
     );

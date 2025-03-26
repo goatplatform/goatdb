@@ -9,9 +9,9 @@ import { buildAssets } from './generate-static-assets.ts';
 import { notReached } from '../base/error.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { generateBuildInfo } from './build-info.ts';
-import type { AppConfig } from '../mod.ts';
 import { isLinux, isMac, isWindows } from '../base/os.ts';
-
+import type { Schema } from '../cfds/base/schema.ts';
+import type { AppConfig } from './app-config.ts';
 function incrementBuildNumber(version: VersionNumber): VersionNumber {
   return tuple4Set(version, 0, tuple4Get(version, 0) + 1);
 }
@@ -116,9 +116,9 @@ export type LiveReloadOptions = {
   afterBuild?: () => Promise<void>;
 };
 
-export type DebugServerOptions =
-  & Omit<ServerOptions, 'staticAssets' | 'buildInfo' | 'domain'>
-  & Partial<Pick<ServerOptions, 'domain'>>
+export type DebugServerOptions<US extends Schema> =
+  & Omit<ServerOptions<US>, 'staticAssets' | 'buildInfo' | 'domain'>
+  & Partial<Pick<ServerOptions<US>, 'domain'>>
   & LiveReloadOptions
   & AppConfig;
 
@@ -128,8 +128,8 @@ export type DebugServerOptions =
  *
  * @param options Options for running the debug server.
  */
-export async function startDebugServer(
-  options: DebugServerOptions,
+export async function startDebugServer<US extends Schema>(
+  options: DebugServerOptions<US>,
 ): Promise<never> {
   Deno.addSignalListener('SIGTERM', () => {
     ctx.close();
@@ -146,7 +146,7 @@ export async function startDebugServer(
     };
   }
   const server = new Server({
-    ...(options as unknown as ServerOptions),
+    ...(options as unknown as ServerOptions<US>),
     buildInfo,
   });
   console.log('Bundling client code...');

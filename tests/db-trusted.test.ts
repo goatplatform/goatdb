@@ -1,5 +1,5 @@
 import { GoatDB } from '../db/db.ts';
-import { SchemaManager } from '../cfds/base/schema-manager.ts';
+import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { assertEquals, assertExists } from '@std/assert';
 import { expect } from '@std/expect';
 import { TEST } from './mod.ts';
@@ -15,21 +15,21 @@ const TestSchema = {
   },
 } as const;
 
-const kSchemaManager = new SchemaManager();
-kSchemaManager.registerSchema(TestSchema);
+const kDataRegistry = new DataRegistry();
+kDataRegistry.registerSchema(TestSchema);
 export default function setup(): void {
   TEST('Trusted', 'initialization', async (ctx) => {
     const db = new GoatDB({
       path: await ctx.tempDir('db-init'),
       orgId: 'test-org',
       trusted: true,
-      schemaManager: kSchemaManager,
+      registry: kDataRegistry,
     });
 
     try {
       assertEquals(db.orgId, 'test-org');
       assertEquals(db.path, await ctx.tempDir('db-init'));
-      assertEquals(db.schemaManager, kSchemaManager);
+      assertEquals(db.registry, kDataRegistry);
 
       // Should start not ready
       assertEquals(db.ready, false);
@@ -51,7 +51,7 @@ export default function setup(): void {
       path: await ctx.tempDir('db-repo'),
       orgId: 'test-org',
       trusted: true,
-      schemaManager: kSchemaManager,
+      registry: kDataRegistry,
     });
 
     try {
@@ -87,7 +87,7 @@ export default function setup(): void {
       path: await ctx.tempDir('db-items'),
       orgId: 'test-org',
       trusted: true,
-      schemaManager: kSchemaManager,
+      registry: kDataRegistry,
     });
 
     try {
@@ -130,7 +130,7 @@ export default function setup(): void {
       path: await ctx.tempDir('db-bulk'),
       orgId: 'test-org',
       trusted: true,
-      schemaManager: kSchemaManager,
+      registry: kDataRegistry,
     });
 
     try {
@@ -166,7 +166,7 @@ export default function setup(): void {
       path: await ctx.tempDir('db-query'),
       orgId: 'test-org',
       trusted: true,
-      schemaManager: kSchemaManager,
+      registry: kDataRegistry,
     });
 
     try {

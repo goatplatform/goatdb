@@ -27,7 +27,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
       this.commit();
     });
     const repo = db.repository(itemPathGetRepoId(path));
-    this._item = Item.nullItem(db.schemaManager);
+    this._item = Item.nullItem(db.registry);
     if (!repo) {
       this.loadRepoAndDoc();
     } else {

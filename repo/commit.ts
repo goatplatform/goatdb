@@ -25,7 +25,7 @@ import {
   JSONCyclicalEncoder,
 } from '../base/core-types/encoding/json.ts';
 import { BloomFilter } from '../base/bloom.ts';
-import { SchemaManager } from '../cfds/base/schema-manager.ts';
+import { DataRegistry } from '../cfds/base/data-registry.ts';
 // import { BloomFilter } from '../cpp/bloom_filter.ts';
 
 export type CommitResolver = (commitId: string) => Commit;
@@ -61,7 +61,7 @@ export interface CommitConfig {
   mergeLeader?: string;
   revert?: string;
   frozen?: true;
-  schemaManager?: SchemaManager;
+  registry?: DataRegistry;
 }
 
 export interface CommitSerializeOptions {
@@ -81,7 +81,7 @@ export interface CommitDecoderConfig<T = object>
 
 export class Commit implements Encodable, Decodable, Equatable, Comparable {
   readonly orgId: string;
-  readonly schemaManager: SchemaManager;
+  readonly registry: DataRegistry;
   private _buildVersion!: VersionNumber;
   private _id!: string;
   private _session!: string;
@@ -106,9 +106,9 @@ export class Commit implements Encodable, Decodable, Equatable, Comparable {
 
   constructor(
     config: CommitConfig | CommitDecoderConfig,
-    schemaManager?: SchemaManager,
+    registry?: DataRegistry,
   ) {
-    this.schemaManager = schemaManager || SchemaManager.default;
+    this.registry = registry || DataRegistry.default;
     if (isDecoderConfig(config)) {
       this.orgId = config.orgId;
       this.deserialize(config.decoder);
@@ -302,12 +302,12 @@ export class Commit implements Encodable, Decodable, Equatable, Comparable {
   static fromJS(
     orgId: string,
     decoder: Decoder,
-    schemaManager: SchemaManager,
+    registry: DataRegistry,
   ): Commit {
     const id = decoder.get('id') as string;
     let result = FROZEN_COMMITS.get(id);
     if (!result) {
-      result = new Commit({ decoder, orgId }, schemaManager);
+      result = new Commit({ decoder, orgId }, registry);
       result._frozen = true;
       FROZEN_COMMITS.set(id, result);
       // if (
@@ -327,7 +327,7 @@ export class Commit implements Encodable, Decodable, Equatable, Comparable {
   static fromJSArr(
     orgId: string,
     arr: readonly ReadonlyJSONObject[],
-    schemaManager: SchemaManager,
+    registry: DataRegistry,
   ): Commit[] {
     const result: Commit[] = [];
     for (const obj of arr) {
@@ -335,7 +335,7 @@ export class Commit implements Encodable, Decodable, Equatable, Comparable {
       let c = FROZEN_COMMITS.get(id);
       if (!c) {
         const decoder = JSONCyclicalDecoder.get(obj);
-        c = new Commit({ decoder, orgId }, schemaManager);
+        c = new Commit({ decoder, orgId }, registry);
         c._frozen = true;
         FROZEN_COMMITS.set(id, c);
         if (
@@ -380,7 +380,7 @@ export class Commit implements Encodable, Decodable, Equatable, Comparable {
     const contentsDecoder = decoder.getDecoder('c');
     this._contents = commitContentsDeserialize(
       contentsDecoder,
-      this.schemaManager,
+      this.registry,
     );
     if (contentsDecoder instanceof JSONCyclicalDecoder) {
       contentsDecoder.finalize();
@@ -435,11 +435,11 @@ export function commitContentsSerialize(
 
 export function commitContentsDeserialize(
   decoder: Decoder,
-  schemaManager: SchemaManager,
+  registry: DataRegistry,
 ): CommitContents {
   if (decoder.has('r')) {
     const recordDecoder = decoder.getDecoder('r');
-    const record = new Item({ decoder: recordDecoder }, schemaManager);
+    const record = new Item({ decoder: recordDecoder }, registry);
     if (recordDecoder instanceof JSONCyclicalDecoder) {
       recordDecoder.finalize();
     }

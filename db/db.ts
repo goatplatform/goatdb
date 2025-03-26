@@ -10,11 +10,7 @@ import { SyncScheduler } from '../net/sync-scheduler.ts';
 import { QueryPersistence } from '../repo/query-persistance.ts';
 import { QueryPersistenceFile } from './persistance/query-file.ts';
 import { ManagedItem } from './managed-item.ts';
-import type {
-  kSchemaUserDefault,
-  Schema,
-  SchemaTypeSession,
-} from '../cfds/base/schema.ts';
+import type { Schema, SchemaTypeSession } from '../cfds/base/schema.ts';
 import {
   itemPathGetPart,
   itemPathGetRepoId,
@@ -50,12 +46,12 @@ import { normalizeEmail } from '../base/string.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
 import { FileImplOPFS } from '../base/json-log/file-impl-opfs.ts';
 import { assert } from '../base/error.ts';
-import { SchemaManager } from '../cfds/base/schema-manager.ts';
+import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { Emitter } from '../base/emitter.ts';
 import { getGoatConfig } from '../server/config.ts';
 // import { remove } from '../base/json-log/json-log.ts';
 
-export interface DBConfig {
+export interface DBInstanceConfig {
   /**
    * Absolute path to the directory that'll store the DB's data.
    */
@@ -77,10 +73,14 @@ export interface DBConfig {
    */
   trusted?: boolean;
   /**
-   * The schema manager to use for this DB instance.
-   * Defaults to `SchemaManger.default`.
+   * Optional schema registry to use for this database instance.
+   * If not provided, the default global registry (DataRegistry.default) will
+   * be used. The registry contains all schema definitions and authorization
+   * rules that this database instance will work with. Authorization rules
+   * define who can read, write, or delete data based on user permissions and
+   * data properties.
    */
-  schemaManager?: SchemaManager;
+  registry?: DataRegistry;
   /**
    * If true, the DB will be in debug mode.
    * Defaults to false.
@@ -102,10 +102,10 @@ export type EventUserChanged = 'UserChanged';
 /**
  * Main entry class for GoatDB - The Edge-Native Database.
  */
-export class GoatDB<US extends Schema = typeof kSchemaUserDefault>
+export class GoatDB<US extends Schema = Schema>
   extends Emitter<EventUserChanged> {
   readonly orgId: string;
-  readonly schemaManager: SchemaManager;
+  readonly registry: DataRegistry;
   readonly trusted: boolean;
   readonly debug: boolean;
   private readonly _basePath: string;
@@ -127,10 +127,10 @@ export class GoatDB<US extends Schema = typeof kSchemaUserDefault>
   private _trustPoolPromise: Promise<TrustPool>;
   private _ready: boolean = false;
 
-  constructor(config: DBConfig) {
+  constructor(config: DBInstanceConfig) {
     super();
     this._basePath = config.path;
-    this.schemaManager = config.schemaManager || SchemaManager.default;
+    this.registry = config.registry || DataRegistry.default;
     this.orgId = config?.orgId || getGoatConfig().orgId;
     this._repositories = new Map();
     this._openPromises = new Map();
@@ -414,7 +414,7 @@ export class GoatDB<US extends Schema = typeof kSchemaUserDefault>
           schema,
           data,
         },
-        this.schemaManager,
+        this.registry,
       ),
       undefined,
     );
@@ -634,7 +634,7 @@ export class GoatDB<US extends Schema = typeof kSchemaUserDefault>
             syncConfig,
             this._trustPool!,
             this.orgId,
-            this.schemaManager,
+            this.registry,
           ),
       );
     }
@@ -656,7 +656,7 @@ export class GoatDB<US extends Schema = typeof kSchemaUserDefault>
     }
     const repo = new Repository(this as unknown as GoatDB, repoId, trustPool, {
       ...opts,
-      authorizer: this.schemaManager.authRuleForRepo(repoId),
+      authorizer: this.registry.authRuleForRepo(repoId),
     });
     this._repositories.set(repoId, repo);
     const file = await JSONLogFileOpen(
@@ -676,7 +676,7 @@ export class GoatDB<US extends Schema = typeof kSchemaUserDefault>
       [entries, done] = await nextPromise;
       nextPromise = JSONLogFileScan(cursor);
       // [entries, done] = await JSONLogFileScan(cursor);
-      const commits = Commit.fromJSArr(this.orgId, entries, this.schemaManager);
+      const commits = Commit.fromJSArr(this.orgId, entries, this.registry);
       if (commits.length > 0) {
         loadedFromBackup = true;
       }

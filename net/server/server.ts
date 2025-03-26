@@ -18,10 +18,12 @@ import { ServerError } from '../../cfds/base/errors.ts';
 import { getGoatConfig } from '../../server/config.ts';
 import { GoatDB } from '../../db/db.ts';
 import { SyncEndpoint } from './sync.ts';
-import type { DBConfig } from '../../db/db.ts';
+import type { DBInstanceConfig } from '../../db/db.ts';
 import type { BuildInfo } from '../../server/build-info.ts';
 import { type EmailConfig, EmailService } from './email.ts';
 import type { StaticAssets } from '../../system-assets/system-assets.ts';
+import { Schema } from '../../cfds/base/schema.ts';
+import { ManagedItem } from '../../db/managed-item.ts';
 
 /**
  * Information about a user attempting to log in for the first time.
@@ -64,7 +66,7 @@ export type DomainConfig = {
 /**
  * A server represents a logical DB with some additional configuration options.
  */
-export interface ServerOptions extends DBConfig {
+export interface ServerOptions<US extends Schema> extends DBInstanceConfig {
   /**
    * Info about the build process.
    */
@@ -92,23 +94,6 @@ export interface ServerOptions extends DBConfig {
    * Compiled static assets the server will serve.
    */
   staticAssets?: StaticAssets;
-  /**
-   * A function that determines whether a user should be automatically created
-   * on first login attempt. If this function returns true, a new user account
-   * will be created when an unrecognized email attempts to log in. This can
-   * be used to:
-   *
-   * - Enable public registration by returning true for all emails
-   * - Enforce organization policies by checking email domains
-   * - Restrict registration to specific email patterns or lists
-   *
-   * If not provided or if the function returns false, only pre-existing users
-   * will be able to log in.
-   *
-   * @param info Information about the user attempting to log in
-   * @returns true to allow creating a new user account, false to deny
-   */
-  autoCreateUser?: (info: AutoCreateUserInfo) => boolean;
   /**
    * Path to deno.json. Defaults to 'deno.json' inside the current directory.
    */
@@ -148,6 +133,26 @@ export interface ServerOptions extends DBConfig {
    */
   emailConfig?: EmailConfig;
   /**
+   * A hook that's used during email-based authentication flows to look up or create users.
+   * This function is called when a user attempts to log in with an email address.
+   *
+   * Implementing this hook allows you to:
+   * - Integrate with external user management systems
+   * - Implement custom user lookup logic
+   * - Lazily create users when they first authenticate
+   * - Apply organization-specific policies for user creation
+   *
+   * If not provided, the system won't handle email-based authentication and authorization.
+   *
+   * @param db The database instance
+   * @param email The normalized email address of the user attempting to authenticate
+   * @returns The user item if found or created, or undefined to deny access
+   */
+  fetchUserByEmail?: (
+    db: GoatDB<US>,
+    email: string,
+  ) => Promise<ManagedItem<US> | undefined> | ManagedItem<US> | undefined;
+  /**
    * The application name to use in emails and other user-facing content.
    * If not provided, a default name will be used.
    */
@@ -162,9 +167,9 @@ export interface ServerOptions extends DBConfig {
  * data dir so all organization data is contained in a single DB/directory on
  * disk.
  */
-export interface ServerServices extends ServerOptions {
+export interface ServerServices<US extends Schema> extends ServerOptions<US> {
   readonly orgId: string;
-  readonly db: GoatDB;
+  readonly db: GoatDB<US>;
   readonly logger: Logger;
   readonly email: EmailService;
 }
@@ -178,14 +183,14 @@ export interface ServerServices extends ServerOptions {
  * In order to fulfill their job, Endpoints can consume Services offered by the
  * server. See `BaseService` below.
  */
-export interface Endpoint {
+export interface Endpoint<US extends Schema> {
   filter(
-    services: ServerServices,
+    services: ServerServices<US>,
     req: Request,
     info: Deno.ServeHandlerInfo,
   ): boolean;
   processRequest(
-    services: ServerServices,
+    services: ServerServices<US>,
     req: Request,
     info: Deno.ServeHandlerInfo,
   ): Promise<Response>;
@@ -199,14 +204,14 @@ export interface Endpoint {
  * Note that all registered middlewares get a chance to run for each request.
  * Execution order follows registration order, just like endpoints.
  */
-export interface Middleware {
+export interface Middleware<US extends Schema> {
   shouldProcess?: (
-    services: ServerServices,
+    services: ServerServices<US>,
     req: Request,
     info: Deno.ServeHandlerInfo,
   ) => Promise<Response | undefined>;
   didProcess?: (
-    services: ServerServices,
+    services: ServerServices<US>,
     req: Request,
     info: Deno.ServeHandlerInfo,
     resp: Response,
@@ -236,16 +241,16 @@ export interface Middleware {
  * All registered middlewares get a chance to run for each request.
  * Execution order follows registration order, like endpoints.
  */
-export class Server {
-  private readonly _endpoints: Endpoint[];
-  private readonly _middlewares: Middleware[];
-  private readonly _baseOptions: ServerOptions;
-  private readonly _servicesByOrg: Dictionary<string, ServerServices>;
+export class Server<US extends Schema> {
+  private readonly _endpoints: Endpoint<US>[];
+  private readonly _middlewares: Middleware<US>[];
+  private readonly _baseOptions: ServerOptions<US>;
+  private readonly _servicesByOrg: Dictionary<string, ServerServices<US>>;
 
   private _abortController: AbortController | undefined;
   private _httpServer?: Deno.HttpServer;
 
-  constructor(options: ServerOptions) {
+  constructor(options: ServerOptions<US>) {
     this._endpoints = [];
     this._middlewares = [];
     getGoatConfig().serverData = this;
@@ -279,7 +284,7 @@ export class Server {
     // this.registerEndpoint(new LogsEndpoint());
   }
 
-  async servicesForOrganization(orgId: string): Promise<ServerServices> {
+  async servicesForOrganization(orgId: string): Promise<ServerServices<US>> {
     let services = this._servicesByOrg.get(orgId);
     if (!services) {
       const dir = path.join(this._baseOptions.path, orgId);
@@ -307,12 +312,12 @@ export class Server {
     return services;
   }
 
-  registerEndpoint(ep: Endpoint): void {
-    this._endpoints.push(ep as Endpoint);
+  registerEndpoint(ep: Endpoint<US>): void {
+    this._endpoints.push(ep);
   }
 
-  registerMiddleware(mid: Middleware): void {
-    this._middlewares.push(mid as Middleware);
+  registerMiddleware(mid: Middleware<US>): void {
+    this._middlewares.push(mid);
   }
 
   orgIds(): Iterable<string> {

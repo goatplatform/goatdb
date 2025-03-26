@@ -19,9 +19,8 @@ import type { HTTPMethod } from '../../logging/metrics.ts';
 import type { Endpoint, ServerServices } from './server.ts';
 import { getBaseURL, getRequestPath } from './utils.ts';
 import {
-  kSchemaUserDefault,
   kSchemaUserStats,
-  Schema,
+  type Schema,
   type SchemaTypeUserStats,
 } from '../../cfds/base/schema.ts';
 import { normalizeEmail } from '../../base/string.ts';
@@ -53,9 +52,9 @@ export interface TemporaryLoginToken extends ReadonlyJSONObject {
   readonly sl: string; // A random salt to ensure uniqueness
 }
 
-export class AuthEndpoint implements Endpoint {
+export class AuthEndpoint<US extends Schema> implements Endpoint<US> {
   filter(
-    _services: ServerServices,
+    _services: ServerServices<US>,
     req: Request,
     _info: Deno.ServeHandlerInfo,
   ): boolean {
@@ -78,7 +77,7 @@ export class AuthEndpoint implements Endpoint {
   }
 
   processRequest(
-    services: ServerServices,
+    services: ServerServices<US>,
     req: Request,
     _info: Deno.ServeHandlerInfo,
   ): Promise<Response> {
@@ -106,7 +105,7 @@ export class AuthEndpoint implements Endpoint {
   }
 
   private async createNewSession(
-    services: ServerServices,
+    services: ServerServices<US>,
     req: Request,
   ): Promise<Response> {
     let publicKey: CryptoKey | undefined;
@@ -152,7 +151,7 @@ export class AuthEndpoint implements Endpoint {
   }
 
   private async sendTemporaryLoginEmail(
-    services: ServerServices,
+    services: ServerServices<US>,
     req: Request,
   ): Promise<Response> {
     const body = await req.json();
@@ -229,7 +228,7 @@ export class AuthEndpoint implements Endpoint {
   }
 
   private async loginWithToken(
-    services: ServerServices,
+    services: ServerServices<US>,
     req: Request,
   ): Promise<Response> {
     const encodedToken = new URL(req.url).searchParams.get('t');
@@ -275,7 +274,7 @@ export class AuthEndpoint implements Endpoint {
       session.owner = userKey;
       sessionsRepo.setValueForKey(
         session.id,
-        await sessionToItem(session, services.db.schemaManager),
+        await sessionToItem(session, services.db.registry),
         sessionsRepo.headForKey(session.id),
       );
       // Update user stats
@@ -305,7 +304,7 @@ export class AuthEndpoint implements Endpoint {
     }
   }
 
-  private redirectHome(services: ServerServices): Response {
+  private redirectHome(services: ServerServices<US>): Response {
     return new Response(null, {
       status: 307,
       headers: {
@@ -315,18 +314,18 @@ export class AuthEndpoint implements Endpoint {
   }
 }
 
-export async function persistSession(
-  services: ServerServices,
+export async function persistSession<US extends Schema>(
+  services: ServerServices<US>,
   session: Session | OwnedSession,
 ): Promise<void> {
   const repo = await services.db.open('/sys/sessions');
-  const record = await sessionToItem(session, services.db.schemaManager);
+  const record = await sessionToItem(session, services.db.registry);
   await repo.setValueForKey(session.id, record, undefined);
   await services.db.flush('/sys/sessions');
 }
 
-export async function fetchEncodedRootSessions(
-  db: GoatDB,
+export async function fetchEncodedRootSessions<US extends Schema>(
+  db: GoatDB<US>,
 ): Promise<EncodedSession[]> {
   const result: EncodedSession[] = [];
   const trustPool = await db.getTrustPool();
@@ -341,47 +340,48 @@ export async function fetchEncodedRootSessions(
   return result;
 }
 
-async function fetchUserByEmail<US extends Schema = typeof kSchemaUserDefault>(
-  services: ServerServices,
+async function fetchUserByEmail<US extends Schema>(
+  services: ServerServices<US>,
   email: string,
 ): Promise<ManagedItem<US> | undefined> {
-  email = normalizeEmail(email);
-  // This query acts as a persistent index over user emails:
-  // 1. It maintains a sorted list of all users by email
-  // 2. The query stays active and automatically updates as users are
-  //    added/modified
-  // 3. Results are cached and immediately available after initial load
-  // 4. Since email is the sort field, binary search is used for O(log n)
-  //    lookups
-  // 5. Query caching allows efficient resume after suspend/close
-  const query = services.db.query({
-    schema: services.db.schemaManager.userSchema,
-    source: '/sys/users',
-    sortBy: 'email',
-  });
-  // Wait for the query to finish loading
-  await query.loadingFinished();
-  const user = query.find('email', email);
-  if (user) {
-    return user as unknown as ManagedItem<US>;
-  }
-  // Lazily create users when needed
-  if (services.autoCreateUser && services.autoCreateUser({ email })) {
-    const result = services.db.create(
-      '/sys/users',
-      services.db.schemaManager.userSchema,
-      {
-        email: email,
-      },
-    ) as unknown as ManagedItem<US>;
-    await services.db.flush('/sys/users');
-    return result;
-  }
-  return undefined;
+  return await services.fetchUserByEmail?.(services.db, email);
+  // email = normalizeEmail(email);
+  // // This query acts as a persistent index over user emails:
+  // // 1. It maintains a sorted list of all users by email
+  // // 2. The query stays active and automatically updates as users are
+  // //    added/modified
+  // // 3. Results are cached and immediately available after initial load
+  // // 4. Since email is the sort field, binary search is used for O(log n)
+  // //    lookups
+  // // 5. Query caching allows efficient resume after suspend/close
+  // const query = services.db.query({
+  //   schema: services.db.schemaManager.userSchema,
+  //   source: '/sys/users',
+  //   sortBy: 'email',
+  // });
+  // // Wait for the query to finish loading
+  // await query.loadingFinished();
+  // const user = query.find('email', email);
+  // if (user) {
+  //   return user as unknown as ManagedItem<US>;
+  // }
+  // // Lazily create users when needed
+  // if (services.autoCreateUser && services.autoCreateUser({ email })) {
+  //   const result = services.db.create(
+  //     '/sys/users',
+  //     services.db.schemaManager.userSchema,
+  //     {
+  //       email: email,
+  //     },
+  //   ) as unknown as ManagedItem<US>;
+  //   await services.db.flush('/sys/users');
+  //   return result;
+  // }
+  // return undefined;
 }
 
-export async function fetchSessionById(
-  services: ServerServices,
+export async function fetchSessionById<US extends Schema>(
+  services: ServerServices<US>,
   sessionId: string,
 ): Promise<Session | undefined> {
   const tp = await services.db.getTrustPool();
@@ -389,8 +389,8 @@ export async function fetchSessionById(
   return session;
 }
 
-export function fetchUserById<US extends Schema = typeof kSchemaUserDefault>(
-  services: ServerServices,
+export function fetchUserById<US extends Schema>(
+  services: ServerServices<US>,
   userId: string,
 ): Item<US> | undefined {
   const entry = services.db
@@ -412,9 +412,9 @@ function responseForError(err: AuthError): Response {
 export type Role = 'user' | 'anonymous';
 
 export async function requireSignedUser<
-  US extends Schema = typeof kSchemaUserDefault,
+  US extends Schema,
 >(
-  services: ServerServices,
+  services: ServerServices<US>,
   requestOrSignature: Request | string,
   role?: Role,
 ): Promise<
@@ -448,7 +448,7 @@ export async function requireSignedUser<
   // Anonymous access
   if (userId === undefined) {
     if (role === 'anonymous') {
-      return [null, Item.nullItem(services.db.schemaManager), signerSession];
+      return [null, Item.nullItem(services.db.registry), signerSession];
     }
     throw accessDenied();
   }

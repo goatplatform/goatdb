@@ -98,7 +98,7 @@ Now, let's implement this pattern in our todo app:
 
 ```typescript
 // schema.ts
-import { itemPathGetPart, SchemaManager } from '@goatdb/goatdb';
+import { DataRegistry, itemPathGetPart } from '@goatdb/goatdb';
 
 export const kSchemaTask = {
   ns: 'task',
@@ -118,13 +118,13 @@ export type SchemaTypeTask = typeof kSchemaTask;
 
 // Register both the schema and authorization rules
 export function registerSchemas(
-  manager: SchemaManager = SchemaManager.default,
+  registry: DataRegistry = DataRegistry.default,
 ): void {
   // Register the task schema
-  manager.registerSchema(kSchemaTask);
+  registry.registerSchema(kSchemaTask);
 
   // Register an authorization rule that only allows users to access their own repositories
-  manager.registerAuthRule(
+  registry.registerAuthRule(
     /\/data\/\w+/, // Matches all repositories under /data/<user-id>
     (_db, repoPath, _itemKey, session, _op) =>
       // Only allow access if the repository matches the user's ID

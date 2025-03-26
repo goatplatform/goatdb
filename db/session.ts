@@ -21,7 +21,7 @@ import {
   encodeBase32URL,
 } from '../base/string.ts';
 import { LRUCache } from '../base/lru-cache.ts';
-import { SchemaManager } from '../cfds/base/schema-manager.ts';
+import { DataRegistry } from '../cfds/base/data-registry.ts';
 
 export const SESSION_CRYPTO_KEY_GEN_PARAMS: EcKeyGenParams = {
   name: 'ECDSA',
@@ -289,7 +289,7 @@ export async function signCommit(
     mergeLeader: commit.mergeLeader,
     revert: commit.revert,
     orgId: commit.orgId,
-    schemaManager: commit.schemaManager,
+    registry: commit.registry,
   });
 }
 
@@ -387,10 +387,10 @@ export async function decodeSession(
 
 export async function sessionToItem(
   session: Session,
-  schemaManager: SchemaManager,
+  registry: DataRegistry,
 ): Promise<Item<SchemaTypeSession>> {
   const encodedSession = await encodeSession(session);
-  return encodedSessionToItem(encodedSession, schemaManager);
+  return encodedSessionToItem(encodedSession, registry);
 }
 
 export async function sessionFromItem(
@@ -401,7 +401,7 @@ export async function sessionFromItem(
 
 export function encodedSessionToItem(
   encodedSession: EncodedSession,
-  schemaManager: SchemaManager,
+  registry: DataRegistry,
 ): Item<SchemaTypeSession> {
   return new Item<SchemaTypeSession>({
     schema: kSchemaSession,
@@ -411,7 +411,7 @@ export function encodedSessionToItem(
       expiration: deserializeDate(encodedSession.expiration),
       publicKey: JSON.stringify(encodedSession.publicKey),
     },
-  }, schemaManager);
+  }, registry);
 }
 
 export function encodedSessionFromItem(

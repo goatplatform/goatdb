@@ -120,7 +120,7 @@ export class SyncEndpoint implements Endpoint {
         decoder,
         orgId: services.orgId,
       },
-      services.db.schemaManager,
+      services.db.registry,
     );
     decoder.finalize();
     let syncCycles = syncConfigGetCycles(kSyncConfigServer);
@@ -146,7 +146,7 @@ export class SyncEndpoint implements Endpoint {
       msg.size,
       syncCycles,
       services.orgId,
-      services.db.schemaManager,
+      services.db.registry,
       // Don't return new commits to old clients
       includeMissing && msg.buildVersion >= getGoatConfig().version,
       lowAccuracy,

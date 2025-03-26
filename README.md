@@ -51,6 +51,11 @@ versioned, making rolling schema updates via branches a natural mechanism.​​
 👉 If you like what we're building, please star ⭐️ our project. We really
 appreciate it! 🙏
 
+> [!WARNING]
+> Please keep in mind that GoatDB is still under active development and
+> therefore full backward compatibility is not guaranteed before reaching
+> v1.0.0.
+
 ## Example Projects
 
 Explore projects built with GoatDB:

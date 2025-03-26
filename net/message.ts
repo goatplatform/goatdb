@@ -13,7 +13,7 @@ import { isDecoderConfig } from '../base/core-types/encoding/utils.ts';
 import { CoroutineScheduler, SchedulerPriority } from '../base/coroutine.ts';
 import type { ReadonlyJSONObject } from '../base/interfaces.ts';
 import type { VersionNumber } from '../base/version-number.ts';
-import type { SchemaManager } from '../cfds/base/schema-manager.ts';
+import type { DataRegistry } from '../cfds/base/data-registry.ts';
 import { Commit } from '../repo/commit.ts';
 import { getGoatConfig } from '../server/config.ts';
 
@@ -110,7 +110,7 @@ export interface SyncMessageDecoderConfig extends ConstructorDecoderConfig {
  */
 export class SyncMessage implements Encodable, Decodable {
   readonly orgId: string;
-  readonly schemaManager: SchemaManager;
+  readonly registry: DataRegistry;
   private _buildVersion!: VersionNumber;
   private _filter!: BloomFilter;
   private _size!: number;
@@ -119,9 +119,9 @@ export class SyncMessage implements Encodable, Decodable {
 
   constructor(
     config: SyncMessageDecoderConfig | SyncMessageConfig,
-    schemaManager: SchemaManager,
+    registry: DataRegistry,
   ) {
-    this.schemaManager = schemaManager;
+    this.registry = registry;
     if (isDecoderConfig(config)) {
       this.orgId = config.orgId;
       this.deserialize(config.decoder);
@@ -200,7 +200,7 @@ export class SyncMessage implements Encodable, Decodable {
           Commit.fromJS(
             this.orgId,
             decoder.getDecoder('c', i),
-            this.schemaManager,
+            this.registry,
           ),
         );
       } catch (e: unknown) {}
@@ -210,7 +210,7 @@ export class SyncMessage implements Encodable, Decodable {
 
   static async decodeAsync(
     decoderConfig: SyncMessageDecoderConfig,
-    schemaManager: SchemaManager,
+    registry: DataRegistry,
   ): Promise<SyncMessage> {
     const decoder: Decoder<string, DecodedValue> = decoderConfig.decoder;
     const buildVersion = decoder.get<VersionNumber>('ver')!;
@@ -230,7 +230,7 @@ export class SyncMessage implements Encodable, Decodable {
           Commit.fromJS(
             decoderConfig.orgId,
             decoder.getDecoder('c', idx),
-            schemaManager,
+            registry,
           ),
         SchedulerPriority.Normal,
         'SyncMessageDecode',
@@ -245,7 +245,7 @@ export class SyncMessage implements Encodable, Decodable {
         accessDenied,
         buildVersion,
       },
-      schemaManager,
+      registry,
     );
   }
 
@@ -256,7 +256,7 @@ export class SyncMessage implements Encodable, Decodable {
     peerSize: number,
     expectedSyncCycles: number,
     orgId: string,
-    schemaManager: SchemaManager,
+    registry: DataRegistry,
     includeMissing = true,
     lowAccuracy = false,
   ): SyncMessage {
@@ -303,7 +303,7 @@ export class SyncMessage implements Encodable, Decodable {
         orgId,
         values: missingPeerValues,
       },
-      schemaManager,
+      registry,
     );
   }
 
@@ -314,7 +314,7 @@ export class SyncMessage implements Encodable, Decodable {
     peerSize: number,
     expectedSyncCycles: number,
     orgId: string,
-    schemaManager: SchemaManager,
+    registry: DataRegistry,
     includeMissing = true,
     lowAccuracy = false,
   ): Promise<SyncMessage> {
@@ -361,7 +361,7 @@ export class SyncMessage implements Encodable, Decodable {
         orgId,
         values: missingPeerValues,
       },
-      schemaManager,
+      registry,
     );
   }
 }

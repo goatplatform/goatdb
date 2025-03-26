@@ -3,7 +3,7 @@ import {
   type DecodedDataChange,
   decodedDataChanges,
 } from './object.ts';
-import { type Schema } from './schema.ts';
+import type { Schema } from './schema.ts';
 import type { JSONValue, ReadonlyJSONObject } from '../../base/interfaces.ts';
 import {
   JSONCyclicalDecoder,
@@ -20,7 +20,7 @@ import type {
   Equatable,
 } from '../../base/core-types/index.ts';
 import { coreValueClone } from '../../base/core-types/clone.ts';
-import { SchemaManager } from './schema-manager.ts';
+import { DataRegistry } from './data-registry.ts';
 
 /**
  * A single set of changes that should be applied to a specific record.
@@ -47,7 +47,7 @@ export interface EncodedEdit {
 }
 
 export class Edit implements Encodable, Equatable, Clonable {
-  readonly schemeManager: SchemaManager;
+  readonly schemeManager: DataRegistry;
   readonly changes: DataChanges;
   readonly srcChecksum: string;
   readonly dstChecksum: string;
@@ -55,9 +55,9 @@ export class Edit implements Encodable, Equatable, Clonable {
 
   constructor(
     config: EditConfig | ConstructorDecoderConfig<EncodedEdit>,
-    schemeManager?: SchemaManager,
+    schemeManager?: DataRegistry,
   ) {
-    this.schemeManager = schemeManager || SchemaManager.default;
+    this.schemeManager = schemeManager || DataRegistry.default;
     if (isDecoderConfig(config)) {
       const decoder = config.decoder;
 

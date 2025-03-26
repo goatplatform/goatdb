@@ -1,25 +1,24 @@
-import type { CoreObject } from "../../base/core-types/base.ts";
-import { coreValueClone } from "../../base/core-types/clone.ts";
-import { assert } from "../../base/error.ts";
-import type { Session } from "../../db/session.ts";
+import type { CoreObject } from '../../base/core-types/base.ts';
+import { coreValueClone } from '../../base/core-types/clone.ts';
+import { assert } from '../../base/error.ts';
+import type { Session } from '../../db/session.ts';
 import {
   type GoatDB,
   itemPathGetPart,
   itemPathGetRepoId,
   Repository,
-} from "../../mod.ts";
+} from '../../mod.ts';
 import {
   kNullSchema,
   kSchemaSession,
-  kSchemaUserDefault,
   kSchemaUserStats,
   type Schema,
-} from "./schema.ts";
+} from './schema.ts';
 
 /**
  * Denotes the type of the requested operation.
  */
-export type AuthOp = "read" | "write";
+export type AuthOp = 'read' | 'write';
 
 /**
  * Information passed to authentication rules to determine if an operation
@@ -57,62 +56,36 @@ export type AuthConfig = {
 }[];
 
 /**
- * The schemaManager acts as a registry of known schemas for a given GoatDB
+ * The DataRegistry acts as a registry of known schemas for a given GoatDB
  * instance. It's initialized when the app starts and stays fixed during its
  * execution.
  *
- * Typically, apps use the `schemaManager.default` instance, but are free to
- * create multiple managers each with different schemas registered.
+ * Typically, apps use the `DataRegistry.default` instance, but are free to
+ * create multiple registries each with different schemas registered.
  */
-export class SchemaManager {
+export class DataRegistry {
   private readonly _schemas: Map<string, Schema[]>;
   private _authRules: AuthConfig;
-  private _userSchema: Schema;
 
   /**
-   * The default manager. Unless explicitly specified, GoatDB will default to
-   * this manager.
+   * The default instance. Unless explicitly specified, GoatDB will default to
+   * this instance.
    */
-  static readonly default: SchemaManager = new this();
+  static readonly default: DataRegistry = new this();
 
   /**
-   * Initialize a new schemaManager.
+   * Initialize a new DataRegistry.
    */
-  constructor(userSchema: Schema = kSchemaUserDefault) {
+  constructor() {
     this._schemas = new Map();
     this._authRules = [];
-    this._userSchema = userSchema;
     // Builtin schemas
     this.registerSchema(kSchemaSession);
-    this.registerSchema(userSchema);
     this.registerSchema(kSchemaUserStats);
   }
 
   /**
-   * Returns the current user schema for this manager.
-   * This schema is used for all user objects in the system.
-   *
-   * @returns The current user schema
-   */
-  get userSchema(): Schema {
-    return this._userSchema;
-  }
-
-  /**
-   * Sets the user schema for this manager.
-   * This will replace the default user schema and register the new schema.
-   *
-   * @param schema The schema to use for users
-   */
-  set userSchema(schema: Schema) {
-    if (this._userSchema !== schema) {
-      this._userSchema = schema;
-      this.registerSchema(schema);
-    }
-  }
-
-  /**
-   * Registers a schema with this manager. This is a NOP if the schema had
+   * Registers a schema with this registry. This is a NOP if the schema had
    * already been registered.
    *
    * @param schema The schema to register.
@@ -131,7 +104,7 @@ export class SchemaManager {
   }
 
   /**
-   * Registers an authorization rule with this manager. If not provided, all
+   * Registers an authorization rule with this registry. If not provided, all
    * data is considered public.
    *
    * @param path Path to a repository or a {@link RegExp} instance.
@@ -139,20 +112,20 @@ export class SchemaManager {
    *             repositories that match the given path.
    */
   registerAuthRule(path: RegExp | string, rule: AuthRule): void {
-    if (typeof path === "string") {
+    if (typeof path === 'string') {
       path = itemPathGetRepoId(path);
     }
     for (const { rulePath: p } of this._authRules) {
       assert(
         p !== path,
-        "Attempting to register multiple rules for the same path",
+        'Attempting to register multiple rules for the same path',
       );
     }
     this._authRules.push({ rulePath: path, rule });
   }
 
   /**
-   * Find a schema that's been registered with this manager.
+   * Find a schema that's been registered with this registry.
    *
    * @param ns      The namespace for the schema.
    * @param version If provided, searches for the specific version. Otherwise
@@ -231,7 +204,7 @@ export class SchemaManager {
    */
   encode(schema: Schema): string {
     if (schema.ns === null) {
-      return "null";
+      return 'null';
     }
     return `${schema.ns}/${schema.version}`;
   }
@@ -239,16 +212,16 @@ export class SchemaManager {
   /**
    * Decodes a schema marker to an actual schema.
    * @param str The schema marker produced by a previous call to
-   *            `schemaManager.encode`.
+   *            `dataRegistry.encode`.
    *
    * @returns The registered schema or undefined if no such schema is found.
    */
   decode(str: string /*| Decoder*/): Schema | undefined {
-    if (str === "null") {
+    if (str === 'null') {
       return kNullSchema;
     }
-    if (typeof str === "string") {
-      const [ns, ver] = str.split("/");
+    if (typeof str === 'string') {
+      const [ns, ver] = str.split('/');
       return this.get(ns, parseInt(ver));
     }
     // if (str.has('ns') && str.has('version')) {
@@ -277,7 +250,7 @@ export class SchemaManager {
     }
     // Look for a user-provided rule
     for (const { rulePath, rule } of this._authRules) {
-      if (typeof rulePath === "string") {
+      if (typeof rulePath === 'string') {
         if (Repository.normalizePath(rulePath) === repoId) {
           return rule;
         }
@@ -299,13 +272,13 @@ export class SchemaManager {
 
 const kBuiltinAuthRulesEnforced: AuthConfig = [
   {
-    rulePath: "/sys/sessions",
+    rulePath: '/sys/sessions',
     rule: ({ op }) => {
-      return op === "read";
+      return op === 'read';
     },
   },
   {
-    rulePath: "/sys/stats",
+    rulePath: '/sys/stats',
     rule: () => {
       return false;
     },
@@ -313,28 +286,18 @@ const kBuiltinAuthRulesEnforced: AuthConfig = [
 ] as const;
 
 const kBuiltinAuthRulesOptional: AuthConfig = [
-  // By default users can see other users but only edit themselves.
-  {
-    rulePath: "/sys/users",
-    rule: ({ itemKey, session, op }) => {
-      if (session.owner === itemKey) {
-        return true;
-      }
-      return op === "read";
-    },
-  },
   // Reserving /sys/* for the system's use
   {
     rulePath: /\/sys\/\w+/g,
     rule: ({ session }) => {
-      return session.owner === "root";
+      return session.owner === 'root';
     },
   },
   // By default, /user/<user-id> is private to the specific user.
   {
     rulePath: /\/user\/\w+/g,
     rule: ({ session, repoPath }) => {
-      return session.owner === itemPathGetPart(repoPath, "repo");
+      return session.owner === itemPathGetPart(repoPath, 'repo');
     },
   },
 ] as const;

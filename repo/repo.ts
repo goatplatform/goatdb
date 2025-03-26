@@ -42,7 +42,7 @@ import type { GoatDB } from '../db/db.ts';
 import { BloomFilter } from '../base/bloom.ts';
 // import { BloomFilter } from '../cpp/bloom_filter.ts';
 import { itemPathIsValid, itemPathJoin } from '../db/path.ts';
-import type { AuthRule, AuthRuleInfo } from '../cfds/base/schema-manager.ts';
+import type { AuthRule, AuthRuleInfo } from '../cfds/base/data-registry.ts';
 
 /**
  * Fired when the value of a document changes (the head of the commit graph
@@ -771,7 +771,7 @@ export class Repository<
             // No good parents are available. This key is effectively null.
             result = lastGoodCommit
               ? this.itemForCommit(lastGoodCommit)
-              : Item.nullItem(this.db.schemaManager);
+              : Item.nullItem(this.db.registry);
           }
           // assert(result.checksum === contents.edit.srcChecksum);
           // result.patch(contents.edit.changes);
@@ -929,7 +929,7 @@ export class Repository<
       commitsToMerge,
     ).filter((c) => this.hasItemForCommit(c));
     if (!commitsToMerge.length) {
-      return [Item.nullItem(this.db.schemaManager), undefined];
+      return [Item.nullItem(this.db.registry), undefined];
     }
     const session = this.trustPool.currentSession.id;
     const roots = commitsToMerge
@@ -954,14 +954,14 @@ export class Repository<
       );
     }
     if (commitsToMerge.length === 0 && !foundRoot && roots.length === 0) {
-      return [Item.nullItem(this.db.schemaManager), undefined];
+      return [Item.nullItem(this.db.registry), undefined];
     }
     // If no LCA is found then we're dealing with concurrent writers who all
     // created of the same key unaware of each other.
     // Use the null record as a base in this case.
     const base = lca
       ? this.itemForCommit(lca).clone()
-      : Item.nullItem(this.db.schemaManager).clone();
+      : Item.nullItem(this.db.registry).clone();
     // Upgrade base to merge scheme
     if (scheme.ns !== null) {
       base.upgradeSchema(scheme);
@@ -973,7 +973,7 @@ export class Repository<
     // Note that we start with these changes in order to let later changes
     // override them as concurrent root creation is likely a temporary
     // error.
-    const nullRecord = Item.nullItem(this.db.schemaManager);
+    const nullRecord = Item.nullItem(this.db.registry);
     for (const c of roots) {
       const record = this.itemForCommit(c);
       if (record.isNull) {
@@ -1264,7 +1264,7 @@ export class Repository<
     const baseRecord = (
       headId
         ? this.itemForCommit<S>(headId)
-        : (Item.nullItem(this.db.schemaManager) as Item<S>)
+        : (Item.nullItem(this.db.registry) as Item<S>)
     ).clone();
     if (
       !headRecord.isNull &&

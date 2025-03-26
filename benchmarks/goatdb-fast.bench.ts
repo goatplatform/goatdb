@@ -2,7 +2,7 @@ import { assert } from '../base/error.ts';
 import { GoatDB } from '../db/db.ts';
 import * as path from '@std/path';
 import { uniqueId } from '../base/common.ts';
-import { SchemaManager } from '../cfds/base/schema-manager.ts';
+import { DataRegistry } from '../cfds/base/data-registry.ts';
 
 // Define test schemas
 const testSchema = {
@@ -15,7 +15,7 @@ const testSchema = {
   },
 } as const;
 
-SchemaManager.default.registerSchema(testSchema);
+DataRegistry.default.registerSchema(testSchema);
 
 const kTempDir = path.join(Deno.cwd(), 'temp_bench_' + uniqueId());
 

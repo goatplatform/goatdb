@@ -96,7 +96,7 @@ const denoJsonScaffold = {
   version: '0.0.1',
 };
 
-const schemaScaffold = `import { SchemaManager } from '@goatdb/goatdb';
+const schemaScaffold = `import { DataRegistry } from '@goatdb/goatdb';
 
 /**
  * A schema defines the structure of items that can be stored in the DB.
@@ -152,13 +152,13 @@ export type SchemaMyItem = typeof kSchemaMyItem;
  * It gets called from both the client and the server code so they agree on the
  * same schemas.
  *
- * @param manager The schema manager to register with.
- *                Uses {@link SchemaManager.default} if not provided.
+ * @param registry The registry to register with.
+ *                 Uses {@link DataRegistry.default} if not provided.
  */
 export function registerSchemas(
-  manager: SchemaManager = SchemaManager.default,
+  registry: DataRegistry = DataRegistry.default,
 ): void {
-  manager.registerSchema(kSchemaMyItem);
+  registry.registerSchema(kSchemaMyItem);
 }
 `;
 

@@ -666,10 +666,10 @@ export class Query<
     if (currentHead && prevHeadId !== currentHead?.id) {
       const prevDoc = prevHeadId
         ? repo.itemForCommit(prevHeadId)
-        : Item.nullItem(repo.db.schemaManager);
+        : Item.nullItem(repo.db.registry);
       const currentDoc = currentHead
         ? repo.itemForCommit(currentHead)
-        : Item.nullItem(repo.db.schemaManager);
+        : Item.nullItem(repo.db.registry);
       this.handleDocChange(
         itemPathJoin(repo.path, key),
         prevDoc as unknown as Item<IS>,

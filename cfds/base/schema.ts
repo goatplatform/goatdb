@@ -252,39 +252,6 @@ export const kSchemaSession = {
 export type SchemaTypeSession = typeof kSchemaSession;
 
 /**
- * The minimal user definition schema. This provides only the most basic user
- * properties needed by the system.
- *
- * Applications should extend this schema to support their specific use cases
- * by adding additional fields as needed, then register their extended schema
- * with SchemaManager.userSchema.
- *
- * Example:
- * ```
- * const myUserSchema = {
- *   ns: 'User',
- *   version: 1,
- *   fields: {
- *     ...kSchemaUserDefault.fields,
- *     displayName: { type: 'string' },
- *     preferences: { type: 'object' }
- *   }
- * };
- * schemaManager.userSchema = myUserSchema;
- * ```
- */
-export const kSchemaUserDefault = {
-  ns: '_user-default',
-  version: 1,
-  fields: {
-    email: {
-      type: 'string',
-    },
-  },
-} as const;
-export type SchemaTypeUserDefault = typeof kSchemaUserDefault;
-
-/**
  * Internally collected user statistics.
  */
 export const kSchemaUserStats = {

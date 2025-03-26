@@ -1,16 +1,21 @@
 /**
- * GoatDB: Lightweight NoDB for Deno & React
+ * GoatDB: An Embedded, Distributed, Document Database
  *
  * GoatDB is a real-time, version-controlled database for Deno, React, and
- * low-friction deployments. It's ideal for prototyping, self-hosting,
- * single-tenant apps, as well as ultra light multi-tenant setups without
- * heavy backends or complex DBs.
+ * low-friction deployments. It excels at real-time collaboration and
+ * embedded caching applications while prioritizing speed and developer
+ * experience.
  *
  * Key Features:
  * - No Dedicated Infra: Run the entire DB client-side, with incremental queries
  * - Resilience & Offline-First: Clients keep working if server goes down
  * - Edge-Native: Most processing happens in the client
  * - Real-Time Collaboration: Built-in sync keeps state synchronized
+ * - Distributed Version Control: Leverages concepts from DVCS with bloom
+ *                                filter-based synchronization
+ * - Automatic Conflict Resolution: Uses ephemeral CRDTs for efficient
+ *                                  real-time conflict resolution
+ * - Application-Level Sharding: Natural scalability for multi-user applications
  *
  * Check out https://goatdb.dev for additional docs.
  *
@@ -18,7 +23,7 @@
  *
  * @example
  * ```typescript
- * import { GoatDB, SchemaManager } from '@goatdb/goatdb';
+ * import { GoatDB, DataRegistry } from '@goatdb/goatdb';
  *
  * // Define a schema for tasks
  * const taskSchema = {
@@ -37,7 +42,7 @@
  * } as const;
  *
  * // Register the schema
- * SchemaManager.default.register(taskSchema);
+ * DataRegistry.default.register(taskSchema);
  *
  * // Initialize GoatDB with optional peers for replication
  * const db = new GoatDB({
@@ -73,11 +78,7 @@
  * ```
  */
 import { GoatDB } from './db/db.ts';
-import {
-  kSchemaUserDefault,
-  type Schema,
-  type SchemaDataType,
-} from './cfds/base/schema.ts';
+import { type Schema, type SchemaDataType } from './cfds/base/schema.ts';
 import { Query } from './repo/query.ts';
 import type { AppConfig } from './server/app-config.ts';
 import {
@@ -85,8 +86,8 @@ import {
   type AuthOp,
   type AuthRule,
   type AuthRuleInfo,
-  SchemaManager,
-} from './cfds/base/schema-manager.ts';
+  DataRegistry,
+} from './cfds/base/data-registry.ts';
 import {
   itemPath,
   itemPathGetPart,
@@ -117,6 +118,7 @@ export type {
 };
 export {
   ConsoleLogStream,
+  DataRegistry,
   GoatDB,
   Item,
   itemPath,
@@ -125,11 +127,9 @@ export {
   itemPathJoin,
   itemPathNormalize,
   JSONLogStream,
-  kSchemaUserDefault,
   ManagedItem,
   prettyJSON,
   Query,
   Repository,
-  SchemaManager,
   uniqueId,
 };

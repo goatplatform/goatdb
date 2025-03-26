@@ -39,7 +39,7 @@ import type {
 } from '../../base/core-types/index.ts';
 import { SchemaGetFieldDef } from './schema.ts';
 import type { Readwrite } from '../../base/types.ts';
-import { SchemaManager } from './schema-manager.ts';
+import { DataRegistry } from './data-registry.ts';
 
 export interface ReadonlyItem<S extends Schema> {
   readonly isNull: boolean;
@@ -83,7 +83,7 @@ const checksumSerOptions: ChecksumEncoderOpts = {
  */
 export class Item<S extends Schema = Schema>
   implements ReadonlyItem<S>, Encodable {
-  readonly schemaManager: SchemaManager;
+  readonly registry: DataRegistry;
   private _schema!: S;
   private _data!: SchemaDataType<S>;
   private _checksum: string | undefined;
@@ -96,14 +96,14 @@ export class Item<S extends Schema = Schema>
    * @param config Either an ItemConfig object containing the schema and data,
    *               or a ConstructorDecoderConfig for deserializing an encoded
    *               item
-   * @param schemaManager Optional schema manager to use. If not provided, the
+   * @param registry Optional schema manager to use. If not provided, the
    *                      default schema manager will be used
    */
   constructor(
     config: ItemConfig<S> | ConstructorDecoderConfig<EncodedItem>,
-    schemaManager?: SchemaManager,
+    registry?: DataRegistry,
   ) {
-    this.schemaManager = schemaManager || SchemaManager.default;
+    this.registry = registry || DataRegistry.default;
     if (isDecoderConfig(config)) {
       this.deserialize(config.decoder);
     } else {
@@ -114,20 +114,20 @@ export class Item<S extends Schema = Schema>
   }
 
   private static _kNullDocuments = new Map<
-    SchemaManager,
+    DataRegistry,
     Item<typeof kNullSchema>
   >();
   /**
    * @returns An item with the null schema.
    */
   static nullItem<S extends Schema = typeof kNullSchema>(
-    schemaManager: SchemaManager,
+    registry: DataRegistry,
   ): Item<S> {
-    let doc = this._kNullDocuments.get(schemaManager);
+    let doc = this._kNullDocuments.get(registry);
     if (!doc) {
-      doc = new this({ schema: kNullSchema, data: {} }, schemaManager);
+      doc = new this({ schema: kNullSchema, data: {} }, registry);
       doc.lock();
-      this._kNullDocuments.set(schemaManager, doc);
+      this._kNullDocuments.set(registry, doc);
     }
     return doc as unknown as Item<S>;
   }
@@ -381,7 +381,7 @@ export class Item<S extends Schema = Schema>
       schema,
       data: clone(schema, this._data),
       normalized: this._normalized,
-    }, this.schemaManager);
+    }, this.registry);
     result._checksum = this._checksum;
     return result;
   }
@@ -500,7 +500,7 @@ export class Item<S extends Schema = Schema>
    */
   upgradeSchema(newSchema?: Schema): boolean {
     assert(!this._locked);
-    const res = this.schemaManager.upgrade(this._data, this._schema, newSchema);
+    const res = this.registry.upgrade(this._data, this._schema, newSchema);
     assert(res !== undefined, 'Upgrade failed');
     // Refresh caches if actually changed the data
     if (res[0] !== this._data) {
@@ -526,7 +526,7 @@ export class Item<S extends Schema = Schema>
     if (this.schema.ns === null) {
       return false;
     }
-    const latestSchema = this.schemaManager.get(this.schema.ns);
+    const latestSchema = this.registry.get(this.schema.ns);
     if (
       latestSchema !== undefined &&
       latestSchema.version > this.schema.version
@@ -575,7 +575,7 @@ export class Item<S extends Schema = Schema>
     options = { local: false },
   ): void {
     this.normalize();
-    encoder.set('s', this.schemaManager.encode(this.schema));
+    encoder.set('s', this.registry.encode(this.schema));
     const dataEncoder = encoder.newEncoder();
     serialize(dataEncoder, this.schema, this._data, {
       local: options.local,
@@ -597,7 +597,7 @@ export class Item<S extends Schema = Schema>
    */
   deserialize(decoder: Decoder): void {
     assert(!this._locked);
-    const schema = this.schemaManager.decode(decoder.get<string>('s')!);
+    const schema = this.registry.decode(decoder.get<string>('s')!);
     assert(schema !== undefined, 'Unknown schema');
     this._schema = schema as S;
     const dataDecoder = decoder.getDecoder('d');

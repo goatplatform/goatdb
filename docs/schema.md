@@ -20,7 +20,7 @@ schemas with different namespaces can exist in a single repository.
 
 A schema must be registered with a
 [Schema Manager](https://github.com/goatplatform/goatdb/blob/main/cfds/base/schema-manager.ts)
-before it can be used to create and manipulate items. The **SchemaManager** acts
+before it can be used to create and manipulate items. The **DataRegistry** acts
 as a registry for schemas within the database. Multiple managers may exist and
 be attached to different database instances, but the default manager is
 sufficient for most applications.
@@ -28,7 +28,7 @@ sufficient for most applications.
 The default schema manager can be accessed as follows:
 
 ```javascript
-const manager = SchemaManager.default;
+const manager = DataRegistry.default;
 ```
 
 ## Defining a New Schema
@@ -48,7 +48,7 @@ export const kSchemeMessage = {
     },
   },
 } as const;
-SchemaManager.default.register(kSchemeMessage);
+DataRegistry.default.register(kSchemeMessage);
 type SchemeMessageType = typeof kSchemeMessage;
 ```
 
@@ -101,10 +101,10 @@ export const kSchemeMessageV2 = {
 } as const;
 
 export function registerSchemas(
-  manager: SchemaManager = SchemaManager.default,
+  registry: DataRegistry = DataRegistry.default,
 ): void {
   // Previous schema versions go in here
-  SchemaManager.default.register(kSchemeMessageV2);
+  registry.default.register(kSchemeMessageV2);
 }
 ```
 

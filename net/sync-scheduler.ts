@@ -13,7 +13,7 @@ import { serviceUnavailable } from '../cfds/base/errors.ts';
 import { log } from '../logging/log.ts';
 import { SyncMessage } from './message.ts';
 import { sendJSONToURL } from './rest-api.ts';
-import type { SchemaManager } from '../cfds/base/schema-manager.ts';
+import type { DataRegistry } from '../cfds/base/data-registry.ts';
 
 const K_MAX_REQ_BATCH = 10;
 
@@ -85,7 +85,7 @@ export class SyncScheduler {
     readonly syncConfig: SyncConfig,
     readonly trustPool: TrustPool,
     readonly orgId: string,
-    readonly schemaManager: SchemaManager,
+    readonly registry: DataRegistry,
   ) {
     this._syncFreqAvg = new MovingAverage(
       syncConfigGetCycles(kSyncConfigClient) * 2,
@@ -209,7 +209,7 @@ export class SyncScheduler {
                 decoder: decoder,
                 orgId: this.orgId,
               },
-              this.schemaManager,
+              this.registry,
             );
             decoder.finalize();
             req.resolve(syncResp);
