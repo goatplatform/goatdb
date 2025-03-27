@@ -103,6 +103,7 @@ import type { BuildInfo } from './server/build-info.ts';
 import { ConsoleLogStream } from './logging/console-stream.ts';
 import type { LogStream } from './logging/log.ts';
 import { JSONLogStream } from './logging/json-log-stream.ts';
+import { normalizeEmail } from './base/string.ts';
 
 export * from './base/core-types/base.ts';
 export type {
@@ -128,6 +129,7 @@ export {
   itemPathNormalize,
   JSONLogStream,
   ManagedItem,
+  normalizeEmail,
   prettyJSON,
   Query,
   Repository,
