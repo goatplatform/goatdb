@@ -186,8 +186,6 @@ export class Repository<
     return id;
   }
 
-  static readonly sysDirId: string = this.path('sys', 'dir');
-
   get orgId(): string {
     return this.trustPool.orgId;
   }
@@ -252,7 +250,7 @@ export class Repository<
           filterIterable(
             this.storage.allCommitsIds(),
             (id) => {
-              this._authInfo.itemKey = id;
+              this._authInfo.itemKey = this.getCommit(id).key;
               this._authInfo.session = session;
               this._authInfo.op = 'read';
               return authorizer(this._authInfo);
