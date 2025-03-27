@@ -602,9 +602,11 @@ export class GoatDB<US extends Schema = Schema>
       this._basePath,
       isBrowser() ? 'client' : 'server',
     );
-    this.queryPersistence = new QueryPersistence(
-      new QueryPersistenceFile(this._path),
-    );
+    if (this._path) {
+      this.queryPersistence = new QueryPersistence(
+        new QueryPersistenceFile(this._path),
+      );
+    }
 
     await this._settingsProvider.load();
     const settings = this._settingsProvider.settings;
