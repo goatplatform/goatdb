@@ -21,7 +21,7 @@ import {
   encodeBase32URL,
 } from '../base/string.ts';
 import { LRUCache } from '../base/lru-cache.ts';
-import { DataRegistry } from '../cfds/base/data-registry.ts';
+import type { DataRegistry } from '../cfds/base/data-registry.ts';
 
 export const SESSION_CRYPTO_KEY_GEN_PARAMS: EcKeyGenParams = {
   name: 'ECDSA',

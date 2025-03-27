@@ -22,8 +22,8 @@ import type { DBInstanceConfig } from '../../db/db.ts';
 import type { BuildInfo } from '../../server/build-info.ts';
 import { type EmailConfig, EmailService } from './email.ts';
 import type { StaticAssets } from '../../system-assets/system-assets.ts';
-import { Schema } from '../../cfds/base/schema.ts';
-import { ManagedItem } from '../../db/managed-item.ts';
+import type { Schema } from '../../cfds/base/schema.ts';
+import type { ManagedItem } from '../../db/managed-item.ts';
 
 /**
  * Information about a user attempting to log in for the first time.
@@ -67,6 +67,11 @@ export type DomainConfig = {
  * A server represents a logical DB with some additional configuration options.
  */
 export interface ServerOptions<US extends Schema> extends DBInstanceConfig {
+  /**
+   * The directory under which all server data will be stored.
+   * This includes database files, logs, and other persistent data.
+   */
+  path: string;
   /**
    * Info about the build process.
    */
