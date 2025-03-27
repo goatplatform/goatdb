@@ -21,17 +21,6 @@
  * The system includes several built-in repositories under the `/sys/` path
  * prefix:
  *
- * - `/sys/users/<user id>`: Stores public user information. The schema
- *   typically includes fields for username, display name, creation date, and
- *   public user preferences. Each user document has a unique ID that can be
- *   referenced in other collections.
- *
- * - `/sys/auth/<user id>`: Contains sensitive authentication data separate
- *   from the public user profile. The schema includes fields for email,
- *   password hash, security questions, and account recovery information. This
- *   and account recovery information. This separation ensures authentication
- *   data is not publicly visible to other users.
- *
  * - `/sys/sessions/<session id>`: Manages active user sessions and
  *   authentication tokens. The schema includes fields for session ID, user ID
  *   reference, creation timestamp, expiration timestamp, and device
@@ -41,6 +30,13 @@
  *   metrics. The schema includes fields for timestamp, operation counts,
  *   query performance metrics, storage usage, and other system health
  *   indicators.
+ *
+ * - `/sys/users/<user id>`: A conventional path for storing user information.
+ *   This is merely a recommended convention; applications are responsible for
+ *   placing user items at this path and setting up custom authentication rules
+ *   if needed. The schema typically includes fields for email, username,
+ *   display name, etc. Each user document has a unique ID that can be
+ *   referenced in other collections.
  *
  * These built-in repositories have predefined schemas and special handling
  * within the system. Custom application data typically resides in separate
