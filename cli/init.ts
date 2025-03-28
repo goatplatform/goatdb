@@ -168,10 +168,10 @@ import { Server, staticAssetsFromJS } from "@goatdb/goatdb/server";
 import { BuildInfo, prettyJSON } from "@goatdb/goatdb";
 import { registerSchemas } from "../common/schema.ts";
 // These imported files will be automatically generated during compilation
-import encodedStaticAsses from "./build/staticAssets.json" with {
+import encodedStaticAsses from "../build/staticAssets.json" with {
   type: "json",
 };
-import kBuildInfo from "./build/buildInfo.json" with { type: "json" };
+import kBuildInfo from "../build/buildInfo.json" with { type: "json" };
 
 interface Arguments {
   path?: string;
