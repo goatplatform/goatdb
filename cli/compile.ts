@@ -6,9 +6,29 @@ import { generateBuildInfo } from '../server/build-info.ts';
 import { notReached } from '../base/error.ts';
 import { staticAssetsToJS } from '../system-assets/system-assets.ts';
 
+/**
+ * Represents the target operating system for compilation.
+ *
+ * - 'mac': macOS operating system
+ * - 'linux': Linux operating system
+ * - 'windows': Windows operating system
+ */
 export type TargetOS = 'mac' | 'linux' | 'windows';
-export type CPUArch = 'x64' | 'aar64';
+/**
+ * Represents the CPU architecture for compilation.
+ *
+ * - 'x64': 64-bit x86 architecture (Intel/AMD)
+ * - 'arm64': 64-bit ARM architecture (Apple Silicon, ARM-based servers)
+ */
+export type CPUArch = 'x64' | 'arm64';
 
+/**
+ * Represents a combined target of operating system and CPU architecture.
+ *
+ * Format is "{os}-{arch}" such as "mac-arm64" or "linux-x64".
+ *
+ * This type is used to specify the complete target platform for compilation.
+ */
 export type OSArchTarget = `${TargetOS}-${CPUArch}`;
 
 export type ExecutableOptions = {
@@ -31,10 +51,55 @@ export type ExecutableOptions = {
   arch?: CPUArch;
 };
 
+/**
+ * Options for compiling a GoatDB application into a standalone executable.
+ *
+ * This combines executable build options with application configuration.
+ *
+ * @example
+ * ```typescript
+ * await compile({
+ *   serverEntry: "./server/main.ts",
+ *   outputName: "my-app",
+ *   os: "linux",
+ *   arch: "x64",
+ *   // App config options
+ *   htmlPath: "./public/index.html",
+ *   jsPath: "./client/index.tsx",
+ *   buildDir: "./build"
+ * });
+ * ```
+ */
 export type CompileOptions =
   & ExecutableOptions
   & AppConfig;
 
+/**
+ * Compiles a GoatDB application into a standalone executable.
+ *
+ * This function performs the following steps:
+ * 1. Bundles client-side code (JS/TS/TSX) into a single JavaScript file
+ * 2. Processes static assets (HTML, CSS, images, etc.)
+ * 3. Generates build information
+ * 4. Compiles the server entry point into a native executable for the target
+ *    platform
+ *
+ * @param options Configuration options for the compilation process
+ * @returns A Promise that resolves when compilation is complete
+ *
+ * @example
+ * ```typescript
+ * await compile({
+ *   serverEntry: "./server/main.ts",
+ *   outputName: "my-app",
+ *   os: "linux",
+ *   arch: "x64",
+ *   htmlPath: "./public/index.html",
+ *   jsPath: "./client/index.tsx",
+ *   buildDir: "./build"
+ * });
+ * ```
+ */
 export async function compile(options: CompileOptions): Promise<void> {
   const targetOsArch = targetFromOSArch(options.os, options.arch);
   console.log(
@@ -128,6 +193,16 @@ export async function compile(options: CompileOptions): Promise<void> {
   );
 }
 
+/**
+ * Converts OS and architecture parameters to a standardized target format.
+ *
+ * @param os The target operating system. If not provided, defaults to the
+ *           current OS.
+ * @param arch The target CPU architecture. If not provided, defaults to the
+ *             current architecture.
+ * @returns A standardized string in the format "{os}-{arch}" representing the
+ *          target platform.
+ */
 export function targetFromOSArch(os?: TargetOS, arch?: CPUArch): OSArchTarget {
   if (!os) {
     switch (Deno.build.os) {
@@ -145,30 +220,42 @@ export function targetFromOSArch(os?: TargetOS, arch?: CPUArch): OSArchTarget {
     }
   }
   if (!arch) {
-    arch = Deno.build.arch === 'aarch64' ? 'aar64' : 'x64';
+    arch = Deno.build.arch === 'aarch64' ? 'arm64' : 'x64';
   }
   return `${os}-${arch}`;
 }
 
+/**
+ * Converts GoatDB OS and architecture parameters to Deno's target format.
+ *
+ * @param os The target operating system. If not provided, defaults to the
+ *           current OS.
+ * @param arch The target CPU architecture. If not provided, defaults to the
+ *             current architecture.
+ * @returns A standardized string in Deno's target format (e.g.,
+ *          'x86_64-apple-darwin') that can be used with Deno's compilation
+ *          tools.
+ * @throws Error when an unsupported target is specified.
+ */
 export function denoTarget(os?: TargetOS, arch?: CPUArch): string {
   const target: OSArchTarget = targetFromOSArch(os, arch);
   switch (target) {
     case 'mac-x64':
       return 'x86_64-apple-darwin';
 
-    case 'mac-aar64':
+    case 'mac-arm64':
       return 'aarch64-apple-darwin';
 
     case 'linux-x64':
       return 'x86_64-unknown-linux-gnu';
 
-    case 'linux-aar64':
+    case 'linux-arm64':
       return 'aarch64-unknown-linux-gnu';
 
     case 'windows-x64':
       return 'x86_64-pc-windows-msvc';
 
-    case 'windows-aar64':
+    case 'windows-arm64':
       notReached(`Unsupported target: ${target}`);
   }
 }
