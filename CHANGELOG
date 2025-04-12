@@ -8,6 +8,10 @@ and GoatDB adheres to
 
 ## [Unreleased]
 
+### Added
+
+- An exception is now thrown an passing an invalid source path to a query
+
 ### Fixed
 
 - FIXED: `itemPathNormalize` sometimes returns relative paths

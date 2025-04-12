@@ -1,3 +1,4 @@
+import { assert } from '../base/error.ts';
 import { Repository } from '../repo/repo.ts';
 
 /**
@@ -102,10 +103,11 @@ export function itemPathGetPart<T extends string>(
  */
 export function itemPathGetRepoId(path: string): string {
   path = itemPathNormalize(path);
-  return Repository.path(
-    itemPathGetPart(path, 'type')!,
-    itemPathGetPart(path, 'repo')!,
-  );
+  const type = itemPathGetPart(path, 'type');
+  assert(type !== undefined, 'Path must have a type');
+  const repo = itemPathGetPart(path, 'repo');
+  assert(repo !== undefined, 'Path must have a repo');
+  return Repository.path(type, repo);
 }
 
 /**

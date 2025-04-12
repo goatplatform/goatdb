@@ -10,7 +10,11 @@ import type { GoatDB } from '../db/db.ts';
 import type { ReadonlyJSONValue } from '../base/interfaces.ts';
 import { isBrowser } from '../base/common.ts';
 import { CoroutineScheduler } from '../base/coroutine.ts';
-import { itemPathGetPart, itemPathJoin } from '../db/path.ts';
+import {
+  itemPathGetPart,
+  itemPathGetRepoId,
+  itemPathJoin,
+} from '../db/path.ts';
 import type { ManagedItem } from '../db/managed-item.ts';
 import type { SchemaDataType } from '../mod.ts';
 import { bsearch_idx } from '../base/algorithms.ts';
@@ -268,6 +272,9 @@ export class Query<
   }: QueryConfig<IS, OS, CTX>) {
     super();
     this.db = db;
+    if (typeof source === 'string') {
+      source = itemPathGetRepoId(source);
+    }
     if (!predicate) {
       predicate = () => true;
     }
