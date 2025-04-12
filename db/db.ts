@@ -100,7 +100,16 @@ export type OpenOptions = Omit<RepositoryConfig, 'storage' | 'authorizer'>;
 export type EventUserChanged = 'UserChanged';
 
 /**
- * Main entry class for GoatDB - The Edge-Native Database.
+ * The main database class that manages repositories, synchronization, and data
+ * access.
+ *
+ * GoatDB is the primary entry point for working with the database. It handles:
+ * - Repository management (opening, closing, accessing)
+ * - Data synchronization with peers
+ * - User authentication and authorization
+ * - Schema validation
+ *
+ * @template US The user schema type, defaults to the base Schema type
  */
 export class GoatDB<US extends Schema = Schema>
   extends Emitter<EventUserChanged> {

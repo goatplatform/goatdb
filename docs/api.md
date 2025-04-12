@@ -7,173 +7,144 @@ nav_order: 4
 
 # GoatDB API
 
-The main API entry point is the `GoatDB` class from
-[db.ts](https://github.com/goatplatform/goatdb/blob/main/db/db.ts).
-
-## Table of Contents
-
-- [GoatDB API](#goatdb-api)
-  - [Creating a new DB instance](#creating-a-new-db-instance)
-  - [Working with Repositories](#working-with-repositories)
-    - [Opening a Repository](#opening-a-repository)
-    - [Closing a Repository](#closing-a-repository)
-  - [Working with Items](#working-with-items)
-    - [Managed Item](#managed-item)
-      - [Reading a Field](#reading-a-field)
-      - [Writing a Field](#writing-a-field)
-      - [Listening to Updates](#listening-to-updates)
-    - [Bulk Loading](#bulk-loading)
-  - [Querying Items](#querying-items)
-    - [Accessing Query Results](#accessing-query-results)
+The main API entry point is the `GoatDB` class. Here's apractical guide to
+using GoatDB in your applications.
 
 ## Creating a new DB instance
 
-```javascript
-const db = new GoatDB({ path: '/data/db' });
-```
-
-When using React hooks, DB creation is handled automatically and will
-automatically be configured to synchronize with the server.
+Create a new database instance by providing configuration options:
 
 ```javascript
-function MyComponent() {
-  const db = useDB();
-  return <p>DB Path: {db.path}</p>;
-}
+const db = new GoatDB({
+  path: '/data/db', // Where your data will be stored
+  orgId: 'my-org', // Used to isolate different organizations' data
+  peers: ['http://peer1'], // Other servers to sync with
+  trusted: false, // Enable/disable security checks
+  debug: false, // Enable/disable debug logging
+});
 ```
 
 ## Working with Repositories
 
-### Opening a Repository
+Think of repositories as separate databases within your main database. They help
+organize your data logically and optimize synchronization.
 
-You must open a [repository](/concepts) and load its contents into memory before
-accessing it. This process is continuously being optimized for speed.
+### When to Use Separate Repositories
 
-When designing your application for GoatDB, consider how you partition your data
-into different repositories. Each repository is synchronized independently,
-giving you the flexibility to optimize for your app’s specific use case.
+- **User Data**: Store user-specific information like settings or preferences
+- **Shared Content**: Group chat messages or shared documents
+- **Isolated Environments**: Game worlds or separate workspaces
 
-Common candidates for separate repositories include:
-
-- User-specific data (e.g., settings)
-- Content shared by a group of users (e.g., group chats, shared documents)
-- A shared world in an MMO environment
+### Basic Repository Operations
 
 ```javascript
-await db.open('/data/repoId');
-```
+// Open a repository (required before accessing data)
+await db.open('/data/userSettings');
 
-**Note:** Opening a repository beforehand isn't mandatory. Calls to access items
-and queries will automatically open the repository if necessary.
+// Get item count
+const itemCount = db.count('/data/userSettings');
 
-### Closing a Repository
+// Get all item keys
+const allKeys = db.keys('/data/userSettings');
 
-Once you have finished using a repository, you should close it to free up
-memory. Closing a repository immediately invalidates all items and queries
-related to it.
-
-```javascript
-await db.close('/data/repoId');
+// Close when done to free memory
+await db.close('/data/userSettings');
 ```
 
 ## Working with Items
 
-A repository is a collection of [items](concepts.md). You can access a specific
-item through its path:
+Items are the basic data units in GoatDB. Think of them as smart objects that
+automatically sync and update.
+
+### Creating and Accessing Items
 
 ```javascript
-const item = db.item('/data/repoId/itemId');
+// Create a new item with specific ID
+const userProfile = db.create('/data/users/john', userSchema, {
+  name: 'John Doe',
+  email: 'john@example.com',
+});
+
+// Create an item with auto-generated ID
+const newPost = db.create('/data/posts', postSchema, {
+  title: 'Hello World',
+  content: 'My first post',
+});
+
+// Access an existing item
+const item = db.item('/data/users/john');
 ```
 
-This call returns a
-[ManagedItem](https://github.com/goatplatform/goatdb/blob/main/db/managed-item.ts)
-instance. It will automatically commit changes made locally and merge remote
-changes in real time.
-
-If the repository for the requested item is not open at the time of this call,
-the returned item will have a null schema and no known fields. This situation
-triggers the automatic opening of the required repository. Once the repository
-is fully open, the item will update itself with the most up-to-date values.
-
-### Managed Item
-
-A managed item represents a snapshot of an item that is automatically committed
-and synchronized with remote updates. Each item provides a map-like interface
-for working directly with primitive values.
-
-#### Reading a Field
+### Reading and Writing Data
 
 ```javascript
-const value = item.get('fieldName');
-```
+// Read data
+const userName = item.get('name');
 
-The field name must be defined in the item's schema. Attempting to access an
-undefined field will throw an exception.
+// Write data (automatically syncs)
+item.set('name', 'John Smith');
 
-#### Writing a Field
-
-```javascript
-item.set('fieldName', value);
-```
-
-Setting a field updates the item's in-memory representation. In the background,
-a commit will be generated and persisted locally, and changes will be
-synchronized over the network. Queries are updated immediately to ensure a
-consistent view of the data.
-
-#### Listening to Updates
-
-```javascript
-item.attach('change', (mutations) => doSomethingOnItemChange());
-```
-
-A managed item notifies its observers when changes occur, providing detailed
-information about the applied
-[mutations](https://github.com/goatplatform/goatdb/blob/main/db/mutations.ts),
-including which fields were edited, whether the edit was local or remote, and
-the previous in-memory values.
-
-When building UI components, consider using React hooks that automatically
-handle these changes.
-
-### Bulk Loading
-
-Sometimes you need to create items without directly accessing them afterward,
-for example, when bulk loading data. A dedicated method is available for this
-scenario, optimizing internal operations:
-
-```javascript
-await db.load('/data/repoId/itemId', schema, itemData);
-```
-
-The recommended approach for bulk loading data is to invoke this method multiple
-times concurrently and wait for all calls to complete.
-
-## Querying Items
-
-[Querying](/query) a repository allows you to efficiently find specific items.
-Query predicates and sort descriptors are plain JavaScript functions, making it
-straightforward to build queries. For example, to find all items that begin with
-a specific prefix:
-
-```javascript
-const query = db.query({
-  source: '/data/repoId',
-  scheme: kSchemeTask,
-  predicate: ({ item }) => item.get('text').startsWith('foo'),
+// Listen for changes
+item.attach('change', (mutations) => {
+  console.log('Item was updated:', mutations);
 });
 ```
 
-GoatDB uses the provided configuration to uniquely identify queries. When
-accessing a query with a previously known configuration, its prior state is used
-to resume execution from the last known position. Refer to the
-[query architecture](/query) for more details.
+## Querying Data
 
-### Accessing Query Results
+Queries help you find and filter items using plain JavaScript functions:
 
 ```javascript
+// Find all posts with "hello" in the title
+const query = db.query({
+  source: '/data/posts',
+  schema: postSchema,
+  predicate: ({ item }) => {
+    return item.get('title').toLowerCase().includes('hello');
+  },
+  sortBy: ({ left, right }) => {
+    // Sort by creation date
+    return left.get('createdAt') - right.get('createdAt');
+  },
+});
+
+// Get results (updates automatically as data changes)
 const results = query.results();
 ```
 
-Query results are updated in real-time as changes occur, either locally or
-remotely.
+## User Authentication
+
+Simple authentication using magic links:
+
+```javascript
+// Send login link to user's email
+await db.loginWithMagicLinkEmail('user@example.com');
+
+// Log out current user
+await db.logout();
+
+// Check login status
+if (db.loggedIn) {
+  console.log('Current user:', db.currentUser);
+}
+```
+
+## Data Persistence and Sync
+
+GoatDB automatically handles data persistence and synchronization, but you can
+manually control it:
+
+```javascript
+// Force save changes to disk
+await db.flush('/data/posts');
+
+// Save all changes across all repositories
+await db.flushAll();
+
+// Wait for database to be ready
+await db.readyPromise();
+```
+
+Remember: Most operations in GoatDB are automatic - changes are saved and synced
+without manual intervention. The manual controls above are mainly for special
+cases.
