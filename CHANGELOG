@@ -8,6 +8,8 @@ and GoatDB adheres to
 
 ## [Unreleased]
 
+## [0.2.2]
+
 ### Added
 
 - An exception is now thrown an passing an invalid source path to a query
@@ -138,8 +140,9 @@ and GoatDB adheres to
 
 - Initial release
 
-[Unreleased]: https://github.com/goatplatform/goatdb/releases/tag/v0.2.1...HEAD
-[0.2.1]: https://github.com/goatplatform/goatdb/releases/tag/v0.2.0
+[Unreleased]: https://github.com/goatplatform/goatdb/releases/tag/v0.2.2...HEAD
+[0.2.2]: https://github.com/goatplatform/goatdb/releases/tag/v0.2.2
+[0.2.1]: https://github.com/goatplatform/goatdb/releases/tag/v0.2.1
 [0.2.0]: https://github.com/goatplatform/goatdb/releases/tag/v0.2.0
 [0.1.6]: https://github.com/goatplatform/goatdb/releases/tag/v0.1.6
 [0.1.3]: https://github.com/goatplatform/goatdb/releases/tag/v0.1.3
