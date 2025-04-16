@@ -78,7 +78,6 @@
  * ```
  */
 import { GoatDB } from './db/db.ts';
-import { type Schema, type SchemaDataType } from './cfds/base/schema.ts';
 import { Query } from './repo/query.ts';
 import type { AppConfig } from './server/app-config.ts';
 import {
@@ -105,6 +104,7 @@ import type { LogStream } from './logging/log.ts';
 import { JSONLogStream } from './logging/json-log-stream.ts';
 import { normalizeEmail } from './base/string.ts';
 
+export * from './cfds/base/schema.ts';
 export * from './base/core-types/base.ts';
 export type {
   AppConfig,
@@ -114,8 +114,6 @@ export type {
   AuthRuleInfo,
   BuildInfo,
   LogStream,
-  Schema,
-  SchemaDataType,
 };
 export {
   ConsoleLogStream,

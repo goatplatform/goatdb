@@ -11,6 +11,7 @@ and GoatDB adheres to
 ### Added
 
 - An exception is now thrown an passing an invalid source path to a query
+- Added `SchemaField<T>` for easy access to a schema's field names
 
 ### Fixed
 
