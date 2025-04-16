@@ -160,13 +160,24 @@ const kBuiltinFields: Record<string, FieldDef<ValueType>> = {
 } as const;
 
 /**
+ * Represents a field in a schema, which can be either a custom field defined
+ * in the schema or one of the built-in fields that are automatically added to
+ * all items.
+ *
+ * @template T The schema type
+ */
+export type SchemaField<T extends Schema> =
+  | keyof T['fields']
+  | keyof typeof kBuiltinFields;
+
+/**
  * Given a schema, extracts the names of all required fields.
  * Note: For practical purposes, fields with a default function are treated
  * as required from the type system.
  */
 export type SchemaRequiredFields<
   T extends Schema,
-  K extends keyof T['fields'] = keyof T['fields'],
+  K extends SchemaField<T> = SchemaField<T>,
 > = T['fields'][K]['required'] extends true
   // deno-lint-ignore ban-types
   ? T['fields'][K]['default'] extends Function ? never
@@ -178,7 +189,7 @@ export type SchemaRequiredFields<
  */
 export type SchemaOptionalFields<
   T extends Schema,
-  K extends keyof T['fields'] = keyof T['fields'],
+  K extends SchemaField<T> = SchemaField<T>,
 > = T['fields'][K]['required'] extends false | undefined ? K : never;
 
 /**
@@ -197,7 +208,7 @@ export type SchemaValueWithOptional<
  * Given a schema, extracts the type of its data.
  */
 export type SchemaDataType<T extends Schema> = {
-  [k in keyof T['fields']]: SchemaValueWithOptional<
+  [k in SchemaField<T>]: SchemaValueWithOptional<
     FieldValue<T['fields'][k]['type']>,
     T['fields'][k]['required'],
     T['fields'][k]['default']
