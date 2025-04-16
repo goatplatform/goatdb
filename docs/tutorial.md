@@ -2,7 +2,7 @@
 permalink: /tutorial/
 layout: default
 title: Tutorial
-nav_order: 1
+nav_order: 2
 ---
 
 - [Building a Todo List App with GoatDB](#building-a-todo-list-app-with-goatdb)

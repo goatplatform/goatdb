@@ -2,66 +2,129 @@
 permalink: /concepts/
 layout: home
 title: Concepts
-nav_order: 2
+nav_order: 1
 ---
 
 # Concepts
 
-**Item**: A basic unit of data, analogous to a row in a relational database or a
-document in a document database. Each item maintains its own
-[distributed commit graph](/commit-graph), serving as its atomic unit. Items
-guarantee [Causal Consistency](https://en.wikipedia.org/wiki/Causal_consistency)
-within their respective commit graphs.
+GoatDB is a distributed, schema-based database designed for collaborative
+applications that work consistently both online and offline. This document
+outlines the core concepts of GoatDB.
 
-**Schema**: Defines the structure of an item. [Schemas](/schema) are versioned,
-allowing multiple versions of the same schema to coexist within the database.
+## Table of Contents
 
-**Repository**: A collection of items and their associated schemas. A repository
-can contain items with varying schemas. Each repository is synchronized
-independently, enabling application-level sharding.
+1. [The Data Registry](#the-data-registry)
+2. [Data Model](#data-model)
+   - [Item](#item)
+   - [Schema](#schema)
+   - [Repository](#repository)
+   - [Path](#path)
+3. [Repositories](#repositories)
+   - [Repository Types](#repository-types)
+   - [System Repositories](#system-repositories)
 
-**Path**: Objects within GoatDB are uniquely identified by their paths, which
-follow this structure:
+## The Data Registry
+
+The `DataRegistry` provides a shared definition of data between all nodes in the
+network (clients and servers). This shared understanding ensures that every
+participant in the distributed system interprets and validates data in the same
+way, which is essential for maintaining consistency.
+
+The registry manages schemas, schema versioning, and access control. It
+maintains a catalog of all available schemas and their versions, handles schema
+upgrades, and enforces authorization rules across repositories. Applications
+typically use the default global registry (`DataRegistry.default`) which is
+initialized when the database starts. The registry ensures data integrity and
+security throughout the system.
+
+## Data Model
+
+### Item
+
+The atomic unit of data in GoatDB. Each item follows a schema and maintains its
+own distributed commit graph, guaranteeing causal consistency. Items track their
+own version history, enabling concurrent modifications across devices.
+
+### Schema
+
+Defines the structure of an item, including field types, validation rules, and
+conflict resolution strategies. Schemas are versioned, allowing gradual schema
+migrations. A schema includes:
+
+- Field types (string, number, boolean, date, set, map, richtext)
+- Validation rules
+- Default values
+- Required fields
+- Upgrade functions for migrating data between schema versions (v1→v2→v3),
+  allowing backward compatibility as schemas evolve
+
+### Repository
+
+A collection of items that are logically related within your application's
+domain. Repositories are synchronized independently, enabling application-level
+sharding. Each repository maintains commit histories for its items and handles
+merging of concurrent changes. Examples of repositories include:
+
+- A user's private notes collection
+- A shared document workspace between team members
+- A group chat with its messages and metadata
+- A project kanban board with its cards, columns, and settings
+- A calendar with events and attendees
+
+### Path
+
+Items are uniquely identified by paths following this structure:
 
 ```
 /type/repo/item
 ```
 
-## Repository Types
+## Repositories
 
-**sys**: Reserved for system-level operations. This type should not be used in
-application code.
+Repositories are collections of items that share a common purpose or access
+pattern. Each repository is synchronized independently, enabling efficient data
+distribution and access control.
 
-**data**: A general-purpose repository for storing the main application data.
+### Repository Types
 
-**user**: Used for user-specific data, such as settings, private collections,
-etc.
+Repository types appear as the first segment in a path (`/type/repo/item`):
 
-## System Repositories
+**sys**: Reserved for system repositories. While applications shouldn't create
+new repositories under this type, they interact with existing system
+repositories through proper APIs.
 
-### /sys/sessions
+**Common Application Types**:
 
-Stores user sessions, including the public keys of authenticated users. These
-keys are used by nodes to verify commits before accepting them into their local
-copies. Sessions may be either anonymous or linked to specific users.
+- **data**: For general application data (e.g., `/data/tasks/task-123`)
+- **user**: For user-specific data (e.g., `/user/alice/preferences`)
 
-**Access Rules:**
+Applications can create additional types as needed to organize their data (e.g.,
+`/team/engineering/roadmap`, `/org/acme/policy`).
 
-- Read-only access for everyone.
+### System Repositories
 
-### /sys/users
+GoatDB includes several built-in repositories under `/sys/` that handle core
+functionality:
 
-Stores user-specific items, including public profile information and metadata.
+#### /sys/sessions
 
-**Access Rules:**
+Stores the public keys of all sessions in the system. This enables each node to
+independently verify the authenticity of commits in the distributed commit graph
+and enforce permissions, without requiring a central authority. Sessions can be
+anonymous or linked to specific users. Read-only access for all users.
 
-- Each user has full read and write access to their own item.
-- Read-only access is granted to other users.
+#### /sys/users
 
-### /sys/stats
+A recommended convention for storing user profiles and metadata. While GoatDB
+provides default authorization rules for this repository (users can manage their
+own profiles, read-only access to others), it's up to the application to decide
+whether and how to use it. Applications may implement their own user management
+system differently if needed.
 
-Stores user-specific usage statistics.
+#### /sys/stats
 
-**Access Rules:**
+System telemetry and monitoring data. Accessible only with root access.
 
-- Private. Accessible only with root access.
+<br />
+[Next: Tutorial](/tutorial){: .btn .btn-purple }
+<br />

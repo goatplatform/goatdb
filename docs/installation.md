@@ -32,7 +32,9 @@ while Node.js support is currently **experimental**.
 
 ### Node.js Installation (Experimental)
 
-**Note:** Node.js support is currently experimental and may have limitations.
+**WARNING:** Node.js support is currently a work in progress and is not yet
+ready for production. Progress is tracked under this
+[GitHub issue](https://github.com/goatplatform/goatdb/issues/27).
 
 Install using one of the following package managers:
 
@@ -54,7 +56,6 @@ yarn dlx jsr add @goatdb/goatdb
 pnpm dlx jsr add @goatdb/goatdb
 ```
 
-## Next Steps
-
-After installing GoatDB, head over to the [tutorial](/tutorial) to learn how to
-build your first application with GoatDB.
+<br />
+[Next: Concepts](/concepts){: .btn .btn-purple }
+<br />
