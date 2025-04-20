@@ -1,0 +1,28 @@
+# GoatDB
+
+> GoatDB is an edge‑native, distributed, schema‑based database designed for collaborative applications. It stores data in an append‑only, cryptographically signed commit graph, syncs in soft real‑time, works fully offline, and ships as a single executable.
+
+GoatDB lets every client act as a replica and run low‑latency local queries while the database transparently merges and syncs changes in the background. The system provides versioned schemas, fine‑grained authorization rules, and React hooks for real‑time UIs.
+
+## Getting Started
+
+- [Installation](https://goatdb.dev/install/index.html.md): Install GoatDB in Deno (stable) or Node.js (experimental)
+- [Tutorial](https://goatdb.dev/tutorial/index.html.md): Build a Todo list app step‑by‑step
+- [Concepts](https://goatdb.dev/concepts/index.html.md): Core architecture, Data Registry, items, and repositories
+
+## API & Guides
+
+- [Schema](https://goatdb.dev/schema/index.html.md): Define, version, and migrate schemas
+- [Sessions and Users](https://goatdb.dev/sessions/index.html.md): Session‑based authentication model
+- [Authorization](https://goatdb.dev/authorization/index.html.md): Fine‑grained authorization rules
+- [Query](https://goatdb.dev/query/index.html.md): Real‑time, incremental query mechanism
+- [React Hooks](https://goatdb.dev/react/index.html.md): Integrate GoatDB with React apps
+- [Commit Graph](https://goatdb.dev/commit-graph/): Core data structure and versioning
+- [Conflict Resolution](https://goatdb.dev/conflict-resolution/): How GoatDB handles concurrent changes
+- [Synchronization](https://goatdb.dev/sync/): How data syncs between nodes
+
+## Optional
+
+- [FAQ](https://goatdb.dev/faq/index.html.md): Frequently asked questions
+- [GoatDB GitHub Repository](https://github.com/goatplatform/goatdb): Source code, issues, and roadmap
+
