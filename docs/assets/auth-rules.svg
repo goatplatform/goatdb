@@ -1,0 +1,114 @@
+<svg width="800" height="580" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="14px"> {/* Increased height */}
+  <defs>
+    <style>
+    /* <![CDATA[ */
+      .bg-card { fill: #ffffff; stroke: #dee2e6; stroke-width: 1; }
+      .bg-checkpoint { fill: #e7f1ff; stroke: #0d6efd; stroke-width: 1.5; } /* Blue theme */
+      .bg-rule-logic { fill: #f8f9fa; stroke: #dee2e6; stroke-width: 1; }
+      .bg-outcome-allow { fill: #d1e7dd; stroke: #198754; stroke-width: 1; } /* Green theme */
+      .bg-outcome-deny { fill: #f8d7da; stroke: #dc3545; stroke-width: 1; } /* Red theme */
+      .text-title { font-size: 16px; font-weight: 600; fill: #0a58ca; }
+      .text-heading { font-size: 14px; font-weight: 500; fill: #212529; }
+      .text-body { font-size: 12px; fill: #495057; }
+      .text-code { font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 10px; fill: #6c757d; }
+      .text-allow { fill: #198754; font-weight: 600; }
+      .text-deny { fill: #dc3545; font-weight: 600; }
+      .text-icon { font-size: 24px; }
+      .text-icon-small { font-size: 16px; }
+      .text-icon-logic { font-size: 20px; }
+      .arrow-line { stroke: #6c757d; stroke-width: 1.5; }
+      .arrow-head { fill: #6c757d; }
+      .arrow-line-allow { stroke: #198754; stroke-width: 1.5; }
+      .arrow-head-allow { fill: #198754; }
+      .arrow-line-deny { stroke: #dc3545; stroke-width: 1.5; }
+      .arrow-head-deny { fill: #dc3545; }
+    /* ]]> */
+    </style>
+    <marker id="arrowhead-auth" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" class="arrow-head" />
+    </marker>
+    <marker id="arrowhead-auth-allow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" class="arrow-head-allow" />
+    </marker>
+    <marker id="arrowhead-auth-deny" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" class="arrow-head-deny" />
+    </marker>
+  </defs>
+
+  <text x="400" y="30" text-anchor="middle" class="text-title">GoatDB Authorization Flow</text>
+  <text x="400" y="50" text-anchor="middle" class="text-body">Checked on Every Operation for Every Item</text>
+
+  <g id="operations">
+    <g transform="translate(50, 100)">
+       <text x="0" y="15" class="text-icon-small">👤</text>
+       <text x="20" y="15" class="text-body">Session A attempts:</text>
+       <text x="20" y="35" class="text-code">READ /public/item1</text>
+       {/* Adjusted arrow end point (y=175) */}
+       <path d="M 100 45 V 75" class="arrow-line" marker-end="url(#arrowhead-auth)"/>
+    </g>
+     <g transform="translate(300, 100)">
+       <text x="0" y="15" class="text-icon-small">👤</text>
+       <text x="20" y="15" class="text-body">Session B attempts:</text>
+       <text x="20" y="35" class="text-code">WRITE /user/xyz/item2</text>
+       {/* Adjusted arrow end point (y=175) */}
+       <path d="M 100 45 V 75" class="arrow-line" marker-end="url(#arrowhead-auth)"/>
+    </g>
+     <g transform="translate(550, 100)">
+       <text x="0" y="15" class="text-icon-small">👤</text>
+       <text x="20" y="15" class="text-body">Session C attempts:</text>
+       <text x="20" y="35" class="text-code">READ /admin/config</text>
+       {/* Adjusted arrow end point (y=175) */}
+       <path d="M 100 45 V 75" class="arrow-line" marker-end="url(#arrowhead-auth)"/>
+    </g>
+    <text x="400" y="90" text-anchor="middle" class="text-body">(... and so on for every operation)</text>
+  </g>
+
+  {/* Checkpoint moved down (y=180), inner box height increased */}
+  <g id="checkpoint" transform="translate(200, 180)">
+      <rect width="400" height="210" rx="8" ry="8" class="bg-checkpoint"/> {/* Increased height */}
+      <text x="200" y="35" text-anchor="middle" class="text-icon">🛡️</text>
+      <text x="200" y="60" text-anchor="middle" class="text-heading">Authorization Checkpoint</text>
+
+      {/* Inner logic box height increased */}
+      <rect x="25" y="80" width="350" height="115" rx="4" ry="4" class="bg-rule-logic"/>
+      <text x="45" y="105" text-anchor="start" class="text-icon-logic">🎯</text>
+      <text x="70" y="105" text-anchor="start" class="text-body">1. Match Path Pattern</text>
+      <text x="350" y="105" text-anchor="end" class="text-code">(e.g., /admin/*)</text> {/* Adjusted x for space */}
+
+       <text x="45" y="135" text-anchor="start" class="text-icon-logic">⚙️</text>
+      <text x="70" y="135" text-anchor="start" class="text-body">2. Execute Rule Function</text>
+      {/* Input text y adjusted slightly */}
+      <text x="70" y="155" text-anchor="start" class="text-code">Input: (Session, Op, Path, Key)</text>
+
+      {/* Step 3 text moved down (y=180) */}
+      <text x="45" y="180" text-anchor="start" class="text-icon-logic">❓</text>
+      <text x="70" y="180" text-anchor="start" class="text-body">3. Result (Boolean)</text>
+      <text x="350" y="180" text-anchor="end" class="text-body">Allow / Deny</text> {/* Adjusted x for space */}
+  </g>
+
+  {/* Output arrows adjusted for new checkpoint position */}
+  <g id="output-arrows">
+     {/* Deny Path starts lower (y=390), ends lower (y=480) */}
+     <path d="M 250 390 Q 200 415 200 430 V 480" class="arrow-line-deny" fill="none" marker-end="url(#arrowhead-auth-deny)"/>
+     <text x="275" y="415" text-anchor="end" class="text-deny">DENY</text>
+     {/* Allow Path starts lower (y=390), ends lower (y=480) */}
+     <path d="M 550 390 Q 600 415 600 430 V 480" class="arrow-line-allow" fill="none" marker-end="url(#arrowhead-auth-allow)"/>
+     {/* ALLOW text moved left (x=525), anchor=end, y adjusted */}
+     <text x="560" y="415" text-anchor="end" class="text-allow">ALLOW</text>
+  </g>
+
+  {/* Outcomes moved down (y=480) */}
+  <g id="outcomes">
+      <g transform="translate(100, 480)">
+          <rect width="200" height="60" rx="8" ry="8" class="bg-outcome-deny"/>
+          <text x="100" y="30" text-anchor="middle" class="text-icon-small">❌</text>
+          <text x="100" y="50" text-anchor="middle" class="text-heading text-deny">Access Denied</text>
+      </g>
+       <g transform="translate(500, 480)">
+          <rect width="200" height="60" rx="8" ry="8" class="bg-outcome-allow"/>
+          <text x="100" y="30" text-anchor="middle" class="text-icon-small">✅</text>
+          <text x="100" y="50" text-anchor="middle" class="text-heading text-allow">Access Granted</text>
+      </g>
+  </g>
+
+</svg>

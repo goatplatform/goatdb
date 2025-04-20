@@ -16,16 +16,15 @@ branches, which simplifies rolling deployments.
 Each schema has a namespace that defines the type of item it manages. Multiple
 schemas with different namespaces can exist in a single repository.
 
-## The Schema Manager
+## The Data Registry
 
 A schema must be registered with a
-[Schema Manager](https://github.com/goatplatform/goatdb/blob/main/cfds/base/schema-manager.ts)
-before it can be used to create and manipulate items. The **DataRegistry** acts
-as a registry for schemas within the database. Multiple managers may exist and
-be attached to different database instances, but the default manager is
-sufficient for most applications.
+[DataRegistry](https://github.com/goatplatform/goatdb/blob/main/cfds/base/data-registry.ts)
+before it can be used to create and manipulate items. Multiple registries may
+exist and be attached to different database instances, but the default registry
+is sufficient for most applications.
 
-The default schema manager can be accessed as follows:
+The default data registry can be accessed as follows:
 
 ```javascript
 const manager = DataRegistry.default;
@@ -60,7 +59,7 @@ type SchemeMessageType = typeof kSchemeMessage;
    - **version:** The version of the schema. This number must be consecutive.
    - **fields:** The fields and their respective types for the item.
 
-2. **Register the Schema:** Register the schema with the default schema manager
+2. **Register the Schema:** Register the schema with the default data registry
    to make it available for use in the database.
 
 3. **Define a Type:** Define a convenience type for the schema to facilitate

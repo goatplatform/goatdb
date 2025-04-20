@@ -1,0 +1,81 @@
+---
+permalink: /sessions/
+layout: default
+title: Sessions and Users
+nav_order: 3
+---
+
+# Sessions and Users
+
+GoatDB implements a robust session-based authentication system that provides
+secure and flexible user management. This document explains how sessions work,
+their security implications, and how they integrate with user management.
+
+## Understanding Session-Based Authentication
+
+At its core, GoatDB's authentication system revolves around sessions - secure
+connections to the database that are represented by ECDSA P-384 public/private
+key pairs. The private key is generated and stored exclusively on the peer's
+machine, never leaving its local storage. Only the corresponding public key is
+shared with the GoatDB network.
+
+![Key Generation Illustration](/assets/key-gen.svg)
+
+Sessions come in two forms: identified sessions, which are tied to specific user
+IDs and peers, and anonymous sessions, which are only associated with specific
+peers. Each session has a default expiration period of 30 days, though this can
+be configured based on your security requirements.
+
+Every operation in GoatDB is cryptographically signed using the session's
+private key on the peer's machine. This signature serves two critical security
+functions: it verifies the integrity of the operation's content (ensuring it
+hasn't been tampered with) and proves the identity of the operation's creator.
+This dual verification system creates a robust foundation for both data
+integrity and accountability.
+
+![Signing and Verification Illustration](/assets/sign-verify.svg)
+
+## Distributed Security Architecture
+
+The public/private key design enables a powerful distributed security model.
+Every operation in GoatDB is cryptographically signed, allowing all peers in the
+network to verify its authenticity. This creates a tamper-proof commit graph
+where each change can be traced back to its authorized source, with invalid or
+unauthorized changes being automatically rejected by the network.
+
+![Distributed Security Illustration](/assets/distributed-security.svg)
+
+A key feature of this architecture is the client-as-replica design. Clients
+maintain their own copy of the commit graph and verify all operations
+independently. This enables clients to act as replicas of the database state,
+providing resilience against peer failures. If a peer crashes, any client can
+safely restore the peer's state by replaying the verified commit graph and
+ensuring all operations were properly signed.
+
+This distributed verification system ensures data integrity even in challenging
+scenarios like network partitions, peer failures, or malicious actors. Clients
+can independently verify the database state, eliminating single points of
+failure in the verification process.
+
+## User Management Integration
+
+GoatDB offers flexible user management options to accommodate different
+deployment scenarios. You can choose between two approaches:
+
+1. **Internal Management**: Users are stored and managed directly in GoatDB
+   using the `/sys/users` repository.
+2. **External Management**: Users are managed by an external system, with GoatDB
+   only receiving user information through session ownership.
+
+This flexibility allows you to:
+
+- Use GoatDB's built-in user management
+- Integrate with external identity providers
+- Support multiple authentication methods
+- Maintain security while being system-agnostic
+- Allow anonymous access where appropriate
+- Gradually upgrade anonymous sessions to identified ones
+
+<br />
+[Next: Authorization](/authorization){: .btn .btn-purple }
+<br />

@@ -2,7 +2,6 @@
 permalink: /conflict-resolution/
 layout: default
 title: Conflict Resolution
-parent: Architecture
 ---
 
 # Conflict Resolution

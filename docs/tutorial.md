@@ -308,3 +308,7 @@ The build process supports cross-compilation for different environments:
 The entire build pipeline is implemented as a TypeScript API, making it easy to
 integrate into existing build systems or CI/CD pipelines. You can
 programmatically control the build process and customize it to your needs.
+
+<br />
+[Next: Sessions and Users](/sessions){: .btn .btn-purple }
+<br />

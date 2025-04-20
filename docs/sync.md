@@ -2,7 +2,6 @@
 permalink: /sync/
 layout: default
 title: Synchronization
-parent: Architecture
 ---
 
 <script

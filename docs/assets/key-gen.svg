@@ -1,0 +1,64 @@
+<svg width="800" height="350" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="14px">
+  <defs>
+    <style>
+      .bg-card { fill: #ffffff; stroke: #dee2e6; stroke-width: 1; }
+      .bg-section-blue { fill: #e7f1ff; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .bg-section-gray { fill: #f8f9fa; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .text-title { font-size: 16px; font-weight: 600; fill: #0a58ca; }
+      .text-heading { font-size: 14px; font-weight: 500; fill: #212529; }
+      .text-body { font-size: 12px; fill: #495057; }
+      .text-code { font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; fill: #d63384; } /* Adjusted color */
+      .text-key-private { fill: #dc3545; }
+      .text-key-public { fill: #198754; }
+      .text-session { fill: #0d6efd; }
+      .text-icon { font-size: 24px; }
+      .text-icon-small { font-size: 16px; }
+      .arrow-line { stroke: #0d6efd; stroke-width: 2; }
+      .arrow-head { fill: #0d6efd; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" class="arrow-head" />
+    </marker>
+  </defs>
+
+  <text x="400" y="30" text-anchor="middle" class="text-title">1. Key Generation &amp; Session Start</text>
+
+  <g transform="translate(20, 60)">
+    <rect width="240" height="260" rx="8" ry="8" class="bg-section-blue"/>
+    <text x="120" y="30" text-anchor="middle" class="text-icon">💻</text>
+    <text x="120" y="55" text-anchor="middle" class="text-heading">Peer Machine</text>
+    <rect x="40" y="80" width="160" height="80" rx="4" ry="4" class="bg-card"/>
+    <text x="55" y="105" class="text-icon-small text-key-private">🔑</text>
+    <text x="80" y="105" class="text-code text-key-private">Private Key</text>
+    <text x="120" y="125" text-anchor="middle" class="text-body">ECDSA P-384</text>
+    <text x="120" y="145" text-anchor="middle" class="text-body">Stored locally</text>
+  </g>
+
+  <g transform="translate(270, 190)">
+     <line x1="0" y1="0" x2="60" y2="0" class="arrow-line" marker-end="url(#arrowhead)" />
+     <text x="30" y="20" text-anchor="middle" class="text-body">Shares</text>
+  </g>
+
+  <g transform="translate(360, 60)">
+      <rect width="420" height="260" rx="8" ry="8" class="bg-section-gray"/>
+      <text x="210" y="30" text-anchor="middle" class="text-icon">🌐</text>
+      <text x="210" y="55" text-anchor="middle" class="text-heading">GoatDB Network</text>
+
+      <rect x="20" y="80" width="180" height="60" rx="4" ry="4" class="bg-card"/>
+      <text x="35" y="105" class="text-icon-small text-key-public">🔑</text>
+      <text x="60" y="105" class="text-code text-key-public">Public Key</text>
+      <text x="110" y="125" text-anchor="middle" class="text-body">Stored by network</text>
+
+      <rect x="220" y="80" width="180" height="60" rx="4" ry="4" class="bg-card"/>
+      <text x="235" y="105" class="text-icon-small text-session">🛡️</text>
+      <text x="260" y="105" class="text-heading text-session">Session</text>
+      <text x="310" y="125" text-anchor="middle" class="text-body">Expires (e.g., 30 days)</text>
+
+       <rect x="20" y="160" width="380" height="80" rx="4" ry="4" fill="#f1f1f1" stroke="#dee2e6"/>
+      <text x="35" y="185" class="text-icon-small text-session">👤</text>
+      <text x="55" y="185" class="text-body"><tspan font-weight="500">Identified Session:</tspan> Tied to User ID &amp; Peer Machine.</text>
+      <text x="35" y="215" class="text-icon-small" fill="#6c757d">❓</text>
+      <text x="55" y="215" class="text-body"><tspan font-weight="500">Anonymous Session:</tspan> Tied only to Peer Machine.</text>
+  </g>
+
+</svg>
