@@ -11,7 +11,8 @@ nav_exclude: true
 
 <p align="center">
 📦 <a href="/install">Installation</a> •
-🚀 <a href="/tutorial">Tutorial</a> • ❓ <a href="/faq">FAQ</a> • ⚡ <a href="/benchmarks">Benchmarks</a> • 💬 <a href="https://github.com/goatplatform/goatdb/discussions">Discussions</a> • 👋 <a href="https://discord.gg/SAt3cbUqxr">Discord</a>
+🔍 <a href="/concepts">Concepts</a> •
+🚀 <a href="/tutorial">Tutorial</a> • ⚡ <a href="/benchmarks">Benchmarks</a> • 💬 <a href="https://github.com/goatplatform/goatdb/discussions">Discussions</a> • 👋 <a href="https://discord.gg/SAt3cbUqxr">Discord</a>
 </p>
 
 GoatDB is an embedded, distributed, document database that prioritizes
