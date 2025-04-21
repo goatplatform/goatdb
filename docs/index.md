@@ -25,7 +25,7 @@ enhanced with novel algorithms ([bloom filter-based synchronization](/sync/) and
 [ephemeral CRDTs](/conflict-resolution)) for efficient synchronization and
 automatic real-time conflict resolution.
 
-Currently optimized for JavaScript environments, GoatDB functions as a
+Currently optimized for TypeScript environments, GoatDB functions as a
 first-class citizen in both browsers and servers. It utilizes a document model
 with schemas, providing causal eventual consistency to simplify development
 while offering built-in optional cryptographic signing for the underlying commit
@@ -46,16 +46,14 @@ Items in GoatDB are defined alongside their schema. Schemas dictate both the
 field types and their conflict resolution strategy. Schemas are themselves
 versioned, making rolling schema updates via branches a natural mechanism.
 
+{: .highlight }
+
+Please keep in mind that GoatDB is still under active development and therefore
+full backward compatibility is not guaranteed before reaching v1.0.0.
+
 If you like what we're building, please star ⭐️ our
 [GitHub project](https://github.com/goatplatform/goatdb). We really appreciate
 it! 🙏
-
-## Getting Started
-
-- [Installation Instructions](/install) - How to add GoatDB to your project
-- [Tutorial](/tutorial) - Build your first application with GoatDB
-- [FAQ](/faq) - Common questions about GoatDB
-- [Benchmarks](/benchmarks) - Performance metrics
 
 ## Example Projects
 
