@@ -30,13 +30,15 @@ while Node.js support is currently **experimental**.
    > Skip this step if you're not building a SPA or already have your React
    > setup configured.
 
-### Node.js Installation (Experimental)
-
-**WARNING:** Node.js support is currently a work in progress and is not yet
-ready for production. Progress is tracked under this
-[GitHub issue](https://github.com/goatplatform/goatdb/issues/27).
+### Node.js Installation
 
 Install using one of the following package managers:
+
+{: .warning }
+
+Node.js support is currently a work in progress and is not yet ready for
+production. Progress is tracked under this
+[GitHub issue](https://github.com/goatplatform/goatdb/issues/27).
 
 **npm:**
 
