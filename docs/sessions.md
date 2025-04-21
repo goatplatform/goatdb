@@ -57,6 +57,47 @@ scenarios like network partitions, peer failures, or malicious actors. Clients
 can independently verify the database state, eliminating single points of
 failure in the verification process.
 
+## Trusted Mode
+
+For applications where security is handled at a different layer or in trusted
+environments (such as microservices running in the cloud without direct client
+interaction), GoatDB offers a trusted mode that bypasses cryptographic
+verification and security controls. This mode can significantly improve
+performance by skipping commit signing and verification.
+
+{: .note }
+
+> Trusted mode is particularly useful in scenarios where:
+>
+> - The application runs in a controlled, trusted environment
+> - Security is handled at a different layer (e.g., network security, container
+>   isolation)
+> - Performance is a critical requirement
+> - The database is used as a backend service without direct client interaction
+> - As an active-active in-memory caching layer for performance optimization
+
+To enable trusted mode, set the `trusted` flag to `true` when creating a DB
+instance:
+
+```typescript
+const db = new GoatDB({
+  path: '/path/to/db',
+  trusted: true,
+});
+```
+
+{: .warning }
+
+> Note that trusted mode disables several security features:
+>
+> - Cryptographic signing of commits
+> - Skips authorization rules
+> - Protection against unauthorized modifications
+> - Distributed security guarantees
+>
+> Use trusted mode with caution and only in environments where the security
+> tradeoffs are acceptable.
+
 ## User Management Integration
 
 GoatDB offers flexible user management options to accommodate different

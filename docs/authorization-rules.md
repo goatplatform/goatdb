@@ -206,3 +206,51 @@ DataRegistry.default.registerAuthRule(
   },
 );
 ```
+
+## Trusted Mode and Authorization Rules
+
+While authorization rules provide fine-grained control over data access, there
+are scenarios where bypassing these rules is necessary for performance or
+architectural reasons. GoatDB's trusted mode allows you to disable authorization
+rule evaluation entirely.
+
+{: .note }
+
+> Trusted mode is particularly useful when:
+>
+> - Building high-performance microservices that handle their own access control
+> - Running in a controlled environment where network-level security is
+>   sufficient
+> - Using GoatDB as a caching layer with separate authorization mechanisms
+
+To enable trusted mode, set the `trusted` flag to `true` when creating a DB
+instance:
+
+```typescript
+const db = new GoatDB({
+  path: '/path/to/db',
+  trusted: true,
+});
+```
+
+When trusted mode is enabled:
+
+- All registered authorization rules are ignored
+- System repositories (`/sys/*`) become accessible without restrictions
+- User-specific repositories (`/user/*`) can be accessed by any session
+- Role-based access control is effectively disabled
+
+{: .warning }
+
+> Important considerations when using trusted mode:
+>
+> - Authorization rules provide critical security boundaries - disabling them
+>   removes these protections
+> - All sessions gain full access to all repositories and items
+> - The security model shifts from GoatDB's authorization system to your
+>   application's security layer
+> - This mode should only be used when you have equivalent or better security
+>   controls at a different layer
+>
+> Use trusted mode with extreme caution and only in environments where you can
+> guarantee security through other means.
