@@ -246,9 +246,3 @@ cleanup when components unmount.
 
 - **Concurrency:** The hooks handle concurrent updates gracefully, ensuring
   consistent state even when multiple components modify the same data.
-
-{: .highlight }
-
-> The React hooks provide a high-level abstraction over GoatDB's core
-> functionality, making it easy to build reactive UIs while maintaining the
-> power and flexibility of the underlying database system.
