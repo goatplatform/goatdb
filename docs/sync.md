@@ -25,13 +25,13 @@ unsuitable for real-time collaboration.
 
 Martin Kleppmann and his team
 [published](https://martin.kleppmann.com/2020/12/02/bloom-filter-hash-graph-sync.html)
-an optimization to Git’s traditional approach. They introduced a preprocessing
+an optimization to Git's traditional approach. They introduced a preprocessing
 stage before the reconciliation protocol to reduce round trips. This stage
 involves exchanging a [Bloom Filter](https://en.wikipedia.org/wiki/Bloom_filter)
 to detect probable missing commits. However, this method still requires running
 the full reconciliation algorithm after processing the initial Bloom Filter.
 
-GoatDB’s synchronization approach differs. It repeatedly exchanges Bloom Filters
+GoatDB's synchronization approach differs. It repeatedly exchanges Bloom Filters
 and commits between nodes without relying on additional protocols. By adjusting
 the filter size and the number of iterations, the protocol ensures all nodes
 converge to an identical commit graph.
@@ -44,7 +44,7 @@ and their IDs). Since the [commit graph](/commit-graph) is append-only,
 previously incorporated commits are immutable and cannot be edited
 retroactively. Any "edit" involves appending a new commit to the graph.
 
-Let’s delve into how Bloom Filters work internally. Assume a 2-bit filter where
+Let's delve into how Bloom Filters work internally. Assume a 2-bit filter where
 one bit is on, and the other is off: `BF=[0, 1]`. This filter has a 50%
 false-positive rate (FPR), meaning if a value maps to the `0` bit, it is
 guaranteed not to be in the filter. However, if it maps to the `1` bit, the
@@ -56,7 +56,7 @@ graph). By identifying which members are absent, each node can determine with
 100% certainty which specific commits are missing on the other side and send
 them over. Due to false positives, some missing values will be overlooked. For
 example, with an FPR of 4 (25% false positive), about 25% of missing values
-won’t be sent initially.
+won't be sent initially.
 
 Repeating the process with different hash functions generates a new Bloom
 Filter, which misses a different subset of commits. By iterating this process
@@ -130,14 +130,15 @@ If this partition occurs, merging the two leaves could inadvertently undo
 changes from one or both parts of the graph. To prevent this, every commit
 stores a reference to K ancestors further up the graph. Since the Bloom Filter
 may randomly miss some commits, the probability of missing `K` consecutive
-commits is approximately `K^FPR`. By capping the Bloom Filter's false positive
+commits is approximately `FPR^K`. By capping the Bloom Filter's false positive
 rate at a minimum of `0.001`, we ensure that a gap larger than three commits is
-extremely unlikely—occurring roughly once every 32 years (given a sync iteration
-once per second). If this partition occurs, merging the two leaves could
-inadvertently undo changes from one or both parts of the graph. To prevent this,
-every commit stores a reference to K ancestors further up the graph. Since the
-Bloom Filter may randomly miss some commits, the probability of missing `K`
-consecutive commits is approximately `K^FPR`. By capping the Bloom Filter's
-false positive rate at a minimum of `0.001`, we ensure that a gap larger than
-three commits is extremely unlikely—occurring roughly once every 32 years
-(assuming one sync iteration per second).
+extremely unlikely—occurring roughly once every 32 years (assuming one sync
+iteration per second).
+
+{: .note }
+
+> The partition handling mechanism described above is currently a work in
+> progress and has not yet been fully implemented in the codebase. The current
+> implementation uses a combination of older heuristics (including strict commit
+> ordering and explicit parent references) which are being phased out in favor
+> of this more robust probabilistic approach.

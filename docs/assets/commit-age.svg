@@ -1,0 +1,78 @@
+<svg width="800" height="350" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="14px">
+  <defs>
+    <style>
+      .bg-card { fill: #ffffff; stroke: #dee2e6; stroke-width: 1; }
+      .bg-section-blue { fill: #e7f1ff; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .bg-section-gray { fill: #f8f9fa; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .text-title { font-size: 16px; font-weight: 600; fill: #0a58ca; }
+      .text-heading { font-size: 14px; font-weight: 500; fill: #212529; }
+      .text-body { font-size: 12px; fill: #495057; }
+      .text-code { font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; fill: #d63384; }
+      .text-icon { font-size: 24px; }
+      .text-icon-small { font-size: 16px; }
+      .arrow-line { stroke: #0d6efd; stroke-width: 2; }
+      .arrow-head { fill: #0d6efd; }
+      .commit-box { fill: #e9ecef; stroke: #6c757d; stroke-width: 1; }
+      .age-number { font-weight: 600; fill: #0d6efd; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" class="arrow-head" />
+    </marker>
+  </defs>
+
+  <text x="400" y="30" text-anchor="middle" class="text-title">2. Commit Age Numbering</text>
+
+  <g transform="translate(20, 60)">
+    <rect width="760" height="260" rx="8" ry="8" class="bg-section-blue"/>
+    <text x="380" y="30" text-anchor="middle" class="text-icon">📝</text>
+    <text x="380" y="55" text-anchor="middle" class="text-heading">Commit Timeline</text>
+
+    <!-- Commit boxes -->
+    <g transform="translate(40, 80)">
+      <rect x="0" y="0" width="120" height="60" rx="4" ry="4" class="commit-box"/>
+      <text x="60" y="30" text-anchor="middle" class="age-number">Age: 1</text>
+      <text x="60" y="45" text-anchor="middle" class="text-body">Initial commit</text>
+
+      <rect x="140" y="0" width="120" height="60" rx="4" ry="4" class="commit-box"/>
+      <text x="200" y="30" text-anchor="middle" class="age-number">Age: 2</text>
+      <text x="200" y="45" text-anchor="middle" class="text-body">User update</text>
+
+      <rect x="280" y="0" width="120" height="60" rx="4" ry="4" class="commit-box"/>
+      <text x="340" y="30" text-anchor="middle" class="age-number">Age: 3</text>
+      <text x="340" y="45" text-anchor="middle" class="text-body">Data sync</text>
+
+      <rect x="420" y="0" width="120" height="60" rx="4" ry="4" class="commit-box"/>
+      <text x="480" y="30" text-anchor="middle" class="age-number">Age: 4</text>
+      <text x="480" y="45" text-anchor="middle" class="text-body">Schema change</text>
+
+      <rect x="560" y="0" width="120" height="60" rx="4" ry="4" class="commit-box"/>
+      <text x="620" y="30" text-anchor="middle" class="age-number">Age: 5</text>
+      <text x="620" y="45" text-anchor="middle" class="text-body">Latest commit</text>
+    </g>
+
+    <!-- Connecting arrows -->
+    <g transform="translate(40, 110)">
+      <line x1="60" y1="0" x2="200" y2="0" class="arrow-line" marker-end="url(#arrowhead)" />
+      <line x1="200" y1="0" x2="340" y2="0" class="arrow-line" marker-end="url(#arrowhead)" />
+      <line x1="340" y1="0" x2="480" y2="0" class="arrow-line" marker-end="url(#arrowhead)" />
+      <line x1="480" y1="0" x2="620" y2="0" class="arrow-line" marker-end="url(#arrowhead)" />
+    </g>
+
+    <!-- Key points -->
+    <g transform="translate(40, 160)">
+      <rect x="0" y="0" width="360" height="80" rx="4" ry="4" fill="#f1f1f1" stroke="#dee2e6"/>
+      <text x="20" y="25" class="text-icon-small">🔢</text>
+      <text x="40" y="25" class="text-body"><tspan font-weight="500">Monotonic:</tspan> Always increases</text>
+      <text x="20" y="55" class="text-icon-small">⏱️</text>
+      <text x="40" y="55" class="text-body"><tspan font-weight="500">Ordered:</tspan> Reflects commit sequence</text>
+    </g>
+
+    <g transform="translate(420, 160)">
+      <rect x="0" y="0" width="360" height="80" rx="4" ry="4" fill="#f1f1f1" stroke="#dee2e6"/>
+      <text x="20" y="25" class="text-icon-small">📊</text>
+      <text x="40" y="25" class="text-body"><tspan font-weight="500">Global:</tspan> Consistent across all peers</text>
+      <text x="20" y="55" class="text-icon-small">🔒</text>
+      <text x="40" y="55" class="text-body"><tspan font-weight="500">Immutable:</tspan> Never changes once assigned</text>
+    </g>
+  </g>
+</svg> 

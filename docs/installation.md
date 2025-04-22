@@ -57,7 +57,3 @@ yarn dlx jsr add @goatdb/goatdb
 ```bash
 pnpm dlx jsr add @goatdb/goatdb
 ```
-
-<br />
-[Next: Concepts](/concepts){: .btn .btn-purple }
-<br />

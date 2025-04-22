@@ -1,0 +1,87 @@
+<svg width="800" height="390" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="14px">
+  <defs>
+    <style>
+      .bg-card { fill: #ffffff; stroke: #dee2e6; stroke-width: 1; }
+      .bg-section-blue { fill: #e7f1ff; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .bg-section-gray { fill: #f8f9fa; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .text-title { font-size: 16px; font-weight: 600; fill: #0a58ca; }
+      .text-heading { font-size: 14px; font-weight: 500; fill: #212529; }
+      .text-body { font-size: 12px; fill: #495057; }
+      .text-code { font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; fill: #d63384; }
+      .text-icon { font-size: 24px; }
+      .text-icon-small { font-size: 16px; }
+      .arrow-line { stroke: #0d6efd; stroke-width: 2; }
+      .arrow-head { fill: #0d6efd; }
+      .cache-box { fill: #e9ecef; stroke: #6c757d; stroke-width: 1; }
+      .age-tag { fill: #0d6efd; font-weight: 600; }
+      .result-box { fill: #f8f9fa; stroke: #6c757d; stroke-width: 1; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" class="arrow-head" />
+    </marker>
+  </defs>
+
+  <text x="380" y="30" text-anchor="middle" class="text-title">3. Query Cache &amp; Age Tracking</text>
+
+  <g transform="translate(20, 60)">
+    <rect width="740" height="308" rx="8" ry="8" class="bg-section-blue"/>
+    <text x="380" y="30" text-anchor="middle" class="text-icon">💾</text>
+    <text x="380" y="55" text-anchor="middle" class="text-heading">Query Cache Storage</text>
+
+    <!-- Query Cache Box -->
+    <g transform="translate(16, 80)">
+      <rect x="0" y="0" width="340" height="160" rx="4" ry="4" class="cache-box"/>
+      <text x="20" y="30" class="text-icon-small">🔍</text>
+      <text x="40" y="30" class="text-heading">Query Cache</text>
+      
+      <!-- Results Section -->
+      <rect x="20" y="50" width="300" height="40" rx="2" ry="2" class="result-box"/>
+      <text x="40" y="75" class="text-code">Results: [item1, item2, ...]</text>
+      
+      <!-- Age Tag -->
+      <rect x="20" y="100" width="300" height="40" rx="2" ry="2" class="result-box"/>
+      <text x="40" y="125" class="text-code">Latest Age: <tspan class="age-tag">3</tspan></text>
+    </g>
+
+    <!-- Commit Timeline -->
+    <g transform="translate(400, 80)">
+      <rect x="0" y="0" width="320" height="160" rx="4" ry="4" class="bg-section-gray"/>
+      <text x="20" y="30" class="text-icon-small">📝</text>
+      <text x="40" y="30" class="text-heading">Commit Timeline</text>
+
+      <g transform="translate(20, 50)">
+        <rect x="0" y="0" width="60" height="30" rx="2" ry="2" class="result-box"/>
+        <text x="30" y="20" text-anchor="middle" class="age-tag">1</text>
+
+        <rect x="70" y="0" width="60" height="30" rx="2" ry="2" class="result-box"/>
+        <text x="100" y="20" text-anchor="middle" class="age-tag">2</text>
+
+        <rect x="140" y="0" width="60" height="30" rx="2" ry="2" class="result-box"/>
+        <text x="170" y="20" text-anchor="middle" class="age-tag">3</text>
+
+        <rect x="210" y="0" width="60" height="30" rx="2" ry="2" class="result-box"/>
+        <text x="240" y="20" text-anchor="middle" class="age-tag">4</text>
+      </g>
+
+      <!-- Connecting arrows -->
+      <g transform="translate(20, 100)">
+        <line x1="30" y1="0" x2="100" y2="0" class="arrow-line" marker-end="url(#arrowhead)" marker-start="url(#arrowhead)" />
+        <line x1="100" y1="0" x2="170" y2="0" class="arrow-line" marker-end="url(#arrowhead)" />
+        <line x1="170" y1="0" x2="240" y2="0" class="arrow-line" marker-end="url(#arrowhead)" />
+      </g>
+
+      <!-- Cache Age Indicator -->
+      <g transform="translate(20, 120)">
+        <rect x="0" y="0" width="280" height="30" rx="2" ry="2" fill="#e7f1ff" stroke="#0d6efd"/>
+        <text x="140" y="20" text-anchor="middle" class="text-body">Cache includes commits up to age <tspan class="age-tag">3</tspan></text>
+      </g>
+    </g>
+
+    <!-- Key Points -->
+    <g transform="translate(16, 256)">
+      <rect x="0" y="0" width="702" height="40" rx="4" ry="4" fill="#f1f1f1" stroke="#dee2e6"/>
+      <text x="20" y="25" class="text-icon-small">📊</text>
+      <text x="40" y="25" class="text-body"><tspan font-weight="500">Cache Age:</tspan> Tracks the latest commit included in results</text>
+    </g>
+  </g>
+</svg> 

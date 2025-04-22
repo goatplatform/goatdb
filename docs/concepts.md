@@ -124,7 +124,3 @@ system differently if needed.
 #### /sys/stats
 
 System telemetry and monitoring data. Accessible only with root access.
-
-<br />
-[Next: Tutorial](/tutorial){: .btn .btn-purple }
-<br />

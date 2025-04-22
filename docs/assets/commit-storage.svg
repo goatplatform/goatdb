@@ -1,0 +1,108 @@
+<svg width="760" height="350" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="14px">
+  <defs>
+    <style>
+      .bg-card { fill: #ffffff; stroke: #dee2e6; stroke-width: 1; }
+      .bg-section-blue { fill: #e7f1ff; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .bg-section-gray { fill: #f8f9fa; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .text-title { font-size: 16px; font-weight: 600; fill: #0a58ca; }
+      .text-heading { font-size: 14px; font-weight: 500; fill: #212529; }
+      .text-body { font-size: 12px; fill: #495057; }
+      .text-code { font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; fill: #d63384; }
+      .text-icon { font-size: 24px; }
+      .text-icon-small { font-size: 16px; }
+      .arrow-line { stroke: #0d6efd; stroke-width: 2; }
+      .arrow-head { fill: #0d6efd; }
+      .commit-box { fill: #e9ecef; stroke: #6c757d; stroke-width: 1; }
+      .age-number { font-weight: 600; fill: #0d6efd; }
+      .storage-box { fill: #f8f9fa; stroke: #0d6efd; stroke-width: 2; }
+      .cloud-box { fill: #e7f1ff; stroke: #0d6efd; stroke-width: 1; stroke-dasharray: 4 2; }
+      .ellipsis { font-weight: 600; fill: #495057; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" class="arrow-head" />
+    </marker>
+  </defs>
+
+  <text x="360" y="30" text-anchor="middle" class="text-title">2. Commit Ordering &amp; Storage</text>
+
+  <g transform="translate(20, 60)">
+    <rect width="700" height="268" rx="8" ry="8" class="bg-section-blue"/>
+    
+    <!-- Unordered commits -->
+    <g transform="translate(100, 20)">
+      <rect x="0" y="0" width="200" height="120" rx="8" ry="8" class="cloud-box"/>
+      <text x="100" y="30" text-anchor="middle" class="text-heading">Sync</text>
+      
+      <!-- Randomly positioned commits -->
+      <g transform="translate(20, 50)">
+        <clipPath id="sync-clip">
+          <rect x="-20" y="-50" width="200" height="120" rx="8" ry="8"/>
+        </clipPath>
+        <g clip-path="url(#sync-clip)">
+          <rect x="0" y="0" width="40" height="40" rx="4" ry="4" class="commit-box"/>
+          <rect x="50" y="0" width="40" height="40" rx="4" ry="4" class="commit-box"/>
+          <rect x="100" y="0" width="40" height="40" rx="4" ry="4" class="commit-box"/>
+          <rect x="0" y="50" width="40" height="40" rx="4" ry="4" class="commit-box"/>
+          <rect x="50" y="50" width="40" height="40" rx="4" ry="4" class="commit-box"/>
+          <rect x="100" y="50" width="40" height="40" rx="4" ry="4" class="commit-box"/>
+          <rect x="150" y="0" width="40" height="40" rx="4" ry="4" class="commit-box"/>
+          <rect x="150" y="50" width="40" height="40" rx="4" ry="4" class="commit-box"/>
+        </g>
+      </g>
+    </g>
+
+    <!-- Arrow -->
+    <g transform="translate(320, 80)">
+      <line x1="0" y1="0" x2="40" y2="0" class="arrow-line" marker-end="url(#arrowhead)" />
+    </g>
+
+    <!-- Ordered storage -->
+    <g transform="translate(396, 20)">
+      <rect x="0" y="0" width="200" height="120" rx="8" ry="8" class="storage-box"/>
+      <text x="100" y="30" text-anchor="middle" class="text-heading">Local Storage</text>
+      
+      <!-- Linearly ordered commits -->
+      <g transform="translate(20, 50)">
+        <rect x="0" y="0" width="40" height="40" rx="4" ry="4" class="commit-box"/>
+        <text x="20" y="20" text-anchor="middle" class="age-number">1</text>
+        
+        <rect x="50" y="0" width="40" height="40" rx="4" ry="4" class="commit-box"/>
+        <text x="70" y="20" text-anchor="middle" class="age-number">2</text>
+        
+        <rect x="100" y="0" width="40" height="40" rx="4" ry="4" class="commit-box"/>
+        <text x="120" y="20" text-anchor="middle" class="age-number">3</text>
+        
+        <text x="156" y="20" text-anchor="middle" class="ellipsis">...</text>
+      </g>
+    </g>
+
+    <!-- Key points -->
+    <g transform="translate(100, 160)">
+      <rect x="0" y="0" width="200" height="94" rx="4" ry="4" fill="#f1f1f1" stroke="#dee2e6"/>
+      <text x="20" y="25" class="text-icon-small">🔄</text>
+      <text x="40" y="25" class="text-body">
+        <tspan font-weight="500">Sync:</tspan> Commits arrive
+      </text>
+      <text x="40" y="40" class="text-body">in random order</text>
+      <text x="20" y="65" class="text-icon-small">📦</text>
+      <text x="40" y="65" class="text-body">
+        <tspan font-weight="500">Delta:</tspan> Only missing
+      </text>
+      <text x="40" y="80" class="text-body">commits are exchanged</text>
+    </g>
+
+    <g transform="translate(396, 160)">
+      <rect x="0" y="0" width="200" height="94" rx="4" ry="4" fill="#f1f1f1" stroke="#dee2e6"/>
+      <text x="20" y="25" class="text-icon-small">🔢</text>
+      <text x="40" y="25" class="text-body">
+        <tspan font-weight="500">Age:</tspan> Monotonic
+      </text>
+      <text x="40" y="40" class="text-body">sequence</text>
+      <text x="20" y="65" class="text-icon-small">🔒</text>
+      <text x="40" y="65" class="text-body">
+        <tspan font-weight="500">Immutable:</tspan> Once
+      </text>
+      <text x="40" y="80" class="text-body">stored, never changed</text>
+    </g>
+  </g>
+</svg> 

@@ -1,83 +1,145 @@
 ---
 permalink: /query/
 layout: default
-title: Query
-nav_order: 7
+title: Querying Data
+nav_order: 4
 ---
 
-# Real-Time Query Mechanism
+# Querying Data in GoatDB
 
-In GoatDB, every node in the network maintains an independent, fully functional
-local copy of the database. Queries are executed locally, providing low-latency
-access and enabling offline capabilities. The real-time query mechanism ensures
-that query results are dynamically updated as the underlying data changes
-through incremental processing of updates.
+{: .highlight }
 
-## Overview
+If you're building a React UI, we recommend using the [React Hooks](/react)
+instead of working with queries directly. The hooks provide a more ergonomic
+interface for React components and handle all the complexity of data
+synchronization and updates.
 
-### Storage
+GoatDB's query system provides real-time, efficient access to your data with
+automatic updates as the underlying data changes. Queries can be chained
+together, sorted, and used as lightweight ad-hoc indexes for fast lookups.
 
-The local source of truth is the history storage containing the
-[commit graph](/commit-graph). This storage is
-[synchronized in the background](/sync) in real-time. To facilitate queries,
-whenever a new commit is persisted to the local storage, it is assigned a
-monotonically increasing age number. Notably, this age value is local to the
-processing node and is never synchronized with the network.
+## Basic Query Usage
 
-A separate storage is used for query results, which acts as a cache. It stores
-the result set of the query alongside the age of the repository at the time the
-result set was generated.
+### Creating a Query
 
-### Executing a Query
-
-When executing a new query, GoatDB first scans all available items in the
-repository, tracking the age of all items included in the result set. The result
-set is periodically persisted to disk during the initial scan and after the
-query completes.
-
-Once the initial scan is complete, the query remains open in the client code.
-Any incoming commits trigger a re-check of the modified item by the query,
-updating the result set as necessary.
-
-If a previously executed query is reopened, the initial scan leverages
-previously saved results to resume execution, skipping unmodified items that
-have already been processed.
-
-### Query Chaining
-
-GoatDB supports chaining queries—using the results of one query as the input to
-another. This enables dependent queries to scan smaller subsets of data,
-effectively acting as lightweight indexing.
-
-For example:
+The simplest way to create a query is through the database's `query()` method:
 
 ```typescript
-// Chain queries to find recent important todos
-const importantTodos = new Query({
-  source: repo,
-  predicate: ({ item }) => item.get('important'),
+// Find all users with admin role
+const adminUsers = db.query({
+  source: '/sys/users',
+  schema: kSchemaUser,
+  predicate: ({ item }) => item.get('role') === 'admin',
 });
 
-const recentImportant = new Query({
-  source: importantTodos,
-  predicate: ({ item }) => isRecent(item.get('date')),
+// Wait for initial results
+await adminUsers.loadingFinished();
+
+// Get the results
+const results = adminUsers.results();
+```
+
+{: .highlight }
+
+> Predicate and sort functions must be
+> [pure functions](https://en.wikipedia.org/wiki/Pure_function):
+>
+> - They should not modify any external state
+> - They should not depend on values that can change between calls
+> - They should not modify the items they receive (items are locked)
+> - Use the `ctx` parameter to pass in any external values needed
+
+### Query Instance Reuse
+
+When you create a query using `db.query()`, GoatDB maintains a cache of open
+queries. If you create another query with the same configuration (same source,
+predicate, sort, etc.), you'll get back the same query instance:
+
+```typescript
+// First query
+const query1 = db.query({
+  source: '/sys/users',
+  schema: kSchemaUser,
+  predicate: ({ item }) => item.get('role') === 'admin',
+});
+
+// Second query with same config - returns same instance
+const query2 = db.query({
+  source: '/sys/users',
+  schema: kSchemaUser,
+  predicate: ({ item }) => item.get('role') === 'admin',
+});
+
+console.log(query1 === query2); // true
+```
+
+This instance reuse is efficient because:
+
+- It prevents duplicate work when multiple parts of your app need the same query
+- It ensures all consumers see the same results
+- It maintains a single source of truth for the query's state
+
+### Closing Queries
+
+Queries remain open and track updates until explicitly closed. When you're done
+with a query, you should close it to free up resources:
+
+```typescript
+const query = db.query({
+  source: '/sys/users',
+  schema: kSchemaUser,
+});
+
+// Use the query...
+
+// When done, close it
+query.close();
+```
+
+{: .highlight }
+
+> Always close queries when you're done with them to prevent memory leaks and
+> unnecessary resource usage.
+
+### Filtering Data
+
+Queries use predicate functions to filter data. The predicate receives an item
+and returns true if the item should be included in the results. Predicates must
+be pure functions - they should not modify any external state or depend on
+values that can change between calls. Instead, use the `ctx` parameter to pass
+in any external values needed for the predicate:
+
+```typescript
+// Find overdue tasks using the current date from context
+const overdueTasks = db.query({
+  source: '/data/tasks',
+  schema: kSchemaTask,
+  ctx: { now: new Date() }, // Pass current date in context
+  predicate: ({ item, ctx }) => {
+    const dueDate = item.get('dueDate');
+    return dueDate < ctx.now && !item.get('completed');
+  },
 });
 ```
 
-### Sorting and Indexing
+### Sorting Results
 
-Queries can be sorted either by a field name or using a custom sort function:
+Queries can be sorted by a field name or using a custom sort function. Sort
+functions must be
+[pure functions](https://en.wikipedia.org/wiki/Pure_function) - they should not
+modify any external state or depend on values that can change between calls.
+Instead, use the `ctx` parameter to pass in any external values needed:
 
 ```typescript
 // Sort by field name
-const usersByEmail = new Query({
+const usersByEmail = db.query({
   source: '/sys/users',
   schema: kSchemaUser,
-  sortBy: 'email', // Will sort by email field values
+  sortBy: 'email', // Sort by email field values
 });
 
 // Custom sort function
-const usersByLastFirst = new Query({
+const usersByLastFirst = db.query({
   source: '/sys/users',
   schema: kSchemaUser,
   sortBy: ({ left, right }) => {
@@ -90,12 +152,14 @@ const usersByLastFirst = new Query({
 });
 ```
 
+### Using Queries as Indexes
+
 When sorted by a field, queries act as efficient indexes enabling O(log n)
 lookups:
 
 ```typescript
 // Create an index over user emails
-const usersByEmail = new Query({
+const usersByEmail = db.query({
   source: '/sys/users',
   schema: kSchemaUser,
   sortBy: 'email',
@@ -106,86 +170,120 @@ await usersByEmail.loadingFinished();
 const user = usersByEmail.find('email', 'user@example.com');
 ```
 
-### Query Performance and Caching
+### Chaining Queries
 
-Queries maintain several performance optimizations:
+Queries can be chained together, where one query's results become the input for
+another. This enables building complex data transformations through composition:
 
-- **Bloom Filters**: Used to efficiently track included paths and minimize false
-  positives
-- **Result Caching**: Query results are cached and only recomputed when
-  necessary
-- **Incremental Updates**: Only changed items are re-evaluated rather than
-  rescanning everything
-- **Persistent Storage**: Results are cached to disk for faster resumption
+```typescript
+// Find important todos
+const importantTodos = db.query({
+  source: '/data/todos',
+  predicate: ({ item }) => item.get('important'),
+});
 
-### Consistency
-
-This strategy ensures a fully consistent view for queries while enabling
-background storage maintenance when resources are available. Writes to the query
-storage are typically much slower than writes to the history storage and benefit
-from batching. By periodically caching query results in the background, batch
-updates enable faster bulk writes. Alternatively, if resources are scarce, query
-storage updates can be temporarily suspended with minimal performance penalties
-for queries.
-
-### Intermittent Results and React UI Integration
-
-GoatDB's real-time query mechanism provides intermittent query results during
-the initial scan and incremental updates as new data becomes available. This
-feature is particularly useful for building responsive and dynamic user
-interfaces in React.
-
-#### Handling Intermittent Results
-
-While executing a query, GoatDB progressively refines the result set. Developers
-can use this behavior to provide users with partial results immediately,
-improving the perceived performance of the application. For example:
-
-1. **Initial Loading State:** Display a loading spinner or skeleton UI while the
-   query begins scanning the repository.
-2. **Partial Results:** As query results are refined, progressively update the
-   UI to reflect the growing dataset.
-3. **Final State:** When the query completes, present the full dataset to the
-   user.
-
-#### Leveraging React Hooks
-
-GoatDB integrates seamlessly with React's declarative paradigm. By combining
-GoatDB's real-time queries with custom hooks, developers can build components
-that automatically update as query results change:
-
-```javascript
-function ItemList() {
-  const { query } = useQuery({
-    schema: kSchemeTask,
-    source: '/data/tasks',
-    predicate: ({ item }) => item.get('text').startsWith('lorem'),
-  });
-
-  if (query.loading) {
-    return <div>Loading...</div>;
-  }
-
-  return (
-    <ul>
-      {query.results().map((item) => <li key={item.path}>{item.get('text')}
-      </li>)}
-    </ul>
-  );
-}
+// Then find recent important todos
+const recentImportant = db.query({
+  source: importantTodos,
+  predicate: ({ item }) => isRecent(item.get('date')),
+});
 ```
 
-This example demonstrates how to create a list that dynamically updates as the
-underlying data changes, ensuring the UI remains responsive and accurate.
+Chained queries are efficient because:
 
-#### Benefits of Intermittent Results
+- Each query only processes the results of the previous query
+- Updates only affect the necessary parts of the chain
+- Memory usage is optimized by processing data in stages
 
-- **Improved User Experience:** Users see data sooner, even during large
-  queries.
-- **Seamless Updates:** UI components remain synchronized with the latest data
-  without additional developer effort.
-- **Efficient Resource Use:** Partial updates minimize unnecessary computations
-  and reduce perceived latency.
+Here's a more complex example showing how chained queries can optimize data
+processing:
 
-By combining intermittent query results with React, GoatDB enables developers to
-deliver fluid, real-time user experiences with minimal complexity.
+```typescript
+// First, get all active users (small subset of total users)
+const activeUsers = db.query({
+  source: '/sys/users',
+  predicate: ({ item }) => item.get('active'),
+});
+
+// Then, get their recent activities (only for active users)
+const recentActivities = db.query({
+  source: activeUsers,
+  predicate: ({ item }) => {
+    const activities = item.get('activities');
+    return activities.some((activity) => isRecent(activity.date));
+  },
+});
+
+// Finally, sort by most recent activity
+const sortedActivities = db.query({
+  source: recentActivities,
+  sortBy: ({ left, right }) => {
+    const leftRecent = getMostRecentActivity(left);
+    const rightRecent = getMostRecentActivity(right);
+    return rightRecent.date - leftRecent.date;
+  },
+});
+```
+
+In this example, each query in the chain:
+
+- Processes only the relevant subset of data
+- Maintains its own efficient cache
+- Updates independently when the underlying data changes
+- Can be reused independently for other purposes
+
+## Real-Time Updates
+
+Queries automatically update their results when the underlying data changes.
+This makes them perfect for building reactive UIs and backend services that need
+to respond to data changes in real-time:
+
+```typescript
+// Create a query
+const activeUsers = db.query({
+  source: '/sys/users',
+  predicate: ({ item }) => item.get('active'),
+});
+
+// Listen for changes
+activeUsers.onResultsChanged(() => {
+  console.log('Active users changed:', activeUsers.results());
+});
+```
+
+## Technical Details
+
+GoatDB's query system is designed for responsiveness and efficiency while being
+super easy to use without explicit indexing. The architecture prioritizes
+developer experience without sacrificing performance:
+
+- **No Manual Indexing**: Unlike traditional databases, GoatDB doesn't require
+  developers to define and maintain explicit indexes
+- **Lazy Evaluation**: Queries only compute what's needed when it's needed
+- **Transparent Caching**: Results are cached transparently without developer
+  intervention
+
+![Local Copy & Offline Availability](/assets/local-copy.svg)
+
+Each peer maintains a complete local copy of the database, enabling offline
+operation and low-latency access. The local copy is synchronized with the
+network when online, ensuring consistency across all peers.
+
+![Commit Storage & Age Assignment](/assets/commit-storage.svg)
+
+As commits are stored in the database, each peer assigns its own monotonically
+increasing age number that reflect the order in which commits were received
+locally. These age numbers are local to each peer and are never synchronized
+across the network.
+
+![Query Cache & Age Tracking](/assets/query-cache.svg)
+
+When persisting query results, we store both the results and the age of the
+latest commit included in those results. This allows us to efficiently track
+which commits have already been processed.
+
+![Incremental Query Updates](/assets/incremental-updates.svg)
+
+When new commits arrive, queries can efficiently resume execution from their
+last known age, only processing the new commits. This incremental update process
+ensures optimal performance and resource usage.

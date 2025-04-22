@@ -1,14 +1,7 @@
----
-permalink: /api/
-layout: default
-title: API
-nav_order: 4
----
-
 # GoatDB API
 
-The main API entry point is the `GoatDB` class. Here's apractical guide to
-using GoatDB in your applications.
+The main API entry point is the `GoatDB` class. Here's apractical guide to using
+GoatDB in your applications.
 
 ## Creating a new DB instance
 

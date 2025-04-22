@@ -2,7 +2,7 @@
 permalink: /sessions/
 layout: default
 title: Sessions and Users
-nav_order: 3
+nav_order: 4
 ---
 
 # Sessions and Users
@@ -116,7 +116,3 @@ This flexibility allows you to:
 - Maintain security while being system-agnostic
 - Allow anonymous access where appropriate
 - Gradually upgrade anonymous sessions to identified ones
-
-<br />
-[Next: Authorization](/authorization){: .btn .btn-purple }
-<br />

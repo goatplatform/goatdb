@@ -7,33 +7,12 @@ nav_order: 4
 
 # GoatDB React Hooks
 
-- [GoatDB React Hooks](#goatdb-react-hooks)
-  - [Hook Overview](#hook-overview)
-    - [`useDB()`](#usedb)
-    - [`useDBReady()`](#usedbready)
-    - [`useQuery()`](#usequery)
-    - [`useItem()`](#useitem)
+The hooks are built on top of GoatDB's core functionality, providing a more
+ergonomic interface for React components. They handle all the complexity of data
+synchronization and updates, making it easy to build reactive UIs that work
+seamlessly both online and offline.
 
-GoatDB React hooks provide a streamlined way to integrate the database into your
-applications by abstracting state management, synchronization, and persistence.
-These hooks manage real-time updates and offline capabilities, enabling you to
-focus on application logic without worrying about network complexities.
-
-GoatDB computes diffs in the background based on the in-memory state, allowing
-you to work directly with native, mutable, JavaScript objects. This approach
-keeps the API simple and intuitive, especially if you're already familiar with
-common state management tools.
-
-The fundamental unit of data in GoatDB is an `Item`, which represents a snapshot
-of a specific data point at a given time. This snapshot is encapsulated by a
-`ManagedItem` instance, providing a mutable in-memory representation of the
-item's state. Any modifications made to this in-memory state automatically
-trigger the creation of a background commit, which is then stored on the local
-disk and synchronized with the server. This state management system seamlessly
-handles local and remote edits, synchronization, and data persistence without
-requiring additional configuration.
-
-## Hook Overview
+## Hooks Overview
 
 ### `useDB()`
 
@@ -44,17 +23,23 @@ ensures that the application is ready to interact with the database without
 requiring additional setup steps.
 
 - **Behavior:**
+  - Uses the Origin Private File System (OPFS) for storage
+  - Synchronizes with the server in the background
+  - Triggers re-renders when the current user changes
 
-  - Uses the Origin Private File System (OPFS) for storage.
-  - Synchronizes with the server in the background.
-
-- **Returns:** A `GoatDB` instance.
+- **Returns:** A `GoatDB` instance
 
 **Example:**
 
 ```javascript
 const db = useDB();
 ```
+
+{: .note }
+
+> The `useDB` hook maintains a single instance of the database throughout your
+> application's lifecycle. All subsequent calls to `useDB` will return the same
+> instance, ensuring consistent state management across your components.
 
 ### `useDBReady()`
 
@@ -63,29 +48,32 @@ initial loading screen. During this phase, the client loads locally stored data,
 establishes a server connection, and initializes an anonymous session if
 required.
 
-NOTE: During the initial session setup, the client requires a network
-connection. Once this setup is complete, full offline functionality is
-supported.
-
 - **Returns:**
-  - `"loading"`: Database is initializing.
-  - `"ready"`: Database is fully loaded and synchronized.
-  - `"error"`: An error occurred during initialization.
+  - `"loading"`: Database is initializing
+  - `"ready"`: Database is fully loaded and synchronized
+  - `"error"`: An error occurred during initialization
 
 **Example:**
 
 ```javascript
-// Monitor database loading status
-const dbStatus = useDBReady();
+function App() {
+  const dbStatus = useDBReady();
 
-if (dbStatus === 'loading') {
-  return <LoadingScreen />;
-} else if (dbStatus === 'error') {
-  return <ErrorScreen message='Failed to load database.' />;
+  if (dbStatus === 'loading') {
+    return <LoadingScreen />;
+  } else if (dbStatus === 'error') {
+    return <ErrorScreen message='Failed to load database.' />;
+  }
+
+  return <MainApp />;
 }
-
-return <MainApp />;
 ```
+
+{: .highlight }
+
+> During the initial session setup, the client may require a network connection
+> in order to download the initial copy of the history. Once this setup is
+> complete, full offline functionality is supported.
 
 ### `useQuery()`
 
@@ -95,99 +83,172 @@ fetching it from the server. The hook triggers UI re-rendering whenever the
 query results are updated, regardless of whether the changes originate from
 local or remote edits.
 
-When a query is first opened, it performs a linear scan of its source without
-blocking the main UI thread. This operation uses a coroutine that runs on the
-main thread. During and after this initial scan, the query caches its results to
-disk, allowing subsequent runs to resume execution from the cached state. For
-additional details, refer to the query mechanism documentation.
+When a query is first opened, it performs a linear scan of its source using a
+coroutine without blocking the main thread. During and after this initial scan,
+the query caches its results to disk, allowing subsequent runs to resume
+execution from the cached state.
 
-**Signature:**
+**Config Options:**
 
-```javascript
-useQuery(config) => Query
-```
+- **`schema`** _(required)_: Specifies the schema(s) for the query results
+- **`source`** _(required)_: Path to a repository or another query instance
+- **`predicate`** _(optional)_: Function to filter results
+- **`sortDescriptor`** _(optional)_: Function to sort results
+- **`ctx`** _(optional)_: Optional context for predicates and sort descriptors
+- **`limit`** _(optional)_: Limits the number of results
+- **`showIntermittentResults`** _(optional)_: If `true`, updates UI during
+  initial scan
 
-- **Config Options:**
-  - **`schema`** _(required)_: Specifies the schema(s) for the query results.
-  - **`source`** _(required)_: Path to a repository or another query instance.
-    Queries can be chained for lightweight indexing.
-  - **`predicate`** _(optional)_: Function to filter results. Receives each item
-    and returns `true` or `false`.
-  - **`sortDescriptor`** _(optional)_: Function to sort results. Receives two
-    items and returns a comparison value.
-  - **`ctx`** _(optional)_: Optional context for predicates and sort
-    descriptors. Changes in context re-trigger the query.
-  - **`limit`** _(optional)_: Limits the number of results. Enables query
-    optimizations.
-  - **`showIntermittentResults`** _(optional)_: If `true`, updates UI during the
-    initial scan. If `false`, waits until scanning is complete.
+{: .highlight }
+
+> GoatDB re-evaluates the entire query whenever any of its configuration values
+> change, including:
+>
+> - The predicate function
+> - The sort descriptor function
+> - The context object
+> - The source repository
+> - The schema
+>
+> GoatDB internally calls `.toString()` on the passed functions to determine if
+> they have changed. While you don't need to explicitly use `useCallback` or
+> other memoization techniques, it's crucial that your predicate and sort
+> functions are pure functions:
+>
+> - They should not modify any external state
+> - They should not depend on values that can change between calls
+> - They should not modify the items they receive
+> - Use the `ctx` parameter to pass in any external values needed
 
 **Example:**
 
 ```javascript
-// Query tasks from the database
-const tasksQuery = useQuery({
-  schema: taskSchema,
-  source: '/data/tasks',
-  sortDescriptor: (a, b) => a.get('text').localeCompare(b.get('text')),
-  predicate: (item) => !item.get('done'),
-  showIntermittentResults: true,
-});
+function TaskList() {
+  const tasksQuery = useQuery({
+    schema: taskSchema,
+    source: '/data/tasks',
+    sortDescriptor: (a, b) => a.get('text').localeCompare(b.get('text')),
+    predicate: (item) => !item.get('done'),
+    showIntermittentResults: true,
+  });
 
-return (
-  <ul className='task-list'>
-    {tasksQuery.results().map((task) => (
-      <li key={task.path}>{task.get('text')}</li>
-    ))}
-  </ul>
-);
+  return (
+    <ul className='task-list'>
+      {tasksQuery.results().map((task) => (
+        <li key={task.path}>{task.get('text')}</li>
+      ))}
+    </ul>
+  );
+}
 ```
 
 ### `useItem()`
 
-The `useItem` hook is available in three convenience forms and monitors changes
-to a specific item, triggering a re-render whenever the item's state changes. It
-returns a mutable `ManagedItem` instance that allows direct modifications. Any
-changes to the item are automatically queued for background commits and
-synchronized with the server. Similar to the `useQuery` hook, `useItem` reacts
-to both local and remote updates.
+Monitors changes to a specific item, triggering a re-render whenever the item's
+state changes. It returns a mutable `ManagedItem` instance that allows direct
+modifications. Any changes to the item are automatically queued for background
+commits and synchronized with the server.
 
 **Signatures:**
 
-```javascript
-useItem(pathComponents...) => ManagedItem | undefined
-useItem(fullPath, opts) => ManagedItem | undefined
-useItem(opts, pathComponents...) => ManagedItem | undefined
+```typescript
+useItem<S extends Schema>(...pathComps: string[]): ManagedItem<S> | undefined
+useItem<S extends Schema>(path: string | undefined, opts: UseItemOpts): ManagedItem<S> | undefined
+useItem<S extends Schema>(item: ManagedItem<S> | undefined, opts: UseItemOpts): ManagedItem<S> | undefined
 ```
 
 - **Options:**
-
   - **`keys`** _(optional)_: Array of field names to track. Optimizes rendering
-    by ignoring changes to other fields.
-
-- **Returns:** A mutable `ManagedItem` instance. Changes to the item
-  automatically schedule commits and synchronization in the background. Returns
-  undefined if the item hadn't been created or loaded yet.
+    by ignoring changes to other fields
 
 **Example:**
 
 ```javascript
-// Access and manage a specific task
-const task = useItem('/data/tasks/123', { keys: ['text'] });
+function TaskEditor({ path }) {
+  const task = useItem(path, { keys: ['text'] });
 
-if (!task) {
-  return <div>Loading task...</div>;
+  if (!task) {
+    return <div>Loading task...</div>;
+  }
+
+  return (
+    <div className='task-editor'>
+      <label htmlFor='task-text'>Task:</label>
+      <input
+        id='task-text'
+        type='text'
+        value={task.get('text')}
+        onChange={(e) => task.set('text', e.target.value)}
+      />
+    </div>
+  );
 }
-
-return (
-  <div className='task-editor'>
-    <label htmlFor='task-text'>Task:</label>
-    <input
-      id='task-text'
-      type='text'
-      value={task.get('text')}
-      onChange={(e) => task.set('text', e.target.value)}
-    />
-  </div>
-);
 ```
+
+{: .note }
+
+> The `useItem` hook will automatically trigger a re-render when:
+>
+> - The item becomes available after loading
+> - Any tracked field changes
+> - The schema changes
+> - The item is deleted or restored
+
+## Best Practices
+
+### Performance Optimization
+
+1. **Use `keys` with `useItem`:** When you only need to track specific fields,
+   use the `keys` option to prevent unnecessary re-renders.
+
+2. **Memoize Predicates:** Define predicate and sort functions outside your
+   component or use `useCallback` to maintain stable references:
+
+   ```javascript
+   const userPredicate = useCallback(
+     ({ item }) => item.get('active') && item.get('role') === roleFilter,
+     [roleFilter],
+   );
+   ```
+
+3. **Chain Queries:** For complex data transformations, chain queries together
+   rather than performing multiple operations in a single query.
+
+### Error Handling
+
+1. **Check for Undefined Items:** Always handle the case where `useItem` returns
+   undefined, which can happen during initial loading or if the item doesn't
+   exist.
+
+2. **Monitor DB Ready State:** Use `useDBReady` to handle loading and error
+   states gracefully.
+
+### Data Synchronization
+
+1. **Background Writes:** All writes are processed asynchronously. The system
+   batches changes and writes them to both local storage and remote servers in
+   parallel.
+
+2. **Offline Support:** GoatDB maintains a local copy of the database and
+   synchronizes changes when the connection is restored.
+
+## Technical Details
+
+The React hooks are implemented using React's `useSyncExternalStore` to manage
+subscriptions to database changes. This ensures efficient updates and proper
+cleanup when components unmount.
+
+- **Change Detection:** The hooks use GoatDB's mutation system to track changes
+  at the field level, enabling precise updates.
+
+- **Memory Management:** Resources are automatically cleaned up when components
+  unmount, preventing memory leaks.
+
+- **Concurrency:** The hooks handle concurrent updates gracefully, ensuring
+  consistent state even when multiple components modify the same data.
+
+{: .highlight }
+
+> The React hooks provide a high-level abstraction over GoatDB's core
+> functionality, making it easy to build reactive UIs while maintaining the
+> power and flexibility of the underlying database system.

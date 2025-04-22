@@ -60,7 +60,8 @@ is ideal for use cases that naturally segment into logical data repositories.
 Yes. Although the underlying structure is an
 [append-only commit graph](/commit-graph), GoatDB employs garbage collection.
 Data deletion involves marking items as deleted, with garbage collection
-handling eventual removal.
+handling eventual removal. Note that the garbage collection feature is still a
+work in progress and will be fully implemented in upcoming releases.
 
 ## How does synchronization work in GoatDB?
 
@@ -73,10 +74,10 @@ updates across nodes.
 
 ## Can GoatDB operate offline?
 
-Yes. GoatDB supports offline mode [by design](/architecture). When the server is
-unavailable, nodes continue functioning autonomously. Updates made offline are
-synchronized with the server once connectivity is restored. Future updates will
-also introduce WebRTC-based peer-to-peer synchronization for added resilience.
+Yes. GoatDB supports offline mode by design. When the server is unavailable,
+nodes continue functioning autonomously. Updates made offline are synchronized
+with the server once connectivity is restored. Future updates will also
+introduce WebRTC-based peer-to-peer synchronization for added resilience.
 
 ## How does GoatDB handle data conflicts?
 
@@ -146,7 +147,8 @@ allows reversion to the last valid state if needed.
 
 GoatDB is optimized for lightweight operations on client devices. The
 append-only storage model and delta-compressed synchronization reduce
-computational overhead while maintaining real-time responsiveness.
+computational overhead while maintaining real-time responsiveness. For detailed
+performance metrics and benchmarks, see our [benchmarks page](/benchmarks).
 
 ## How does distributed local querying differ from centralized queries?
 
@@ -170,16 +172,14 @@ tolerance.
 
 ## What licensing options does GoatDB offer?
 
-As a developer considering GoatDB for your project, you have two licensing
-options tailored to different use cases:
+GoatDB is released under the Apache License 2.0, a permissive open-source
+license that provides:
 
-- AGPL (Affero General Public License): For open-source projects, this license
-  ensures compatibility with open-source principles, fostering transparency and
-  collaboration.
+- Freedom to use the software for any purpose
+- Freedom to modify and distribute the software
+- Patent rights from contributors to users
+- No requirement to release your source code when making changes
 
-- ELv2 (Elastic License v2): Allows use in closed-source projects but prohibits
-  redistributing GoatDB as a service, making it ideal for commercial
-  applications.
-
-Choosing between these options depends on whether your project aligns more with
-open-source principles or requires a proprietary approach.
+The Apache 2.0 license is business-friendly while still maintaining open-source
+principles, making GoatDB suitable for both commercial and open-source projects
+without imposing restrictive conditions on users.

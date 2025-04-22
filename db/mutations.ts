@@ -1,10 +1,10 @@
 import * as ArrayUtils from '../base/array.ts';
-import { CoreValue } from '../base/core-types/index.ts';
+import type { CoreValue } from '../base/core-types/index.ts';
 
 export type Mutation<T extends string = string> = [
   field: T,
   local: boolean,
-  value: CoreValue,
+  oldValue: CoreValue,
 ];
 
 export type MutationPack<T extends string = string> =
