@@ -14,9 +14,37 @@ of working with ManagedItems directly. The hooks provide a more ergonomic
 interface for React components and handle all the complexity of data
 synchronization and updates.
 
-GoatDB's data model is built around three key concepts: Items, Managed Items,
-and the GoatDB API. Together, they provide a robust system for working with data
-that's both efficient and reliable.
+## Quick Start
+
+Here's a simple example to get you started:
+
+```typescript
+// Get a managed item
+const userProfile = db.item('/users/john/profile');
+
+// Write data
+userProfile.set('name', 'John Smith');
+
+// Read data
+const name = userProfile.get('name');
+console.log(name); // "John Smith"
+```
+
+## Overview
+
+GoatDB provides a flexible and powerful system for managing data in your
+application. This guide will walk you through the core concepts and show you how
+to effectively read and write data.
+
+The data model is built around three key concepts:
+
+1. **Items**: The basic building blocks that store your data
+2. **Managed Items**: A higher-level interface that handles data synchronization
+3. **GoatDB API**: The main interface for interacting with your data
+
+Think of Items as the raw data containers, while Managed Items are like smart
+wrappers that handle all the complexity of keeping your data in sync across
+different parts of your application.
 
 ## The Data Model
 
@@ -27,24 +55,10 @@ data with its schema definition and can be either mutable or immutable depending
 on its lock state. This design provides flexibility while maintaining data
 integrity.
 
-```typescript
-// Create a new mutable item
-const item = new Item({
-  schema: mySchema,
-  data: { name: 'Example', value: 42 },
-});
-
-// Items can be locked to make them immutable
-item.lock();
-```
-
 {: .note }
 
-Items are typically locked when they represent a specific version in history,
-ensuring that historical data remains unchanged. Unlocked items can be modified
-directly, though this is mostly used internally. Most user code will work with
-ManagedItems instead, which provide a more convenient interface for data
-manipulation.
+For information about schemas and how to define them, see the
+[Schema documentation](/schema).
 
 ### Managed Items: The Live Interface
 
@@ -52,12 +66,17 @@ manipulation.
 maintains an in-memory, mutable Item and handles synchronization with both local
 storage and remote peers.
 
+Here's how you typically work with Managed Items:
+
 ```typescript
-// Get a managed item
-const managedItem = db.item('/path/to/item');
+// Get a managed item (creates one if it doesn't exist)
+const userProfile = db.item('/users/john/profile');
 
 // Changes are immediately reflected in memory
-managedItem.set('name', 'New Name');
+userProfile.set('name', 'John Smith');
+
+// The changes will be automatically synchronized
+// with other parts of your application
 ```
 
 {: .note }
@@ -72,21 +91,26 @@ immediate local updates while ensuring eventual consistency across all peers.
 
 ### Reading Data
 
-Reading data is straightforward with ManagedItem:
+Reading data is straightforward with ManagedItem. Here are some common patterns:
 
 ```typescript
-const item = db.item('/path/to/item');
+// Get a specific item
+const userSettings = db.item('/users/john/settings');
 
 // Get a field value
-const name = item.get('name');
+const theme = userSettings.get('theme');
 
-// Check field existence
-if (item.has('optionalField')) {
-  // Handle optional field
+// Check if a field exists
+if (userSettings.has('notifications')) {
+  const notifications = userSettings.get('notifications');
 }
 
 // Get all available fields
-const fields = item.keys;
+const allSettings = userSettings.keys;
+
+// Example: Reading nested data
+const preferences = userSettings.get('preferences');
+const language = preferences?.language;
 ```
 
 ### Writing Data
@@ -94,17 +118,23 @@ const fields = item.keys;
 Writing data is equally simple, but there's more happening behind the scenes:
 
 ```typescript
+const userProfile = db.item('/users/john/profile');
+
 // Single field update
-item.set('name', 'New Name');
+userProfile.set('name', 'John Smith');
 
 // Multiple fields at once
-item.setMulti({
-  name: 'New Name',
-  value: 100,
+userProfile.setMulti({
+  name: 'John Smith',
+  age: 31,
+  email: 'john.smith@example.com',
 });
 
 // Delete a field
-item.delete('optionalField');
+userProfile.delete('email');
+
+// Example: Updating nested data
+userProfile.set('theme', 'dark');
 ```
 
 {: .note }
@@ -119,25 +149,24 @@ Creating new items is done through the GoatDB API:
 
 ```typescript
 // Create with initial data
-const newItem = db.create('/path/to/item', schema, {
-  name: 'Initial Name',
-  data: {
-    foo: 'bar',
-  },
+const newTodo = db.create('/todos/work', {
+  title: 'Finish documentation',
+  completed: false,
+  dueDate: '2024-03-15',
 });
 
 // Create empty item
-const emptyItem = db.create('/path/to/item', schema);
+const emptyTodo = db.create('/todos/personal');
 ```
 
 Items can be marked for deletion using the `isDeleted` property:
 
 ```typescript
 // Mark an item for deletion
-item.isDeleted = true;
+todoItem.isDeleted = true;
 
 // Restore a deleted item
-item.isDeleted = false;
+todoItem.isDeleted = false;
 ```
 
 {: .note }
@@ -154,7 +183,7 @@ persistence when needed:
 
 ```typescript
 // Wait for writes to complete for a specific repository
-await db.flush('/path/to/repo');
+await db.flush('/todos/personal');
 
 // Or flush all repositories
 await db.flushAll();
@@ -172,61 +201,77 @@ like application shutdown or critical data updates.
 ManagedItems emit change events that you can listen to:
 
 ```typescript
-item.on('change', (mutations) => {
+const todoItem = db.item('/todos/work/1');
+
+todoItem.on('change', (mutations) => {
   // mutations contain the changes that occurred
-  console.log('Item changed:', mutations);
+  console.log('Todo changed:', mutations);
+
+  // Example: Update UI based on changes
+  mutations.forEach(([field, isLocal, oldValue]) => {
+    if (field === 'completed') {
+      updateCheckbox(oldValue);
+    }
+  });
 });
 ```
 
-## Mutations: The Low-Level Change API
+## Mutations: Tracking Changes
 
-Under the hood, GoatDB uses a mutation system to track changes to items. A
-mutation represents a single field change and contains three pieces of
-information:
+GoatDB uses a mutation system to track changes to items. While you'll typically
+use the higher-level ManagedItem API (`set()`, `delete()`, etc.), understanding
+mutations can be helpful for advanced use cases.
 
-```typescript
-type Mutation = [
-  field: string, // The field name that changed
-  local: boolean, // Whether this is a local or remote change
-  oldValue: CoreValue, // The old value before the change
-];
-```
+A mutation represents a single field change and contains:
 
-Mutations are typically used in batches (MutationPack) to represent multiple
-changes:
+- The field name that changed
+- Whether the change was made locally or received from a remote peer
+- The old value before the change
+
+Here's a practical example of how mutations work:
 
 ```typescript
-// Example mutation pack
-const changes = [
-  ['name', true, 'New Name'],
-  ['value', true, 42],
-];
+const todoItem = db.item('/todos/work/1');
+
+// When you make a change
+todoItem.set('title', 'New Task');
+
+// Behind the scenes, a mutation is created:
+const mutation = ['title', true, 'Old Task'];
+
+// You can listen to these changes
+todoItem.on('change', (mutations) => {
+  mutations.forEach(([field, isLocal, oldValue]) => {
+    console.log(`${field} changed from ${oldValue}`);
+  });
+});
 ```
-
-{: .highlight }
-
-While you can work with mutations directly, it's generally easier to use the
-higher-level ManagedItem API (`set()`, `delete()`, etc.). The mutation system is
-primarily used internally for change tracking and synchronization and for
-constructing higher level APIs like the [React Hooks](/react).
 
 {: .note }
 
-> The inclusion of the old value in mutations makes it easy to implement
-> features like:
->
-> - Animating transitions between old and new values
-> - Computing diffs for undo/redo operations
-> - Tracking change history
+The mutation system is primarily used internally for change tracking and
+synchronization. Most applications will use the higher-level ManagedItem API or
+[React Hooks](/react) instead of working with mutations directly.
 
 ## Data Validation
 
-GoatDB provides built-in validation:
+GoatDB automatically validates all data changes to maintain data integrity. When
+you try to set invalid data:
 
 ```typescript
-// Check validity
-if (!item.isValid) {
-  const [valid, error] = item.validate();
-  console.error('Validation failed:', error);
-}
+const userProfile = db.item('/users/john/profile');
+
+// Try to set invalid data
+userProfile.set('age', 150); // This will be rejected if age > 120 in the schema
+
+// The invalid value will temporarily appear in memory
+console.log(userProfile.get('age')); // Shows 150 temporarily
+
+// But it won't be persisted to storage or synchronized with the network
 ```
+
+{: .note }
+
+Validation rules are defined in your [schema](/schema). GoatDB uses these rules
+to automatically prevent invalid data from being persisted or synchronized,
+ensuring your data always meets the defined constraints.
