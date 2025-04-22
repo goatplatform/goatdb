@@ -21,11 +21,13 @@
 title: GoatDB Docs
 email: contact@goatdb.com
 description: >- # this means to ignore newlines until "baseurl:"
-  GoatDB - Official Site — Build Your Next Project on GoatDB, the Edge-Native
-  Database. GoatDB empowers frontend developers to build and deploy complex,
-  scalable, and secure applications in under 20 minutes—without requiring
-  backend expertise. It's the fastest and easiest way to create modern apps,
-  tailored for today's developer needs.
+  GoatDB is an embedded, distributed, document database that prioritizes speed and developer experience.
+  It excels at real-time collaboration and embedded caching applications, leveraging concepts from distributed
+  version control systems enhanced with novel algorithms for efficient synchronization and automatic conflict resolution.
+  Optimized for TypeScript/JavaScript environments, GoatDB works seamlessly in both browsers and servers, offering
+  a document model with schemas, causal eventual consistency, and optional cryptographic signing. Its memory-first
+  design and application-level sharding approach enable natural scalability for multi-user applications without
+  complex manual sharding.
 baseurl: '' # the subpath of your site, e.g. /blog
 url: 'https://goatdb.com' # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: jekyllrb
