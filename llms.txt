@@ -6,23 +6,28 @@ GoatDB lets every client act as a replica and run low‑latency local queries wh
 
 ## Getting Started
 
-- [Installation](https://goatdb.dev/install/index.html.md): Install GoatDB in Deno (stable) or Node.js (experimental)
-- [Tutorial](https://goatdb.dev/tutorial/index.html.md): Build a Todo list app step‑by‑step
-- [Concepts](https://goatdb.dev/concepts/index.html.md): Core architecture, Data Registry, items, and repositories
+- [Installation](https://goatdb.dev/installation): Install GoatDB in Deno (stable) or Node.js (experimental)
+- [Tutorial](https://goatdb.dev/tutorial): Build a Todo list app step‑by‑step
+- [Concepts](https://goatdb.dev/concepts): Core architecture, Data Registry, items, and repositories
 
-## API & Guides
+## Core Features
 
-- [Schema](https://goatdb.dev/schema/index.html.md): Define, version, and migrate schemas
-- [Sessions and Users](https://goatdb.dev/sessions/index.html.md): Session‑based authentication model
-- [Authorization](https://goatdb.dev/authorization/index.html.md): Fine‑grained authorization rules
-- [Query](https://goatdb.dev/query/index.html.md): Real‑time, incremental query mechanism
-- [React Hooks](https://goatdb.dev/react/index.html.md): Integrate GoatDB with React apps
-- [Commit Graph](https://goatdb.dev/commit-graph/): Core data structure and versioning
-- [Conflict Resolution](https://goatdb.dev/conflict-resolution/): How GoatDB handles concurrent changes
-- [Synchronization](https://goatdb.dev/sync/): How data syncs between nodes
+- [Schema](https://goatdb.dev/schema): Define, version, and migrate schemas
+- [Reading and Writing Data](https://goatdb.dev/reading-and-writing-data): Basic data operations
+- [Query](https://goatdb.dev/query): Real‑time, incremental query mechanism
+- [Authorization Rules](https://goatdb.dev/authorization-rules): Fine‑grained authorization rules
+- [Sessions](https://goatdb.dev/sessions): Session‑based authentication model
+- [React Integration](https://goatdb.dev/react): Integrate GoatDB with React apps
 
-## Optional
+## Advanced Topics
 
-- [FAQ](https://goatdb.dev/faq/index.html.md): Frequently asked questions
+- [Commit Graph](https://goatdb.dev/commit-graph): Core data structure and versioning
+- [Conflict Resolution](https://goatdb.dev/conflict-resolution): How GoatDB handles concurrent changes
+- [Synchronization](https://goatdb.dev/sync): How data syncs between nodes
+- [Benchmarks](https://goatdb.dev/benchmarks): Performance metrics and comparisons
+
+## Additional Resources
+
+- [FAQ](https://goatdb.dev/faq): Frequently asked questions
 - [GoatDB GitHub Repository](https://github.com/goatplatform/goatdb): Source code, issues, and roadmap
 
