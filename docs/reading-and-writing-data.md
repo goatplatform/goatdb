@@ -14,22 +14,6 @@ of working with ManagedItems directly. The hooks provide a more ergonomic
 interface for React components and handle all the complexity of data
 synchronization and updates.
 
-## Quick Start
-
-Here's a simple example to get you started:
-
-```typescript
-// Get a managed item
-const userProfile = db.item('/users/john/profile');
-
-// Write data
-userProfile.set('name', 'John Smith');
-
-// Read data
-const name = userProfile.get('name');
-console.log(name); // "John Smith"
-```
-
 ## Overview
 
 GoatDB provides a flexible and powerful system for managing data in your
