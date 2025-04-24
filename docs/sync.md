@@ -12,7 +12,7 @@ title: Synchronization
 # Synchronization Protocol
 
 At the heart of GoatDB lies a [distributed commit graph](/commit-graph). This
-graph must be synchronized across all nodes in the network to converge into a
+graph must be synchronized across all peers in the network to converge into a
 single version of truth.
 
 ## Background
@@ -32,8 +32,8 @@ to detect probable missing commits. However, this method still requires running
 the full reconciliation algorithm after processing the initial Bloom Filter.
 
 GoatDB's synchronization approach differs. It repeatedly exchanges Bloom Filters
-and commits between nodes without relying on additional protocols. By adjusting
-the filter size and the number of iterations, the protocol ensures all nodes
+and commits between peers without relying on additional protocols. By adjusting
+the filter size and the number of iterations, the protocol ensures all peers
 converge to an identical commit graph.
 
 ## Bloom Filter Synchronization
@@ -52,7 +52,7 @@ value might be present, or the bit might be turned on due to a collision—hence
 the false positive.
 
 In this context, the Bloom Filter represents a set of members (commits in the
-graph). By identifying which members are absent, each node can determine with
+graph). By identifying which members are absent, each peer can determine with
 100% certainty which specific commits are missing on the other side and send
 them over. Due to false positives, some missing values will be overlooked. For
 example, with an FPR of 4 (25% false positive), about 25% of missing values
@@ -66,8 +66,8 @@ iteration re-examines the entire history. Each successive iteration includes
 values received in previous iterations, significantly reducing the number of
 misses. For instance:
 
-- Node `A` has 200 entries.
-- Node `B` has 100 entries (100 present, 100 missing).
+- Peer `A` has 200 entries.
+- Peer `B` has 100 entries (100 present, 100 missing).
 - Using FPR = 4:
 
   1. Iteration 1 misses 100 × 0.25 = 25 entries.
@@ -86,36 +86,36 @@ or vice versa.
 
 ## Example of Synchronization
 
-Here is an example of how synchronization works between two nodes:
+Here is an example of how synchronization works between two peers:
 
 ### Initial State
 
-- **Node A:** Commits: `C1`, `C2`, `C3` (missing `C4`).
-- **Node B:** Commits: `C1`, `C2`, `C4` (missing `C3`).
+- **Peer A:** Commits: `C1`, `C2`, `C3` (missing `C4`).
+- **Peer B:** Commits: `C1`, `C2`, `C4` (missing `C3`).
 
 ### Synchronization Steps
 
 1. **Step 1:**
 
-   - **Node A** creates a Bloom Filter based on its commit IDs (`C1`, `C2`,
-     `C3`) and sends it to **Node B**.
-   - **Node B** checks the Bloom Filter against its own commit IDs (`C1`, `C2`,
+   - **Peer A** creates a Bloom Filter based on its commit IDs (`C1`, `C2`,
+     `C3`) and sends it to **Peer B**.
+   - **Peer B** checks the Bloom Filter against its own commit IDs (`C1`, `C2`,
      `C4`) identifies `C4` as missing with 100% certainty.
 
 2. **Step 2:**
 
-   - **Node B** creates a Bloom Filter based on its commit IDs (`C1`, `C2`,
-     `C4`) and sends it to **Node A** alongside `C4` which was identified as
+   - **Peer B** creates a Bloom Filter based on its commit IDs (`C1`, `C2`,
+     `C4`) and sends it to **Peer A** alongside `C4` which was identified as
      missing in **Step 1**.
-   - **Node A** receives `C4`. It then checks the Bloom Filter against its own
+   - **Peer A** receives `C4`. It then checks the Bloom Filter against its own
      commit IDs (`C1`, `C2`, `C3`, `C4`) identifies `C3` as missing with 100%
      certainty.
 
 3. **Step 3:**
-   - **Node A** repeats **Step 1** except now it also sends over `C3` which was
+   - **Peer A** repeats **Step 1** except now it also sends over `C3` which was
      identified as missing in **Step 2**.
 
-At this point, both **Node A** and **Node B** have identical commit graphs:
+At this point, both **Peer A** and **Peer B** have identical commit graphs:
 `C1`, `C2`, `C3`, `C4`.
 
 ## Dealing with Partitions

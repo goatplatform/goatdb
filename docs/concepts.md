@@ -25,7 +25,7 @@ outlines the core concepts of GoatDB.
 
 ## The Data Registry
 
-The `DataRegistry` provides a shared definition of data between all nodes in the
+The `DataRegistry` provides a shared definition of data between all peers in the
 network (clients and servers). This shared understanding ensures that every
 participant in the distributed system interprets and validates data in the same
 way, which is essential for maintaining consistency.
@@ -108,7 +108,7 @@ functionality:
 
 #### /sys/sessions
 
-Stores the public keys of all sessions in the system. This enables each node to
+Stores the public keys of all sessions in the system. This enables each peer to
 independently verify the authenticity of commits in the distributed commit graph
 and enforce permissions, without requiring a central authority. Sessions can be
 anonymous or linked to specific users. Read-only access for all users.

@@ -170,7 +170,7 @@ for a new data type or conflict resolution approach, please let us know!
 1. Additions and edits take precedence over deletions.
 2. Deleting works only on elements that have existed in the base version of the
    three way merge.
-3. Operates at the granularity of individual element nodes and single
+3. Operates at the granularity of individual element peers and single
    characters, meaning changes can be applied to precise parts of the text, such
    as modifying a single word or even a single letter, without affecting the
    surrounding content.

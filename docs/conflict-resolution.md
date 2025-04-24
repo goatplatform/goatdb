@@ -6,7 +6,7 @@ title: Conflict Resolution
 
 # Conflict Resolution
 
-Whenever a node in the network detects more than one differing value at the
+Whenever a peer in the network detects more than one differing value at the
 leaves of the [commit graph](/commit-graph), it performs a
 [three-way merge](https://en.wikipedia.org/wiki/Merge_(version_control)#Three-way_merge)
 to resolve the conflict. Internally, a conflict-free patch function is used
@@ -25,7 +25,7 @@ their usage to the context of a three-way merge. During a merge, the base
 version is first transformed into a short-lived CRDT. Changes computed by the
 diff function are then applied to the generated CRDT. Finally, the resulting
 output from the CRDT is captured and saved as the commit's contents, while the
-CRDT itself is discarded. This approach ensures that the CRDT’s changeset is
+CRDT itself is discarded. This approach ensures that the CRDT's changeset is
 limited to the scope of a single three-way merge.
 
 ## Exploiting Three-Way Merge
@@ -46,7 +46,7 @@ Value:  A B C
 Index:  0 1 2
 ```
 
-If Node N1 changes the value to "BCY," it would traditionally be represented as:
+If Peer P1 changes the value to "BCY," it would traditionally be represented as:
 
 ```
 Value:  B C Y
@@ -56,7 +56,7 @@ Index:  0 1 2
 Changes: [-A, 0], [+Y, 2]
 ```
 
-Simultaneously, if Node N2 changes "ABC" to "ABX," it would traditionally be
+Simultaneously, if Peer P2 changes "ABC" to "ABX," it would traditionally be
 represented as:
 
 ```
@@ -84,7 +84,7 @@ Value:    A   B   C
 Index:  0 1 2 3 4 5 6
 ```
 
-### Node N1
+### Peer P1
 
 ```
 Value:        B   C Y
@@ -94,7 +94,7 @@ Index:  0 1 2 3 4 5 6
 Changes: [-A, 1], [+Y, 6]
 ```
 
-### Node N2
+### Peer P2
 
 ```
 Value:    A   B     X
@@ -106,7 +106,7 @@ Changes: [-C, 5], [+X, 6]
 
 Now, there is a single insertion conflict at index 6. To resolve this, GoatDB
 employs three resolution strategies, all of which rely on an external,
-predefined order agreed upon by all nodes in the network. In the current
+predefined order agreed upon by all peers in the network. In the current
 implementation, we use the random IDs of the commits to establish a global
 order. The resolution strategies are as follows:
 

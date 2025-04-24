@@ -31,13 +31,13 @@ nav_order: 9
 GoatDB is a distributed database designed for edge-native applications. Inspired
 by distributed version control systems, GoatDB focuses on maximizing client-side
 processing, reducing server dependency, and supporting real-time synchronization
-across nodes.
+across peers.
 
 ## Won't This Architecture Overload the Client?
 
 No. Modern cloud-first applications already perform similar operations under the
-guise of temporary caching. Any data rendered on the client’s screen has already
-been downloaded to the client, aligning with GoatDB’s approach. Modern client
+guise of temporary caching. Any data rendered on the client's screen has already
+been downloaded to the client, aligning with GoatDB's approach. Modern client
 devices are significantly more powerful than the fraction of a server's
 resources allocated to serve them, enabling them to handle such workloads
 efficiently.
@@ -66,16 +66,16 @@ work in progress and will be fully implemented in upcoming releases.
 ## How does synchronization work in GoatDB?
 
 GoatDB employs a soft [real-time synchronization](/sync) mechanism that captures
-in-memory states of nodes up to three times per second. These states are
+in-memory states of peers up to three times per second. These states are
 packaged into signed commits and appended to an append-only commit graph.
 Synchronization uses a probabilistic protocol with Bloom Filters to minimize
 data comparison overhead, ensuring efficient and consistent propagation of
-updates across nodes.
+updates across peers.
 
 ## Can GoatDB operate offline?
 
 Yes. GoatDB supports offline mode by design. When the server is unavailable,
-nodes continue functioning autonomously. Updates made offline are synchronized
+peers continue functioning autonomously. Updates made offline are synchronized
 with the server once connectivity is restored. Future updates will also
 introduce WebRTC-based peer-to-peer synchronization for added resilience.
 
@@ -109,11 +109,11 @@ operations for developers and reducing the need for manual interventions.
 
 ## How does GoatDB ensure data reliability?
 
-- **Active Replication:** Each client node maintains a local copy of the data,
+- **Active Replication:** Each client peer maintains a local copy of the data,
   serving as an active replica. In case of server data loss, these replicas can
   restore the server state.
 - **Backup and Restore:** The distributed design inherently supports backup and
-  redundancy. Nodes store partial replicas, facilitating recovery. Backing up
+  redundancy. Peers store partial replicas, facilitating recovery. Backing up
   the data is as simple as zipping the live directory of data, making it
   straightforward to preserve and restore states.
 
@@ -126,7 +126,7 @@ be reverted seamlessly.
 
 ## Can GoatDB integrate with data warehouses?
 
-Yes. GoatDB’s schema-based data organization supports straightforward
+Yes. GoatDB's schema-based data organization supports straightforward
 integration with data warehouses. Its structured approach aligns well with
 analytical workflows.
 
@@ -152,17 +152,17 @@ performance metrics and benchmarks, see our [benchmarks page](/benchmarks).
 
 ## How does distributed local querying differ from centralized queries?
 
-In GoatDB, each node performs local querying on its own data subset, eliminating
+In GoatDB, each peer performs local querying on its own data subset, eliminating
 the need to query a centralized data repository. This approach offers several
 benefits:
 
-- **Latency Reduction:** Queries are executed directly on the local node,
+- **Latency Reduction:** Queries are executed directly on the local peer,
   reducing the round-trip time to a central server.
-- **Scalability:** Each node handles its own query load, allowing the system to
-  scale horizontally as more nodes are added.
+- **Scalability:** Each peer handles its own query load, allowing the system to
+  scale horizontally as more peers are added.
 - **Resilience:** Local querying ensures continued functionality even if the
   central server becomes unavailable, supporting offline operations.
-- **Focused Query Scope:** By segmenting data logically across nodes, queries
+- **Focused Query Scope:** By segmenting data logically across peers, queries
   are inherently limited to relevant subsets, improving performance and
   efficiency.
 
