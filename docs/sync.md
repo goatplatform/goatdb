@@ -2,6 +2,7 @@
 permalink: /sync/
 layout: default
 title: Synchronization
+nav_order: 10
 ---
 
 <script

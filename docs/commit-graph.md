@@ -2,7 +2,7 @@
 permalink: /commit-graph/
 layout: default
 title: Commit Graph
-parent: Architecture
+nav_order: 11
 ---
 
 # Commit Graph
@@ -24,8 +24,8 @@ Simply put, all data creation and editing operations in GoatDB append new
 commits to the replicated commit graph. The commit graph is then synchronized in
 the background, in real-time, with other peers in the network.
 
-Each commit in the graph is signed with the private key of the peer that created
-it. This enables the network to verify the graph and ensures that:
+Each commit in the graph is [signed with the private key](/sessions) of the peer
+that created it. This enables the network to verify the graph and ensures that:
 
 1. All commits were created by known, trusted peers.
 2. Each commit edited only what was allowed, effectively enforcing permissions

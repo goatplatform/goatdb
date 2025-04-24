@@ -2,6 +2,7 @@
 permalink: /conflict-resolution/
 layout: default
 title: Conflict Resolution
+nav_order: 9
 ---
 
 # Conflict Resolution
