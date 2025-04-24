@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="760" height="448" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="14px">
+  <defs>
+    <style>
+      .bg-card { fill: #ffffff; stroke: #dee2e6; stroke-width: 1; }
+      .bg-section-blue { fill: #e7f1ff; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .bg-section-gray { fill: #f8f9fa; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .text-title { font-size: 16px; font-weight: 600; fill: #0a58ca; }
+      .text-heading { font-size: 14px; font-weight: 500; fill: #212529; }
+      .text-body { font-size: 12px; fill: #495057; }
+      .text-code { font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; fill: #d63384; }
+      .text-icon { font-size: 24px; }
+      .text-icon-small { font-size: 16px; }
+      .arrow-line { stroke: #0d6efd; stroke-width: 2; }
+      .arrow-head { fill: #0d6efd; }
+      .commit-box { fill: #e9ecef; stroke: #6c757d; stroke-width: 1; }
+      .storage-box { fill: #f8f9fa; stroke: #0d6efd; stroke-width: 2; }
+      .jsonl-box { fill: #f8f9fa; stroke: #6c757d; stroke-width: 1; }
+      .ssd-box { fill: #e7f1ff; stroke: #0d6efd; stroke-width: 2; }
+      .flash-chip { fill: #cce6ff; stroke: #0d6efd; stroke-width: 1; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" class="arrow-head" />
+    </marker>
+  </defs>
+
+  <text x="360" y="30" text-anchor="middle" class="text-title">Repository Structure</text>
+
+  <g transform="translate(20, 40)">
+    <rect width="700" height="406" rx="8" ry="8" class="bg-section-blue"/>
+    
+    <!-- JSONL File Section -->
+    <g transform="translate(40, 20)">
+      <rect x="0" y="0" width="620" height="140" rx="4" ry="4" class="jsonl-box"/>
+      <text x="20" y="30" class="text-icon-small">📝</text>
+      <text x="40" y="30" class="text-heading">JSONL Commit Log</text>
+      
+      <g transform="translate(20, 50)">
+        <text x="0" y="0" class="text-code">{"id":"commit1","key":"/users/john","data":{"name":"John"}}</text>
+        <text x="0" y="20" class="text-code">{"id":"commit2","key":"/users/john","data":{"age":30}}</text>
+        <text x="0" y="40" class="text-code">{"id":"commit3","key":"/users/john","data":{"email":"john@example.com"}}</text>
+        <text x="0" y="60" class="text-code">{"id":"commit4","key":"/users/jane","data":{"name":"Jane"}}</text>
+      </g>
+    </g>
+
+    <!-- Arrow -->
+    <g transform="translate(350, 160)">
+      <line x1="0" y1="0" x2="0" y2="40" class="arrow-line" marker-end="url(#arrowhead)" />
+      <text x="0" y="-10" text-anchor="middle" class="text-body">Sequential Writes</text>
+    </g>
+
+    <!-- SSD Section -->
+    <g transform="translate(40, 220)">
+      <rect x="0" y="0" width="620" height="120" rx="4" ry="4" class="ssd-box"/>
+      <text x="20" y="30" class="text-icon-small">💾</text>
+      <text x="40" y="30" class="text-heading">Modern SSD</text>
+      
+      <!-- Flash Chips -->
+      <g transform="translate(70, 50)">
+        <rect x="0" y="0" width="80" height="30" rx="2" ry="2" class="flash-chip"/>
+        <rect x="100" y="0" width="80" height="30" rx="2" ry="2" class="flash-chip"/>
+        <rect x="200" y="0" width="80" height="30" rx="2" ry="2" class="flash-chip"/>
+        <rect x="300" y="0" width="80" height="30" rx="2" ry="2" class="flash-chip"/>
+        <rect x="400" y="0" width="80" height="30" rx="2" ry="2" class="flash-chip"/>
+        <text x="238" y="50" text-anchor="middle" class="text-body">Parallel Flash Chips</text>
+      </g>
+    </g>
+
+    <!-- Key Points -->
+    <g transform="translate(40, 350)">
+      <rect x="0" y="0" width="620" height="40" rx="4" ry="4" fill="#f1f1f1" stroke="#dee2e6"/>
+      <text x="20" y="25" class="text-icon-small">⚡</text>
+      <text x="40" y="25" class="text-body">
+        <tspan font-weight="500">Performance:</tspan> Sequential writes + parallel flash chips = high throughput
+      </text>
+    </g>
+  </g>
+</svg> 
