@@ -24,7 +24,16 @@ shared with the GoatDB network.
 Sessions come in two forms: identified sessions, which are tied to specific user
 IDs and peers, and anonymous sessions, which are only associated with specific
 peers. Each session has a default expiration period of 30 days, though this can
-be configured based on your security requirements.
+be configured based on your security requirements. Session expiration serves as
+an automatic key rotation mechanism - once a session expires, its private key
+can no longer be used to sign new commits, effectively forcing the creation of a
+new session with fresh cryptographic keys.
+
+For additional security, sessions can be manually revoked by editing their
+expiration time to a past date. Since sessions are regular items in the system,
+this forced logout is achieved by updating the session's expiration field. Note
+that only root users (typically servers) have the authority to modify sessions,
+ensuring that session management remains under administrative control.
 
 Every operation in GoatDB is cryptographically signed using the session's
 private key on the peer's machine. This signature serves two critical security
