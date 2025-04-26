@@ -33,6 +33,7 @@ plugins:
   - jekyll-feed
 
 logo: '/assets/goatdb_logo_dark_500.png'
+favicon_ico: '/assets/favicon.svg'
 
 mermaid:
   version: 11.4.1
