@@ -77,25 +77,6 @@ executable), we also provide experimental support for Node.js. See the full
 [installation instructions](https://goatdb.dev/install) for all compatible
 runtimes.
 
-### Installation
-
-1. **Add GoatDB to your project:**
-
-   ```bash
-   deno add jsr:@goatdb/goatdb
-   ```
-
-2. **Initialize the React Skaffold:**
-
-   ```bash
-   deno run -A jsr:@goatdb/goatdb/init
-   ```
-   > **Note**: This step is only needed for Single Page Applications (SPAs). The
-   > initialization command installs React dependencies and creates a project
-   > skaffold that includes both client-side and server-side code structure. If
-   > you're not building a SPA or already have your React setup, you can skip
-   > this step.
-
 ## Basic Usage
 
 ```tsx
