@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="760" height="700" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="14px">
+  <defs>
+    <style>
+      .bg-card { fill: #ffffff; stroke: #dee2e6; stroke-width: 1; }
+      .bg-section-blue { fill: #e7f1ff; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .bg-section-gray { fill: #f8f9fa; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .bg-section-cloud { fill: #f0f7ff; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .text-title { font-size: 16px; font-weight: 600; fill: #0a58ca; }
+      .text-heading { font-size: 14px; font-weight: 500; fill: #212529; }
+      .text-body { font-size: 12px; fill: #495057; }
+      .text-code { font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; fill: #d63384; }
+      .text-icon { font-size: 24px; }
+      .text-icon-small { font-size: 16px; }
+      .repo-box { fill: #ffffff; stroke: #0d6efd; stroke-width: 2; }
+      .repo-box-inactive { fill: #f8f9fa; stroke: #6c757d; stroke-width: 1; }
+      .memory-box { fill: #e7f1ff; stroke: #0d6efd; stroke-width: 2; }
+      .arrow-line-load { stroke: #0d6efd; stroke-width: 2; }
+      .arrow-line-unload { stroke: #0d6efd; stroke-width: 2; }
+      .arrow-line-sync { stroke: #0d6efd; stroke-width: 2; }
+      .arrow-head-load { fill: #0d6efd; }
+      .arrow-head-unload { fill: #0d6efd; }
+      .arrow-head-sync { fill: #0d6efd; }
+    </style>
+    <marker id="arrowhead-load" markerWidth="6" markerHeight="4" refX="0" refY="2" orient="auto">
+      <polygon points="0 0, 6 2, 0 4" class="arrow-head-load" />
+    </marker>
+    <marker id="arrowhead-unload" markerWidth="6" markerHeight="4" refX="0" refY="2" orient="auto">
+      <polygon points="0 0, 6 2, 0 4" class="arrow-head-unload" />
+    </marker>
+    <marker id="arrowhead-sync" markerWidth="6" markerHeight="4" refX="0" refY="2" orient="auto">
+      <polygon points="0 0, 6 2, 0 4" class="arrow-head-sync" />
+    </marker>
+  </defs>
+
+  <text x="360" y="30" text-anchor="middle" class="text-title">Repository Memory Management</text>
+
+  <g transform="translate(20, 60)">
+    <rect width="700" height="640" rx="8" ry="8" class="bg-section-blue"/>
+    
+    <!-- Cloud Section -->
+    <g transform="translate(40, 40)">
+      <rect x="0" y="0" width="620" height="120" rx="4" ry="4" class="bg-section-cloud"/>
+      <text x="20" y="30" class="text-icon-small">☁️</text>
+      <text x="40" y="30" class="text-heading">Remote Server</text>
+      
+      <!-- Cloud Repositories -->
+      <g transform="translate(40, 50)">
+        <rect x="0" y="0" width="540" height="60" rx="2" ry="2" fill="#ffffff" stroke="#0d6efd"/>
+        <g transform="translate(20, 20)">
+          <rect x="0" y="0" width="100" height="20" rx="2" ry="2" class="repo-box"/>
+          <text x="10" y="15" class="text-body">repo1</text>
+          <rect x="120" y="0" width="100" height="20" rx="2" ry="2" class="repo-box"/>
+          <text x="130" y="15" class="text-body">repo2</text>
+          <rect x="240" y="0" width="100" height="20" rx="2" ry="2" class="repo-box"/>
+          <text x="250" y="15" class="text-body">repo3</text>
+        </g>
+      </g>
+    </g>
+
+    <!-- RAM Section -->
+    <g transform="translate(40, 200)">
+      <rect x="0" y="0" width="620" height="120" rx="4" ry="4" class="memory-box"/>
+      <text x="20" y="30" class="text-icon-small">🧠</text>
+      <text x="40" y="30" class="text-heading">Local RAM</text>
+      
+      <!-- Active Repositories in RAM -->
+      <g transform="translate(40, 50)">
+        <rect x="0" y="0" width="540" height="60" rx="2" ry="2" fill="#ffffff" stroke="#0d6efd"/>
+        <g transform="translate(20, 20)">
+          <rect x="0" y="0" width="100" height="20" rx="2" ry="2" class="repo-box"/>
+          <text x="10" y="15" class="text-body">repo1</text>
+          <rect x="120" y="0" width="100" height="20" rx="2" ry="2" class="repo-box"/>
+          <text x="130" y="15" class="text-body">repo2</text>
+          <rect x="240" y="0" width="100" height="20" rx="2" ry="2" class="repo-box"/>
+          <text x="250" y="15" class="text-body">repo3</text>
+        </g>
+      </g>
+    </g>
+
+    <!-- Disk Section -->
+    <g transform="translate(40, 360)">
+      <rect x="0" y="0" width="620" height="200" rx="4" ry="4" class="bg-section-gray"/>
+      <text x="20" y="30" class="text-icon-small">💾</text>
+      <text x="40" y="30" class="text-heading">Local Disk</text>
+      
+      <!-- Repositories on Disk -->
+      <g transform="translate(40, 50)">
+        <rect x="0" y="0" width="540" height="140" rx="2" ry="2" fill="#ffffff" stroke="#6c757d"/>
+        <g transform="translate(20, 20)">
+          <rect x="0" y="0" width="100" height="20" rx="2" ry="2" class="repo-box-inactive"/>
+          <text x="10" y="15" class="text-body">repo1</text>
+          <rect x="120" y="0" width="100" height="20" rx="2" ry="2" class="repo-box-inactive"/>
+          <text x="130" y="15" class="text-body">repo2</text>
+          <rect x="240" y="0" width="100" height="20" rx="2" ry="2" class="repo-box-inactive"/>
+          <text x="250" y="15" class="text-body">repo3</text>
+          <rect x="360" y="0" width="100" height="20" rx="2" ry="2" class="repo-box-inactive"/>
+          <text x="370" y="15" class="text-body">repo4</text>
+          <rect x="0" y="40" width="100" height="20" rx="2" ry="2" class="repo-box-inactive"/>
+          <text x="10" y="55" class="text-body">repo5</text>
+          <rect x="120" y="40" width="100" height="20" rx="2" ry="2" class="repo-box-inactive"/>
+          <text x="130" y="55" class="text-body">repo6</text>
+          <rect x="240" y="40" width="100" height="20" rx="2" ry="2" class="repo-box-inactive"/>
+          <text x="250" y="55" class="text-body">repo7</text>
+          <rect x="360" y="40" width="100" height="20" rx="2" ry="2" class="repo-box-inactive"/>
+          <text x="370" y="55" class="text-body">repo8</text>
+        </g>
+      </g>
+    </g>
+
+    <!-- Flow Arrows -->
+    <g>
+      <!-- Cloud-RAM sync arrows -->
+      <line x1="120" y1="160" x2="120" y2="200" class="arrow-line-sync" marker-end="url(#arrowhead-sync)"/>
+      <line x1="120" y1="200" x2="120" y2="160" class="arrow-line-sync" marker-end="url(#arrowhead-sync)"/>
+      <line x1="340" y1="160" x2="340" y2="200" class="arrow-line-sync" marker-end="url(#arrowhead-sync)"/>
+      <line x1="340" y1="200" x2="340" y2="160" class="arrow-line-sync" marker-end="url(#arrowhead-sync)"/>
+      <line x1="560" y1="160" x2="560" y2="200" class="arrow-line-sync" marker-end="url(#arrowhead-sync)"/>
+      <line x1="560" y1="200" x2="560" y2="160" class="arrow-line-sync" marker-end="url(#arrowhead-sync)"/>
+      
+      <!-- Loading arrows -->
+      <line x1="120" y1="320" x2="120" y2="360" class="arrow-line-load" marker-end="url(#arrowhead-load)"/>
+      <line x1="340" y1="320" x2="340" y2="360" class="arrow-line-load" marker-end="url(#arrowhead-load)"/>
+      <line x1="560" y1="320" x2="560" y2="360" class="arrow-line-load" marker-end="url(#arrowhead-load)"/>
+      
+      <!-- Unloading arrows -->
+      <line x1="120" y1="360" x2="120" y2="320" class="arrow-line-unload" marker-end="url(#arrowhead-unload)"/>
+      <line x1="340" y1="360" x2="340" y2="320" class="arrow-line-unload" marker-end="url(#arrowhead-unload)"/>
+      <line x1="560" y1="360" x2="560" y2="320" class="arrow-line-unload" marker-end="url(#arrowhead-unload)"/>
+    </g>
+
+    <!-- Key Points -->
+    <g transform="translate(40, 580)">
+      <rect x="0" y="0" width="620" height="40" rx="4" ry="4" fill="#f1f1f1" stroke="#dee2e6"/>
+      <text x="20" y="25" class="text-icon-small">⚡</text>
+      <text x="40" y="25" class="text-body">
+        <tspan font-weight="500">Explicit Control:</tspan> Applications manage which repositories are loaded into RAM and sync with the cloud
+      </text>
+    </g>
+  </g>
+</svg> 

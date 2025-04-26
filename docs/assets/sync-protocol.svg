@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="760" height="420" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="14px">
+  <defs>
+    <style>
+      .bg-card { fill: #ffffff; stroke: #dee2e6; stroke-width: 1; }
+      .bg-section-blue { fill: #e7f1ff; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .bg-section-gray { fill: #f8f9fa; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .text-title { font-size: 16px; font-weight: 600; fill: #0a58ca; }
+      .text-heading { font-size: 14px; font-weight: 500; fill: #212529; }
+      .text-body { font-size: 12px; fill: #495057; }
+      .text-code { font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; fill: #d63384; }
+      .text-icon { font-size: 24px; }
+      .text-icon-small { font-size: 16px; }
+      .peer-box { fill: #ffffff; stroke: #0d6efd; stroke-width: 2; }
+      .delta-box { fill: #e9ecef; stroke: #6c757d; stroke-width: 1; }
+      .sync-line { stroke: #0d6efd; stroke-width: 2; stroke-dasharray: 4 2; }
+      .arrow-head { fill: #0d6efd; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" class="arrow-head" />
+    </marker>
+  </defs>
+
+  <text x="360" y="30" text-anchor="middle" class="text-title">Synchronization Protocol</text>
+
+  <g transform="translate(20, 60)">
+    <rect width="700" height="352" rx="8" ry="8" class="bg-section-blue"/>
+    <text x="350" y="30" text-anchor="middle" class="text-icon">🔄</text>
+    <text x="350" y="55" text-anchor="middle" class="text-heading">Stateless Delta Exchange</text>
+
+    <!-- Peer 1 -->
+    <g transform="translate(50, 80)">
+      <rect x="0" y="0" width="280" height="200" rx="4" ry="4" class="peer-box"/>
+      <text x="20" y="30" class="text-icon-small">💻</text>
+      <text x="40" y="30" class="text-heading">Peer A</text>
+      
+      <g transform="translate(40, 50)">
+        <rect x="0" y="0" width="200" height="30" rx="2" ry="2" class="delta-box"/>
+        <text x="10" y="20" class="text-body">Commit 1 (Full)</text>
+        
+        <rect x="0" y="40" width="200" height="30" rx="2" ry="2" class="delta-box"/>
+        <text x="10" y="60" class="text-body">Commit 2 (Delta)</text>
+        
+        <rect x="0" y="80" width="200" height="30" rx="2" ry="2" class="delta-box"/>
+        <text x="10" y="100" class="text-body">Commit 3 (Delta)</text>
+      </g>
+    </g>
+
+    <!-- Peer 2 -->
+    <g transform="translate(370, 80)">
+      <rect x="0" y="0" width="280" height="200" rx="4" ry="4" class="peer-box"/>
+      <text x="20" y="30" class="text-icon-small">💻</text>
+      <text x="40" y="30" class="text-heading">Peer B</text>
+      
+      <g transform="translate(40, 50)">
+        <rect x="0" y="0" width="200" height="30" rx="2" ry="2" class="delta-box"/>
+        <text x="10" y="20" class="text-body">Commit 1 (Full)</text>
+        
+        <rect x="0" y="40" width="200" height="30" rx="2" ry="2" class="delta-box"/>
+        <text x="10" y="60" class="text-body">Commit 2 (Delta)</text>
+      </g>
+    </g>
+
+    <!-- Sync Arrows -->
+    <g transform="translate(330, 180)">
+      <line x1="0" y1="0" x2="40" y2="0" class="sync-line"/>
+      <text x="20" y="-8" text-anchor="middle" class="text-body">Delta</text>
+      <text x="20" y="16" text-anchor="middle" class="text-body">Sync</text>
+    </g>
+
+    <!-- Key Points -->
+    <g transform="translate(40, 300)">
+      <rect x="10" y="0" width="600" height="40" rx="4" ry="4" fill="#f1f1f1" stroke="#dee2e6"/>
+      <text x="20" y="25" class="text-icon-small">⚡</text>
+      <text x="40" y="25" class="text-body">
+        <tspan font-weight="500">Efficient Exchange:</tspan> Stateless, delta-compressed synchronization between peers
+      </text>
+    </g>
+  </g>
+</svg> 

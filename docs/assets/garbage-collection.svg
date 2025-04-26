@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="760" height="452" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="14px">
+  <defs>
+    <style>
+      .bg-card { fill: #ffffff; stroke: #dee2e6; stroke-width: 1; }
+      .bg-section-blue { fill: #e7f1ff; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .bg-section-gray { fill: #f8f9fa; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
+      .text-title { font-size: 16px; font-weight: 600; fill: #0a58ca; }
+      .text-heading { font-size: 14px; font-weight: 500; fill: #212529; }
+      .text-body { font-size: 12px; fill: #495057; }
+      .text-code { font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; fill: #d63384; }
+      .text-icon { font-size: 24px; }
+      .text-icon-small { font-size: 16px; }
+      .timeline-box { fill: #ffffff; stroke: #0d6efd; stroke-width: 2; }
+      .commit-box { fill: #e9ecef; stroke: #6c757d; stroke-width: 1; }
+      .expired { fill: #dc3545; opacity: 0.5; }
+      .active { fill: #198754; }
+      .threshold-line { stroke: #dc3545; stroke-width: 2; stroke-dasharray: 4 2; }
+    </style>
+  </defs>
+
+  <text x="360" y="30" text-anchor="middle" class="text-title">Garbage Collection</text>
+
+  <g transform="translate(20, 60)">
+    <rect width="700" height="392" rx="8" ry="8" class="bg-section-blue"/>
+    <text x="350" y="30" text-anchor="middle" class="text-icon">🗑️</text>
+    <text x="350" y="55" text-anchor="middle" class="text-heading">Time-Based Cleanup</text>
+
+    <!-- Timeline -->
+    <g transform="translate(40, 80)">
+      <rect x="0" y="0" width="620" height="190" rx="4" ry="4" class="timeline-box"/>
+      <text x="20" y="30" class="text-icon-small">⏰</text>
+      <text x="40" y="30" class="text-heading">Commit Timeline</text>
+      
+      <!-- Threshold Line -->
+      <line x1="40" y1="90" x2="580" y2="90" class="threshold-line"/>
+      <text x="40" y="80" class="text-body">Expiration Threshold</text>
+
+      <!-- Commits -->
+      <g transform="translate(40, 110)">
+        <!-- Expired Commits -->
+        <rect x="0" y="0" width="60" height="30" rx="2" ry="2" class="commit-box expired"/>
+        <text x="30" y="20" text-anchor="middle" class="text-body">C1</text>
+        
+        <rect x="70" y="0" width="60" height="30" rx="2" ry="2" class="commit-box expired"/>
+        <text x="100" y="20" text-anchor="middle" class="text-body">C2</text>
+        
+        <rect x="140" y="0" width="60" height="30" rx="2" ry="2" class="commit-box expired"/>
+        <text x="170" y="20" text-anchor="middle" class="text-body">C3</text>
+        
+        <!-- Active Commits -->
+        <rect x="210" y="0" width="60" height="30" rx="2" ry="2" class="commit-box active"/>
+        <text x="240" y="20" text-anchor="middle" class="text-body">C4</text>
+        
+        <rect x="280" y="0" width="60" height="30" rx="2" ry="2" class="commit-box active"/>
+        <text x="310" y="20" text-anchor="middle" class="text-body">C5</text>
+        
+        <rect x="350" y="0" width="60" height="30" rx="2" ry="2" class="commit-box active"/>
+        <text x="380" y="20" text-anchor="middle" class="text-body">C6</text>
+      </g>
+
+      <!-- Time Labels -->
+      <g transform="translate(40, 160)">
+        <text x="30" y="0" text-anchor="middle" class="text-body">Old</text>
+        <text x="380" y="0" text-anchor="middle" class="text-body">New</text>
+      </g>
+    </g>
+
+    <!-- Garbage Collection Process -->
+    <g transform="translate(40, 280)">
+      <rect x="0" y="0" width="620" height="40" rx="4" ry="4" class="bg-section-gray"/>
+      <text x="20" y="25" class="text-icon-small">🔄</text>
+      <text x="40" y="25" class="text-heading">Garbage Collection Process</text>
+    </g>
+
+    <!-- Key Points -->
+    <g transform="translate(40, 340)">
+      <rect x="0" y="0" width="620" height="40" rx="4" ry="4" fill="#f1f1f1" stroke="#dee2e6"/>
+      <text x="20" y="25" class="text-icon-small">⚡</text>
+      <text x="40" y="25" class="text-body">
+        <tspan font-weight="500">Time-Based:</tspan> Commits older than the expiration threshold are safely removed
+      </text>
+    </g>
+  </g>
+</svg> 
