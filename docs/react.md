@@ -198,18 +198,20 @@ function TaskEditor({ path }) {
 
 ### Performance Optimization
 
-1. **Use `keys` with `useItem`:** When you only need to track specific fields,
-   use the `keys` option to prevent unnecessary re-renders.
-
-2. **Memoize Predicates:** Define predicate and sort functions outside your
-   component or use `useCallback` to maintain stable references:
+1. **Pure Predicates:** Define predicate and sort functions as pure functions
+   that:
+   - Do not modify any external state
+   - Do not depend on values that can change between calls
+   - Do not modify the items they receive
+   - Use the `ctx` parameter to pass in any external values needed
 
    ```javascript
-   const userPredicate = useCallback(
-     ({ item }) => item.get('active') && item.get('role') === roleFilter,
-     [roleFilter],
-   );
+   const userPredicate = ({ item, ctx }) =>
+     item.get('active') && item.get('role') === ctx.roleFilter;
    ```
+
+2. **Use `keys` with `useItem`:** When you only need to track specific fields,
+   use the `keys` option to prevent unnecessary re-renders.
 
 3. **Chain Queries:** For complex data transformations, chain queries together
    rather than performing multiple operations in a single query.
