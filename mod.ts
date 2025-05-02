@@ -106,6 +106,9 @@ import { normalizeEmail } from './base/string.ts';
 
 export * from './cfds/base/schema.ts';
 export * from './base/core-types/base.ts';
+
+export * as Orderstamp from '@goatdb/orderstamp';
+
 export type {
   AppConfig,
   AuthConfig,
