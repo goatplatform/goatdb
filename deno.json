@@ -10,7 +10,7 @@
     "singleQuote": true
   },
   "name": "@goatdb/goatdb",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "license": "AGPL/ELV2",
   "exports": {
     ".": "./mod.ts",
@@ -25,7 +25,7 @@
     "bench": "deno bench -A --no-check"
   },
   "imports": {
-    "@goatdb/orderstamp": "jsr:@goatdb/orderstamp@^1.1.0",
+    "@goatdb/orderstamp": "jsr:@goatdb/orderstamp@^1.1.1",
     "@luca/esbuild-deno-loader": "jsr:@luca/esbuild-deno-loader@^0.11.1",
     "@std/assert": "jsr:@std/assert@^1.0.11",
     "@std/data-structures": "jsr:@std/data-structures@^1.0.6",
