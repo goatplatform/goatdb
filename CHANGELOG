@@ -8,6 +8,13 @@ and GoatDB adheres to
 
 ## [Unreleased]
 
+## [0.2.3]
+
+### Added
+
+- [Orderstamp](https://github.com/goatplatform/orderstamp-js) is now bundled and
+  exposed directly within GoatDB
+
 ## [0.2.2]
 
 ### Added
