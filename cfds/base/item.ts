@@ -46,8 +46,8 @@ export interface ReadonlyItem<S extends Schema> {
   readonly schema: S;
   readonly isValid: boolean;
   readonly checksum: string;
-  get<K extends keyof SchemaDataType<S>>(key: K): SchemaDataType<S>[K];
-  has(key: keyof SchemaDataType<S>): boolean;
+  get<K extends keyof S['fields']>(key: K): SchemaDataType<S>[K];
+  has(key: keyof S['fields']): boolean;
   cloneData(): SchemaDataType<S>;
 }
 
@@ -243,19 +243,19 @@ export class Item<S extends Schema = Schema>
    * @throws    Throws if attempting to access a field not defined by this
    *            item's schema (unless this is a null item).
    */
-  get<T extends keyof SchemaDataType<S>>(
-    key: string & T,
+  get<T extends keyof S['fields']>(
+    key: T,
   ): SchemaDataType<S>[T] {
     if (this.isNull) {
-      return undefined as SchemaDataType<S>[T];
+      return undefined as unknown as SchemaDataType<S>[T];
     }
     const fieldDef = SchemaGetFieldDef(this.schema, key);
     assert(
       fieldDef !== undefined,
-      `Unknown field name '${key}' for schema '${this.schema.ns}'`,
+      `Unknown field name '${key as string}' for schema '${this.schema.ns}'`,
     );
     if (!Object.hasOwn(this._data, key) && fieldDef.default !== undefined) {
-      return fieldDef.default(this._data);
+      return fieldDef.default(this._data) as SchemaDataType<S>[T];
     }
     return this._data[key] as SchemaDataType<S>[T];
   }
@@ -268,10 +268,10 @@ export class Item<S extends Schema = Schema>
    * @throws    Throws if attempting to access a field not defined by this
    *            item's schema.
    */
-  has<T extends keyof SchemaDataType<S>>(key: string & T): boolean {
+  has<T extends keyof SchemaDataType<S>>(key: T): boolean {
     assert(
       SchemaGetFieldDef(this.schema, key) !== undefined,
-      `Unknown field name '${key}' for schema '${this.schema.ns}'`,
+      `Unknown field name '${key as string}' for schema '${this.schema.ns}'`,
     );
     return Object.hasOwn(this._data, key);
   }

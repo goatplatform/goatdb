@@ -5,7 +5,7 @@ import { uniqueId } from '../base/common.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 
 // Define test schemas
-const testSchema = {
+const SchemaTest = {
   ns: 'test',
   version: 1,
   fields: {
@@ -14,8 +14,9 @@ const testSchema = {
     tags: { type: 'set', default: () => new Set<string>() },
   },
 } as const;
+type SchemaTestType = typeof SchemaTest;
 
-DataRegistry.default.registerSchema(testSchema);
+DataRegistry.default.registerSchema(SchemaTest);
 
 const kTempDir = path.join(Deno.cwd(), 'temp_bench_' + uniqueId());
 
@@ -88,7 +89,7 @@ async function populateRepository(
   const currentCount = db.count(repoPath);
   if (currentCount < count) {
     for (const item of createTestData(count - currentCount)) {
-      db.load(repoPath, testSchema, item);
+      db.load(repoPath, SchemaTest, item);
     }
     await db.flushAll();
   }
@@ -123,7 +124,7 @@ Deno.bench('Create single item', {
     const db = new GoatDB({ path: tempDir });
     await db.readyPromise();
     ctx.start();
-    await db.load('/test/basic', testSchema, {
+    await db.load('/test/basic', SchemaTest, {
       title: 'Test item',
       count: 1,
       tags: new Set(['test', 'benchmark']),
@@ -145,7 +146,7 @@ Deno.bench('Read item by path', {
     const path = `/test/basic/foo`;
 
     // Create the item first
-    const item = db.create(path, testSchema, {
+    const item = db.create(path, SchemaTest, {
       title: 'Test read item',
       count: 42,
       tags: new Set(['read', 'test']),
@@ -178,7 +179,7 @@ Deno.bench('Update item', {
     const path = `/test/basic/${itemId}`;
 
     // Create the item
-    const item = db.create(path, testSchema, {
+    const item = db.create(path, SchemaTest, {
       title: 'Original title',
       count: 1,
       tags: new Set(['original']),
@@ -218,7 +219,7 @@ Deno.bench('Bulk create 100 items', {
     const testData = createTestData(100);
     ctx.start();
     const promises = testData.map((data, i) =>
-      db.load(`/test/basic/item${i}`, testSchema, data)
+      db.load(`/test/basic/item${i}`, SchemaTest, data)
     );
     await Promise.all(promises);
     await db.flushAll();
@@ -240,7 +241,7 @@ Deno.bench('Bulk read 100 items', {
     // Create items first
     const testData = createTestData(100);
     const promises = testData.map((data, i) =>
-      db.load(`/test/basic/item${i}`, testSchema, data)
+      db.load(`/test/basic/item${i}`, SchemaTest, data)
     );
     await Promise.all(promises);
 
@@ -270,7 +271,7 @@ Deno.bench('Simple query', {
     if (db.count('/test/basic') < 100) {
       const testData = createTestData(100);
       const promises = testData.map((data, i) =>
-        db.load(`/test/basic/item${i}`, testSchema, data)
+        db.load(`/test/basic/item${i}`, SchemaTest, data)
       );
       await Promise.all(promises);
     }
@@ -280,7 +281,7 @@ Deno.bench('Simple query', {
     const query = db.query({
       source: '/test/basic',
       predicate: ({ item }) => item.get('count') > 50,
-      schema: testSchema,
+      schema: SchemaTest,
     });
 
     await query.loadingFinished();
@@ -306,7 +307,7 @@ Deno.bench('Complex query with sort', {
     if (db.count('/test/basic') < 100) {
       const testData = createTestData(100);
       const promises = testData.map((data, i) =>
-        db.load(`/test/basic/item${i}`, testSchema, data)
+        db.load(`/test/basic/item${i}`, SchemaTest, data)
       );
       await Promise.all(promises);
     }
@@ -321,7 +322,7 @@ Deno.bench('Complex query with sort', {
         return count > 30 && count < 70 && tags.has('tag50');
       },
       sortBy: ({ left, right }) => right.get('count') - left.get('count'),
-      schema: testSchema,
+      schema: SchemaTest,
     });
 
     await query.loadingFinished();
@@ -342,7 +343,7 @@ Deno.bench('Repository operations: count', async (ctx) => {
 
     // Create a few items
     for (let i = 0; i < 10; i++) {
-      const item = db.create(`/test/basic/item${i}`, testSchema, {
+      const item = db.create(`/test/basic/item${i}`, SchemaTest, {
         title: `Repo item ${i}`,
         count: i,
         tags: new Set(['repo', 'test']),
@@ -370,7 +371,7 @@ Deno.bench('Repository operations: keys', async (ctx) => {
 
     // Create a few items
     for (let i = 0; i < 10; i++) {
-      const item = db.create(`/test/basic/item${i}`, testSchema, {
+      const item = db.create(`/test/basic/item${i}`, SchemaTest, {
         title: `Repo item ${i}`,
         count: i,
         tags: new Set(['repo', 'test']),

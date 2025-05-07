@@ -198,20 +198,21 @@ export type SchemaOptionalFields<
  */
 export type SchemaValueWithOptional<
   T,
-  R extends boolean | undefined,
-  // deno-lint-ignore ban-types
-  D extends Function | undefined,
-> // deno-lint-ignore ban-types
- = R extends true ? T : D extends Function ? T : undefined | T;
+  R extends boolean,
+  D extends boolean,
+> = R extends true ? T : D extends true ? T : (undefined | T);
 
 /**
  * Given a schema, extracts the type of its data.
  */
-export type SchemaDataType<T extends Schema> = {
-  [k in SchemaField<T>]: SchemaValueWithOptional<
+export type SchemaDataType<
+  T extends Schema,
+  K extends keyof T['fields'] = keyof T['fields'],
+> = {
+  [k in K]: SchemaValueWithOptional<
     FieldValue<T['fields'][k]['type']>,
-    T['fields'][k]['required'],
-    T['fields'][k]['default']
+    T['fields'][k] extends { required: true } ? true : false,
+    T['fields'][k] extends { default: Function } ? true : false
   >;
 };
 

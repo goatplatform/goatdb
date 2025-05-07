@@ -125,7 +125,7 @@ export type QueryConfig<
   CTX extends ReadonlyJSONValue,
 > = {
   /** The database instance this query will operate on */
-  db: GoatDB;
+  db: GoatDB<Schema>;
   /** The source repository, query or path to query from */
   source: QuerySource<IS, OS>;
   /** Optional predicate function to filter items */
@@ -213,7 +213,7 @@ export class Query<
   readonly id: string;
 
   /** Database instance this query operates on */
-  readonly db: GoatDB;
+  readonly db: GoatDB<Schema>;
 
   /** Optional context data passed to predicate and sort functions */
   readonly context: CTX;
@@ -410,7 +410,7 @@ export class Query<
       this._cachedResults = [];
       this._cachedResultsAge = this.age;
       for (const path of this._includedPaths) {
-        this._cachedResults.push(this.db.item(path));
+        this._cachedResults.push(this.db.item<OS>(path));
       }
       if (this.sortDescriptor) {
         this._cachedResults.sort((left, right) => {
