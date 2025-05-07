@@ -11,23 +11,14 @@ import type { JSONValue, ReadonlyJSONObject } from '../base/interfaces.ts';
 import { sleep } from '../base/time.ts';
 import { timeout } from '../cfds/base/errors.ts';
 import { getGoatConfig } from '../server/config.ts';
-
-// Polyfill global crypto in Node.js
-// deno-lint-ignore no-explicit-any
-if (
-  typeof globalThis.crypto === 'undefined' && typeof process !== 'undefined' &&
-  process.versions && process.versions.node
-) {
-  // @ts-ignore
-  globalThis.crypto = require('node:crypto').webcrypto;
-}
+import { getCrypto } from '../base/common.ts';
 
 export async function createNewSession(
   publicKey: CryptoKey,
 ): Promise<[Session | undefined, Session[] | undefined]> {
   try {
     const resp = await sendJSONToEndpoint('/auth/session', undefined, {
-      publicKey: (await crypto.subtle.exportKey(
+      publicKey: (await getCrypto().subtle.exportKey(
         'jwk',
         publicKey,
       )) as ReadonlyJSONObject,

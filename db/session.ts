@@ -361,10 +361,6 @@ export async function decodeSession(session: EncodedSession): Promise<Session>;
 
 export async function decodeSession(
   session: EncodedSession | EncodedOwnedSession,
-): Promise<Session | OwnedSession>;
-
-export async function decodeSession(
-  session: EncodedSession | EncodedOwnedSession,
 ): Promise<Session | OwnedSession> {
   const publicKey = await crypto.subtle.importKey(
     'jwk',
