@@ -12,6 +12,16 @@ import { sleep } from '../base/time.ts';
 import { timeout } from '../cfds/base/errors.ts';
 import { getGoatConfig } from '../server/config.ts';
 
+// Polyfill global crypto in Node.js
+// deno-lint-ignore no-explicit-any
+if (
+  typeof globalThis.crypto === 'undefined' && typeof process !== 'undefined' &&
+  process.versions && process.versions.node
+) {
+  // @ts-ignore
+  globalThis.crypto = require('node:crypto').webcrypto;
+}
+
 export async function createNewSession(
   publicKey: CryptoKey,
 ): Promise<[Session | undefined, Session[] | undefined]> {

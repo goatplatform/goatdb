@@ -4,6 +4,7 @@ import setupUntrusted from './db-untrusted.test.ts';
 import setupTrusted from './db-trusted.test.ts';
 import setupItemPath from './item-path.ts';
 import setupOrderstamp from './orderstamp-expose.test.ts';
+import setupGoatRequestTest from './goat-request.test.ts';
 import { exit } from '../base/process.ts';
 
 async function main(): Promise<void> {
@@ -11,6 +12,7 @@ async function main(): Promise<void> {
   setupTrusted();
   setupItemPath();
   setupOrderstamp();
+  setupGoatRequestTest();
   await TestsRunner.default.run();
 
   if (!isBrowser()) {

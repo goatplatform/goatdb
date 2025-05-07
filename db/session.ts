@@ -23,6 +23,16 @@ import {
 import { LRUCache } from '../base/lru-cache.ts';
 import type { DataRegistry } from '../cfds/base/data-registry.ts';
 
+// Polyfill global crypto in Node.js
+// deno-lint-ignore no-explicit-any
+if (
+  typeof globalThis.crypto === 'undefined' && typeof process !== 'undefined' &&
+  process.versions && process.versions.node
+) {
+  // @ts-ignore
+  globalThis.crypto = require('node:crypto').webcrypto;
+}
+
 export const SESSION_CRYPTO_KEY_GEN_PARAMS: EcKeyGenParams = {
   name: 'ECDSA',
   namedCurve: 'P-384',

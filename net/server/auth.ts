@@ -32,6 +32,16 @@ import type { GoatDB } from '../../db/db.ts';
 import { itemPathGetPart } from '../../db/path.ts';
 import type { ManagedItem } from '../../db/managed-item.ts';
 
+// Polyfill global crypto in Node.js
+// deno-lint-ignore no-explicit-any
+if (
+  typeof globalThis.crypto === 'undefined' && typeof process !== 'undefined' &&
+  process.versions && process.versions.node
+) {
+  // @ts-ignore
+  globalThis.crypto = require('node:crypto').webcrypto;
+}
+
 export const kAuthEndpointPaths = [
   '/auth/session',
   '/auth/send-login-email',
