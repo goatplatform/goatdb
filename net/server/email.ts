@@ -8,6 +8,7 @@ import {
   type EmailBuilder,
   type EmailInfo,
 } from '../../db/emails.ts';
+import { Schema } from '../../cfds/base/schema.ts';
 
 /**
  * Configuration type for NodeMailer transport options.
@@ -82,7 +83,8 @@ export interface EmailMessage extends nodemailer.SendMailOptions {
   emailType?: EmailType;
 }
 
-export class EmailService extends BaseService<ServerServices> {
+export class EmailService<US extends Schema>
+  extends BaseService<ServerServices<US>> {
   private readonly _config: EmailConfig | undefined;
   private readonly _transporter?: nodemailer.Transporter;
 
