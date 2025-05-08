@@ -1,5 +1,6 @@
 import { cli } from './base/development.ts';
 import * as path from 'jsr:@std/path';
+import { zip } from 'jsr:@deno-library/compress';
 
 export async function buildDocs(): Promise<void> {
   await cli('rm', '-rf', 'build/docs');
@@ -12,6 +13,7 @@ export async function buildDocs(): Promise<void> {
     '-d',
     'build/docs',
   );
+  await zip.compress('build/docs', 'build/docs.zip');
   // await cli('mkdir', '-p', 'build/docs/api');
   // await cli(
   //   'deno',
