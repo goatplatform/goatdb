@@ -8,6 +8,11 @@ and GoatDB adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- Support for crypto on older Node.js versions has been improved
+- Item not properly propagating schema field types
+
 ## [0.3.0]
 
 ### Added
