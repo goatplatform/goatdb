@@ -15,41 +15,49 @@ nav_exclude: true
 🚀 <a href="/tutorial">Tutorial</a> • ⚡ <a href="/benchmarks">Benchmarks</a> • 💬 <a href="https://github.com/goatplatform/goatdb/discussions">Discussions</a> • 👋 <a href="https://discord.gg/SAt3cbUqxr">Discord</a>
 </p>
 
-GoatDB is an embedded, distributed, document database that prioritizes
-[speed](/benchmarks) and [developer experience](/tutorial/). It excels at
-real-time collaboration and embedded caching applications.
+[GoatDB](https://goatdb.dev/) is an embedded, [distributed](/architecture),
+[document database](/concepts) that prioritizes [speed](/benchmarks) and
+[developer experience](/tutorial/). It excels at real-time collaboration and
+embedded caching applications.
 
 Instead of following traditional database design patterns, GoatDB leverages
-concepts refined over decades by distributed version control systems. These are
-enhanced with novel algorithms ([bloom filter-based synchronization](/sync/) and
-[ephemeral CRDTs](/conflict-resolution)) for efficient synchronization and
-automatic real-time conflict resolution.
+[concepts](/concepts) refined over decades by distributed version control
+systems. These are enhanced with novel algorithms
+([bloom filter-based synchronization](/sync/) and
+[ephemeral CRDTs](/conflict-resolution)) for efficient [synchronization](/sync)
+and automatic real-time conflict resolution.
 
 Currently optimized for TypeScript environments, GoatDB functions as a
-first-class citizen in both browsers and servers. It utilizes a document model
-with schemas, providing causal eventual consistency to simplify development
-while offering built-in optional cryptographic signing for the underlying commit
-graph.
+first-class citizen in both browsers and servers. It utilizes a
+[document model](/concepts) with [schemas](/schema), providing
+[causal eventual consistency](https://en.wikipedia.org/wiki/Causal_consistency)
+to simplify development while offering built-in optional
+[cryptographic signing](/sessions) for the underlying
+[commit graph](/commit-graph).
 
-GoatDB implements incremental local queries, leveraging its version control
-internals to efficiently process only changed documents.
+GoatDB implements [incremental local queries](/query), leveraging its version
+control internals to efficiently process only changed documents.
 
-GoatDB employs a memory-first design and a different scaling approach than
-traditional databases. Rather than growing a single large database, it uses
-application-level sharding with multiple medium-sized repositories that sync
-independently. Each user or data group has its own repository, enabling
-horizontal scaling and efficient client-server synchronization. This
-architecture provides natural scalability for multi-user applications without
-complex manual sharding.
+GoatDB employs a [memory-first design](/repositories) and a different
+[scaling approach](/repositories) than traditional databases. Rather than
+growing a single large database, it uses application-level sharding with
+multiple medium-sized [repositories](/repositories) that [sync](/sync)
+independently. Each user or data group has its own [repository](/repositories),
+enabling horizontal scaling and efficient client-server
+[synchronization](/sync). This [architecture](/architecture) provides natural
+scalability for multi-user applications without complex manual sharding.
 
-Items in GoatDB are defined alongside their schema. Schemas dictate both the
-field types and their conflict resolution strategy. Schemas are themselves
-versioned, making rolling schema updates via branches a natural mechanism.
+Items in [GoatDB](https://goatdb.dev/) are defined alongside their
+[schema](/schema). Schemas dictate both the field types and their
+[conflict resolution](/conflict-resolution) strategy. [Schemas](/schema) are
+themselves versioned, making rolling schema updates via branches a natural
+mechanism.
 
 {: .highlight }
 
-Please keep in mind that GoatDB is still under active development and therefore
-full backward compatibility is not guaranteed before reaching v1.0.0.
+Please keep in mind that [GoatDB](https://goatdb.dev/) is still under active
+development and therefore full backward compatibility is not guaranteed before
+reaching v1.0.0.
 
 If you like what we're building, please star ⭐️ our
 [GitHub project](https://github.com/goatplatform/goatdb). We really appreciate

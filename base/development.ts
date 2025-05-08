@@ -49,3 +49,24 @@ export async function copyToClipboard(value: string): Promise<boolean> {
   }
   return false;
 }
+
+/**
+ * Executes a command line interface command and waits for it to complete.
+ *
+ * @param cmd - The command to execute
+ * @param args - Additional arguments to pass to the command
+ * @returns A promise that resolves when the command completes
+ *
+ * @example
+ * ```ts
+ * await cli('deno', 'run', 'app.ts');
+ * ```
+ */
+export async function cli(cmd: string, ...args: string[]): Promise<void> {
+  console.log(`Running: ${cmd} ${args.join(' ')}`);
+  await new Deno.Command(cmd, {
+    args,
+    stdout: 'inherit',
+    stderr: 'inherit',
+  }).output();
+}
