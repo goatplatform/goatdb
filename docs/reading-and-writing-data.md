@@ -11,33 +11,37 @@ nav_order: 3
 
 If you're writing UI code, we recommend using the [React Hooks](/react) instead
 of working with ManagedItems directly. The hooks provide a more ergonomic
-interface for React components and handle all the complexity of data
-synchronization and updates.
+interface for [React](/react) components and handle all the complexity of data
+[synchronization](/sync) and updates.
 
 ## Overview
 
-GoatDB provides a flexible and powerful system for managing data in your
+[GoatDB](/) provides a flexible and powerful system for managing data in your
 application. This guide will walk you through the core concepts and show you how
-to effectively read and write data.
+to effectively [read and write data](/read-write-data).
 
-The data model is built around three key concepts:
+The data model is built around three key [concepts](/concepts):
 
-1. **Items**: The basic building blocks that store your data
-2. **Managed Items**: A higher-level interface that handles data synchronization
-3. **GoatDB API**: The main interface for interacting with your data
+1. [**Items**](/concepts#item): The basic building blocks that store your data
+2. [**Managed Items**](/concepts/#manageditem): A higher-level interface that
+   handles data synchronization
+3. [**Repositories**](/concepts#repository): The fundamental unit of data
+   organization, managing collections of related items
 
-Think of Items as the raw data containers, while Managed Items are like smart
-wrappers that handle all the complexity of keeping your data in sync across
-different parts of your application.
+Think of [Items](/concepts#item) as the raw data containers,
+[Managed Items](/concepts#manageditem) as smart wrappers that handle data
+[synchronization](/sync) and updates, and [Repositories](/concepts#repository)
+as the containers that organize and store collections of related
+[Items](/concepts#item) efficiently and [durably](/repositories/#durability).
 
 ## The Data Model
 
 ### Items: The Foundation
 
-At its core, GoatDB uses `Item` objects to represent data. An `Item` combines
-data with its schema definition and can be either mutable or immutable depending
-on its lock state. This design provides flexibility while maintaining data
-integrity.
+At its core, GoatDB uses [Items](/concepts#item) to represent data. An
+[Item](/concepts#item) combines data with its [schema](/schema) definition and
+can be either mutable or immutable depending on its lock state. This design
+provides flexibility while maintaining data integrity.
 
 {: .note }
 
@@ -46,11 +50,11 @@ For information about schemas and how to define them, see the
 
 ### Managed Items: The Live Interface
 
-`ManagedItem` provides a high-level interface for working with data. It
-maintains an in-memory, mutable Item and handles synchronization with both local
-storage and remote peers.
+[ManagedItem](/concepts#manageditem) provides a high-level interface for working
+with data. It maintains an in-memory, mutable Item and handles
+[synchronization](/sync) with both local storage and remote peers.
 
-Here's how you typically work with Managed Items:
+Here's how you typically work with [Managed Items](/concepts#manageditem):
 
 ```typescript
 // Get a managed item (creates one if it doesn't exist)
@@ -65,17 +69,19 @@ userProfile.set('name', 'John Smith');
 
 {: .note }
 
-ManagedItem maintains an in-memory, mutable Item that can be modified directly.
-In the background, it periodically computes diffs to track changes and
-synchronize them with both local storage and remote peers. When remote changes
-are received, they are merged back into the in-memory Item. This design provides
+[ManagedItem](/concepts#manageditem) maintains an in-memory, mutable
+[Item](/concepts#item) that can be modified directly. In the background, it
+periodically computes diffs to track changes and [synchronize](/sync) them with
+both local storage and remote peers. When remote changes are received, they are
+merged back into the in-memory Item. This [design](/architecture) provides
 immediate local updates while ensuring eventual consistency across all peers.
 
 ## Working with Data
 
 ### Reading Data
 
-Reading data is straightforward with ManagedItem. Here are some common patterns:
+Reading data is straightforward with [ManagedItem](/concepts#manageditem). Here
+are some common patterns:
 
 ```typescript
 // Get a specific item
@@ -155,14 +161,16 @@ todoItem.isDeleted = false;
 
 {: .note }
 
-Deletion in GoatDB is soft-delete by default. Items marked as deleted are not
-immediately removed but are instead hidden from queries and prepared for future
-garbage collection. This design allows for easy recovery of accidentally deleted
-items and maintains data history.
+Deletion in GoatDB is soft-delete by default. [Items](/concepts#item) marked as
+deleted are not immediately removed but are instead hidden from
+[queries](/query) and prepared for future
+[garbage collection](/architecture/#garbage-collection). This design allows for
+easy [recovery](/repositories/#durability) of accidentally deleted items and
+maintains data history.
 
 ### Ensuring Data Durability
 
-While GoatDB handles writes efficiently in the background, you can force
+While [GoatDB](/) handles writes efficiently in the background, you can force
 persistence when needed:
 
 ```typescript
@@ -175,14 +183,14 @@ await db.flushAll();
 
 {: .highlight }
 
-The `flush()` operation should be used sparingly as it can impact performance.
-The system is designed to handle writes efficiently in the background, and
-forcing immediate persistence is typically only needed in specific scenarios
-like application shutdown or critical data updates.
+The `flush()` operation should be used sparingly as it can impact
+[performance](/benchmarks). The system is designed to handle writes efficiently
+in the background, and forcing immediate persistence is typically only needed in
+specific scenarios like application shutdown or critical data updates.
 
 ## Change Notifications
 
-ManagedItems emit change events that you can listen to:
+[ManagedItems](/concepts#manageditem) emit change events that you can listen to:
 
 ```typescript
 const todoItem = db.item('/todos/work/1');
@@ -202,9 +210,10 @@ todoItem.on('change', (mutations) => {
 
 ## Mutations: Tracking Changes
 
-GoatDB uses a mutation system to track changes to items. While you'll typically
-use the higher-level ManagedItem API (`set()`, `delete()`, etc.), understanding
-mutations can be helpful for advanced use cases.
+[GoatDB](/) uses a mutation system to track changes to items. While you'll
+typically use the higher-level [ManagedItem](/concepts#manageditem) API
+(`set()`, `delete()`, etc.), understanding mutations can be helpful for advanced
+use cases.
 
 A mutation represents a single field change and contains:
 
@@ -234,13 +243,14 @@ todoItem.on('change', (mutations) => {
 {: .note }
 
 The mutation system is primarily used internally for change tracking and
-synchronization. Most applications will use the higher-level ManagedItem API or
-[React Hooks](/react) instead of working with mutations directly.
+synchronization. Most applications will use the higher-level
+[ManagedItem](/concepts#manageditem) API or [React Hooks](/react) instead of
+working with mutations directly.
 
 ## Data Validation
 
-GoatDB automatically validates all data changes to maintain data integrity. When
-you try to set invalid data:
+[GoatDB](/) automatically validates all data changes to maintain data integrity.
+When you try to set invalid data:
 
 ```typescript
 const userProfile = db.item('/users/john/profile');
@@ -257,5 +267,5 @@ console.log(userProfile.get('age')); // Shows 150 temporarily
 {: .note }
 
 Validation rules are defined in your [schema](/schema). GoatDB uses these rules
-to automatically prevent invalid data from being persisted or synchronized,
-ensuring your data always meets the defined constraints.
+to automatically prevent invalid data from being persisted or
+[synchronized](/sync), ensuring your data always meets the defined constraints.
