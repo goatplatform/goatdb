@@ -7,9 +7,10 @@ nav_order: 2
 
 # Building a Todo List App with GoatDB
 
-This tutorial walks you through building a Todo List app with GoatDB using
-React. It demonstrates how to leverage GoatDB's distributed, edge-native
-architecture and real-time synchronization features.
+This tutorial walks you through building a Todo List app with
+[GoatDB](https://goatdb.dev/) using [React](/react). It demonstrates how to
+leverage GoatDB's distributed, edge-native [architecture](/architecture) and
+real-time [synchronization](/sync) features.
 
 ## Prerequisites
 
@@ -20,8 +21,8 @@ Before starting, make sure you have:
 
 ## Define the Task Schema
 
-Edit the file `common/registry.ts` to define our schemas and authorization
-rules:
+Edit the file `common/registry.ts` to define our [schemas](/schema) and
+[authorization](/authorization) rules:
 
 ```typescript
 import { DataRegistry, itemPathGetPart } from '@goatdb/goatdb';
@@ -63,7 +64,7 @@ export function registerSchemas(
 }
 ```
 
-This schema defines:
+This [schema](/schema) defines:
 
 - A required `text` field for the task description
 - A `done` boolean field that defaults to false
@@ -74,7 +75,8 @@ This schema defines:
 
 ### Header Component
 
-The `Header` component provides an input field for adding new tasks:
+The `Header` component provides an input field for adding new task
+[items](/concepts#item):
 
 ```tsx
 // client/Header.tsx
@@ -109,7 +111,8 @@ export function Header() {
 
 ### TaskItem Component
 
-The `TaskItem` component displays and manages individual tasks:
+The `TaskItem` component displays and manages individual tasks
+[items](/concepts#items):
 
 ```tsx
 // client/TaskItem.tsx
@@ -152,7 +155,8 @@ export function TaskItem({ path }: TaskItemProps) {
 
 ### Contents Component
 
-The `Contents` component manages the task list and filtering:
+The `Contents` component manages the task list and
+[filtering](/query/#filtering-data):
 
 ```tsx
 // client/Contents.tsx
@@ -198,7 +202,7 @@ export function Contents() {
 
 ### Login Component
 
-The `Login` component handles user authentication:
+The `Login` component handles user [authentication](/sessions):
 
 ```tsx
 // client/Login.tsx

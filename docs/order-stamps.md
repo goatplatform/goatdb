@@ -1,4 +1,5 @@
 ---
+permalink: /ordering-items/
 layout: default
 title: Ordering Items
 nav_order: 8

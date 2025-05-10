@@ -81,16 +81,12 @@ back to its authorized source.
 
 ## Basic Operations
 
-### Creating and Writing
-
-Repositories are created implicitly when you first open them:
-
-```typescript
-// Create a new repository by opening it
-const userRepo = await db.open('/users/john');
-```
-
 ### Reading Data
+
+{: .highlight }
+
+For more details on reading and writing data, see
+[Reading and Writing Data](/read-write-data).
 
 GoatDB provides several ways to read data from repositories:
 
@@ -111,10 +107,44 @@ const allNotes = db.query({
 const allKeys = db.keys('/users/john');
 ```
 
-{: .highlight }
+### Opening a Repository
 
-For more details on reading and writing data, see
-[Reading and Writing Data](/read-write-data).
+In most cases, repositories are opened automatically when you access an item or
+perform an operation that requires the repository. However, you can also
+explicitly open a repository using the `db.open()` method. This is useful if you
+want to preload a repository or perform operations that require direct access to
+the repository instance.
+
+```typescript
+// Explicitly open a repository (returns a Promise that resolves to the Repository instance)
+const repo = await db.open('/users/john');
+```
+
+While GoatDB will open repositories on demand, this can introduce a
+[performance penalty](/benchmarks) the first time you access data in a
+repository, especially in interactive applications. If you know your application
+will need a repository (for example, when loading a user profile or switching
+workspaces), it is recommended to manually open (preload) the repository in
+advance using `db.open()`. This ensures the repository is ready for immediate
+use and avoids delays during user interactions.
+
+### Closing a Repository
+
+Repositories remain open in memory for the duration of your application's
+session unless you explicitly close them. To manually close a repository and
+release its resources, use the `db.close()` method:
+
+```typescript
+// Close a repository and flush any pending writes to disk
+await db.close('/chats/chatId');
+```
+
+When you close a repository, GoatDB will first commit any in-memory changes for
+items in that repository, then flush all pending writes to disk. This ensures
+that all local edits are saved and durable before the repository is fully
+released from memory. This is currently a manual operation. In future versions
+of GoatDB, there will be an option to automatically close repositories when they
+are no longer in use.
 
 ## Durability
 

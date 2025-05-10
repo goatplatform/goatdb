@@ -7,16 +7,17 @@ nav_order: 1
 
 # Concepts
 
-[GoatDB](https://goatdb.dev/) is an embedded, [distributed](/architecture),
+[GoatDB](/) is an embedded, [distributed](/architecture),
 [schema-based](/schema) database designed for collaborative applications that
 work consistently both online and offline. This document outlines the core
-concepts of [GoatDB](https://goatdb.dev/).
+concepts of [GoatDB](/).
 
 ## Table of Contents
 
 1. [The Data Registry](#the-data-registry)
 2. [Data Model](#data-model)
    - [Item](#item)
+   - [ManagedItem](#manageditem)
    - [Schema](#schema)
    - [Repository](#repository)
    - [Path](#path)
@@ -43,12 +44,19 @@ integrity and security throughout the system.
 
 ### Item
 
-The atomic unit of data in [GoatDB](https://goatdb.dev/). Each item follows a
-[schema](/schema) and maintains its own
-[distributed commit graph](/commit-graph), guaranteeing
+The atomic unit of data in [GoatDB](/). Each item follows a [schema](/schema)
+and maintains its own [distributed commit graph](/commit-graph), guaranteeing
 [causal consistency](https://en.wikipedia.org/wiki/Causal_consistency). Items
 track their own [version history](/commit-graph), enabling concurrent
 modifications across devices.
+
+### ManagedItem
+
+A `ManagedItem` provides a high-level interface for [reading](/read-write-data),
+[writing](/read-write-data), and [synchronizing](/sync) a single
+[item](/concepts#item) in [GoatDB](/). It manages the item's state,
+[schema](/schema) validation, and [version history](/commit-graph), ensuring
+changes are tracked and merged across devices.
 
 ### Schema
 

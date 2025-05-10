@@ -7,8 +7,9 @@ nav_order: 2
 
 # GoatDB Architecture
 
-GoatDB is a distributed, schema-based database that implements novel approaches
-to data synchronization and conflict resolution, drawing inspiration from
+[GoatDB](/) is a distributed, [schema-based](/schema) database that implements
+novel approaches to data [synchronization](/sync) and
+[conflict resolution](/conflict-resolution), drawing inspiration from
 distributed version control systems (DVCS). This document explores the technical
 foundations and design decisions that shape GoatDB's architecture.
 
@@ -16,26 +17,30 @@ foundations and design decisions that shape GoatDB's architecture.
 
 ![Repository-Centric Design](/assets/repository-model.svg)
 
-The [repository model](/repositories) in GoatDB takes inspiration from DVCS
-systems but adapts it for database operations. Each repository functions as an
-independent unit of data synchronization and access control, providing natural
-boundaries for data isolation. This design enables independent synchronization
-operations and gives applications fine-grained control over which data sets are
-loaded into memory.
+The [repository model](/repositories) in [GoatDB](/) takes inspiration from DVCS
+systems but adapts it for database operations. Each [repository](/repositories)
+functions as an independent unit of data [synchronization](/sync) and
+[access control](/authorization), providing natural boundaries for data
+isolation. This design enables independent [synchronization](/sync) operations
+and gives applications fine-grained control over which data sets are loaded into
+memory.
 
 At the core of this model is the concept of item-level
-[commit graphs](/commit-graph). Each item, identified by its key, maintains its
-own independent [commit graph](/commit-graph). This approach enables parallel
-evolution of items and efficient concurrent operations. Access control is
-implemented at the item level through repository-level
-[authorization rules](/authorization), striking a balance between granularity
-and performance.
+[commit graphs](/commit-graph). Each [item](/concepts#item), identified by its
+key, maintains its own independent [commit graph](/commit-graph). This approach
+enables parallel evolution of items and efficient concurrent operations.
+[Access control](/authorization) is implemented at the [item](/concepts#item)
+level through repository-level
+[authorization rules](/authorization/#creating-authorization-rules), striking a
+balance between granularity and [performance](/benchmarks).
 
-The repository model presents several technical challenges that require careful
-consideration. Managing repository commit histories efficiently is crucial, as
-is coordinating cross-repository queries. The repository lifecycle must be
-carefully managed, and authorization rules need to be designed with performance
-in mind.
+The [repository model](/repositories) presents several technical challenges that
+require careful consideration. Managing repository
+[commit histories](/commit-graph) efficiently is crucial, as is coordinating
+cross-repository [queries](/query). The
+[repository lifecycle](/repositories/#opening-a-repository) must be carefully
+managed, and [authorization rules](/authorization/#creating-authorization-rules)
+need to be designed with performance in mind.
 
 ## Memory Management
 
@@ -43,16 +48,18 @@ in mind.
 
 GoatDB's memory management approach prioritizes explicit control over automatic
 optimization. This design decision reflects several technical tradeoffs. While
-only active repositories consume memory, loading a repository requires its full
-commit history. This explicit repository management enables predictable
-performance characteristics and allows applications to implement custom caching
-and loading strategies.
+only active [repositories](/repositories) consume memory, loading a
+[repository](/repositories) requires its full [commit history](/commit-graph).
+This explicit repository management enables
+[predictable performance](/benchmarks) characteristics and allows applications
+to implement custom caching and loading strategies.
 
 Looking ahead, several technical improvements are under consideration. Lazy
-loading of commit history could reduce initial memory requirements, while
-zero-copy operations could minimize memory overhead. Automatic repository
-lifecycle management with configurable policies might provide a balance between
-control and convenience.
+loading of [commit history](/commit-graph) could reduce initial memory
+requirements, while zero-copy operations could minimize memory overhead.
+Automatic [repository lifecycle](/repositories/#opening-a-repository) management
+with configurable policies might provide a balance between control and
+convenience.
 
 ## Local Query Processing
 
