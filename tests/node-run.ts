@@ -10,11 +10,16 @@ import * as path from 'jsr:@std/path';
  * bundling dependencies and generating inline sourcemaps for better debugging.
  *
  * @param inputFile - Path to the TypeScript file to run
+ * @param inspectBrk - Optional flag to enable Node.js inspector with break on
+ *                     start
+ * @param env - Optional environment variables to set for the Node.js process
  * @returns A Promise that resolves to true if the Node.js process exits
  *          successfully, false otherwise
  */
 export async function nodeRun(
   inputFile: string,
+  inspectBrk?: boolean,
+  env?: Record<string, string>,
 ): Promise<boolean> {
   inputFile = path.resolve(Deno.cwd(), inputFile);
   const outName = path.basename(inputFile).replace('.ts', '');
@@ -41,11 +46,12 @@ export async function nodeRun(
       stdin: 'piped',
       stdout: 'inherit',
       stderr: 'inherit',
-      // ...(inspectBrk
-      //   ? {
-      //     args: ['--inspect-brk', outName],
-      //   }
-      //   : {}),
+      ...(inspectBrk
+        ? {
+          args: ['--inspect-brk'],
+        }
+        : {}),
+      ...(env ? { env } : {}),
     });
     const nodeProcess = nodeCmd.spawn();
     const writer = nodeProcess.stdin.getWriter();

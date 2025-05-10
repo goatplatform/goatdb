@@ -87,9 +87,42 @@ export class TestsRunner {
     return suite;
   }
 
-  async run() {
-    for (const suite of this._suites.values()) {
-      await suite.run();
+  async run(suiteName?: string, testName?: string) {
+    for (const [name, suite] of this._suites.entries()) {
+      if (suiteName && name !== suiteName) continue;
+      if (testName) {
+        // Run only the specific test in the suite
+        const test = suite['_tests'].get(testName);
+        if (test) {
+          const start = performance.now();
+          try {
+            await test(suite);
+            const duration = performance.now() - start;
+            console.log(
+              `✅ ${suite.name}/${testName} passed %c(${
+                Math.round(duration)
+              }ms)`,
+              'color: gray',
+            );
+          } catch (error) {
+            const duration = performance.now() - start;
+            console.log(
+              `❌ ${suite.name}/${testName} failed %c(${
+                Math.round(duration)
+              }ms)`,
+              'color: gray',
+            );
+            console.log(error);
+          }
+        } else {
+          console.log(`Test '${testName}' not found in suite '${suite.name}'.`);
+        }
+        if (suite['_tempDir']) {
+          await (await FileImplGet()).remove(suite['_tempDir']);
+        }
+      } else {
+        await suite.run();
+      }
     }
   }
 }
