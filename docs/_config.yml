@@ -31,6 +31,7 @@ github_username: goatplatform
 theme: just-the-docs
 plugins:
   - jekyll-feed
+  - jekyll-sitemap
 
 logo: '/assets/goatdb_logo_dark_500.png'
 favicon_ico: '/assets/favicon.svg'
