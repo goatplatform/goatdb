@@ -79,11 +79,16 @@ export async function startJSONLogWorkerIfNeeded(): Promise<
     } else {
       if (isNode()) {
         const NodeWorker = (await import('node:worker_threads')).Worker;
+        // deno-lint-ignore no-process-global
+        const inspect = process.execArgv.includes('--inspect-brk') ||
+          // deno-lint-ignore no-process-global
+          process.execArgv.includes('--inspect');
         gWorker = new NodeWorker!(
           'data:' + workerJs,
           {
             eval: true,
             name: 'json-log-worker',
+            execArgv: inspect ? ['--inspect'] : [],
           },
         );
       } else {
