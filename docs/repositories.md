@@ -128,6 +128,15 @@ workspaces), it is recommended to manually open (preload) the repository in
 advance using `db.open()`. This ensures the repository is ready for immediate
 use and avoids delays during user interactions.
 
+{: .note }
+
+> When preloading a repository, you usually don't need to `await` the
+> result—just call `db.open()` and continue. It's safe to call `open()` multiple
+> times for the same repository; only the first call will actually start
+> loading. If the repository isn't fully loaded by the time you access its data,
+> GoatDB will automatically wait for loading to finish. This approach ensures
+> your application remains responsive and avoids unnecessary delays for users.
+
 ### Closing a Repository
 
 Repositories remain open in memory for the duration of your application's
