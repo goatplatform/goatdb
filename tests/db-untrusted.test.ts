@@ -198,4 +198,47 @@ export default function setup(): void {
       await db.flushAll();
     }
   });
+
+  TEST('Untrusted', 'close commits uncommitted changes', async (ctx) => {
+    const db = new GoatDB({
+      path: await ctx.tempDir('db-close-commit'),
+      orgId: 'test-org',
+      trusted: false,
+      registry: kDataRegistry,
+    });
+
+    await db.readyPromise();
+
+    // Open a repository and create an item
+    await db.open('/test/close-commit');
+    const item = db.create('/test/close-commit', TestSchema, {
+      name: 'Close Commit Item',
+      count: 1,
+    });
+    const itemKey = item.key;
+
+    const newCount = item.get('count') + 1;
+    // Edit the item but do NOT flush/commit explicitly
+    item.set('count', newCount);
+
+    // Immediately close the repo (should commit changes)
+    await db.close('/test/close-commit');
+
+    // Ensure the repo is not present in memory
+    assertEquals(db.repository('/test/close-commit'), undefined);
+
+    // Ensure the query persistence is not present in memory
+    assertEquals(db.queryPersistence?.repoExists('/test/close-commit'), false);
+
+    // Ensure the managed item is not present in memory
+    assertEquals(db.itemLoaded(`/test/close-commit/${itemKey}`), false);
+
+    // Re-open the repo and access the item
+    await db.open('/test/close-commit');
+    const reloadedItem = db.item('/test/close-commit', itemKey);
+
+    // The changes should have been saved
+    assertEquals(reloadedItem.get('name'), 'Close Commit Item');
+    assertEquals(reloadedItem.get('count'), newCount);
+  });
 }

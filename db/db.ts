@@ -305,20 +305,28 @@ export class GoatDB<US extends Schema = Schema>
       return;
     }
     const deletedKeys = new Set<string>();
+    const commitPromises: Promise<void>[] = [];
     for (const [itemPath, item] of this._items) {
       if (item.repository === repo) {
         deletedKeys.add(itemPath);
-        item.detachAll();
+        commitPromises.push(item.commit());
       }
     }
+    await Promise.allSettled(commitPromises);
     for (const k of deletedKeys) {
+      this._items.get(k)!.detachAll();
       this._items.delete(k);
     }
+    // Flush log file
     await this.flush(path);
+    // Flush query caches
+    await this.queryPersistence?.closeRepo(repoId);
+    // Close repo clients
     for (const client of this._repoClients?.get(repoId) || []) {
       client.close();
     }
     this._repoClients?.delete(repoId);
+    // Close log file
     const fileEntry = this._files.get(repoId);
     if (fileEntry) {
       await JSONLogFileClose(fileEntry);
@@ -743,6 +751,17 @@ export class GoatDB<US extends Schema = Schema>
       this._repoClients!.set(repoId, clients);
     }
     return repo;
+  }
+
+  /**
+   * Checks if an item at the given path is currently loaded in memory.
+   * This is a passive check that does not trigger loading the item.
+   *
+   * @param path The full path to the item to check
+   * @returns True if the item is loaded in memory, false otherwise
+   */
+  itemLoaded(path: string): boolean {
+    return this._items.has(itemPathNormalize(path));
   }
 }
 

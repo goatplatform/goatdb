@@ -1,11 +1,11 @@
 import * as path from '@std/path';
 import {
   EncodedRepoCache,
-  QueryPersistanceStorage,
+  QueryPersistenceStorage,
 } from '../../repo/query-persistance.ts';
 import { readTextFile, writeTextFile } from '../../base/json-log/json-log.ts';
 
-export class QueryPersistenceFile implements QueryPersistanceStorage {
+export class QueryPersistenceFile implements QueryPersistenceStorage {
   constructor(readonly dir: string) {}
 
   async load(repoId: string): Promise<EncodedRepoCache | undefined> {
