@@ -10,8 +10,10 @@ and GoatDB adheres to
 
 ### Fixed
 
-- Support for crypto on older Node.js versions has been improved
+- Support for crypto on older Node.js versions has been improved #27
 - Item not properly propagating schema field types
+- Correctly propagate inspect flag to worker in node #27
+- `GoatDB.close()` correctly flushes to disk and clears memory
 
 ## [0.3.0]
 
