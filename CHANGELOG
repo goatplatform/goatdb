@@ -15,6 +15,10 @@ and GoatDB adheres to
 - Correctly propagate inspect flag to worker in node #27
 - `GoatDB.close()` correctly flushes to disk and clears memory
 
+### Changed
+
+- Updated React dependency to 19.1.0
+
 ## [0.3.0]
 
 ### Added

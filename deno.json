@@ -34,11 +34,9 @@
     "@std/path": "jsr:@std/path@^1.0.8",
     "@std/encoding": "jsr:@std/encoding@1.0.6",
     "@types/nodemailer": "npm:@types/nodemailer@^6.4.17",
-    "@types/react": "npm:@types/react@^19.0.8",
     "esbuild": "npm:esbuild@^0.24.2",
     "nodemailer": "npm:nodemailer@^6.10.0",
-    "react": "npm:react@19.0.0",
-    "react-jss": "npm:react-jss@10.10.0",
+    "react": "npm:react@^19.1.0",
     "yargs": "npm:yargs@17.7.2"
   },
   "nodeModulesDir": "auto"
