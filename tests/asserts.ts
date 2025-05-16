@@ -84,3 +84,38 @@ export function expectToContain(
     );
   }
 }
+
+/**
+ * Asserts that a function throws an error when called.
+ * @param fn - The function expected to throw
+ * @param message - Optional error message to display if assertion fails
+ * @throws {AssertionError} If the function does not throw
+ */
+export function assertThrows(
+  fn: () => unknown | Promise<unknown>,
+  message?: string,
+): void | Promise<void> {
+  let threw = false;
+  try {
+    const result = fn();
+    if (result instanceof Promise) {
+      return result.then(
+        () => {
+          throw new AssertionError(
+            message || 'Expected function to throw, but it did not',
+          );
+        },
+        () => {
+          // Threw as expected (rejected)
+        },
+      );
+    }
+  } catch (_e) {
+    threw = true;
+  }
+  if (!threw) {
+    throw new AssertionError(
+      message || 'Expected function to throw, but it did not',
+    );
+  }
+}

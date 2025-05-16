@@ -11,7 +11,7 @@ import {
   verifyRequestSignature,
 } from '../db/session.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
-import { assertEquals, assertTrue } from './asserts.ts';
+import { assertEquals, assertThrows, assertTrue } from './asserts.ts';
 import { TEST } from './mod.ts';
 
 export default function setup() {
@@ -76,14 +76,10 @@ export default function setup() {
 
   // Edge case: decodeSession with missing/invalid fields
   TEST('Session', 'decodeSession with missing fields should fail', async () => {
-    let errorCaught = false;
-    try {
+    await assertThrows(async () => {
       // Missing publicKey
       await decodeSession({ id: 'x', expiration: Date.now() } as any);
-    } catch (e) {
-      errorCaught = true;
-    }
-    assertTrue(errorCaught);
+    });
   });
 
   // Edge case: verifyData with wrong session
@@ -162,17 +158,13 @@ export default function setup() {
         );
         return;
       }
-      let errorCaught = false;
-      try {
+      await assertThrows(async () => {
         await decodeSession({
           id: 'x',
           publicKey: { kty: 'EC', crv: 'P-384', x: 'bad', y: 'bad' },
           expiration: Date.now(),
         } as any);
-      } catch (e) {
-        errorCaught = true;
-      }
-      assertTrue(errorCaught);
+      });
     },
   );
 }
