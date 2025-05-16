@@ -69,7 +69,7 @@ export async function retry<T>(
 ): Promise<T> {
   const startTime = Date.now();
   let factor = 0;
-  let err: any = null;
+  let err: unknown = null;
   do {
     try {
       return err === null || err instanceof TryAgain
