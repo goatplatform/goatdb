@@ -9,6 +9,8 @@ import {
 } from '../../system-assets/system-assets.ts';
 import { getGoatConfig } from '../../server/config.ts';
 import type { VersionNumber } from '../../base/version-number.ts';
+import { GoatRequest } from './http-compat.ts';
+import type { Schema } from '../../cfds/base/schema.ts';
 
 export const APP_ENTRY_POINT = 'web-app';
 
@@ -27,18 +29,18 @@ const ContentTypeMapping: Record<string, ContentType> = {
   wasm: 'application/wasm',
 };
 
-export class StaticAssetsEndpoint implements Endpoint {
+export class StaticAssetsEndpoint<US extends Schema> implements Endpoint<US> {
   filter(
-    _services: ServerServices,
-    req: Request,
+    _services: ServerServices<US>,
+    req: GoatRequest,
     _info: Deno.ServeHandlerInfo,
   ): boolean {
     return req.method === 'GET';
   }
 
   processRequest(
-    services: ServerServices,
-    req: Request,
+    services: ServerServices<US>,
+    req: GoatRequest,
     _info: Deno.ServeHandlerInfo,
   ): Promise<Response> {
     if (!services.staticAssets) {

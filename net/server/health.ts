@@ -1,9 +1,11 @@
-import { ServerServices, Endpoint } from './server.ts';
+import { Endpoint, ServerServices } from './server.ts';
+import type { Schema } from '../../cfds/base/schema.ts';
+import { GoatRequest } from './http-compat.ts';
 
-export class HealthCheckEndpoint implements Endpoint {
+export class HealthCheckEndpoint<US extends Schema> implements Endpoint<US> {
   filter(
-    server: ServerServices,
-    req: Request,
+    server: ServerServices<US>,
+    req: GoatRequest,
     info: Deno.ServeHandlerInfo,
   ): boolean {
     if (req.method !== 'GET') {
@@ -14,8 +16,8 @@ export class HealthCheckEndpoint implements Endpoint {
   }
 
   processRequest(
-    server: ServerServices,
-    req: Request,
+    server: ServerServices<US>,
+    req: GoatRequest,
     info: Deno.ServeHandlerInfo,
   ): Promise<Response> {
     return Promise.resolve(

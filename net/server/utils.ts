@@ -1,6 +1,8 @@
 import type { ServerServices } from './server.ts';
+import type { Schema } from '../../cfds/base/schema.ts';
+import { GoatRequest } from './http-compat.ts';
 
-export function getRequestPath<T extends string = string>(req: Request): T {
+export function getRequestPath<T extends string = string>(req: GoatRequest): T {
   return new URL(req.url).pathname.toLowerCase() as T;
 }
 
@@ -10,7 +12,9 @@ export function getRequestPath<T extends string = string>(req: Request): T {
  * @param services The services of the current server instance.
  * @returns A fully qualified base URL.
  */
-export function getBaseURL(services: ServerServices): string {
+export function getBaseURL<US extends Schema>(
+  services: ServerServices<US>,
+): string {
   if (services.buildInfo.debugBuild) {
     return 'http://localhost:8080';
   }

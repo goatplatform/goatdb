@@ -31,6 +31,7 @@ import { sleep } from '../../base/time.ts';
 import type { GoatDB } from '../../db/db.ts';
 import { itemPathGetPart } from '../../db/path.ts';
 import type { ManagedItem } from '../../db/managed-item.ts';
+import { GoatRequest } from './http-compat.ts';
 
 // Polyfill global crypto in Node.js
 // deno-lint-ignore no-explicit-any
@@ -65,7 +66,7 @@ export interface TemporaryLoginToken extends ReadonlyJSONObject {
 export class AuthEndpoint<US extends Schema> implements Endpoint<US> {
   filter(
     _services: ServerServices<US>,
-    req: Request,
+    req: GoatRequest,
     _info: Deno.ServeHandlerInfo,
   ): boolean {
     const path = getRequestPath<AuthEndpointPath>(req);
@@ -88,7 +89,7 @@ export class AuthEndpoint<US extends Schema> implements Endpoint<US> {
 
   processRequest(
     services: ServerServices<US>,
-    req: Request,
+    req: GoatRequest,
     _info: Deno.ServeHandlerInfo,
   ): Promise<Response> {
     const path = getRequestPath<AuthEndpointPath>(req);
@@ -116,7 +117,7 @@ export class AuthEndpoint<US extends Schema> implements Endpoint<US> {
 
   private async createNewSession(
     services: ServerServices<US>,
-    req: Request,
+    req: GoatRequest,
   ): Promise<Response> {
     let publicKey: CryptoKey | undefined;
     try {
@@ -162,7 +163,7 @@ export class AuthEndpoint<US extends Schema> implements Endpoint<US> {
 
   private async sendTemporaryLoginEmail(
     services: ServerServices<US>,
-    req: Request,
+    req: GoatRequest,
   ): Promise<Response> {
     const body = await req.json();
     const email = normalizeEmail(body.email);
@@ -239,7 +240,7 @@ export class AuthEndpoint<US extends Schema> implements Endpoint<US> {
 
   private async loginWithToken(
     services: ServerServices<US>,
-    req: Request,
+    req: GoatRequest,
   ): Promise<Response> {
     const encodedToken = new URL(req.url).searchParams.get('t');
     if (!encodedToken) {
@@ -425,7 +426,7 @@ export async function requireSignedUser<
   US extends Schema,
 >(
   services: ServerServices<US>,
-  requestOrSignature: Request | string,
+  requestOrSignature: GoatRequest | Request | string,
   role?: Role,
 ): Promise<
   [

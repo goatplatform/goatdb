@@ -1,14 +1,15 @@
-import { LogStream, log } from '../../logging/log.ts';
-import { ServerServices, Endpoint, Middleware } from './server.ts';
-import { getRequestPath } from './utils.ts';
+import { log, type LogStream } from '../../logging/log.ts';
+import type { Middleware, ServerServices } from './server.ts';
+import type { Schema } from '../../cfds/base/schema.ts';
+import type { GoatRequest } from './http-compat.ts';
 
-export class MetricsMiddleware implements Middleware {
+export class MetricsMiddleware<US extends Schema> implements Middleware<US> {
   constructor(readonly outputStreams?: readonly LogStream[]) {}
 
   didProcess(
-    services: ServerServices,
-    req: Request,
-    info: Deno.ServeHandlerInfo,
+    services: ServerServices<US>,
+    req: GoatRequest,
+    _info: Deno.ServeHandlerInfo,
     resp: Response,
   ): Promise<Response> {
     log(
@@ -19,7 +20,7 @@ export class MetricsMiddleware implements Middleware {
         value: resp.status,
         url: req.url,
         method: req.method,
-        orgId: services.organizationId,
+        orgId: services.orgId,
       },
       this.outputStreams,
     );
@@ -27,31 +28,32 @@ export class MetricsMiddleware implements Middleware {
   }
 }
 
-export class PrometheusMetricsEndpoint implements Endpoint {
-  filter(
-    services: ServerServices,
-    req: Request,
-    info: Deno.ServeHandlerInfo,
-  ): boolean {
-    if (req.method !== 'GET') {
-      return false;
-    }
-    return getRequestPath(req) === '/metrics';
-  }
+// export class PrometheusMetricsEndpoint<US extends Schema>
+//   implements Endpoint<US> {
+//   filter(
+//     services: ServerServices<US>,
+//     req: GoatRequest,
+//     info: Deno.ServeHandlerInfo,
+//   ): boolean {
+//     if (req.method !== 'GET') {
+//       return false;
+//     }
+//     return getRequestPath(req) === '/metrics';
+//   }
 
-  processRequest(
-    services: ServerServices,
-    req: Request,
-    info: Deno.ServeHandlerInfo,
-  ): Promise<Response> {
-    const logStream = services.prometheusLogStream;
-    const metrics = logStream.getMetrics();
-    return Promise.resolve(
-      new Response(metrics, {
-        headers: {
-          'content-type': 'text/plain; version=0.0.4; charset=utf-8',
-        },
-      }),
-    );
-  }
-}
+//   processRequest(
+//     services: ServerServices<US>,
+//     req: GoatRequest,
+//     info: Deno.ServeHandlerInfo,
+//   ): Promise<Response> {
+//     const logStream = services.prometheusLogStream;
+//     const metrics = logStream.getMetrics();
+//     return Promise.resolve(
+//       new Response(metrics, {
+//         headers: {
+//           'content-type': 'text/plain; version=0.0.4; charset=utf-8',
+//         },
+//       }),
+//     );
+//   }
+// }

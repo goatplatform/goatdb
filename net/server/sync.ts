@@ -17,11 +17,13 @@ import { kSyncConfigServer, syncConfigGetCycles } from '../sync-scheduler.ts';
 import { requireSignedUser } from './auth.ts';
 import type { Endpoint, ServerServices } from './server.ts';
 import { getRequestPath } from './utils.ts';
+import { GoatRequest } from './http-compat.ts';
+import type { Schema } from '../../cfds/base/schema.ts';
 
-export class SyncEndpoint implements Endpoint {
+export class SyncEndpoint<US extends Schema> implements Endpoint<US> {
   filter(
-    _services: ServerServices,
-    req: Request,
+    _services: ServerServices<US>,
+    req: GoatRequest,
     _info: Deno.ServeHandlerInfo,
   ): boolean {
     if (req.method !== 'POST') {
@@ -31,8 +33,8 @@ export class SyncEndpoint implements Endpoint {
   }
 
   processRequest(
-    services: ServerServices,
-    req: Request,
+    services: ServerServices<US>,
+    req: GoatRequest,
     info: Deno.ServeHandlerInfo,
   ): Promise<Response> {
     if (!req.body) {
@@ -49,8 +51,8 @@ export class SyncEndpoint implements Endpoint {
   }
 
   async processBatchSyncRequest(
-    services: ServerServices,
-    req: Request,
+    services: ServerServices<US>,
+    req: GoatRequest,
     _info: Deno.ServeHandlerInfo,
   ): Promise<Response> {
     const encodedRequests = await req.json();
@@ -79,7 +81,7 @@ export class SyncEndpoint implements Endpoint {
   }
 
   private async doSync(
-    services: ServerServices,
+    services: ServerServices<US>,
     path: string,
     userSession: Session,
     json: JSONObject,
@@ -105,7 +107,7 @@ export class SyncEndpoint implements Endpoint {
   }
 
   private async _handleSyncRequestAfterAuth(
-    services: ServerServices,
+    services: ServerServices<US>,
     msgJSON: JSONObject,
     persistCommits: (commits: Commit[]) => Promise<number>,
     fetchAll: () => Promise<Iterable<[string, Commit]>>,

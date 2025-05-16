@@ -1,6 +1,5 @@
 import { isNode } from '../../base/common.ts';
 import { assert, notReached } from '../../base/error.ts';
-import type { JSONValue } from '../../base/interfaces.ts';
 
 /**
  * A minimal interface for Node.js Buffer functionality used in this module.
@@ -27,7 +26,43 @@ export type MinimalBuffer = {
   };
 };
 
-let _Buffer: MinimalBuffer | undefined = undefined;
+let _nodeHttp: typeof import('node:http') | undefined;
+let _nodeBufferModule: typeof import('node:buffer') | undefined;
+
+/**
+ * Gets a reference to the Node.js HTTP module implementation.
+ *
+ * This function lazily loads the HTTP module from node:http and caches it
+ * for subsequent calls. It will throw an error if called outside of a Node.js
+ * environment.
+ *
+ * @returns A promise that resolves to the HTTP module implementation
+ * @throws {Error} If called outside of Node.js
+ */
+async function getNodeHttp() {
+  if (!_nodeHttp) {
+    _nodeHttp = await import('node:http');
+  }
+  return _nodeHttp;
+}
+
+/**
+ * Gets a reference to the Node.js Buffer module implementation.
+ *
+ * This function lazily loads the Buffer module from node:buffer and caches it
+ * for subsequent calls. It will throw an error if called outside of a Node.js
+ * environment.
+ *
+ * @returns A promise that resolves to the Buffer module implementation
+ * @throws {Error} If called outside of Node.js
+ */
+async function getNodeBufferModule() {
+  if (!_nodeBufferModule) {
+    _nodeBufferModule = await import('node:buffer');
+  }
+  return _nodeBufferModule;
+}
+
 /**
  * Gets a reference to the Node.js Buffer implementation.
  *
@@ -40,13 +75,9 @@ let _Buffer: MinimalBuffer | undefined = undefined;
  */
 async function getBuffer(): Promise<MinimalBuffer> {
   assert(isNode(), 'Buffer is only available in Node.js');
-  if (_Buffer) {
-    return _Buffer;
-  }
-  // Dynamically import node:buffer module
-  const mod = await import('node:buffer');
-  _Buffer = mod.Buffer;
-  return _Buffer as MinimalBuffer;
+  // Use cached dynamic import
+  const mod = await getNodeBufferModule();
+  return mod.Buffer;
 }
 
 /**
@@ -189,11 +220,46 @@ export class NodeHeadersPolyfill extends Map<string, string> {
    */
   override get(k: string) {
     const val = super.get(k);
-    if (val === undefined) return undefined;
+    if (val === undefined) {
+      return undefined;
+    }
     // Match native Headers.get: return first value before comma
     return val.split(',')[0];
   }
 }
+
+/**
+ * Minimal Node.js IncomingMessage type for our usage
+ */
+export type MinimalNodeIncomingMessage = {
+  headers: Record<string, string | string[] | undefined>;
+  url?: string;
+  method: string;
+  socket?: {
+    encrypted?: boolean;
+    remoteAddress?: string;
+  };
+  // Node.js IncomingMessage is async iterable for body
+  [Symbol.asyncIterator](): AsyncIterator<Uint8Array>;
+};
+
+/**
+ * Minimal Node.js ServerResponse type for our usage
+ */
+export type MinimalNodeServerResponse = {
+  statusCode: number;
+  setHeader(key: string, value: string): void;
+  write(chunk: Uint8Array | string): void;
+  end(chunk?: Uint8Array | string): void;
+};
+
+/**
+ * Minimal Node.js Server type for our usage
+ */
+export type MinimalNodeServer = {
+  listen(port: number, callback: () => void): void;
+  close(): void;
+};
 
 /**
  * A cross-platform request wrapper that provides a consistent interface for
@@ -210,7 +276,11 @@ export class NodeHeadersPolyfill extends Map<string, string> {
  */
 export class GoatRequest {
   /** The original request object from the runtime */
-  private _native: Request | NodeHttp1Request | NodeHttp2Request;
+  private _native:
+    | Request
+    | NodeHttp1Request
+    | NodeHttp2Request
+    | MinimalNodeIncomingMessage;
   /** The normalized request URL including scheme, authority and path */
   public url!: string;
   /** The HTTP method (GET, POST, etc) */
@@ -225,7 +295,13 @@ export class GoatRequest {
    * @param req The original request object from Deno or Node.js
    * @throws Error if running in an unsupported runtime
    */
-  constructor(req: Request | NodeHttp1Request | NodeHttp2Request) {
+  constructor(
+    req:
+      | Request
+      | NodeHttp1Request
+      | NodeHttp2Request
+      | MinimalNodeIncomingMessage,
+  ) {
     if (isWebRequest(req)) {
       // Deno/web: just use the native Request
       this._native = req;
@@ -256,27 +332,27 @@ export class GoatRequest {
         notReached('Unknown Node.js request type');
       }
       this.url = `${scheme}://${authority}${path}`;
-      this.method = (req as NodeHttp1Request | NodeHttp2Request).method;
+      this.method = typeof req.method === 'string' ? req.method : 'GET';
       let headers: GoatHeaders;
       if (typeof Headers !== 'undefined') {
         headers = new Headers();
       } else {
         headers = new NodeHeadersPolyfill();
       }
-      const nodeHeaders = (req as NodeHttp1Request | NodeHttp2Request).headers;
-      for (const [k, v] of Object.entries(nodeHeaders)) {
-        if (!k.startsWith(':')) {
-          if (Array.isArray(v)) {
-            for (const vv of v) headers.append(k, vv);
-          } else if (v != null) {
-            headers.set(k, v as string);
-          }
+      const rawHeaders = req.headers && typeof req.headers === 'object'
+        ? req.headers
+        : {};
+      for (const [k, v] of Object.entries(rawHeaders)) {
+        if (v !== undefined) {
+          headers.set(k, Array.isArray(v) ? v.join(',') : v);
         }
       }
       this.headers = headers;
       // For both http1 and http2, the body is the request stream
-      // We cannot type this.body as ReadableStream, but keep as any for Node
-      this.body = req as any;
+      // Use MinimalNodeIncomingMessage for Node
+      this.body = (req as MinimalNodeIncomingMessage)[Symbol.asyncIterator]
+        ? req as unknown as ReadableStream<Uint8Array>
+        : null;
     } else {
       throw new Error('Unsupported runtime for GoatRequest');
     }
@@ -324,5 +400,185 @@ export class GoatRequest {
    */
   get raw() {
     return this._native;
+  }
+}
+
+/**
+ * Define a minimal local ServeHandlerInfo type for compatibility
+ */
+export type ServeHandlerInfo<Addr = { hostname: string }> = {
+  remoteAddr: Addr;
+  completed: Promise<void>;
+};
+
+/**
+ * Minimal cross-platform HTTP server abstraction for GoatDB.
+ *
+ * This interface and implementation allow the server to be started and stopped
+ * in a platform-agnostic way. Currently, only the Deno implementation is provided.
+ */
+export interface MinimalHttpServer<Addr = { hostname: string }> {
+  start(
+    handler: (req: Request, info: ServeHandlerInfo<Addr>) => Promise<Response>,
+    port: number,
+    signal?: AbortSignal,
+  ): Promise<void>;
+  stop(): void;
+}
+
+/**
+ * Deno implementation of the MinimalHttpServer abstraction.
+ */
+export class DenoHttpServer implements MinimalHttpServer<Deno.NetAddr> {
+  private _abortController?: AbortController;
+  private _server?: Deno.HttpServer;
+  private _started: boolean = false;
+
+  start(
+    handler: (
+      req: Request,
+      info: ServeHandlerInfo<Deno.NetAddr>,
+    ) => Promise<Response>,
+    port: number,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    if (this._started) {
+      return Promise.resolve();
+    }
+    this._abortController = new AbortController();
+    const combinedSignal = signal || this._abortController.signal;
+    let resolve: () => void;
+    const started = new Promise<void>((res) => {
+      resolve = res;
+    });
+    this._server = Deno.serve(
+      {
+        port,
+        onListen() {
+          resolve();
+        },
+        signal: combinedSignal,
+      },
+      handler,
+    );
+    this._started = true;
+    return started;
+  }
+
+  stop(): void {
+    this._abortController?.abort();
+    this._started = false;
+  }
+}
+
+/**
+ * Node.js implementation of the MinimalHttpServer abstraction.
+ * This class provides a Node.js-specific implementation of the HTTP server.
+ */
+export class NodeHttpServer implements MinimalHttpServer<{ hostname: string }> {
+  /** The underlying Node.js HTTP server instance */
+  private _server?: import('node:http').Server<
+    typeof import('node:http').IncomingMessage,
+    typeof import('node:http').ServerResponse
+  >;
+  /** Whether the server has been started */
+  private _started: boolean = false;
+  /** Cached reference to the Node.js Buffer implementation */
+  private _Buffer?: typeof import('node:buffer').Buffer;
+
+  /**
+   * Starts the HTTP server on the specified port.
+   *
+   * @param handler - The request handler function that processes incoming requests
+   * @param port - The port number to listen on
+   * @param _signal - Optional AbortSignal for server shutdown
+   * @returns A promise that resolves when the server is ready to accept connections
+   */
+  async start(
+    handler: (
+      req: Request,
+      info: ServeHandlerInfo<{ hostname: string }>,
+    ) => Promise<Response>,
+    port: number,
+    _signal?: AbortSignal,
+  ): Promise<void> {
+    if (this._started) {
+      return;
+    }
+
+    // Load required Node.js modules
+    const { createServer, IncomingMessage, ServerResponse } =
+      await getNodeHttp();
+    const { Buffer } = await getNodeBufferModule();
+    this._Buffer = Buffer;
+
+    // Create and configure the HTTP server
+    this._server = createServer(
+      async (
+        req: InstanceType<typeof IncomingMessage>,
+        res: InstanceType<typeof ServerResponse>,
+      ) => {
+        try {
+          // Convert Node.js request to standardized GoatRequest
+          const goatReq = new GoatRequest(req as MinimalNodeIncomingMessage);
+
+          // Extract client hostname from request socket
+          const hostname = req.socket?.remoteAddress ?? '';
+
+          // Create server info object
+          const info: ServeHandlerInfo<{ hostname: string }> = {
+            remoteAddr: { hostname },
+            completed: Promise.resolve(),
+          };
+
+          // Process request and get response
+          const response = await handler(goatReq as unknown as Request, info);
+
+          // Set response status and headers
+          res.statusCode = response.status;
+          response.headers.forEach((value, key) => res.setHeader(key, value));
+
+          // Handle response body streaming
+          if (response.body) {
+            const reader = response.body.getReader();
+            const write = async () => {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                if (value != null) {
+                  // Convert Uint8Array to Node.js Buffer if needed
+                  if (value instanceof Uint8Array && this._Buffer) {
+                    res.write(this._Buffer.from(value));
+                  } else {
+                    res.write(value);
+                  }
+                }
+              }
+              res.end();
+            };
+            write();
+          } else {
+            res.end();
+          }
+        } catch (err) {
+          // Handle errors with 500 response
+          res.statusCode = 500;
+          res.end('Internal Server Error');
+        }
+      },
+    );
+
+    // Start listening on specified port
+    await new Promise<void>((resolve) => this._server!.listen(port, resolve));
+    this._started = true;
+  }
+
+  /**
+   * Stops the HTTP server and cleans up resources.
+   */
+  stop(): void {
+    this._server?.close();
+    this._started = false;
   }
 }

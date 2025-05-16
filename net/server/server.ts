@@ -24,6 +24,7 @@ import { type EmailConfig, EmailService } from './email.ts';
 import type { StaticAssets } from '../../system-assets/system-assets.ts';
 import type { Schema } from '../../cfds/base/schema.ts';
 import type { ManagedItem } from '../../db/managed-item.ts';
+import { GoatRequest } from './http-compat.ts';
 
 /**
  * Information about a user attempting to log in for the first time.
@@ -176,7 +177,7 @@ export interface ServerServices<US extends Schema> extends ServerOptions<US> {
   readonly orgId: string;
   readonly db: GoatDB<US>;
   readonly logger: Logger;
-  readonly email: EmailService;
+  readonly email: EmailService<US>;
 }
 
 /**
@@ -191,12 +192,12 @@ export interface ServerServices<US extends Schema> extends ServerOptions<US> {
 export interface Endpoint<US extends Schema> {
   filter(
     services: ServerServices<US>,
-    req: Request,
+    req: GoatRequest,
     info: Deno.ServeHandlerInfo,
   ): boolean;
   processRequest(
     services: ServerServices<US>,
-    req: Request,
+    req: GoatRequest,
     info: Deno.ServeHandlerInfo,
   ): Promise<Response>;
 }
@@ -212,12 +213,12 @@ export interface Endpoint<US extends Schema> {
 export interface Middleware<US extends Schema> {
   shouldProcess?: (
     services: ServerServices<US>,
-    req: Request,
+    req: GoatRequest,
     info: Deno.ServeHandlerInfo,
   ) => Promise<Response | undefined>;
   didProcess?: (
     services: ServerServices<US>,
-    req: Request,
+    req: GoatRequest,
     info: Deno.ServeHandlerInfo,
     resp: Response,
   ) => Promise<Response>;
@@ -270,21 +271,21 @@ export class Server<US extends Schema> {
     this._baseOptions = options;
     // Monitoring
     if (options.logStreams) {
-      this.registerMiddleware(new MetricsMiddleware(options.logStreams));
+      this.registerMiddleware(new MetricsMiddleware<US>(options.logStreams));
     }
     // Health check
-    this.registerEndpoint(new HealthCheckEndpoint());
+    this.registerEndpoint(new HealthCheckEndpoint<US>());
     // Auth
-    this.registerEndpoint(new AuthEndpoint());
+    this.registerEndpoint(new AuthEndpoint<US>());
     // Stats
     // this.registerEndpoint(new StatsEndpoint());
     // Sync
-    this.registerEndpoint(new SyncEndpoint());
+    this.registerEndpoint(new SyncEndpoint<US>());
     // CORS Support
-    this.registerMiddleware(new CORSMiddleware());
-    this.registerEndpoint(new CORSEndpoint());
+    this.registerMiddleware(new CORSMiddleware<US>());
+    this.registerEndpoint(new CORSEndpoint<US>());
     // Static Assets
-    this.registerEndpoint(new StaticAssetsEndpoint());
+    this.registerEndpoint(new StaticAssetsEndpoint<US>());
     // Logs
     // this.registerEndpoint(new LogsEndpoint());
   }
@@ -340,20 +341,21 @@ export class Server<US extends Schema> {
     req: Request,
     info: Deno.ServeHandlerInfo,
   ): Promise<Response> {
-    if (req.url === 'http://AWSALB/healthy') {
+    const goatReq = new GoatRequest(req);
+    if (goatReq.url === 'http://AWSALB/healthy') {
       return new Response(null, { status: 200 });
     }
-    const orgId = this._baseOptions.domain.resolveDomain(req.url);
+    const orgId = this._baseOptions.domain.resolveDomain(goatReq.url);
     if (!orgId) {
       log({
         severity: 'METRIC',
         name: 'HttpStatusCode',
         unit: 'Count',
         value: 404,
-        url: req.url,
-        method: req.method as HTTPMethod,
+        url: goatReq.url,
+        method: goatReq.method as HTTPMethod,
         message: `Organization ID not found. Hostname: ${
-          new URL(req.url).hostname
+          new URL(goatReq.url).hostname
         }`,
       });
       return new Response(null, {
@@ -364,23 +366,23 @@ export class Server<US extends Schema> {
     const services = await this.servicesForOrganization(orgId);
     const middlewares = this._middlewares;
     for (const endpoint of this._endpoints) {
-      if (endpoint.filter(services, req, info) === true) {
+      if (endpoint.filter(services, goatReq, info) === true) {
         try {
           let resp: Response | undefined;
           for (const m of middlewares) {
             if (m.shouldProcess) {
-              resp = await m.shouldProcess(services, req, info);
+              resp = await m.shouldProcess(services, goatReq, info);
               if (resp) {
                 break;
               }
             }
           }
           if (!resp) {
-            resp = await endpoint.processRequest(services, req, info);
+            resp = await endpoint.processRequest(services, goatReq, info);
           }
           for (const m of middlewares) {
             if (m.didProcess) {
-              resp = await m.didProcess(services, req, info, resp);
+              resp = await m.didProcess(services, goatReq, info, resp);
             }
           }
           return resp;
@@ -391,8 +393,8 @@ export class Server<US extends Schema> {
               name: 'HttpStatusCode',
               unit: 'Count',
               value: e.code,
-              url: req.url,
-              method: req.method as HTTPMethod,
+              url: goatReq.url,
+              method: goatReq.method as HTTPMethod,
               error: e.message,
               trace: e.stack,
               orgId,
@@ -406,8 +408,8 @@ export class Server<US extends Schema> {
             name: 'InternalServerError',
             unit: 'Count',
             value: 500,
-            url: req.url,
-            method: req.method as HTTPMethod,
+            url: goatReq.url,
+            method: goatReq.method as HTTPMethod,
             error: e instanceof Error ? e.message : String(e),
             trace: e instanceof Error ? e.stack : undefined,
             orgId,
@@ -423,7 +425,7 @@ export class Server<US extends Schema> {
     });
     for (const m of middlewares) {
       if (m.didProcess) {
-        resp = await m.didProcess(services, req, info, resp);
+        resp = await m.didProcess(services, goatReq, info, resp);
       }
     }
     return resp;
