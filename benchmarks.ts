@@ -5,9 +5,7 @@ import { coreValueCompare } from './base/core-types/comparable.ts';
 import { assert } from './base/error.ts';
 import { randomInt } from './base/math.ts';
 import { DataRegistry } from './cfds/base/data-registry.ts';
-import { BloomFilter } from './cpp/bloom_filter.ts';
 import { GoatDB } from './db/db.ts';
-import { Query } from './repo/query.ts';
 
 const ITEM_COUNT = 100000;
 
