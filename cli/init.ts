@@ -362,4 +362,6 @@ async function bootstrapProject(): Promise<void> {
   console.log('Done');
 }
 
-if (import.meta.main) bootstrapProject();
+if (import.meta.main) {
+  bootstrapProject();
+}
