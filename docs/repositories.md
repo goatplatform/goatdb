@@ -155,6 +155,14 @@ released from memory. This is currently a manual operation. In future versions
 of GoatDB, there will be an option to automatically close repositories when they
 are no longer in use.
 
+{: .note }
+
+> In most cases, you don't need to `await` the result of `db.close()`. It's
+> common to simply call `db.close()` and let GoatDB handle the process in the
+> background. The system will ensure all changes are safely written to disk, so
+> you can keep your application responsive without waiting for the close
+> operation to finish.
+
 ## Durability
 
 GoatDB provides strong durability through:
