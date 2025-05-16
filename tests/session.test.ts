@@ -11,8 +11,7 @@ import {
   verifyRequestSignature,
 } from '../db/session.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
-import { assertTrue } from './asserts.ts';
-import { assertEquals } from '@std/assert';
+import { assertEquals, assertTrue } from './asserts.ts';
 import { TEST } from './mod.ts';
 
 export default function setup() {

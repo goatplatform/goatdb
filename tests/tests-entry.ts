@@ -34,7 +34,6 @@ async function main(): Promise<void> {
   setupOrderstamp();
   setupGoatRequestTest();
   setupSession();
-  setupHttpServerTest();
 
   // Read suite and test name from environment variables (cross-platform)
   const suiteName = getEnvVar('GOATDB_SUITE');

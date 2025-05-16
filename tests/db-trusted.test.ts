@@ -1,9 +1,12 @@
 import { GoatDB } from '../db/db.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
-import { assertEquals, assertExists } from '@std/assert';
-import { expect } from '@std/expect';
+import {
+  assertEquals,
+  assertExists,
+  assertTrue,
+  expectToContain,
+} from './asserts.ts';
 import { TEST } from './mod.ts';
-import { assertTrue } from './asserts.ts';
 
 // Define a test schema
 const TestSchema = {
@@ -194,8 +197,8 @@ export default function setup(): void {
       assertEquals(results.length, 2);
 
       // Items should have the expected values
-      expect(results.map((i) => i.get('name'))).toContain('Item 2');
-      expect(results.map((i) => i.get('name'))).toContain('Item 3');
+      expectToContain(results.map((i) => i.get('name')), 'Item 2');
+      expectToContain(results.map((i) => i.get('name')), 'Item 3');
 
       // Close the query
       query.close();

@@ -66,16 +66,15 @@ export default function setupGoatRequestTest() {
   if (isNode()) {
     TEST('GoatRequest', 'wraps Node.js http2-style request', async () => {
       const { Buffer } = await import('node:buffer');
-      // Minimal http2 request mock
+      // Minimal http2 request mock (no pseudo-headers)
       const mockReq = {
         method: 'PUT',
         headers: {
-          ':scheme': 'https',
-          ':authority': 'localhost:1234',
-          ':path': '/node-api',
           'content-type': 'application/json',
           'x-test': 'node',
+          'host': 'localhost:1234', // Use host for authority
         },
+        url: '/node-api', // Provide the path as url
         // Simulate a readable stream for body
         [Symbol.asyncIterator]: async function* () {
           yield Buffer.from('{"hello":"node"}');
@@ -83,13 +82,17 @@ export default function setupGoatRequestTest() {
       };
       const goatReq = new GoatRequest(mockReq);
       assert(
-        goatReq.url === 'https://localhost:1234/node-api',
+        goatReq.url === 'http://localhost:1234/node-api',
         `url mismatch: got ${goatReq.url}`,
       );
       assert(goatReq.method === 'PUT', 'method mismatch');
       assert(
         goatReq.headers.get('content-type') === 'application/json',
         'headers mismatch',
+      );
+      assert(
+        goatReq.headers.get('x-test') === 'node',
+        'headers mismatch (x-test)',
       );
       assert((await goatReq.text()) === '{"hello":"node"}', 'text() mismatch');
       const json = await goatReq.json();

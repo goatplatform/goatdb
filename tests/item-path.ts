@@ -1,4 +1,4 @@
-import { assertEquals } from '@std/assert';
+import { assertEquals } from './asserts.ts';
 import { TEST } from './mod.ts';
 import {
   itemPath,
