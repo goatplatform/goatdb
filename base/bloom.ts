@@ -105,6 +105,8 @@ export class BloomFilter implements Encodable, Decodable {
   private _filter!: BitField;
   private _hashes: MurmurHash3[];
 
+  static readonly empty = new BloomFilter({ size: 1, fpr: 0.5 });
+
   constructor(options: BloomFilterOptions | BloomFilterDecoderConfig) {
     if (isDecoderConfig(options)) {
       // this._filter = new BitField(1);
