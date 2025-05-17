@@ -40,6 +40,10 @@ export function setGlobalLoggerStreams(streams: readonly LogStream[]): void {
   gLogStreams = streams;
 }
 
+export function getGlobalLoggerStreams(): readonly LogStream[] {
+  return gLogStreams;
+}
+
 export function resetGlobalLoggerStreams(): void {
   gLogStreams = kDefaultLoggerStreams;
 }

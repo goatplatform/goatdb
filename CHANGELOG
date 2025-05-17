@@ -8,6 +8,10 @@ and GoatDB adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `getGlobalLoggerStreams()` returns the currently set global log streams
+
 ### Fixed
 
 - Removed dependency on @std/expect which fixes tests on node
