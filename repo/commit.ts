@@ -14,7 +14,7 @@ import type {
 import { isDecoderConfig } from '../base/core-types/encoding/utils.ts';
 import { uniqueId } from '../base/common.ts';
 import { coreValueEquals } from '../base/core-types/equals.ts';
-import { assert } from '../base/error.ts';
+import { assert, notReached } from '../base/error.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import type { VersionNumber } from '../base/version-number.ts';
 import { getGoatConfig } from '../server/config.ts';
@@ -448,6 +448,7 @@ export function commitContentsDeserialize(
       record: record,
     };
   } else {
+    assert(decoder.has('e'), 'Commit has no contents');
     const editDecoder = decoder.getDecoder('e');
     const r = {
       base: decoder.get<string>('b')!,
