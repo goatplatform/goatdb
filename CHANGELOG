@@ -15,6 +15,8 @@ and GoatDB adheres to
 ### Changed
 
 - Updated all dependencies to latest versions
+- `ManagedItem.commit()` now ensures all changes are fully committed before
+  returning.
 
 ## [0.3.1]
 

@@ -9,6 +9,13 @@ import { SimpleTimer, type Timer } from '../base/timer.ts';
 import type { GoatDB } from './db.ts';
 import { assert } from '../base/error.ts';
 
+/**
+ * A high-level interface for reading, writing, and synchronizing a single item
+ * in GoatDB. Manages the item's state, schema validation, and version history.
+ *
+ * @template S The schema type for this item
+ * @template US User schema type for the database
+ */
 export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
   extends Emitter<'change'> {
   private readonly _commitDelayTimer: Timer;
@@ -108,20 +115,45 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     }
   }
 
+  /**
+   * Returns the age of this item, which is a monotonically increasing number
+   * that reflects the order in which commits were received locally. Age numbers
+   * are local to each peer and are never synchronized across the network.
+   *
+   * @returns The local age number of this item
+   */
   get age(): number {
     return this._age;
   }
 
+  /**
+   * Checks if this item has a value for the given key.
+   *
+   * @param key The key to check for
+   * @returns True if the item has a value for the key, false otherwise
+   */
   has<T extends keyof SchemaDataType<S>>(key: string & T): boolean {
     return this._item.has(key);
   }
 
+  /**
+   * Gets the value for the given key from this item.
+   *
+   * @param key The key to get the value for
+   * @returns The value associated with the key
+   */
   get<K extends keyof SchemaDataType<S>>(
     key: K & string,
   ): SchemaDataType<S>[K] {
     return this._item.get(key);
   }
 
+  /**
+   * Sets the value for the given key in this item.
+   *
+   * @param key The key to set the value for
+   * @param value The value to associate with the key
+   */
   set<T extends keyof SchemaDataType<S>>(
     key: string & T,
     value: SchemaDataType<S>[T],
@@ -141,6 +173,15 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     }
   }
 
+  /**
+   * Deletes a key-value pair from this item. If the field has a default value
+   * defined in the schema, the field will be set to that default value instead
+   * of being deleted.
+   *
+   * @param key The key to delete
+   * @returns True if the key was deleted or reset to its default value, false
+   * if it didn't exist
+   */
   delete<T extends keyof SchemaDataType<S>>(key: string & T): boolean {
     const oldValue = this.has(key) ? this.get(key) : undefined;
     if (this._item.delete(key)) {
@@ -150,6 +191,19 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     return false;
   }
 
+  /**
+   * Commits the current state of this item to the database.
+   *
+   * This method:
+   * 1. Normalizes and validates the item
+   * 2. In debug mode, asserts that the item is valid
+   * 3. In non-debug mode, silently returns if the item is invalid
+   * 4. Cancels any pending delayed commits
+   * 5. If a commit is already in progress, waits for it to complete before retrying
+   * 6. Executes the commit
+   *
+   * @returns A promise that resolves when the commit is complete
+   */
   commit(): Promise<void> {
     this._item.normalize();
     const [valid, error] = this._item.validate();
@@ -163,17 +217,28 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
         return Promise.resolve();
       }
     }
-    if (!this._commitPromise) {
-      const p = this._commitImpl().finally(() => {
-        if (this._commitPromise === p) {
-          this._commitPromise = undefined;
-        }
-      });
-      this._commitPromise = p;
+    // Always flush any scheduled commit and run now
+    this._commitDelayTimer.unschedule();
+    if (this._commitPromise) {
+      // Wait for the existing commit to finish, then try again if needed
+      return this._commitPromise.then(() => this.commit());
     }
-    return this._commitPromise;
+    const p = this._commitImpl().finally(() => {
+      if (this._commitPromise === p) {
+        this._commitPromise = undefined;
+      }
+    });
+    this._commitPromise = p;
+    return p;
   }
 
+  /**
+   * Synchronizes the local item state with the latest version from the
+   * repository.
+   *
+   * Similar to git rebase, this merges any remote changes into the local
+   * in-memory state.
+   */
   rebase(): void {
     const repo = this.repository;
     if (!repo) {
@@ -202,13 +267,26 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     }
   }
 
+  /**
+   * Downloads a debug graph visualization of the item's network state.
+   * The downloaded file is in a format compatible with Cytoscape, a network
+   * visualization and analysis tool.
+   */
   downloadDebugGraph(): void {
     const key = itemPathGetPart(this.path, 'item')!;
     this.repository?.downloadDebugNetworkForKey(key);
   }
 
-  reset(): void {}
-
+  /**
+   * @internal
+   * Activates the managed item by attaching a document change listener to the
+   * repository. When the document changes, it will trigger a rebase of the item
+   * to sync with the latest version. This method is idempotent - calling it
+   * multiple times will only attach one listener.
+   *
+   * Note: This is an internal method used by GoatDB and should not be called
+   * directly by users.
+   */
   activate(): void {
     const repo = this.repository;
     if (!this._detachHandler && repo) {
@@ -220,6 +298,15 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     }
   }
 
+  /**
+   * @internal
+   * Deactivates the managed item by removing the document change listener and
+   * canceling any pending commits. This method is idempotent - calling it
+   * multiple times has no additional effect.
+   *
+   * Note: This is an internal method used by GoatDB and should not be called
+   * directly by users.
+   */
   deactivate(): void {
     if (this._detachHandler) {
       this._detachHandler();
@@ -228,6 +315,12 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     this._commitDelayTimer.unschedule();
   }
 
+  /**
+   * Handles changes to the managed item by incrementing its age, emitting a
+   * change event, and scheduling a commit.
+   *
+   * @param mutations The mutations that triggered this change
+   */
   private onChange(
     mutations: MutationPack<keyof SchemaDataType<S> & string>,
   ): void {
@@ -251,6 +344,13 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     this._commitInProgress = false;
   }
 
+  /**
+   * Loads the repository and initializes the document by opening the repository
+   * and passing it to loadInitialDoc.
+   *
+   * This is an internal method that handles the initial loading of the managed
+   * item from the repository.
+   */
   private async loadRepoAndDoc(): Promise<void> {
     this.loadInitialDoc(await this.db.open(itemPathGetRepoId(this.path)));
   }
