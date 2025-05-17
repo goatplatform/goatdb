@@ -56,10 +56,12 @@ to implement custom caching and loading strategies.
 
 Looking ahead, several technical improvements are under consideration. Lazy
 loading of [commit history](/commit-graph) could reduce initial memory
-requirements, while zero-copy operations could minimize memory overhead.
-Automatic [repository lifecycle](/repositories/#opening-a-repository) management
-with configurable policies might provide a balance between control and
-convenience.
+requirements, while zero-copy operations
+([see GitHub issue #36](https://github.com/goatplatform/goatdb/issues/36)) could
+minimize memory overhead. Automatic
+[repository lifecycle](/repositories/#opening-a-repository) management
+([see GitHub issue #34](https://github.com/goatplatform/goatdb/issues/34)) with
+configurable policies might provide a balance between control and convenience.
 
 ## Local Query Processing
 

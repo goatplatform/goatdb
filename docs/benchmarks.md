@@ -106,8 +106,9 @@ in-memory representation of the commit graph—a particularly challenging worklo
 for modern JavaScript garbage collectors.
 
 To address this performance bottleneck, we are developing a zero-copy format
-that will significantly reduce this overhead and bring opening times much closer
-to SQLite's performance.
+([see GitHub issue #36](https://github.com/goatplatform/goatdb/issues/36)) that
+will significantly reduce this overhead and bring opening times much closer to
+SQLite's performance.
 
 GoatDB uses a different scaling approach than traditional databases. Rather than
 growing a single large database, it employs application-level sharding with
