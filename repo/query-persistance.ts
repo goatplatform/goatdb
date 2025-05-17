@@ -177,7 +177,6 @@ export class QueryPersistence {
     let map = this._cachedDataForRepo.get(repoId);
     if (!map) {
       map = await this.loadCacheForRepo(repoId);
-      debugger;
       this._cachedDataForRepo.set(repoId, map || new Map());
     }
 
@@ -341,7 +340,6 @@ export class QueryPersistence {
         break;
       }
     }
-    debugger;
     return hasQueries || hasCache || hasLoading || hasFlush || hasPersisted;
   }
 }
