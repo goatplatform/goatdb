@@ -9,14 +9,14 @@ export class QueryPersistenceFile implements QueryPersistenceStorage {
   constructor(readonly dir: string) {}
 
   async load(repoId: string): Promise<EncodedRepoCache | undefined> {
-    // try {
-    const text = await readTextFile(
-      path.join(this.dir, repoId + '.cache.json'),
-    );
-    return text && JSON.parse(text);
-    // } catch (_: unknown) {
-    //   return undefined;
-    // }
+    try {
+      const text = await readTextFile(
+        path.join(this.dir, repoId + '.cache.json'),
+      );
+      return text && JSON.parse(text);
+    } catch (_: unknown) {
+      return undefined;
+    }
   }
 
   async store(repoId: string, value: EncodedRepoCache): Promise<boolean> {
