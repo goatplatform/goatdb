@@ -6,6 +6,11 @@
  * any JavaScript/TypeScript environment.
  */
 
+import {
+  getGlobalLoggerStreams,
+  setGlobalLoggerStreams,
+} from '../logging/log.ts';
+
 /**
  * Custom error class for assertion failures.
  */
@@ -95,6 +100,8 @@ export function assertThrows(
   fn: () => unknown | Promise<unknown>,
   message?: string,
 ): void | Promise<void> {
+  const logStreams = getGlobalLoggerStreams();
+  setGlobalLoggerStreams([]);
   let threw = false;
   try {
     const result = fn();
@@ -112,6 +119,8 @@ export function assertThrows(
     }
   } catch (_e) {
     threw = true;
+  } finally {
+    setGlobalLoggerStreams(logStreams);
   }
   if (!threw) {
     throw new AssertionError(
