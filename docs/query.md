@@ -9,10 +9,11 @@ nav_order: 4
 
 {: .highlight }
 
-If you're building a React UI, we recommend using the [React Hooks](/react)
-instead of working with queries directly. The hooks provide a more ergonomic
-interface for React components and handle all the complexity of data
-synchronization and updates.
+If you're building a [React](/react) UI, we recommend using the
+[React Hooks](/react) instead of working with [queries](/query) directly. The
+[hooks](/react) provide a more ergonomic interface for [React](/react)
+components and handle all the complexity of data [synchronization](/sync) and
+updates.
 
 GoatDB's query system provides real-time, efficient access to your data with
 automatic updates as the underlying data changes. Queries can be chained
@@ -51,9 +52,10 @@ const results = adminUsers.results();
 
 ### Query Instance Reuse
 
-When you create a query using `db.query()`, GoatDB maintains a cache of open
-queries. If you create another query with the same configuration (same source,
-predicate, sort, etc.), you'll get back the same query instance:
+When you create a query using `db.query()`, GoatDB
+[maintains a cache](#technical-details) of open queries. If you create another
+query with the same configuration (same source, predicate, sort, etc.), you'll
+get back the same query instance:
 
 ```typescript
 // First query
@@ -254,8 +256,8 @@ activeUsers.onResultsChanged(() => {
 ## Technical Details
 
 GoatDB's query system is designed for responsiveness and efficiency while being
-super easy to use without explicit indexing. The architecture prioritizes
-developer experience without sacrificing performance:
+super easy to use without explicit indexing. The [architecture](/architecture)
+prioritizes developer experience without sacrificing [performance](/benchmarks):
 
 - **No Manual Indexing**: Unlike traditional databases, GoatDB doesn't require
   developers to define and maintain explicit indexes
@@ -266,8 +268,8 @@ developer experience without sacrificing performance:
 ![Local Copy & Offline Availability](/assets/local-copy.svg)
 
 Each peer maintains a complete local copy of the database, enabling offline
-operation and low-latency access. The local copy is synchronized with the
-network when online, ensuring consistency across all peers.
+operation and low-latency access. The local copy is [synchronized](/sync) with
+the network when online, ensuring consistency across all peers.
 
 ![Commit Storage & Age Assignment](/assets/commit-storage.svg)
 

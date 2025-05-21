@@ -7,15 +7,16 @@ nav_order: 4
 
 # Sessions and Users
 
-GoatDB implements a robust session-based authentication system that provides
-secure and flexible user management. This document explains how sessions work,
-their security implications, and how they integrate with user management.
+[GoatDB](/) implements a robust session-based authentication system that
+provides secure and flexible [user management](/authorization). This document
+explains how sessions work, their security implications, and how they integrate
+with [user management](/authorization).
 
 ## Understanding Session-Based Authentication
 
 At its core, GoatDB's authentication system revolves around sessions - secure
-connections to the database that are represented by ECDSA P-384 public/private
-key pairs. The private key is generated and stored exclusively on the peer's
+connections to the database that are represented by **ECDSA P-384 public/private
+key pairs**. The private key is generated and stored exclusively on the peer's
 machine, never leaving its local storage. Only the corresponding public key is
 shared with the GoatDB network.
 
@@ -35,7 +36,7 @@ this forced logout is achieved by updating the session's expiration field. Note
 that only root users (typically servers) have the authority to modify sessions,
 ensuring that session management remains under administrative control.
 
-Every operation in GoatDB is cryptographically signed using the session's
+Every operation in [GoatDB](/) is cryptographically signed using the session's
 private key on the peer's machine. This signature serves two critical security
 functions: it verifies the integrity of the operation's content (ensuring it
 hasn't been tampered with) and proves the identity of the operation's creator.
@@ -47,19 +48,20 @@ integrity and accountability.
 ## Distributed Security Architecture
 
 The public/private key design enables a powerful distributed security model.
-Every operation in GoatDB is cryptographically signed, allowing all peers in the
-network to verify its authenticity. This creates a tamper-proof commit graph
-where each change can be traced back to its authorized source, with invalid or
-unauthorized changes being automatically rejected by the network.
+Every operation in [GoatDB](/) is cryptographically signed, allowing all peers
+in the network to verify its authenticity. This creates a tamper-proof
+[commit graph](/commit-graph) where each change can be traced back to its
+authorized source, with invalid or unauthorized changes being automatically
+rejected by the network.
 
 ![Distributed Security Illustration](/assets/distributed-security.svg)
 
 A key feature of this architecture is the client-as-replica design. Clients
-maintain their own copy of the commit graph and verify all operations
-independently. This enables clients to act as replicas of the database state,
-providing resilience against peer failures. If a peer crashes, any client can
-safely restore the peer's state by replaying the verified commit graph and
-ensuring all operations were properly signed.
+maintain their own copy of the [commit graph](/commit-graph) and verify all
+operations independently. This enables clients to act as replicas of the
+database state, providing resilience against peer failures. If a peer crashes,
+any client can safely restore the peer's state by replaying the verified commit
+graph and ensuring all operations were properly signed.
 
 This distributed verification system ensures data integrity even in challenging
 scenarios like network partitions, peer failures, or malicious actors. Clients
@@ -70,9 +72,10 @@ failure in the verification process.
 
 For applications where security is handled at a different layer or in trusted
 environments (such as microservices running in the cloud without direct client
-interaction), GoatDB offers a trusted mode that bypasses cryptographic
-verification and security controls. This mode can significantly improve
-performance by skipping commit signing and verification.
+interaction), [GoatDB](/) offers a trusted mode that bypasses cryptographic
+verification and security controls. This mode can significantly
+[improve performance](/benchmarks/#trusted-mode) by skipping commit signing and
+verification.
 
 {: .note }
 

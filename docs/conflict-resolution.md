@@ -15,25 +15,35 @@ temporarily during the merge process.
 
 ## CRDTs
 
-Conflict-Free Replicated Data Structures (CRDTs) were designed to enable
-concurrent editing without centralized synchronization, making them particularly
-well-suited for conflict resolution. While CRDTs elegantly resolve conflicts,
-they are often difficult to scale due to their tendency to inspect the entire
-history to produce the latest value.
+[Conflict-Free Replicated Data Structures (CRDTs)](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type)
+were designed to enable concurrent editing without centralized synchronization,
+making them particularly well-suited for conflict resolution. While
+[CRDTs](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type)
+elegantly resolve conflicts, they are often difficult to scale due to their
+tendency to inspect the entire history to produce the latest value.
 
-GoatDB overcomes the traditional scaling challenges of CRDTs by restricting
-their usage to the context of a three-way merge. During a merge, the base
-version is first transformed into a short-lived CRDT. Changes computed by the
-diff function are then applied to the generated CRDT. Finally, the resulting
-output from the CRDT is captured and saved as the commit's contents, while the
-CRDT itself is discarded. This approach ensures that the CRDT's changeset is
-limited to the scope of a single three-way merge.
+[GoatDB](/) overcomes the traditional scaling challenges of CRDTs by restricting
+their usage to the context of a
+[three-way merge](https://en.wikipedia.org/wiki/Merge_(version_control)#Three-way_merge).
+During a merge, the base version is first transformed into a short-lived
+[CRDT](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type).
+Changes computed by the diff function are then applied to the generated
+[CRDT](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type).
+Finally, the resulting output from the
+[CRDT](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type) is
+captured and saved as the commit's contents, while the
+[CRDT](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type) itself
+is discarded. This approach ensures that the CRDT's changeset is limited to the
+scope of a single
+[three-way merge](https://en.wikipedia.org/wiki/Merge_(version_control)#Three-way_merge).
 
 ## Exploiting Three-Way Merge
 
-While early implementations of GoatDB utilized a short-lived CRDT for merging
-conflicts, a more efficient approach was developed for the specific context of
-three-way merges.
+While early implementations of [GoatDB](/) utilized a short-lived
+[CRDT](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type) for
+merging conflicts, a more efficient approach was developed for the specific
+context of
+[three-way merges](https://en.wikipedia.org/wiki/Merge_(version_control)#Three-way_merge).
 
 First, consider the core principle behind the
 [Logoot CRDT](https://inria.hal.science/inria-00432368/document):
@@ -69,8 +79,10 @@ Changes: [-C, 2], [+X, 2]
 ```
 
 Using fixed indexes, removing "A" at index 0 affects how subsequent changes are
-interpreted. However, Logoot resolves this by treating indexes as continuous
-identifiers. GoatDB supplements this idea with the following rules:
+interpreted. However,
+[Logoot](https://inria.hal.science/inria-00432368/document) resolves this by
+treating indexes as continuous identifiers. [GoatDB](/) supplements this idea
+with the following rules:
 
 - Deletions can only apply to values that exist in the base version.
 - Insertions can only occur between values in the base version.
@@ -105,11 +117,11 @@ Index:  0 1 2 3 4 5 6
 Changes: [-C, 5], [+X, 6]
 ```
 
-Now, there is a single insertion conflict at index 6. To resolve this, GoatDB
-employs three resolution strategies, all of which rely on an external,
-predefined order agreed upon by all peers in the network. In the current
-implementation, we use the random IDs of the commits to establish a global
-order. The resolution strategies are as follows:
+Now, there is a single insertion conflict at index 6. To resolve this,
+[GoatDB](/) employs four resolution strategies, all of which rely on an
+external, predefined order agreed upon by all peers in the network. In the
+current implementation, we use the random IDs of the commits to establish a
+global order. The resolution strategies are as follows:
 
 1. **Either**: Select one of the conflicting changes based on the predefined
    order. The result could be "BY" or "BX."
@@ -118,6 +130,20 @@ order. The resolution strategies are as follows:
    instance, if "Y" and "X" are replaced with "cat" and "hat" respectively, the
    changes ["+cat", 6] and ["+hat", 6] resolve to "chat" (or "hcat" depending on
    the order). The final result could be "Bchat" or "Bhcat."
+4. **Timestamp-based**: Select the change with the latest timestamp (aka **Last
+   Write Wins**). This strategy works well when all parties have relatively
+   synchronized clocks, but may lead to unexpected results if clocks are
+   significantly skewed.
+
+{: .highlight }
+
+Timestamp-based resolution is not fair and may lead to starvation in some cases,
+where changes from parties with slower clocks are consistently ignored. It is
+especially suited for environments where clocks are tightly synchronized, such
+as within a data center, and less appropriate for real-time collaboration
+sessions between different clients.
 
 This approach ensures efficient conflict resolution tailored to the requirements
-of a three-way merge while maintaining scalability and performance.
+of a
+[three-way merge](https://en.wikipedia.org/wiki/Merge_(version_control)#Three-way_merge)
+while maintaining scalability and performance.
