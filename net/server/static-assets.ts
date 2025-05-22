@@ -1,47 +1,49 @@
-import { exists, walk } from '@std/fs';
-import { extname } from '@std/path';
 import type { Endpoint, ServerServices } from './server.ts';
 import { getRequestPath } from './utils.ts';
-import {
-  type Asset,
-  type ContentType,
-  kStaticAssetsSystem,
-} from '../../system-assets/system-assets.ts';
+import { kStaticAssetsSystem } from '../../system-assets/system-assets.ts';
 import { getGoatConfig } from '../../server/config.ts';
 import type { VersionNumber } from '../../base/version-number.ts';
-import { GoatRequest } from './http-compat.ts';
+import type { GoatRequest } from './http-compat.ts';
 import type { Schema } from '../../cfds/base/schema.ts';
+import type { ServeHandlerInfo } from './http-compat.ts';
 
 export const APP_ENTRY_POINT = 'web-app';
 
 const STATIC_ASSETS_CACHE_DURATION_SEC = 86400;
 
-const ContentTypeMapping: Record<string, ContentType> = {
-  svg: 'image/svg+xml',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  json: 'application/json',
-  js: 'text/javascript',
-  ts: 'text/javascript',
-  html: 'text/html',
-  css: 'text/css',
-  wasm: 'application/wasm',
-};
-
+/**
+ * Endpoint handler for serving static assets.
+ *
+ * This endpoint handles GET requests for static files like JavaScript bundles,
+ * images, and HTML files. It supports both system assets and organization-specific
+ * assets, with special handling for the main app bundle to inject configuration.
+ */
 export class StaticAssetsEndpoint<US extends Schema> implements Endpoint<US> {
+  /**
+   * Filters requests to only process GET methods.
+   */
   filter(
     _services: ServerServices<US>,
     req: GoatRequest,
-    _info: Deno.ServeHandlerInfo,
+    _info: ServeHandlerInfo,
   ): boolean {
     return req.method === 'GET';
   }
 
+  /**
+   * Processes requests for static assets.
+   *
+   * Handles the following cases:
+   * - Returns 404 if no static assets are configured
+   * - Looks up assets in system assets first, then org-specific assets
+   * - Falls back to index.html if no specific asset is found
+   * - Adds caching headers for image assets
+   * - Injects configuration into the main app bundle
+   */
   processRequest(
     services: ServerServices<US>,
     req: GoatRequest,
-    _info: Deno.ServeHandlerInfo,
+    _info: ServeHandlerInfo,
   ): Promise<Response> {
     if (!services.staticAssets) {
       return Promise.resolve(new Response(null, { status: 404 }));
@@ -88,44 +90,19 @@ export class StaticAssetsEndpoint<US extends Schema> implements Endpoint<US> {
   }
 }
 
-export async function compileAssetsDirectory(
-  dir: string,
-  filter?: (path: string) => boolean,
-  prefix?: string,
-): Promise<Record<string, Asset>> {
-  const result: Record<string, Asset> = {};
-  if (!(await exists(dir))) {
-    return result;
-  }
-  for await (
-    const { path } of walk(dir, {
-      includeDirs: false,
-      includeSymlinks: false,
-      followSymlinks: false,
-    })
-  ) {
-    if (filter && !filter(path)) {
-      continue;
-    }
-    const origExt = extname(path);
-    let ext = origExt.substring(1);
-    if (ext === 'ts') {
-      ext = 'js';
-    }
-    let key = path.substring(dir.length).toLowerCase();
-    // Rewrite extension to match
-    key = key.substring(0, key.length - origExt.length) + '.' + ext;
-    if (prefix) {
-      key = `${prefix}${key}`;
-    }
-    result[key] = {
-      data: await Deno.readFile(path),
-      contentType: ContentTypeMapping[ext] || 'application/octet-stream',
-    };
-  }
-  return result;
-}
-
+/**
+ * Generates a JavaScript configuration snippet for the client-side application.
+ *
+ * This function creates a configuration object that is injected into the main
+ * application bundle. It includes essential runtime configuration like version,
+ * organization ID, and server URL, while removing sensitive server-side data.
+ *
+ * @param version - The current version number of the application
+ * @param serverURL - The base URL of the server for this organization
+ * @param orgId - The organization identifier
+ * @param debug - Whether debug mode is enabled
+ * @returns A JavaScript snippet that assigns the configuration to GoatDBConfig
+ */
 function generateConfigSnippet(
   version: VersionNumber,
   serverURL: string,

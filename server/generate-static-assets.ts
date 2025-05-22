@@ -1,18 +1,20 @@
+import { exists, walk } from '@std/fs';
+import { extname } from '@std/path';
 import * as esbuild from 'esbuild';
 import * as path from '@std/path';
 import { denoPlugins } from '@luca/esbuild-deno-loader';
-import type { VersionNumber } from '../base/version-number.ts';
 import {
   bundleResultFromBuildResult,
   isReBuildContext,
   type ReBuildContext,
 } from '../build.ts';
-import {
-  APP_ENTRY_POINT,
-  compileAssetsDirectory,
-} from '../net/server/static-assets.ts';
+import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import type { AppConfig } from './app-config.ts';
-import type { StaticAssets } from '../system-assets/system-assets.ts';
+import type {
+  Asset,
+  ContentType,
+  StaticAssets,
+} from '../system-assets/system-assets.ts';
 
 export type EntryPoint = { in: string; out: string };
 
@@ -104,6 +106,57 @@ export async function buildAssets(
     result[`/${ep}.js.map`] = {
       data: textEncoder.encode(map),
       contentType: 'application/json',
+    };
+  }
+  return result;
+}
+
+const ContentTypeMapping: Record<string, ContentType> = {
+  svg: 'image/svg+xml',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  json: 'application/json',
+  js: 'text/javascript',
+  ts: 'text/javascript',
+  html: 'text/html',
+  css: 'text/css',
+  wasm: 'application/wasm',
+};
+
+export async function compileAssetsDirectory(
+  dir: string,
+  filter?: (path: string) => boolean,
+  prefix?: string,
+): Promise<Record<string, Asset>> {
+  const result: Record<string, Asset> = {};
+  if (!(await exists(dir))) {
+    return result;
+  }
+  for await (
+    const { path } of walk(dir, {
+      includeDirs: false,
+      includeSymlinks: false,
+      followSymlinks: false,
+    })
+  ) {
+    if (filter && !filter(path)) {
+      continue;
+    }
+    const origExt = extname(path);
+    let ext = origExt.substring(1);
+    if (ext === 'ts') {
+      ext = 'js';
+    }
+    let key = path.substring(dir.length).toLowerCase();
+    // Rewrite extension to match
+    key = key.substring(0, key.length - origExt.length) + '.' + ext;
+    if (prefix) {
+      key = `${prefix}${key}`;
+    }
+    result[key] = {
+      data: await Deno.readFile(path),
+      contentType: ContentTypeMapping[ext] || 'application/octet-stream',
     };
   }
   return result;
