@@ -24,7 +24,12 @@ import { type EmailConfig, EmailService } from './email.ts';
 import type { StaticAssets } from '../../system-assets/system-assets.ts';
 import type { Schema } from '../../cfds/base/schema.ts';
 import type { ManagedItem } from '../../db/managed-item.ts';
-import { GoatRequest } from './http-compat.ts';
+import {
+  createHttpServer,
+  GoatRequest,
+  HttpServerInstance,
+  ServeHandlerInfo,
+} from './http-compat.ts';
 
 /**
  * Information about a user attempting to log in for the first time.
@@ -163,6 +168,10 @@ export interface ServerOptions<US extends Schema> extends DBInstanceConfig {
    * If not provided, a default name will be used.
    */
   appName?: string;
+  /**
+   * If true, disables all default endpoints and middlewares (health, auth, static, etc).
+   */
+  disableDefaultEndpoints?: boolean;
 }
 
 /**
@@ -193,12 +202,12 @@ export interface Endpoint<US extends Schema> {
   filter(
     services: ServerServices<US>,
     req: GoatRequest,
-    info: Deno.ServeHandlerInfo,
+    info: ServeHandlerInfo,
   ): boolean;
   processRequest(
     services: ServerServices<US>,
     req: GoatRequest,
-    info: Deno.ServeHandlerInfo,
+    info: ServeHandlerInfo,
   ): Promise<Response>;
 }
 
@@ -214,12 +223,12 @@ export interface Middleware<US extends Schema> {
   shouldProcess?: (
     services: ServerServices<US>,
     req: GoatRequest,
-    info: Deno.ServeHandlerInfo,
+    info: ServeHandlerInfo,
   ) => Promise<Response | undefined>;
   didProcess?: (
     services: ServerServices<US>,
     req: GoatRequest,
-    info: Deno.ServeHandlerInfo,
+    info: ServeHandlerInfo,
     resp: Response,
   ) => Promise<Response>;
 }
@@ -228,24 +237,64 @@ export interface Middleware<US extends Schema> {
  * A simple abstraction around an HTTP server. The server is built using two
  * primitives: endpoints and middlewares.
  *
- * Endpoint:
- * ---------
+ * The generic parameter US defines the schema of User items throughout the
+ * system. Pass your custom user schema to enable type-safe user management and
+ * authorization. See @sessions.md and @authorization-rules.md for details on
+ * user authentication and access control.
  *
- * An endpoint catches a request using its filter, and generates an appropriate
- * response. For every incoming request, all endpoints are searched until the
- * first filter hit is found. Thus, the order of endpoint registration
- * determines the priority of all endpoints.
+ * # Usage Examples
  *
- * Middleware:
+ * ## 1. Standalone Server
+ *
+ * ```ts
+ * import { Server } from './net/server/server.ts';
+ *
+ * const server = new Server({
+ *   // ...options
+ * });
+ *
+ * await server.start();
+ * // The server now listens for HTTP requests on the default port (8080).
+ * ```
+ *
+ * ## 2. Integrating into an Existing Server
+ *
+ * If you want to use GoatDB's server as a handler within another HTTP server,
+ * you can call `await server.processRequest(request, info)` directly:
+ *
+ * ```ts
+ * import { Server } from './net/server/server.ts';
+ *
+ * const server = new Server({
+ *   // ...options
+ * });
+ *
+ * // Inside your own HTTP server handler:
+ * async function handler(request: Request) {
+ *   const info = { // ...ServeHandlerInfo... };
+ *   return await server.processRequest(request, info);
+ * }
+ *
+ * // Use `handler` in your custom server framework.
+ * ```
+ *
+ * Endpoints:
+ * ----------
+ * Endpoints are the core request handlers that process specific HTTP requests.
+ * Each endpoint has a filter that determines which requests it handles, and a
+ * processRequest method that generates the response. Endpoints are executed in
+ * registration order until the first matching endpoint is found.
+ *
+ * Middlewares:
  * -----------
+ * Middlewares provide cross-cutting functionality that runs before and/or after
+ * endpoint processing. They can:
+ * - Block requests before they reach endpoints (e.g. for authentication)
+ * - Modify responses after endpoints complete (e.g. adding headers)
+ * - Log requests and responses
+ * - Handle errors
  *
- * A middleware runs before and/or after the selected endpoint. A middleware
- * may either block the request entirely (to enforce permissions, etc) or modify
- * the response after the endpoint finished execution (to apply custom headers,
- * compression, etc).
- *
- * All registered middlewares get a chance to run for each request.
- * Execution order follows registration order, like endpoints.
+ * All registered middlewares run for each request in registration order.
  */
 export class Server<US extends Schema> {
   private readonly _endpoints: Endpoint<US>[];
@@ -254,7 +303,7 @@ export class Server<US extends Schema> {
   private readonly _servicesByOrg: Dictionary<string, ServerServices<US>>;
 
   private _abortController: AbortController | undefined;
-  private _httpServer?: Deno.HttpServer;
+  private _httpServer?: HttpServerInstance;
 
   constructor(options: ServerOptions<US>) {
     this._endpoints = [];
@@ -269,32 +318,47 @@ export class Server<US extends Schema> {
       options.orgId = 'localhost';
     }
     this._baseOptions = options;
-    // Monitoring
-    if (options.logStreams) {
-      this.registerMiddleware(new MetricsMiddleware<US>(options.logStreams));
+    if (!options.disableDefaultEndpoints) {
+      // Monitoring
+      if (options.logStreams) {
+        this.registerMiddleware(new MetricsMiddleware<US>(options.logStreams));
+      }
+      // Health check
+      this.registerEndpoint(new HealthCheckEndpoint<US>());
+      // Auth
+      this.registerEndpoint(new AuthEndpoint<US>());
+      // Stats
+      // this.registerEndpoint(new StatsEndpoint());
+      // Sync
+      this.registerEndpoint(new SyncEndpoint<US>());
+      // CORS Support
+      this.registerMiddleware(new CORSMiddleware<US>());
+      this.registerEndpoint(new CORSEndpoint<US>());
+      // Static Assets
+      this.registerEndpoint(new StaticAssetsEndpoint<US>());
+      // Logs
+      // this.registerEndpoint(new LogsEndpoint());
     }
-    // Health check
-    this.registerEndpoint(new HealthCheckEndpoint<US>());
-    // Auth
-    this.registerEndpoint(new AuthEndpoint<US>());
-    // Stats
-    // this.registerEndpoint(new StatsEndpoint());
-    // Sync
-    this.registerEndpoint(new SyncEndpoint<US>());
-    // CORS Support
-    this.registerMiddleware(new CORSMiddleware<US>());
-    this.registerEndpoint(new CORSEndpoint<US>());
-    // Static Assets
-    this.registerEndpoint(new StaticAssetsEndpoint<US>());
-    // Logs
-    // this.registerEndpoint(new LogsEndpoint());
+    this._httpServer = createHttpServer();
   }
 
+  /**
+   * Gets or creates server services for a given organization ID.
+   *
+   * This method manages the lifecycle of server services for each organization,
+   * creating them on first access and caching them for subsequent requests.
+   *
+   * @param orgId - The organization identifier
+   * @returns Promise resolving to the organization's server services
+   */
   async servicesForOrganization(orgId: string): Promise<ServerServices<US>> {
+    // Return cached services if they exist
     let services = this._servicesByOrg.get(orgId);
     if (!services) {
+      // Create new services for this organization
       const dir = path.join(this._baseOptions.path, orgId);
-      // Monitoring
+
+      // Initialize services with base configuration
       services = {
         ...this._baseOptions,
         path: dir,
@@ -309,27 +373,51 @@ export class Server<US extends Schema> {
         email: new EmailService(this._baseOptions.emailConfig),
       };
 
-      // Setup all services in the correct order of dependencies
-      // Add any new service.setup() calls here
+      // Initialize service dependencies
       await services.email.setup(services);
-      // <<< End Services Setup >>>
+
+      // Cache the services for future requests
       this._servicesByOrg.set(orgId, services);
     }
     return services;
   }
 
+  /**
+   * Registers an endpoint handler with the server.
+   *
+   * @param ep - The endpoint handler to register
+   */
   registerEndpoint(ep: Endpoint<US>): void {
     this._endpoints.push(ep);
   }
 
+  /**
+   * Registers a middleware handler with the server.
+   *
+   * @param mid - The middleware handler to register
+   */
   registerMiddleware(mid: Middleware<US>): void {
     this._middlewares.push(mid);
   }
 
+  /**
+   * Returns an iterable of all organization IDs that have services initialized.
+   *
+   * @returns An iterable of organization ID strings
+   */
   orgIds(): Iterable<string> {
     return this._servicesByOrg.keys();
   }
 
+  /**
+   * Updates the static assets configuration for the server and all existing
+   * organization services.
+   *
+   * This is primarily used by the live-reload debug server functionality to
+   * update static assets without requiring a full server restart.
+   *
+   * @param assets - The new static assets configuration to apply
+   */
   updateStaticAssets(assets: StaticAssets): void {
     this._baseOptions.staticAssets = assets;
     for (const services of this._servicesByOrg.values()) {
@@ -337,9 +425,17 @@ export class Server<US extends Schema> {
     }
   }
 
+  /**
+   * Processes an incoming HTTP request through the server's middleware and
+   * endpoint pipeline.
+   *
+   * @param req - The incoming HTTP request
+   * @param info - Additional request information
+   * @returns Promise resolving to the HTTP response
+   */
   async processRequest(
     req: Request,
-    info: Deno.ServeHandlerInfo,
+    info: ServeHandlerInfo,
   ): Promise<Response> {
     const goatReq = new GoatRequest(req);
     if (goatReq.url === 'http://AWSALB/healthy') {
@@ -431,10 +527,18 @@ export class Server<US extends Schema> {
     return resp;
   }
 
+  /**
+   * Starts the server and all associated services.
+   *
+   * @returns Promise that resolves when server is fully started
+   */
   async start(): Promise<void> {
+    // Return early if server is already running
     if (this._abortController) {
       return Promise.resolve();
     }
+
+    // Start all services for each org
     for (const services of this._servicesByOrg.values()) {
       for (const v of Object.values(services)) {
         if (v instanceof BaseService) {
@@ -442,30 +546,29 @@ export class Server<US extends Schema> {
         }
       }
     }
+
+    // Log server start metric
     log({
       severity: 'METRIC',
       name: 'ServerStarted',
       value: 1,
       unit: 'Count',
     });
-    let resolve: () => void;
+
+    // Create promise to track server start
+    let resolve: () => void = () => {};
     const result = new Promise<void>((res) => {
       resolve = res;
     });
+
+    // Initialize abort controller and start HTTP server
     this._abortController = new AbortController();
-    this._httpServer = Deno.serve(
-      {
-        port: this._baseOptions.port,
-        onListen() {
-          resolve();
-        },
-        signal: this._abortController.signal,
-      },
+    this._httpServer!.start(
       this.processRequest.bind(this),
-    );
-    Deno.addSignalListener('SIGTERM', () => {
-      Deno.exit(0);
-    });
+      this._baseOptions.port!,
+      this._abortController.signal,
+    ).then(resolve);
+
     return result;
   }
 }

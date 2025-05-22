@@ -7,8 +7,9 @@ import setupOrderstamp from './orderstamp-expose.test.ts';
 import setupGoatRequestTest from './goat-request.test.ts';
 import setupSession from './session.test.ts';
 import setupCommit from './commit.test.ts';
+import setupServerArchitectureTest from './server-architecture.test.ts';
 import { exit } from '../base/process.ts';
-import { setGlobalLoggerStreams } from '../logging/log.ts';
+import setupStaticAssetsEndpointTest from './static-assets-endpoint.test.ts';
 
 // Minimal interface for globalThis with process.env
 interface GlobalWithProcessEnv {
@@ -37,6 +38,8 @@ async function main(): Promise<void> {
   setupGoatRequestTest();
   setupSession();
   setupCommit();
+  await setupServerArchitectureTest();
+  setupStaticAssetsEndpointTest();
   // Read suite and test name from environment variables (cross-platform)
   const suiteName = getEnvVar('GOATDB_SUITE');
   const testName = getEnvVar('GOATDB_TEST');

@@ -19,12 +19,13 @@ import type { Endpoint, ServerServices } from './server.ts';
 import { getRequestPath } from './utils.ts';
 import { GoatRequest } from './http-compat.ts';
 import type { Schema } from '../../cfds/base/schema.ts';
+import type { ServeHandlerInfo } from './http-compat.ts';
 
 export class SyncEndpoint<US extends Schema> implements Endpoint<US> {
   filter(
     _services: ServerServices<US>,
     req: GoatRequest,
-    _info: Deno.ServeHandlerInfo,
+    _info: ServeHandlerInfo,
   ): boolean {
     if (req.method !== 'POST') {
       return false;
@@ -35,7 +36,7 @@ export class SyncEndpoint<US extends Schema> implements Endpoint<US> {
   processRequest(
     services: ServerServices<US>,
     req: GoatRequest,
-    info: Deno.ServeHandlerInfo,
+    info: ServeHandlerInfo,
   ): Promise<Response> {
     if (!req.body) {
       return Promise.resolve(
@@ -53,7 +54,7 @@ export class SyncEndpoint<US extends Schema> implements Endpoint<US> {
   async processBatchSyncRequest(
     services: ServerServices<US>,
     req: GoatRequest,
-    _info: Deno.ServeHandlerInfo,
+    _info: ServeHandlerInfo,
   ): Promise<Response> {
     const encodedRequests = await req.json();
     if (!(encodedRequests instanceof Array)) {

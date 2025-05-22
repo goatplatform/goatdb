@@ -1,4 +1,4 @@
-import { isNode } from '../../base/common.ts';
+import { isDeno, isNode } from '../../base/common.ts';
 import { assert, notReached } from '../../base/error.ts';
 
 /**
@@ -403,11 +403,15 @@ export class GoatRequest {
   }
 }
 
+// Unified address abstraction for all runtimes
+export type HttpRemoteAddr = { hostname: string };
+
 /**
  * Define a minimal local ServeHandlerInfo type for compatibility
+ * Always uses the unified HttpRemoteAddr abstraction.
  */
-export type ServeHandlerInfo<Addr = { hostname: string }> = {
-  remoteAddr: Addr;
+export type ServeHandlerInfo = {
+  remoteAddr: HttpRemoteAddr;
   completed: Promise<void>;
 };
 
@@ -417,9 +421,9 @@ export type ServeHandlerInfo<Addr = { hostname: string }> = {
  * This interface and implementation allow the server to be started and stopped
  * in a platform-agnostic way. Currently, only the Deno implementation is provided.
  */
-export interface MinimalHttpServer<Addr = { hostname: string }> {
+export interface MinimalHttpServer {
   start(
-    handler: (req: Request, info: ServeHandlerInfo<Addr>) => Promise<Response>,
+    handler: (req: Request, info: ServeHandlerInfo) => Promise<Response>,
     port: number,
     signal?: AbortSignal,
   ): Promise<void>;
@@ -429,7 +433,7 @@ export interface MinimalHttpServer<Addr = { hostname: string }> {
 /**
  * Deno implementation of the MinimalHttpServer abstraction.
  */
-export class DenoHttpServer implements MinimalHttpServer<Deno.NetAddr> {
+export class DenoHttpServer implements MinimalHttpServer {
   private _abortController?: AbortController;
   private _server?: Deno.HttpServer;
   private _started: boolean = false;
@@ -437,7 +441,7 @@ export class DenoHttpServer implements MinimalHttpServer<Deno.NetAddr> {
   start(
     handler: (
       req: Request,
-      info: ServeHandlerInfo<Deno.NetAddr>,
+      info: ServeHandlerInfo,
     ) => Promise<Response>,
     port: number,
     signal?: AbortSignal,
@@ -459,7 +463,13 @@ export class DenoHttpServer implements MinimalHttpServer<Deno.NetAddr> {
         },
         signal: combinedSignal,
       },
-      handler,
+      (req: Request, info: Deno.ServeHandlerInfo) => {
+        // Map Deno's info to the unified abstraction
+        const remoteAddr: HttpRemoteAddr = {
+          hostname: (info.remoteAddr as any).hostname ?? 'localhost',
+        };
+        return handler(req, { remoteAddr, completed: info.completed });
+      },
     );
     this._started = true;
     return started;
@@ -475,7 +485,7 @@ export class DenoHttpServer implements MinimalHttpServer<Deno.NetAddr> {
  * Node.js implementation of the MinimalHttpServer abstraction.
  * This class provides a Node.js-specific implementation of the HTTP server.
  */
-export class NodeHttpServer implements MinimalHttpServer<{ hostname: string }> {
+export class NodeHttpServer implements MinimalHttpServer {
   /** The underlying Node.js HTTP server instance */
   private _server?: import('node:http').Server<
     typeof import('node:http').IncomingMessage,
@@ -497,7 +507,7 @@ export class NodeHttpServer implements MinimalHttpServer<{ hostname: string }> {
   async start(
     handler: (
       req: Request,
-      info: ServeHandlerInfo<{ hostname: string }>,
+      info: ServeHandlerInfo,
     ) => Promise<Response>,
     port: number,
     _signal?: AbortSignal,
@@ -526,7 +536,7 @@ export class NodeHttpServer implements MinimalHttpServer<{ hostname: string }> {
           const hostname = req.socket?.remoteAddress ?? '';
 
           // Create server info object
-          const info: ServeHandlerInfo<{ hostname: string }> = {
+          const info: ServeHandlerInfo = {
             remoteAddr: { hostname },
             completed: Promise.resolve(),
           };
@@ -580,5 +590,22 @@ export class NodeHttpServer implements MinimalHttpServer<{ hostname: string }> {
   stop(): void {
     this._server?.close();
     this._started = false;
+  }
+}
+
+// Union type for all supported MinimalHttpServer implementations
+export type HttpServerInstance = DenoHttpServer | NodeHttpServer;
+
+/**
+ * Factory function to create the appropriate HTTP server implementation
+ * depending on the runtime (Deno or Node.js).
+ */
+export function createHttpServer(): HttpServerInstance {
+  if (isDeno()) {
+    return new DenoHttpServer();
+  } else if (isNode()) {
+    return new NodeHttpServer();
+  } else {
+    throw new Error('Unsupported runtime: cannot create HTTP server');
   }
 }

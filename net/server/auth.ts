@@ -32,6 +32,7 @@ import type { GoatDB } from '../../db/db.ts';
 import { itemPathGetPart } from '../../db/path.ts';
 import type { ManagedItem } from '../../db/managed-item.ts';
 import { GoatRequest } from './http-compat.ts';
+import type { ServeHandlerInfo } from './http-compat.ts';
 
 // Polyfill global crypto in Node.js
 // deno-lint-ignore no-explicit-any
@@ -67,7 +68,7 @@ export class AuthEndpoint<US extends Schema> implements Endpoint<US> {
   filter(
     _services: ServerServices<US>,
     req: GoatRequest,
-    _info: Deno.ServeHandlerInfo,
+    _info: ServeHandlerInfo,
   ): boolean {
     const path = getRequestPath<AuthEndpointPath>(req);
     if (!kAuthEndpointPaths.includes(path)) {
@@ -90,7 +91,7 @@ export class AuthEndpoint<US extends Schema> implements Endpoint<US> {
   processRequest(
     services: ServerServices<US>,
     req: GoatRequest,
-    _info: Deno.ServeHandlerInfo,
+    _info: ServeHandlerInfo,
   ): Promise<Response> {
     const path = getRequestPath<AuthEndpointPath>(req);
     const method = req.method as HTTPMethod;

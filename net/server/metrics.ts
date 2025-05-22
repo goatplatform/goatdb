@@ -1,7 +1,7 @@
 import { log, type LogStream } from '../../logging/log.ts';
 import type { Middleware, ServerServices } from './server.ts';
 import type { Schema } from '../../cfds/base/schema.ts';
-import type { GoatRequest } from './http-compat.ts';
+import type { GoatRequest, ServeHandlerInfo } from './http-compat.ts';
 
 export class MetricsMiddleware<US extends Schema> implements Middleware<US> {
   constructor(readonly outputStreams?: readonly LogStream[]) {}
@@ -9,7 +9,7 @@ export class MetricsMiddleware<US extends Schema> implements Middleware<US> {
   didProcess(
     services: ServerServices<US>,
     req: GoatRequest,
-    _info: Deno.ServeHandlerInfo,
+    _info: ServeHandlerInfo,
     resp: Response,
   ): Promise<Response> {
     log(
