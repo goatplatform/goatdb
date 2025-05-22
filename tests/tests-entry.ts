@@ -10,6 +10,7 @@ import setupCommit from './commit.test.ts';
 import setupServerArchitectureTest from './server-architecture.test.ts';
 import { exit } from '../base/process.ts';
 import setupStaticAssetsEndpointTest from './static-assets-endpoint.test.ts';
+import setupHealthCheckEndpointTest from './health-check-endpoint.test.ts';
 
 // Minimal interface for globalThis with process.env
 interface GlobalWithProcessEnv {
@@ -40,6 +41,7 @@ async function main(): Promise<void> {
   setupCommit();
   await setupServerArchitectureTest();
   setupStaticAssetsEndpointTest();
+  setupHealthCheckEndpointTest();
   // Read suite and test name from environment variables (cross-platform)
   const suiteName = getEnvVar('GOATDB_SUITE');
   const testName = getEnvVar('GOATDB_TEST');
