@@ -28,7 +28,7 @@ export function getOS(): OperatingSystem {
   if (isDeno()) {
     return Deno.build.os;
   } else if (isNode()) {
-    const os = require('os');
+    const os = require('node:os');
     return os.platform();
   }
   notReached('Platform not supported');
