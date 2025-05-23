@@ -5,12 +5,18 @@ import {
   Server,
   type ServerOptions,
 } from '../net/server/server.ts';
-import type { ServeHandlerInfo } from '../net/server/http-compat.ts';
+import {
+  GoatRequest,
+  type ServeHandlerInfo,
+  createGoatHeaders,
+  NodeHeadersPolyfill,
+} from '../net/server/http-compat.ts';
 import { TEST } from './mod.ts';
 import { assertEquals, assertTrue } from './asserts.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import { generateBuildInfo } from '../server/build-info.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
+import { isDeno, isNode } from '../base/common.ts';
 
 export default async function setupServerArchitectureTest() {
   // Minimal DomainConfig for single-org
@@ -64,7 +70,9 @@ export default async function setupServerArchitectureTest() {
     server.registerEndpoint(ep1);
     server.registerEndpoint(ep2);
     // Should match ep1
-    const req1 = new Request('http://localhost/foo', { method: 'GET' });
+    const req1 = new GoatRequest(
+      new Request('http://localhost/foo', { method: 'GET' }),
+    );
     const info: ServeHandlerInfo = {
       remoteAddr: { hostname: 'localhost' },
       completed: Promise.resolve(),
@@ -73,7 +81,9 @@ export default async function setupServerArchitectureTest() {
     assertEquals(await resp1.text(), 'ep1');
     assertEquals(calls, ['ep1']);
     // Should match ep2 (not /foo)
-    const req2 = new Request('http://localhost/bar', { method: 'GET' });
+    const req2 = new GoatRequest(
+      new Request('http://localhost/bar', { method: 'GET' }),
+    );
     const resp2 = await server.processRequest(req2, info);
     assertEquals(await resp2.text(), 'ep2');
     assertEquals(calls, ['ep1', 'ep2']);
@@ -97,7 +107,9 @@ export default async function setupServerArchitectureTest() {
     };
     server.registerMiddleware(mid);
     server.registerEndpoint(ep);
-    const req = new Request('http://localhost/any', { method: 'GET' });
+    const req = new GoatRequest(
+      new Request('http://localhost/any', { method: 'GET' }),
+    );
     const info: ServeHandlerInfo = {
       remoteAddr: { hostname: 'localhost' },
       completed: Promise.resolve(),
@@ -126,7 +138,9 @@ export default async function setupServerArchitectureTest() {
     };
     server.registerMiddleware(mid);
     server.registerEndpoint(ep);
-    const req = new Request('http://localhost/ok', { method: 'GET' });
+    const req = new GoatRequest(
+      new Request('http://localhost/ok', { method: 'GET' }),
+    );
     const info: ServeHandlerInfo = {
       remoteAddr: { hostname: 'localhost' },
       completed: Promise.resolve(),
@@ -148,7 +162,9 @@ export default async function setupServerArchitectureTest() {
     };
     server.registerMiddleware(mid);
     // No endpoints match
-    const req = new Request('http://localhost/none', { method: 'GET' });
+    const req = new GoatRequest(
+      new Request('http://localhost/none', { method: 'GET' }),
+    );
     const info: ServeHandlerInfo = {
       remoteAddr: { hostname: 'localhost' },
       completed: Promise.resolve(),
@@ -168,7 +184,9 @@ export default async function setupServerArchitectureTest() {
       },
     };
     server.registerEndpoint(ep);
-    const req = new Request('http://localhost/fail', { method: 'GET' });
+    const req = new GoatRequest(
+      new Request('http://localhost/fail', { method: 'GET' }),
+    );
     const info: ServeHandlerInfo = {
       remoteAddr: { hostname: 'localhost' },
       completed: Promise.resolve(),
@@ -187,7 +205,9 @@ export default async function setupServerArchitectureTest() {
     };
     server.registerEndpoint(ep);
     // Use a URL that will not resolve to an orgId
-    const req = new Request('http://notfound/any', { method: 'GET' });
+    const req = new GoatRequest(
+      new Request('http://notfound/any', { method: 'GET' }),
+    );
     const info: ServeHandlerInfo = {
       remoteAddr: { hostname: 'notfound' },
       completed: Promise.resolve(),
@@ -195,4 +215,103 @@ export default async function setupServerArchitectureTest() {
     const resp = await server.processRequest(req, info);
     assertEquals(resp.status, 404);
   });
+  
+  // --- createGoatHeaders tests ---
+  TEST(
+    'ServerArchitecture',
+    'createGoatHeaders returns the correct implementation',
+    () => {
+      const headers = createGoatHeaders();
+      
+      // Verify the correct implementation is returned based on runtime
+      if (isDeno() || (typeof globalThis !== 'undefined' && 'Headers' in globalThis)) {
+        assertTrue(headers instanceof Headers, 'Should return Headers instance in Deno/browser');
+      } else if (isNode()) {
+        assertTrue(headers instanceof NodeHeadersPolyfill, 'Should return NodeHeadersPolyfill in Node.js');
+      }
+    },
+  );
+
+  TEST(
+    'ServerArchitecture',
+    'createGoatHeaders initializes with object literal',
+    async () => {
+      // Import the createGoatHeaders function
+      const { createGoatHeaders } = await import('../net/server/http-compat.ts');
+      
+      const headers = createGoatHeaders({
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer token123',
+      });
+      
+      assertEquals(
+        headers.get('content-type'),
+        'application/json',
+        'Should initialize with content-type header',
+      );
+      assertEquals(
+        headers.get('authorization'),
+        'Bearer token123',
+        'Should initialize with authorization header',
+      );
+    },
+  );
+
+  TEST(
+    'ServerArchitecture',
+    'createGoatHeaders initializes with array of entries',
+    async () => {
+      // Import the createGoatHeaders function
+      const { createGoatHeaders } = await import('../net/server/http-compat.ts');
+      
+      const headers = createGoatHeaders([
+        ['Content-Type', 'application/json'],
+        ['X-API-Key', 'abc123'],
+      ]);
+      
+      assertEquals(
+        headers.get('content-type'),
+        'application/json',
+        'Should initialize with content-type header from array',
+      );
+      assertEquals(
+        headers.get('x-api-key'),
+        'abc123',
+        'Should initialize with x-api-key header from array',
+      );
+    },
+  );
+
+  TEST(
+    'ServerArchitecture',
+    'createGoatHeaders initializes with existing headers',
+    async () => {
+      // Import the createGoatHeaders function
+      const { createGoatHeaders } = await import('../net/server/http-compat.ts');
+      
+      // Create initial headers
+      const initialHeaders = createGoatHeaders();
+      initialHeaders.set('Content-Type', 'text/plain');
+      initialHeaders.set('X-Custom', 'test-value');
+      
+      // Create new headers by extracting entries from existing headers
+      const entries: [string, string][] = [];
+      initialHeaders.forEach((value, key) => {
+        entries.push([key, value]);
+      });
+      
+      const headers = createGoatHeaders(entries);
+      
+      assertEquals(
+        headers.get('content-type'),
+        'text/plain',
+        'Should copy content-type from existing headers',
+      );
+      assertEquals(
+        headers.get('x-custom'),
+        'test-value',
+        'Should copy custom header from existing headers',
+      );
+    },
+  );
 }

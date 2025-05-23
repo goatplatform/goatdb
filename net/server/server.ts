@@ -434,10 +434,9 @@ export class Server<US extends Schema> {
    * @returns Promise resolving to the HTTP response
    */
   async processRequest(
-    req: Request,
+    goatReq: GoatRequest,
     info: ServeHandlerInfo,
   ): Promise<Response> {
-    const goatReq = new GoatRequest(req);
     if (goatReq.url === 'http://AWSALB/healthy') {
       return new Response(null, { status: 200 });
     }

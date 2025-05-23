@@ -177,10 +177,59 @@ function isWebRequest(req: unknown): req is Request {
 export type GoatHeaders = Headers | NodeHeadersPolyfill;
 
 /**
- * Polyfill for Headers that mimics standards-compliant behavior:
- * - append adds a new value (comma-separated)
- * - set overwrites
- * - get returns the first value (before the first comma), matching native Headers.get
+ * Creates a GoatHeaders instance with the appropriate implementation for the current runtime.
+ *
+ * @param init Optional headers initialization data
+ * @returns A GoatHeaders instance (either Headers or NodeHeadersPolyfill)
+ */
+export function createGoatHeaders(init?: HeadersInit): GoatHeaders {
+  if (typeof Headers !== 'undefined') {
+    // Web standard Headers is available (Deno or modern Node.js)
+    return new Headers(init);
+  } else if (isNode()) {
+    // Node.js environment without Headers
+    const headers = new NodeHeadersPolyfill();
+
+    // Process initialization data if provided
+    if (init) {
+      if (init instanceof Map || init instanceof NodeHeadersPolyfill) {
+        // Handle Map-like initialization
+        for (const [key, value] of init.entries()) {
+          headers.set(key, value);
+        }
+      } else if (Array.isArray(init)) {
+        // Handle array of header entries
+        for (const [key, value] of init) {
+          headers.set(key, value);
+        }
+      } else {
+        // Handle record/object initialization
+        for (const [key, value] of Object.entries(init)) {
+          headers.set(key, value);
+        }
+      }
+    }
+
+    return headers;
+  } else {
+    notReached('Unsupported runtime');
+  }
+}
+
+/**
+ * A polyfill implementation of the web standard Headers interface for Node.js
+ * environments. This class extends Map<string, string> to provide a
+ * standards-compliant Headers implementation that can be used interchangeably
+ * with the web standard Headers class.
+ *
+ * Use the GoatHeaders type when you need to work with headers in a
+ * cross-platform way:
+ * ```typescript
+ * function handleHeaders(headers: GoatHeaders) {
+ *   // Works with both web standard Headers and NodeHeadersPolyfill
+ *   headers.set('Content-Type', 'application/json');
+ * }
+ * ```
  */
 export class NodeHeadersPolyfill extends Map<string, string> {
   /**
@@ -423,7 +472,7 @@ export type ServeHandlerInfo = {
  */
 export interface MinimalHttpServer {
   start(
-    handler: (req: Request, info: ServeHandlerInfo) => Promise<Response>,
+    handler: (req: GoatRequest, info: ServeHandlerInfo) => Promise<Response>,
     port: number,
     signal?: AbortSignal,
   ): Promise<void>;
@@ -440,7 +489,7 @@ export class DenoHttpServer implements MinimalHttpServer {
 
   start(
     handler: (
-      req: Request,
+      req: GoatRequest,
       info: ServeHandlerInfo,
     ) => Promise<Response>,
     port: number,
@@ -468,7 +517,10 @@ export class DenoHttpServer implements MinimalHttpServer {
         const remoteAddr: HttpRemoteAddr = {
           hostname: (info.remoteAddr as any).hostname ?? 'localhost',
         };
-        return handler(req, { remoteAddr, completed: info.completed });
+        return handler(req as unknown as GoatRequest, {
+          remoteAddr,
+          completed: info.completed,
+        });
       },
     );
     this._started = true;
@@ -506,7 +558,7 @@ export class NodeHttpServer implements MinimalHttpServer {
    */
   async start(
     handler: (
-      req: Request,
+      req: GoatRequest,
       info: ServeHandlerInfo,
     ) => Promise<Response>,
     port: number,
@@ -542,7 +594,7 @@ export class NodeHttpServer implements MinimalHttpServer {
           };
 
           // Process request and get response
-          const response = await handler(goatReq as unknown as Request, info);
+          const response = await handler(goatReq, info);
 
           // Set response status and headers
           res.statusCode = response.status;

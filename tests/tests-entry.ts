@@ -31,7 +31,35 @@ function getEnvVar(key: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Main entry point for running tests.
+ *
+ * This function:
+ * 1. Sets up all test suites by calling their setup functions
+ * 2. Reads test configuration from environment variables
+ * 3. Runs the specified tests using the default test runner
+ * 4. Exits the process with code 0 if not running in a browser
+ *
+ * To register new tests:
+ * 1. Create a new test file (e.g. my-feature.test.ts)
+ * 2. Import the TEST function from './mod.ts'
+ * 3. Define test cases using TEST(suiteName, testName, testFunction)
+ * 4. Create a setup function that registers all tests
+ * 5. Import and call the setup function here in main()
+ *
+ * Example test registration:
+ * ```ts
+ * import { TEST } from './mod.ts';
+ *
+ * export default function setupMyFeatureTests() {
+ *   TEST('MyFeature', 'should do something', async (ctx) => {
+ *     // Test implementation
+ *   });
+ * }
+ * ```
+ */
 async function main(): Promise<void> {
+  // Set up all test suites
   setupUntrusted();
   setupTrusted();
   setupItemPath();
@@ -42,12 +70,15 @@ async function main(): Promise<void> {
   await setupServerArchitectureTest();
   setupStaticAssetsEndpointTest();
   setupHealthCheckEndpointTest();
-  // Read suite and test name from environment variables (cross-platform)
+
+  // Get test configuration from environment
   const suiteName = getEnvVar('GOATDB_SUITE');
   const testName = getEnvVar('GOATDB_TEST');
 
+  // Run the tests
   await TestsRunner.default.run(suiteName, testName);
 
+  // Exit if not in browser environment
   if (!isBrowser()) {
     await exit(0);
   }
