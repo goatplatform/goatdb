@@ -39,8 +39,7 @@ to simplify development while offering built-in optional
 
 - **<a href="https://goatdb.dev/repositories/">Repository-centric</a>:** Each
   repository is a self-contained unit, enabling natural sharding, isolation, and
-  fine-grained <a href="https://goatdb.dev/authorization-rules/">access
-  control</a>.
+  fine-grained <a href="https://goatdb.dev/authorization/">access control</a>.
 - **<a href="https://goatdb.dev/sync/">Stateless, probabilistic sync</a>:**
   Synchronization uses iterative Bloom filter exchanges for efficient,
   low-latency, and transport-agnostic convergence—no persistent sync state
@@ -158,16 +157,8 @@ To unlink GoatDB, run:
 deno run -A jsr:@goatdb/goatdb/link unlink
 ```
 
-For more on contributing, see the
-<a href="https://goatdb.dev/">documentation</a>.
-
 ## License
 
 GoatDB is licensed under the
 <a href="https://github.com/goatplatform/goatdb/blob/main/LICENSE">Apache 2.0
 License</a>.
-
----
-
-If GoatDB sounds interesting, please star the project or join the discussion. We
-appreciate your feedback and contributions as we work towards a stable v1.0.0.
