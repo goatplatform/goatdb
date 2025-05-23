@@ -16,7 +16,7 @@ nav_exclude: true
 </p>
 
 [GoatDB](https://goatdb.dev/) is an embedded, [distributed](/architecture),
-[document database](/concepts) that prioritizes [speed](/benchmarks) and
+document database that prioritizes [speed](/benchmarks) and
 [developer experience](/tutorial/). It excels at real-time collaboration and
 embedded caching applications.
 
