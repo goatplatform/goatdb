@@ -3,45 +3,48 @@ import { denoPlugins } from 'jsr:@luca/esbuild-deno-loader';
 import * as path from 'jsr:@std/path';
 
 /**
- * Compiles and runs a TypeScript file in Node.js environment.
+ * Compiles a TypeScript file using esbuild for execution in Node.js and returns the build result.
  *
- * This function uses esbuild to compile the TypeScript file into JavaScript,
- * then pipes the compiled output directly to a Node.js process. It handles
- * bundling dependencies and generating inline sourcemaps for better debugging.
+ * @param inputFile - Path to the TypeScript file to compile
+ * @param outName - Output file name (without extension)
+ * @returns The esbuild BuildResult
+ */
+export async function compileForNodeWithEsbuild(
+  inputFile: string,
+  outName: string,
+) {
+  return await esbuild.build({
+    entryPoints: [
+      {
+        in: inputFile,
+        out: outName,
+      },
+    ],
+    plugins: [...denoPlugins()],
+    outfile: outName,
+    bundle: true,
+    write: false,
+    sourcemap: 'inline',
+    logOverride: {
+      'empty-import-meta': 'silent',
+    },
+  });
+}
+
+/**
+ * Runs a pre-compiled esbuild result in Node.js environment.
  *
- * @param inputFile - Path to the TypeScript file to run
- * @param inspectBrk - Optional flag to enable Node.js inspector with break on
- *                     start
+ * @param result - The esbuild BuildResult (output of compileForNodeWithEsbuild)
+ * @param inspectBrk - Optional flag to enable Node.js inspector with break on start
  * @param env - Optional environment variables to set for the Node.js process
- * @returns A Promise that resolves to true if the Node.js process exits
- *          successfully, false otherwise
+ * @returns A Promise that resolves to true if the Node.js process exits successfully, false otherwise
  */
 export async function nodeRun(
-  inputFile: string,
+  result: Awaited<ReturnType<typeof compileForNodeWithEsbuild>>,
   inspectBrk?: boolean,
   env?: Record<string, string>,
 ): Promise<boolean> {
-  inputFile = path.resolve(Deno.cwd(), inputFile);
-  const outName = path.basename(inputFile).replace('.ts', '');
-  const entryPoints = [
-    {
-      in: inputFile,
-      out: outName,
-    },
-  ];
-
   try {
-    const result = await esbuild.build({
-      entryPoints,
-      plugins: [...denoPlugins()],
-      outfile: outName,
-      bundle: true,
-      write: false,
-      sourcemap: 'inline',
-      logOverride: {
-        'empty-import-meta': 'silent',
-      },
-    });
     const nodeCmd = new Deno.Command('node', {
       stdin: 'piped',
       stdout: 'inherit',

@@ -1,4 +1,4 @@
-import { nodeRun } from './node-run.ts';
+import { compileForNodeWithEsbuild, nodeRun } from './node-run.ts';
 
 /**
  * Runs tests in Deno and/or Node.js environments based on command line arguments.
@@ -96,6 +96,7 @@ async function runTests(): Promise<void> {
 
   let denoElapsed = 0;
   let nodeElapsed = 0;
+  let esbuildElapsed = 0;
 
   // Run tests in Deno if configured
   if (runDeno) {
@@ -135,7 +136,6 @@ async function runTests(): Promise<void> {
   // Run tests in Node.js if configured
   if (runNode) {
     console.log('=== ⚡️ Running tests in Node.js... ===');
-    const nodeStart = performance.now();
 
     // Set up environment variables
     const nodeEnv: Record<string, string> = { ...Deno.env.toObject() };
@@ -146,9 +146,21 @@ async function runTests(): Promise<void> {
       nodeEnv['GOATDB_TEST'] = testName;
     }
 
-    // Execute Node.js tests
-    await nodeRun('./tests/tests-entry.ts', nodeInspectBrk, nodeEnv);
+    // Compile with esbuild before timing
+    const inputFile = './tests/tests-entry.ts';
+    const outName = 'tests-entry';
+    console.log('🛠️ Bundling with esbuild for Node.js...');
+    const esbuildStart = performance.now();
+    const esbuildResult = await compileForNodeWithEsbuild(inputFile, outName);
+    const esbuildEnd = performance.now();
+    esbuildElapsed = (esbuildEnd - esbuildStart) / 1000;
+    console.log(
+      `🛠️ esbuild bundling completed in ${esbuildElapsed.toFixed(2)}s`,
+    );
 
+    const nodeStart = performance.now();
+    // Execute Node.js tests (timing only the Node.js phase)
+    await nodeRun(esbuildResult, nodeInspectBrk, nodeEnv);
     const nodeEnd = performance.now();
     nodeElapsed = (nodeEnd - nodeStart) / 1000;
     console.log('=== ⚡️ Tests in Node.js completed ===');
@@ -162,7 +174,9 @@ async function runTests(): Promise<void> {
     summary += ` Deno: ${denoElapsed.toFixed(2)}s`;
   }
   if (runNode) {
-    summary += ` | Node.js: ${nodeElapsed.toFixed(2)}s`;
+    summary += ` | esbuild: ${esbuildElapsed.toFixed(2)}s | Node.js: ${
+      nodeElapsed.toFixed(2)
+    }s`;
   }
   summary += ` | Total: ${totalElapsed.toFixed(2)}s ===`;
   console.log(summary);
