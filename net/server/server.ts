@@ -26,9 +26,9 @@ import type { Schema } from '../../cfds/base/schema.ts';
 import type { ManagedItem } from '../../db/managed-item.ts';
 import {
   createHttpServer,
-  GoatRequest,
-  HttpServerInstance,
-  ServeHandlerInfo,
+  type GoatRequest,
+  type HttpServerInstance,
+  type ServeHandlerInfo,
 } from './http-compat.ts';
 
 /**
