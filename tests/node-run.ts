@@ -1,6 +1,5 @@
 import * as esbuild from 'npm:esbuild';
 import { denoPlugins } from 'jsr:@luca/esbuild-deno-loader';
-import * as path from 'jsr:@std/path';
 
 /**
  * Compiles a TypeScript file using esbuild for execution in Node.js and returns the build result.
