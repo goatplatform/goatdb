@@ -11,6 +11,7 @@ import setupServerArchitectureTest from './server-architecture.test.ts';
 import { exit } from '../base/process.ts';
 import setupStaticAssetsEndpointTest from './static-assets-endpoint.test.ts';
 import setupHealthCheckEndpointTest from './health-check-endpoint.test.ts';
+import setupMinimalSync from './minimal-client-server-sync.test.ts';
 
 // Minimal interface for globalThis with process.env
 interface GlobalWithProcessEnv {
@@ -70,6 +71,7 @@ async function main(): Promise<void> {
   await setupServerArchitectureTest();
   setupStaticAssetsEndpointTest();
   setupHealthCheckEndpointTest();
+  setupMinimalSync();
 
   // Get test configuration from environment
   const suiteName = getEnvVar('GOATDB_SUITE');
