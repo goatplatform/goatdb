@@ -36,9 +36,9 @@ export default async function setupServerArchitectureTest() {
     path.join((await FileImplGet()).getCWD(), 'deno.json'),
   );
 
-  function makeServer() {
+  function makeServer(path: string) {
     const opts: ServerOptions<Schema> = {
-      path: './tmp-server-test',
+      path,
       buildInfo,
       domain,
       orgId: 'test-org',
@@ -48,8 +48,8 @@ export default async function setupServerArchitectureTest() {
     return new Server<Schema>(opts);
   }
 
-  TEST('ServerArchitecture', 'endpoint order and filter', async () => {
-    const server = makeServer();
+  TEST('ServerArchitecture', 'endpoint order and filter', async (ctx) => {
+    const server = makeServer(await ctx.tempDir('endpoint-filter'));
     const calls: string[] = [];
     // Endpoint 1: matches only GET /foo
     const ep1: Endpoint<Schema> = {
@@ -89,8 +89,8 @@ export default async function setupServerArchitectureTest() {
     assertEquals(calls, ['ep1', 'ep2']);
   });
 
-  TEST('ServerArchitecture', 'middleware blocks request', async () => {
-    const server = makeServer();
+  TEST('ServerArchitecture', 'middleware blocks request', async (ctx) => {
+    const server = makeServer(await ctx.tempDir('middleware-blocks'));
     let blocked = false;
     // Middleware that blocks all requests
     const mid: Middleware<Schema> = {
@@ -119,8 +119,8 @@ export default async function setupServerArchitectureTest() {
     assertTrue(blocked);
   });
 
-  TEST('ServerArchitecture', 'middleware modifies response', async () => {
-    const server = makeServer();
+  TEST('ServerArchitecture', 'middleware modifies response', async (ctx) => {
+    const server = makeServer(await ctx.tempDir('middleware-modifies'));
     // Middleware that adds a header
     const mid: Middleware<Schema> = {
       didProcess: async (_s, _r, _i, resp) => {
@@ -150,8 +150,8 @@ export default async function setupServerArchitectureTest() {
     assertEquals(resp.headers.get('X-Test'), 'yes');
   });
 
-  TEST('ServerArchitecture', '404 and didProcess middleware', async () => {
-    const server = makeServer();
+  TEST('ServerArchitecture', '404 and didProcess middleware', async (ctx) => {
+    const server = makeServer(await ctx.tempDir('404-didprocess'));
     let didProcessCalled = false;
     // Middleware that marks didProcess
     const mid: Middleware<Schema> = {
@@ -174,8 +174,8 @@ export default async function setupServerArchitectureTest() {
     assertTrue(didProcessCalled);
   });
 
-  TEST('ServerArchitecture', 'endpoint throws error', async () => {
-    const server = makeServer();
+  TEST('ServerArchitecture', 'endpoint throws error', async (ctx) => {
+    const server = makeServer(await ctx.tempDir('endpoint-throws'));
     // Endpoint that throws
     const ep: Endpoint<Schema> = {
       filter: () => true,
@@ -195,8 +195,8 @@ export default async function setupServerArchitectureTest() {
     assertEquals(resp.status, 500);
   });
 
-  TEST('ServerArchitecture', 'orgId not found returns 404', async () => {
-    const server = makeServer();
+  TEST('ServerArchitecture', 'orgId not found returns 404', async (ctx) => {
+    const server = makeServer(await ctx.tempDir('orgid-404'));
     // Endpoint that would match if orgId was found
     const ep: Endpoint<Schema> = {
       filter: () => true,
