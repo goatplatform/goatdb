@@ -203,6 +203,59 @@ export default function setup(): void {
     }
   });
 
+  TEST('Untrusted', 'ManagedItem loading state management', async (ctx) => {
+    const db = new GoatDB({
+      path: await ctx.tempDir('db-loading'),
+      orgId: 'test-org',
+      trusted: false,
+      registry: kDataRegistry,
+    });
+
+    try {
+      await db.readyPromise();
+
+      // Test 1: New item should start with ready = false, then become true after loading
+      const newItem = db.item('/test/loading', 'new-item');
+
+      // Even new items start with ready = false because they need to check the repo
+      assertEquals(newItem.ready, false);
+
+      // readyPromise should resolve after loading completes
+      await newItem.readyPromise();
+
+      // After loading, should be ready
+      assertEquals(newItem.ready, true);
+
+      // Test 2: Create and test with completely fresh repository to ensure loading behavior
+      const freshRepoPath = '/test/loading-fresh';
+      const freshItem = db.create(freshRepoPath, TestSchema, {
+        name: 'Fresh Loading Item',
+        count: 100,
+      });
+      await db.flush(freshRepoPath);
+
+      // Close and clear this repository
+      await db.close(freshRepoPath);
+
+      // Re-open with fresh item access - this should trigger loading
+      const loadedItem = db.item(freshRepoPath, freshItem.key);
+
+      // Test that readyPromise works correctly
+      await loadedItem.readyPromise();
+      assertEquals(loadedItem.ready, true);
+      assertEquals(loadedItem.get('name'), 'Fresh Loading Item');
+      assertEquals(loadedItem.get('count'), 100);
+
+      // Test 3: readyPromise should resolve immediately if already ready
+      const start2 = Date.now();
+      await loadedItem.readyPromise();
+      const elapsed2 = Date.now() - start2;
+      assertTrue(elapsed2 < 50); // Should be nearly instant when already ready
+    } finally {
+      await db.flushAll();
+    }
+  });
+
   TEST('Untrusted', 'close commits uncommitted changes', async (ctx) => {
     const db = new GoatDB({
       path: await ctx.tempDir('db-close-commit'),

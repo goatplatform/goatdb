@@ -17,7 +17,7 @@ import { assert } from '../base/error.ts';
  * @template US User schema type for the database
  */
 export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
-  extends Emitter<'change'> {
+  extends Emitter<'change' | 'LoadingFinished'> {
   private readonly _commitDelayTimer: Timer;
   private _head?: Commit;
   private _item!: Item<S>;
@@ -25,6 +25,9 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
   private _detachHandler?: () => void;
   private _age: number = 0;
   private _commitInProgress: boolean = false;
+  private _ready: boolean = false;
+  private _readyPromiseResolve?: () => void;
+  private _readyPromise?: Promise<void>;
 
   constructor(readonly db: GoatDB<US>, readonly path: string) {
     super();
@@ -32,6 +35,9 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     this.path = path;
     this._commitDelayTimer = new SimpleTimer(300, false, () => {
       this.commit();
+    });
+    this._readyPromise = new Promise<void>((resolve) => {
+      this._readyPromiseResolve = resolve;
     });
     const repo = db.repository(itemPathGetRepoId(path));
     this._item = Item.nullItem(db.registry);
@@ -47,6 +53,22 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    */
   get key(): string {
     return itemPathGetPart(this.path, 'item')!;
+  }
+
+  /**
+   * Returns whether this managed item is ready to use.
+   * An item is ready when its initial loading from the repository is complete.
+   */
+  get ready(): boolean {
+    return this._ready;
+  }
+
+  /**
+   * Returns a promise that resolves when this managed item is ready to use.
+   * If the item is already ready, the promise resolves immediately.
+   */
+  readyPromise(): Promise<void> {
+    return this._readyPromise!;
   }
 
   /**
@@ -390,5 +412,10 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
       // schedules a commit.
       this.rebase();
     }
+
+    // Mark as ready and notify waiters
+    this._ready = true;
+    this._readyPromiseResolve?.();
+    this.emit('LoadingFinished');
   }
 }

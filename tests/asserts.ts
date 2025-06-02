@@ -128,3 +128,22 @@ export function assertThrows(
     );
   }
 }
+
+/**
+ * Asserts that a number is less than another number.
+ * @param actual - The actual number to check
+ * @param expected - The number that actual should be less than
+ * @param message - Optional error message to display if assertion fails
+ * @throws {AssertionError} If actual is greater than or equal to expected
+ */
+export function assertLessThan(
+  actual: number,
+  expected: number,
+  message?: string,
+): void {
+  if (actual >= expected) {
+    throw new AssertionError(
+      message || `Expected ${actual} to be less than ${expected}`,
+    );
+  }
+}

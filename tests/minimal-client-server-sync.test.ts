@@ -2,11 +2,12 @@ import { TEST } from './mod.ts';
 import { GoatDB } from '../db/db.ts';
 import { Server } from '../net/server/server.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
-import { assertEquals, assertExists } from './asserts.ts';
+import { assertEquals, assertExists, assertLessThan } from './asserts.ts';
 import { generateBuildInfo } from '../server/build-info.ts';
 import * as path from '@std/path';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
 import type { Schema } from '../cfds/base/schema.ts';
+import { sleep } from '../base/time.ts';
 
 // Define a minimal test schema
 const MinimalTestSchema = {
@@ -112,17 +113,18 @@ export default function setup(): void {
         const serverItem = serverDb.item('/test/sync-repo', item.key);
 
         // Wait for the server item to finish loading
-        // ManagedItem starts with null state and loads asynchronously
-        await new Promise<void>((resolve) => {
-          const checkLoaded = () => {
-            if (serverItem.schema.ns !== null) {
-              resolve();
-            } else {
-              setTimeout(checkLoaded, 50);
-            }
-          };
-          checkLoaded();
-        });
+        await serverItem.readyPromise();
+
+        // Wait for the item to actually exist (have non-null schema)
+        const sleepStart = performance.now();
+        while (!serverItem.exists) {
+          await sleep(10);
+          assertLessThan(
+            performance.now() - sleepStart,
+            5000,
+            'Timeout waiting for item to exist',
+          );
+        }
 
         // Verify all data fields match
         assertExists(serverItem);
