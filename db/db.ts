@@ -51,11 +51,24 @@ import { Emitter } from '../base/emitter.ts';
 import { getGoatConfig } from '../server/config.ts';
 // import { remove } from '../base/json-log/json-log.ts';
 
+/**
+ * The mode of operation for a database instance.
+ *
+ * - 'client': The database operates as a client, syncing with server peers
+ * - 'server': The database operates as a server, accepting sync requests from
+ *   clients
+ */
+export type DBMode = 'client' | 'server';
+
 export interface DBInstanceConfig {
   /**
    * Absolute path to the directory that'll store the DB's data.
    */
   path: string;
+  /**
+   * The mode of operation for this database instance.
+   */
+  mode?: DBMode;
   /**
    * Optional organization id used to sandbox the data of a specific
    * organization in a multi-tenant deployment. Defaults to "localhost".
@@ -117,6 +130,7 @@ export class GoatDB<US extends Schema = Schema>
   readonly registry: DataRegistry;
   readonly trusted: boolean;
   readonly debug: boolean;
+  readonly mode: DBMode;
   private readonly _basePath: string;
   private readonly _repositories: Map<string, Repository>;
   private readonly _openPromises: Map<string, Promise<Repository>>;
@@ -139,6 +153,7 @@ export class GoatDB<US extends Schema = Schema>
   constructor(config: DBInstanceConfig) {
     super();
     this._basePath = config.path;
+    this.mode = config.mode || (isBrowser() ? 'client' : 'server');
     this.registry = config.registry || DataRegistry.default;
     this.orgId = config?.orgId || getGoatConfig().orgId;
     this._repositories = new Map();
@@ -617,7 +632,7 @@ export class GoatDB<US extends Schema = Schema>
       : this._basePath;
     this._settingsProvider = new FileSettings(
       this._basePath,
-      isBrowser() ? 'client' : 'server',
+      this.mode,
     );
     if (this._path) {
       this.queryPersistence = new QueryPersistence(
@@ -645,7 +660,9 @@ export class GoatDB<US extends Schema = Schema>
       },
     );
     if (this._peerURLs) {
-      const syncConfig = isBrowser() ? kSyncConfigClient : kSyncConfigServer;
+      const syncConfig = this.mode === 'client'
+        ? kSyncConfigClient
+        : kSyncConfigServer;
       this._syncSchedulers = this._peerURLs.map(
         (url) =>
           new SyncScheduler(
