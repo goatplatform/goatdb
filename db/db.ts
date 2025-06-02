@@ -52,6 +52,18 @@ import { getGoatConfig } from '../server/config.ts';
 // import { remove } from '../base/json-log/json-log.ts';
 
 /**
+ * The result of a sync operation with all peers for a repository.
+ *
+ * - { status: 'success' } if all peers succeeded
+ * - { status: 'failed' } if all peers failed
+ * - { status: 'partial', failedPeers: string[] } if some peers failed
+ */
+export type SyncResult =
+  | { status: 'success' }
+  | { status: 'failed' }
+  | { status: 'partial'; failedPeers: string[] };
+
+/**
  * The mode of operation for a database instance.
  *
  * - 'client': The database operates as a client, syncing with server peers
@@ -559,6 +571,73 @@ export class GoatDB<US extends Schema = Schema>
     );
     await Promise.allSettled(promises);
     await this.queryPersistence?.flushAll();
+  }
+
+  /**
+   * Syncs the given repository with all configured peers and waits for
+   * completion.
+   *
+   * @param path Path to the desired repository.
+   * @returns {Promise<SyncResult>} An object with a status field:
+   *   - { status: 'success' } if all peers succeeded
+   *   - { status: 'failed' } if all peers failed
+   *   - { status: 'partial', failedPeers: string[] } if some peers failed
+   *
+   * @example
+   * const result = await db.sync('/my-repo');
+   * if (result.status === 'success') {
+   *   console.log('All peers synced successfully!');
+   * } else if (result.status === 'failed') {
+   *   console.log('All peers failed to sync.');
+   * } else {
+   *   console.log('Some peers failed:', result.failedPeers);
+   * }
+   */
+  async sync(path: string): Promise<SyncResult> {
+    const repoId = itemPathGetRepoId(itemPathNormalize(path));
+    const clients = Array.from(this.clientsForRepo(repoId));
+    if (clients.length === 0) return { status: 'success' };
+    const results = await Promise.allSettled(clients.map((c) => c.sync()));
+    const failedPeers: string[] = results
+      .map((
+        r,
+        i,
+      ) => (r.status === 'fulfilled' ? null : clients[i].scheduler.url))
+      .filter((p): p is string => !!p);
+    if (failedPeers.length === 0) {
+      return { status: 'success' };
+    }
+    if (failedPeers.length === clients.length) {
+      return { status: 'failed' };
+    }
+    return { status: 'partial', failedPeers };
+  }
+
+  /**
+   * Syncs all open repositories with all configured peers and waits for completion.
+   *
+   * @returns {Promise<Record<string, SyncResult>>} An object mapping repoId to SyncResult.
+   *
+   * @example
+   * const results = await db.syncAll();
+   * for (const [repo, result] of Object.entries(results)) {
+   *   if (result.status === 'success') {
+   *     console.log(`${repo}: all peers synced!`);
+   *   } else if (result.status === 'failed') {
+   *     console.log(`${repo}: all peers failed!`);
+   *   } else {
+   *     console.log(`${repo}: some peers failed:`, result.failedPeers);
+   *   }
+   * }
+   */
+  async syncAll(): Promise<Record<string, SyncResult>> {
+    const repoIds = Array.from(this._repositories.keys());
+    const results = await Promise.all(repoIds.map((rid) => this.sync(rid)));
+    const out: Record<string, SyncResult> = {};
+    repoIds.forEach((rid, i) => {
+      out[rid] = results[i];
+    });
+    return out;
   }
 
   /**
