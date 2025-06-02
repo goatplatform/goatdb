@@ -9,7 +9,7 @@ import type {
 } from '../base/interfaces.ts';
 import { MovingAverage, randomInt } from '../base/math.ts';
 import { sleep } from '../base/time.ts';
-import { serviceUnavailable } from '../cfds/base/errors.ts';
+import { Code, ServerError, serviceUnavailable } from '../cfds/base/errors.ts';
 import { log } from '../logging/log.ts';
 import { SyncMessage } from './message.ts';
 import { sendJSONToURL } from './rest-api.ts';
@@ -223,13 +223,15 @@ export class SyncScheduler {
         await sleep(5);
       }
     } catch (e: unknown) {
-      log({
-        severity: 'INFO',
-        error: 'SerializeError',
-        value: respText,
-        message: (e as Error).message,
-        trace: (e as Error).stack,
-      });
+      if (!(e instanceof ServerError && e.code === Code.ServiceUnavailable)) {
+        log({
+          severity: 'INFO',
+          error: 'SerializeError',
+          value: respText,
+          message: (e as Error).message,
+          trace: (e as Error).stack,
+        });
+      }
       pendingRequests.forEach((r) => r.reject(serviceUnavailable()));
       return;
     } finally {
