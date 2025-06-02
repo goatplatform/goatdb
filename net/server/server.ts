@@ -376,6 +376,9 @@ export class Server<US extends Schema> {
       // Initialize service dependencies
       await services.email.setup(services);
 
+      // Wait for database to be ready before using it
+      await services.db.readyPromise();
+
       // Cache the services for future requests
       this._servicesByOrg.set(orgId, services);
     }
