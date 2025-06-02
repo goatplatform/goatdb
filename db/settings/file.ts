@@ -21,13 +21,16 @@ import { createNewSession } from '../../net/rest-api.ts';
 import { serviceUnavailable } from '../../cfds/base/errors.ts';
 import { SimpleTimer } from '../../base/timer.ts';
 import { retry } from '../../base/time.ts';
-
-export type FileSettingsMode = 'server' | 'client';
+import type { DBMode } from '../db.ts';
 
 export class FileSettings implements DBSettingsProvider {
   private _settings?: DBSettings;
 
-  constructor(readonly dir: string, readonly mode: FileSettingsMode) {}
+  constructor(
+    readonly dir: string,
+    readonly mode: DBMode,
+    readonly serverUrl?: string,
+  ) {}
 
   async load(): Promise<void> {
     let currentSession: OwnedSession | undefined;
@@ -70,6 +73,7 @@ export class FileSettings implements DBSettingsProvider {
         const keys = await generateKeyPair();
         const [publicSession, serverRoots] = await createNewSession(
           keys.publicKey,
+          this.serverUrl,
         );
         if (publicSession) {
           currentSession = {

@@ -633,6 +633,7 @@ export class GoatDB<US extends Schema = Schema>
     this._settingsProvider = new FileSettings(
       this._basePath,
       this.mode,
+      this._peerURLs ? this._peerURLs[0] : undefined,
     );
     if (this._path) {
       this.queryPersistence = new QueryPersistence(
