@@ -11,16 +11,31 @@ and GoatDB adheres to
 ### Added
 
 - `getGlobalLoggerStreams()` returns the currently set global log streams
+- `ManagedItem.loading` property to expose the loading status of managed items
+- `GoatDB.sync()` and `GoatDB.syncAll()` methods for manual synchronization
+- `GoatDB.mode` property to check the current database mode
+- `StderrLogStream` for logging to stderr
+- Support for client mode outside of browser environments
+- CLI support for Node.js environments
 
 ### Fixed
 
 - Removed dependency on @std/expect which fixes tests on node
+- Cross-platform compatibility improvements
+- Database loading synchronization issues
+- Missing commit contents validation - now throws an error when commit contents are missing
+- Cache file missing crash - no longer crashes if cache file doesn't exist
+- Node.js compatibility for tests and build process
 
 ### Changed
 
 - Updated all dependencies to latest versions
 - `ManagedItem.commit()` now ensures all changes are fully committed before
   returning.
+- Enhanced Node.js and Windows build support
+- Improved session handling and health check endpoints
+- Server code refactored to better support Node.js environments
+- Updated commit semantics for better reliability
 
 ## [0.3.1]
 
