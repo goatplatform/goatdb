@@ -1489,7 +1489,7 @@ export class Repository<
     for (const c of result) {
       this.emit('NewCommitSync', c);
     }
-    if (this.priorityRepo || typeof Deno !== 'undefined') {
+    if (this.priorityRepo || this.db.mode === 'server') {
       // Do it synchronously in the server
       for (const c of result) {
         this.emit('NewCommit', c);
