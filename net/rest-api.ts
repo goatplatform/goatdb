@@ -15,9 +15,11 @@ import { getCrypto } from '../base/common.ts';
 
 export async function createNewSession(
   publicKey: CryptoKey,
+  serverUrl?: string,
 ): Promise<[Session | undefined, Session[] | undefined]> {
   try {
-    const resp = await sendJSONToEndpoint('/auth/session', undefined, {
+    const url = serverUrl ? `${serverUrl}/auth/session` : '/auth/session';
+    const resp = await sendJSONToURL(url, undefined, {
       publicKey: (await getCrypto().subtle.exportKey(
         'jwk',
         publicKey,
