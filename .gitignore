@@ -5,3 +5,7 @@ build
 _site
 .jekyll-cache
 temp_bench_*
+# Code Index MCP cache directory
+.code_indexer/
+.mem
+.zed
