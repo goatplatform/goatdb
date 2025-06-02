@@ -60,3 +60,22 @@ export class ConsoleLogStream implements LogStream {
     }
   }
 }
+
+/**
+ * A LogStream implementation that writes log entries to stderr for all severities.
+ * This is intended for use in testing only, to ensure logs do not interfere with stdout output.
+ */
+export class StderrLogStream implements LogStream {
+  /**
+   * Appends a log entry to stderr (console.error) for all severities.
+   * @param e The normalized log entry to append
+   */
+  appendEntry(e: NormalizedLogEntry<LogEntry>): void {
+    let textLog = `[${new Date(e.timestamp).toISOString()}] `;
+    if (typeof e.message === 'string') {
+      textLog += e.message + ': ';
+    }
+    textLog += JSON.stringify(e, null, 2);
+    console.error(textLog);
+  }
+}
