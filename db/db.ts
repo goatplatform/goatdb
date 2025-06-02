@@ -756,15 +756,18 @@ export class GoatDB<US extends Schema = Schema>
           this.orgId,
         );
         clients.push(c);
-        if (!loadedFromBackup) {
-          c.sync().then(() => {
-            c.ready = true;
-            c.startSyncing();
-          });
-        } else {
-          c.ready = true;
-          c.startSyncing();
+        c.ready = true;
+        if (
+          !loadedFromBackup && repoId !== '/sys/sessions' &&
+          repoId !== '/sys/users'
+        ) {
+          try {
+            await c.sync();
+          } catch (_: unknown) {
+            // Ignore
+          }
         }
+        c.startSyncing();
       }
       this._repoClients!.set(repoId, clients);
     }
