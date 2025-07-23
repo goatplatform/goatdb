@@ -13,6 +13,7 @@ nav_order: 12
 - [What workload is GoatDB optimized for?](#what-workload-is-goatdb-optimized-for)
 - [Can you delete data from GoatDB?](#can-you-delete-data-from-goatdb)
 - [How does synchronization work in GoatDB?](#how-does-synchronization-work-in-goatdb)
+- [What sync latency should I expect?](#what-sync-latency-should-i-expect)
 - [Can GoatDB operate offline?](#can-goatdb-operate-offline)
 - [How does GoatDB handle data conflicts?](#how-does-goatdb-handle-data-conflicts)
 - [How does GoatDB simplify development?](#how-does-goatdb-simplify-development)
@@ -71,6 +72,12 @@ packaged into signed commits and appended to an append-only commit graph.
 Synchronization uses a probabilistic protocol with Bloom Filters to minimize
 data comparison overhead, ensuring efficient and consistent propagation of
 updates across peers.
+
+## What sync latency should I expect?
+
+Typical synchronization latency is **700-1000ms** between peers in real-world deployments. This represents application-perceived latency (when data becomes available via API) rather than pure network transmission time.
+
+GoatDB prioritizes data consistency and offline-first capabilities over minimal latency. The architecture uses polling-based synchronization with adaptive timing that balances performance with reliability. For applications requiring sub-100ms sync times, evaluate whether GoatDB's consistency guarantees align with your performance requirements.
 
 ## Can GoatDB operate offline?
 

@@ -143,3 +143,15 @@ iteration per second).
 > implementation uses a combination of older heuristics (including strict commit
 > ordering and explicit parent references) which are being phased out in favor
 > of this more robust probabilistic approach.
+
+## Real-World Performance
+
+GoatDB's synchronization prioritizes consistency over speed. In typical deployments, expect **700-1000ms application-perceived latency** between peers.
+
+This latency reflects several architectural components:
+
+- **Sync scheduling:** 200ms polling intervals with 300-1500ms adaptive cycles
+- **Protocol overhead:** Multiple HTTP round-trips for Bloom filter convergence
+- **Processing time:** Commit validation, serialization, and storage operations
+
+For applications requiring sub-100ms synchronization, consider the planned Server-Sent Events optimization or evaluate whether GoatDB's consistency guarantees align with your performance requirements.

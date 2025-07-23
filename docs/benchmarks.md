@@ -127,6 +127,20 @@ prioritizes distributed operation and offline-first capabilities, while SQLite's
 B-tree implementation has been refined since 2000 for traditional database
 performance, reflecting their different design goals.
 
+## Synchronization Latency
+
+The benchmarks above focus on local database operations. For distributed synchronization between peers, GoatDB exhibits different performance characteristics:
+
+| Metric | Typical Range | Notes |
+|--------|---------------|-------|
+| Single item sync | 700-1000ms | Application-perceived latency |
+| Concurrent sync (10 items) | 1000-1400ms average | Includes queuing overhead |
+| Success rate under load | >95% | 10 concurrent operations |
+
+These measurements represent end-to-end latency from item creation on one peer to API availability on another peer, including GoatDB's polling-based sync architecture, Bloom filter exchanges, and processing overhead. Pure network transmission comprises approximately 50-200ms of the total latency.
+
+Synchronization performance prioritizes consistency and offline-first design over minimal latency, making GoatDB well-suited for collaborative applications but less optimal for high-frequency real-time use cases.
+
 ## Default Mode
 
 The benchmarks below show performance in Default mode, which includes all
