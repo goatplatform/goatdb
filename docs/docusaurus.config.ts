@@ -9,7 +9,7 @@ import rehypeKatex from 'rehype-katex';
 const config: Config = {
   title: 'GoatDB Docs',
   tagline: 'GoatDB the embedded, distributed, document database',
-  favicon: 'img/favicon.svg',
+  favicon: 'img/favicon.png',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {

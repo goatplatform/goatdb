@@ -17,6 +17,7 @@ and GoatDB adheres to
 - `StderrLogStream` for logging to stderr
 - Support for client mode outside of browser environments
 - CLI support for Node.js environments
+- End-to-end latency testing with load testing capabilities
 
 ### Fixed
 
@@ -36,6 +37,7 @@ and GoatDB adheres to
 - Improved session handling and health check endpoints
 - Server code refactored to better support Node.js environments
 - Updated commit semantics for better reliability
+- Documentation migrated from Jekyll to Docusaurus for improved developer experience
 
 ## [0.3.1]
 
