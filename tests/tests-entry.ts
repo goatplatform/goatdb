@@ -12,6 +12,7 @@ import { exit } from '../base/process.ts';
 import setupStaticAssetsEndpointTest from './static-assets-endpoint.test.ts';
 import setupHealthCheckEndpointTest from './health-check-endpoint.test.ts';
 import setupMinimalSync from './minimal-client-server-sync.test.ts';
+import setupE2ELatency from './e2e-latency.test.ts';
 
 // Minimal interface for globalThis with process.env
 interface GlobalWithProcessEnv {
@@ -72,6 +73,7 @@ async function main(): Promise<void> {
   setupStaticAssetsEndpointTest();
   setupHealthCheckEndpointTest();
   setupMinimalSync();
+  setupE2ELatency();
 
   // Get test configuration from environment
   const suiteName = getEnvVar('GOATDB_SUITE');
