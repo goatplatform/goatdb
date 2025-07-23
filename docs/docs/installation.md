@@ -1,9 +1,10 @@
 ---
-permalink: /install/
-layout: default
+id: installation
 title: Install
-nav_order: 0
+sidebar_position: 0
+slug: /install
 ---
+
 
 ## GoatDB Installation
 
@@ -34,11 +35,13 @@ while Node.js support is currently **experimental**.
 
 Install using one of the following package managers:
 
-{: .warning }
+:::warning
 
 Node.js support is currently a work in progress and is not yet ready for
 production. Progress is tracked under this
 [GitHub issue](https://github.com/goatplatform/goatdb/issues/27).
+
+:::
 
 **npm:**
 

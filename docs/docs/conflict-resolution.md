@@ -1,9 +1,10 @@
 ---
-permalink: /conflict-resolution/
-layout: default
+id: conflict-resolution
 title: Conflict Resolution
-nav_order: 9
+sidebar_position: 9
+slug: /conflict-resolution
 ---
+
 
 # Conflict Resolution
 
@@ -135,7 +136,7 @@ global order. The resolution strategies are as follows:
    synchronized clocks, but may lead to unexpected results if clocks are
    significantly skewed.
 
-{: .highlight }
+:::tip
 
 Timestamp-based resolution is not fair and may lead to starvation in some cases,
 where changes from parties with slower clocks are consistently ignored. It is

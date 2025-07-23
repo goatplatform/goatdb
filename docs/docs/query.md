@@ -1,19 +1,22 @@
 ---
-permalink: /query/
-layout: default
+id: query
 title: Querying Data
-nav_order: 4
+sidebar_position: 4
+slug: /query
 ---
+
 
 # Querying Data in GoatDB
 
-{: .highlight }
+:::tip
 
 If you're building a [React](/react) UI, we recommend using the
 [React Hooks](/react) instead of working with [queries](/query) directly. The
 [hooks](/react) provide a more ergonomic interface for [React](/react)
 components and handle all the complexity of data [synchronization](/sync) and
 updates.
+
+:::
 
 GoatDB's query system provides real-time, efficient access to your data with
 automatic updates as the underlying data changes. Queries can be chained
@@ -40,15 +43,17 @@ await adminUsers.loadingFinished();
 const results = adminUsers.results();
 ```
 
-{: .highlight }
+:::tip
 
-> Predicate and sort functions must be
-> [pure functions](https://en.wikipedia.org/wiki/Pure_function):
->
-> - They should not modify any external state
-> - They should not depend on values that can change between calls
-> - They should not modify the items they receive (items are locked)
-> - Use the `ctx` parameter to pass in any external values needed
+Predicate and sort functions must be
+[pure functions](https://en.wikipedia.org/wiki/Pure_function):
+
+- They should not modify any external state
+- They should not depend on values that can change between calls
+- They should not modify the items they receive (items are locked)
+- Use the `ctx` parameter to pass in any external values needed
+
+:::
 
 ### Query Instance Reuse
 
@@ -98,10 +103,12 @@ const query = db.query({
 query.close();
 ```
 
-{: .highlight }
+:::tip
 
-> Always close queries when you're done with them to prevent memory leaks and
-> unnecessary resource usage.
+Always close queries when you're done with them to prevent memory leaks and
+unnecessary resource usage.
+
+:::
 
 ### Filtering Data
 
@@ -265,26 +272,34 @@ prioritizes developer experience without sacrificing [performance](/benchmarks):
 - **Transparent Caching**: Results are cached transparently without developer
   intervention
 
-![Local Copy & Offline Availability](/assets/local-copy.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/local-copy.svg" alt="Local Copy & Offline Availability" />
+</div>
 
 Each peer maintains a complete local copy of the database, enabling offline
 operation and low-latency access. The local copy is [synchronized](/sync) with
 the network when online, ensuring consistency across all peers.
 
-![Commit Storage & Age Assignment](/assets/commit-storage.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/commit-storage.svg" alt="Commit Storage & Age Assignment" />
+</div>
 
 As commits are stored in the database, each peer assigns its own monotonically
 increasing age number that reflect the order in which commits were received
 locally. These age numbers are local to each peer and are never synchronized
 across the network.
 
-![Query Cache & Age Tracking](/assets/query-cache.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/query-cache.svg" alt="Query Cache & Age Tracking" />
+</div>
 
 When persisting query results, we store both the results and the age of the
 latest commit included in those results. This allows us to efficiently track
 which commits have already been processed.
 
-![Incremental Query Updates](/assets/incremental-updates.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/incremental-updates.svg" alt="Incremental Query Updates" />
+</div>
 
 When new commits arrive, queries can efficiently resume execution from their
 last known age, only processing the new commits. This incremental update process

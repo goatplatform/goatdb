@@ -1,24 +1,29 @@
 ---
-permalink: /repositories/
-layout: default
+id: repositories
 title: Repositories
-nav_order: 7
+sidebar_position: 7
+slug: /repositories
 ---
+
 
 # Repositories in GoatDB
 
-{: .highlight }
+:::tip
 
 Repositories in GoatDB are the fundamental unit of data organization, similar to
 tables in SQL databases or document collections in NoSQL databases. Each
 repository manages a collection of related data items and provides synchronized,
 durable storage with efficient read and write operations.
 
+:::
+
 ## Core Concepts
 
 ### Storage Architecture
 
-![Repository Structure](/assets/repository-structure.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/repository-structure.svg" alt="Repository Structure" />
+</div>
 
 Each repository is backed by a single `.jsonl` file that stores a log of
 commits. This design takes advantage of modern SSD characteristics:
@@ -38,7 +43,9 @@ The [JSON Lines](https://jsonlines.org/) format provides several benefits:
 
 ### Commit Graphs
 
-![Distinct Commit Graphs](/assets/commit-graphs.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/commit-graphs.svg" alt="Distinct Commit Graphs" />
+</div>
 
 Repositories are collections of distinct commit graphs - one per item. Each item
 (identified by its key) has its own independent commit history, allowing for
@@ -70,23 +77,27 @@ This security model ensures that all operations in GoatDB are cryptographically
 signed, creating a tamper-proof commit graph where each change can be traced
 back to its authorized source.
 
-{: .note }
+:::note
 
-> For performance-critical applications or trusted environments (like backend
-> services), GoatDB offers a trusted mode that bypasses cryptographic
-> verification. This mode can significantly [improve performance](/benchmarks)
-> by skipping commit signing and verification. However, it should only be used
-> in controlled, trusted environments where [security](/sessions) is handled at
-> a different layer.
+For performance-critical applications or trusted environments (like backend
+services), GoatDB offers a trusted mode that bypasses cryptographic
+verification. This mode can significantly [improve performance](/benchmarks)
+by skipping commit signing and verification. However, it should only be used
+in controlled, trusted environments where [security](/sessions) is handled at
+a different layer.
+
+:::
 
 ## Basic Operations
 
 ### Reading Data
 
-{: .highlight }
+:::tip
 
 For more details on reading and writing data, see
 [Reading and Writing Data](/read-write-data).
+
+:::
 
 GoatDB provides several ways to read data from repositories:
 
@@ -128,14 +139,16 @@ workspaces), it is recommended to manually open (preload) the repository in
 advance using `db.open()`. This ensures the repository is ready for immediate
 use and avoids delays during user interactions.
 
-{: .note }
+:::note
 
-> When preloading a repository, you usually don't need to `await` the
-> result—just call `db.open()` and continue. It's safe to call `open()` multiple
-> times for the same repository; only the first call will actually start
-> loading. If the repository isn't fully loaded by the time you access its data,
-> GoatDB will automatically wait for loading to finish. This approach ensures
-> your application remains responsive and avoids unnecessary delays for users.
+When preloading a repository, you usually don't need to `await` the
+result—just call `db.open()` and continue. It's safe to call `open()` multiple
+times for the same repository; only the first call will actually start
+loading. If the repository isn't fully loaded by the time you access its data,
+GoatDB will automatically wait for loading to finish. This approach ensures
+your application remains responsive and avoids unnecessary delays for users.
+
+:::
 
 ### Closing a Repository
 
@@ -155,13 +168,15 @@ released from memory. This is currently a manual operation. In future versions
 of GoatDB, there will be an option to automatically close repositories when they
 are no longer in use.
 
-{: .note }
+:::note
 
-> In most cases, you don't need to `await` the result of `db.close()`. It's
-> common to simply call `db.close()` and let GoatDB handle the process in the
-> background. The system will ensure all changes are safely written to disk, so
-> you can keep your application responsive without waiting for the close
-> operation to finish.
+In most cases, you don't need to `await` the result of `db.close()`. It's
+common to simply call `db.close()` and let GoatDB handle the process in the
+background. The system will ensure all changes are safely written to disk, so
+you can keep your application responsive without waiting for the close
+operation to finish.
+
+:::
 
 ## Durability
 
@@ -176,16 +191,18 @@ GoatDB provides strong durability through:
    peers converge to the same state. The P2P design enables both clients and
    servers to act as active replicas, providing redundancy and resilience
 
-{: .note }
+:::note
 
-> Traditional database durability often focuses on server-side guarantees -
-> ensuring data survives server crashes. But in GoatDB, we recognize that client
-> durability is fundamentally different. Modern SSDs in laptops and phones
-> rarely fail, and when they do, it's typically due to physical damage rather
-> than data corruption. More importantly, user expectations differ between
-> client and server operations - if your phone dies mid-click, you wouldn't
-> expect that click's effect to be saved, but when a server acknowledges an API
-> call, you rightfully expect that operation to be durable.
+Traditional database durability often focuses on server-side guarantees -
+ensuring data survives server crashes. But in GoatDB, we recognize that client
+durability is fundamentally different. Modern SSDs in laptops and phones
+rarely fail, and when they do, it's typically due to physical damage rather
+than data corruption. More importantly, user expectations differ between
+client and server operations - if your phone dies mid-click, you wouldn't
+expect that click's effect to be saved, but when a server acknowledges an API
+call, you rightfully expect that operation to be durable.
+
+:::
 
 ## Advanced Usage
 

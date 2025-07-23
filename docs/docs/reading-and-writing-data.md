@@ -1,18 +1,21 @@
 ---
-permalink: /read-write-data/
-layout: default
+id: reading-and-writing-data
 title: Reading and Writing Data
-nav_order: 3
+sidebar_position: 3
+slug: /read-write-data
 ---
+
 
 # Reading and Writing Data in GoatDB
 
-{: .highlight }
+:::tip
 
 If you're writing UI code, we recommend using the [React Hooks](/react) instead
 of working with ManagedItems directly. The hooks provide a more ergonomic
 interface for [React](/react) components and handle all the complexity of data
 [synchronization](/sync) and updates.
+
+:::
 
 ## Overview
 
@@ -43,10 +46,12 @@ At its core, GoatDB uses [Items](/concepts#item) to represent data. An
 can be either mutable or immutable depending on its lock state. This design
 provides flexibility while maintaining data integrity.
 
-{: .note }
+:::note
 
 For information about schemas and how to define them, see the
 [Schema documentation](/schema).
+
+:::
 
 ### Managed Items: The Live Interface
 
@@ -67,7 +72,7 @@ userProfile.set('name', 'John Smith');
 // with other parts of your application
 ```
 
-{: .note }
+:::note
 
 [ManagedItem](/concepts#manageditem) maintains an in-memory, mutable
 [Item](/concepts#item) that can be modified directly. In the background, it
@@ -75,6 +80,8 @@ periodically computes diffs to track changes and [synchronize](/sync) them with
 both local storage and remote peers. When remote changes are received, they are
 merged back into the in-memory Item. This [design](/architecture) provides
 immediate local updates while ensuring eventual consistency across all peers.
+
+:::
 
 ## Working with Data
 
@@ -127,11 +134,13 @@ userProfile.delete('email');
 userProfile.set('theme', 'dark');
 ```
 
-{: .note }
+:::note
 
 All writes are processed asynchronously. The system batches changes and writes
 them to both local storage and remote servers in parallel for maximum
 performance.
+
+:::
 
 ### Item Lifecycle: Creation and Deletion
 
@@ -159,7 +168,7 @@ todoItem.isDeleted = true;
 todoItem.isDeleted = false;
 ```
 
-{: .note }
+:::note
 
 Deletion in GoatDB is soft-delete by default. [Items](/concepts#item) marked as
 deleted are not immediately removed but are instead hidden from
@@ -167,6 +176,8 @@ deleted are not immediately removed but are instead hidden from
 [garbage collection](/architecture/#garbage-collection). This design allows for
 easy [recovery](/repositories/#durability) of accidentally deleted items and
 maintains data history.
+
+:::
 
 ### Ensuring Data Durability
 
@@ -181,12 +192,14 @@ await db.flush('/todos/personal');
 await db.flushAll();
 ```
 
-{: .highlight }
+:::tip
 
 The `flush()` operation should be used sparingly as it can impact
 [performance](/benchmarks). The system is designed to handle writes efficiently
 in the background, and forcing immediate persistence is typically only needed in
 specific scenarios like application shutdown or critical data updates.
+
+:::
 
 ## Change Notifications
 
@@ -240,12 +253,14 @@ todoItem.on('change', (mutations) => {
 });
 ```
 
-{: .note }
+:::note
 
 The mutation system is primarily used internally for change tracking and
 synchronization. Most applications will use the higher-level
 [ManagedItem](/concepts#manageditem) API or [React Hooks](/react) instead of
 working with mutations directly.
+
+:::
 
 ## Data Validation
 
@@ -264,8 +279,10 @@ console.log(userProfile.get('age')); // Shows 150 temporarily
 // But it won't be persisted to storage or synchronized with the network
 ```
 
-{: .note }
+:::note
 
 Validation rules are defined in your [schema](/schema). GoatDB uses these rules
 to automatically prevent invalid data from being persisted or
 [synchronized](/sync), ensuring your data always meets the defined constraints.
+
+:::

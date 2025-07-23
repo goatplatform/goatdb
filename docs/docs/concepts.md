@@ -1,9 +1,10 @@
 ---
-permalink: /concepts/
-layout: home
+id: concepts
 title: Concepts
-nav_order: 1
+sidebar_position: 1
+slug: /concepts
 ---
+
 
 # Concepts
 
@@ -11,19 +12,6 @@ nav_order: 1
 [schema-based](/schema) database designed for collaborative applications that
 work consistently both online and offline. This document outlines the core
 concepts of [GoatDB](/).
-
-## Table of Contents
-
-1. [The Data Registry](#the-data-registry)
-2. [Data Model](#data-model)
-   - [Item](#item)
-   - [ManagedItem](#manageditem)
-   - [Schema](#schema)
-   - [Repository](#repository)
-   - [Path](#path)
-3. [Repositories](#repositories)
-   - [Repository Types](#repository-types)
-   - [System Repositories](#system-repositories)
 
 ## The Data Registry
 

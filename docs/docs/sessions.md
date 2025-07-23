@@ -1,9 +1,10 @@
 ---
-permalink: /sessions/
-layout: default
+id: sessions
 title: Sessions and Users
-nav_order: 4
+sidebar_position: 4
+slug: /sessions
 ---
+
 
 # Sessions and Users
 
@@ -20,7 +21,9 @@ key pairs**. The private key is generated and stored exclusively on the peer's
 machine, never leaving its local storage. Only the corresponding public key is
 shared with the GoatDB network.
 
-![Key Generation Illustration](/assets/key-gen.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/key-gen.svg" alt="Key Generation Illustration" />
+</div>
 
 Sessions come in two forms: identified sessions, which are tied to specific user
 IDs and peers, and anonymous sessions, which are only associated with specific
@@ -43,7 +46,9 @@ hasn't been tampered with) and proves the identity of the operation's creator.
 This dual verification system creates a robust foundation for both data
 integrity and accountability.
 
-![Signing and Verification Illustration](/assets/sign-verify.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/sign-verify.svg" alt="Signing and Verification Illustration" />
+</div>
 
 ## Distributed Security Architecture
 
@@ -54,7 +59,9 @@ in the network to verify its authenticity. This creates a tamper-proof
 authorized source, with invalid or unauthorized changes being automatically
 rejected by the network.
 
-![Distributed Security Illustration](/assets/distributed-security.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/distributed-security.svg" alt="Distributed Security Illustration" />
+</div>
 
 A key feature of this architecture is the client-as-replica design. Clients
 maintain their own copy of the [commit graph](/commit-graph) and verify all
@@ -77,16 +84,18 @@ verification and security controls. This mode can significantly
 [improve performance](/benchmarks/#trusted-mode) by skipping commit signing and
 verification.
 
-{: .note }
+:::note
 
-> Trusted mode is particularly useful in scenarios where:
->
-> - The application runs in a controlled, trusted environment
-> - Security is handled at a different layer (e.g., network security, container
->   isolation)
-> - Performance is a critical requirement
-> - The database is used as a backend service without direct client interaction
-> - As an active-active in-memory caching layer for performance optimization
+Trusted mode is particularly useful in scenarios where:
+
+- The application runs in a controlled, trusted environment
+- Security is handled at a different layer (e.g., network security, container
+  isolation)
+- Performance is a critical requirement
+- The database is used as a backend service without direct client interaction
+- As an active-active in-memory caching layer for performance optimization
+
+:::
 
 To enable trusted mode, set the `trusted` flag to `true` when creating a DB
 instance:
@@ -98,17 +107,19 @@ const db = new GoatDB({
 });
 ```
 
-{: .warning }
+:::warning
 
-> Note that trusted mode disables several security features:
->
-> - Cryptographic signing of commits
-> - Skips authorization rules
-> - Protection against unauthorized modifications
-> - Distributed security guarantees
->
-> Use trusted mode with caution and only in environments where the security
-> tradeoffs are acceptable.
+Note that trusted mode disables several security features:
+
+- Cryptographic signing of commits
+- Skips authorization rules
+- Protection against unauthorized modifications
+- Distributed security guarantees
+
+Use trusted mode with caution and only in environments where the security
+tradeoffs are acceptable.
+
+:::
 
 ## User Management Integration
 

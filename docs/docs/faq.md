@@ -1,31 +1,12 @@
 ---
-permalink: /faq/
-layout: default
+id: faq
 title: FAQ
-nav_order: 12
+sidebar_position: 12
+slug: /faq
 ---
 
-# GoatDB FAQ
 
-- [What is GoatDB?](#what-is-goatdb)
-- [Won't This Architecture Overload the Client?](#wont-this-architecture-overload-the-client)
-- [Won't it expose sensitive data to clients?](#wont-it-expose-sensitive-data-to-clients)
-- [What workload is GoatDB optimized for?](#what-workload-is-goatdb-optimized-for)
-- [Can you delete data from GoatDB?](#can-you-delete-data-from-goatdb)
-- [How does synchronization work in GoatDB?](#how-does-synchronization-work-in-goatdb)
-- [What sync latency should I expect?](#what-sync-latency-should-i-expect)
-- [Can GoatDB operate offline?](#can-goatdb-operate-offline)
-- [How does GoatDB handle data conflicts?](#how-does-goatdb-handle-data-conflicts)
-- [How does GoatDB simplify development?](#how-does-goatdb-simplify-development)
-- [What is the deployment process for GoatDB?](#what-is-the-deployment-process-for-goatdb)
-- [How does GoatDB ensure data reliability?](#how-does-goatdb-ensure-data-reliability)
-- [Does GoatDB support schema migrations?](#does-goatdb-support-schema-migrations)
-- [Can GoatDB integrate with data warehouses?](#can-goatdb-integrate-with-data-warehouses)
-- [What debugging tools does GoatDB provide?](#what-debugging-tools-does-goatdb-provide)
-- [How does GoatDB ensure compliance and auditability?](#how-does-goatdb-ensure-compliance-and-auditability)
-- [What is the performance impact of GoatDB on client devices?](#what-is-the-performance-impact-of-goatdb-on-client-devices)
-- [How does distributed local querying differ from centralized queries?](#how-does-distributed-local-querying-differ-from-centralized-queries)
-- [What licensing options does GoatDB offer?](#what-licensing-options-does-goatdb-offer)
+# GoatDB FAQ
 
 ## What is GoatDB?
 

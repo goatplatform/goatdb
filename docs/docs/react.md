@@ -1,9 +1,10 @@
 ---
-permalink: /react/
-layout: home
+id: react
 title: React
-nav_order: 4
+sidebar_position: 4
+slug: /react
 ---
+
 
 # GoatDB React Hooks
 
@@ -38,12 +39,14 @@ requiring additional setup steps. For more on storage and repositories, see
 const db = useDB();
 ```
 
-{: .note }
+:::note
 
-> The `useDB` hook maintains a single instance of the database throughout your
-> application's lifecycle. All subsequent calls to `useDB` will return the same
-> instance, ensuring consistent state management across your components. See
-> [Concepts](/concepts) for more on the data model.
+The `useDB` hook maintains a single instance of the database throughout your
+application's lifecycle. All subsequent calls to `useDB` will return the same
+instance, ensuring consistent state management across your components. See
+[Concepts](/concepts) for more on the data model.
+
+:::
 
 ### `useDBReady()`
 
@@ -73,12 +76,14 @@ function App() {
 }
 ```
 
-{: .highlight }
+:::tip
 
-> During the initial session setup, the client may require a network connection
-> in order to download the initial copy of the history. Once this setup is
-> complete, full offline functionality is supported. See
-> [Synchronization](/sync) and [Repositories](/repositories) for more details.
+During the initial session setup, the client may require a network connection
+in order to download the initial copy of the history. Once this setup is
+complete, full offline functionality is supported. See
+[Synchronization](/sync) and [Repositories](/repositories) for more details.
+
+:::
 
 ### `useQuery()`
 
@@ -107,17 +112,18 @@ execution from the cached state. For more on the data model, see
 - **`showIntermittentResults`** _(optional)_: If `true`, updates UI during
   initial scan
 
-{: .highlight }
+:::tip
 
-> GoatDB re-evaluates the entire query whenever any of its configuration values
-> change, including:
->
-> - The predicate function
-> - The sort descriptor function
-> - The context object
-> - The source repository
-> - The schema
->
+GoatDB re-evaluates the entire query whenever any of its configuration values
+change, including:
+
+- The predicate function
+- The sort descriptor function
+- The context object
+- The source repository
+- The schema
+
+:::
 > GoatDB internally calls `.toString()` on the passed functions to determine if
 > they have changed. While you don't need to explicitly use `useCallback` or
 > other memoization techniques, it's crucial that your predicate and sort
@@ -197,14 +203,16 @@ function TaskEditor({ path }) {
 }
 ```
 
-{: .note }
+:::note
 
-> The `useItem` hook will automatically trigger a re-render when:
->
-> - The item becomes available after loading
-> - Any tracked field changes
-> - The [schema](/schema) changes
-> - The item is deleted or restored
+The `useItem` hook will automatically trigger a re-render when:
+
+- The item becomes available after loading
+- Any tracked field changes
+- The [schema](/schema) changes
+- The item is deleted or restored
+
+:::
 
 ## Best Practices
 

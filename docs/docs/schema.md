@@ -1,9 +1,10 @@
 ---
-permalink: /schema/
-layout: default
+id: schema
 title: Schema
-nav_order: 6
+sidebar_position: 6
+slug: /schema
 ---
+
 
 # GoatDB Schemas
 

@@ -1,11 +1,10 @@
 ---
-# Feel free to add content and custom Front Matter to this file.
-# To modify the layout, see https://jekyllrb.com/docs/themes/#overriding-theme-defaults
-
-layout: home
+id: index
 title: Home
-nav_exclude: true
+slug: /
+hide_title: true
 ---
+
 
 # GoatDB: An Embedded, Distributed, Document Database
 
@@ -53,11 +52,13 @@ Items in [GoatDB](https://goatdb.dev/) are defined alongside their
 themselves versioned, making rolling schema updates via branches a natural
 mechanism.
 
-{: .highlight }
+:::tip
 
 Please keep in mind that [GoatDB](https://goatdb.dev/) is still under active
 development and therefore full backward compatibility is not guaranteed before
 reaching v1.0.0.
+
+:::
 
 If you like what we're building, please star ⭐️ our
 [GitHub project](https://github.com/goatplatform/goatdb). We really appreciate
@@ -79,4 +80,4 @@ Explore projects built with GoatDB:
 
 ## License
 
-GoatDB is licensed under the [Apache 2.0 License](LICENSE).
+GoatDB is licensed under the [Apache 2.0 License](https://github.com/goatplatform/goatdb/blob/main/LICENSE).

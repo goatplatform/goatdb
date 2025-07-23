@@ -1,9 +1,10 @@
 ---
-permalink: /ordering-items/
-layout: default
+id: order-stamps
 title: Ordering Items
-nav_order: 8
+sidebar_position: 8
+slug: /ordering-items
 ---
+
 
 # Ordering Items in [GoatDB](https://goatdb.dev)
 

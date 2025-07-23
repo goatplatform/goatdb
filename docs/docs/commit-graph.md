@@ -1,9 +1,10 @@
 ---
-permalink: /commit-graph/
-layout: default
+id: commit-graph
 title: Commit Graph
-nav_order: 11
+sidebar_position: 11
+slug: /commit-graph
 ---
+
 
 # Commit Graph
 
@@ -37,12 +38,9 @@ the maximum supported offline period. For example, if configured to retain two
 weeks of history, clients can go offline for up to two weeks and still rejoin
 the network and merge their offline edits.
 
-<p align="center">
-<img src="https://github.com/user-attachments/assets/eb7690f8-d814-4240-886c-8427ee96513f" width=600>
-</p>
-<p align="center">
-<sup>An example of a real world commit graph being edited by two users in realtime</sup>
-</p>
+<div style={{textAlign: 'center'}}>
+  <img src="/img/commit-graphs.svg" alt="An example of a real world commit graph being edited by two users in realtime" />
+</div>
 
 ## Creation Process
 

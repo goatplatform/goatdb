@@ -1,9 +1,10 @@
 ---
-permalink: /authorization/
-layout: default
+id: authorization-rules
 title: Authorization
-nav_order: 5
+sidebar_position: 5
+slug: /authorization
 ---
+
 
 # Authorization
 
@@ -14,7 +15,9 @@ write to specific [repositories](/repositories) or items within repositories.
 For details about how sessions and authentication work, see
 [Sessions and Users](/sessions) and [Concepts](/concepts).
 
-![Auth Rule Diagram](/assets/auth-rules.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/auth-rules.svg" alt="Auth Rule Diagram" />
+</div>
 
 ## Overview
 
@@ -234,14 +237,16 @@ architectural reasons. GoatDB's [trusted mode](/sessions#trusted-mode) allows
 you to disable authorization rule evaluation entirely. For performance
 implications, see [Benchmarks](/benchmarks#trusted-mode).
 
-{: .note }
+:::note
 
-> Trusted mode is particularly useful when:
->
-> - Building high-performance microservices that handle their own access control
-> - Running in a controlled environment where network-level security is
->   sufficient
-> - Using GoatDB as a caching layer with separate authorization mechanisms
+Trusted mode is particularly useful when:
+
+- Building high-performance microservices that handle their own access control
+- Running in a controlled environment where network-level security is
+  sufficient
+- Using GoatDB as a caching layer with separate authorization mechanisms
+
+:::
 
 To enable trusted mode, set the `trusted` flag to `true` when creating a DB
 instance:
@@ -260,20 +265,22 @@ When trusted mode is enabled:
 - User-specific repositories (`/user/*`) can be accessed by any session
 - Role-based access control is effectively disabled
 
-{: .warning }
+:::warning
 
-> Important considerations when using trusted mode:
->
-> - Authorization rules provide critical security boundaries—disabling them
->   removes these protections
-> - All sessions gain full access to all repositories and items
-> - The security model shifts from GoatDB's authorization system to your
->   application's security layer
-> - This mode should only be used when you have equivalent or better security
->   controls at a different layer
->
-> Use trusted mode with extreme caution and only in environments where you can
-> guarantee security through other means.
+Important considerations when using trusted mode:
+
+- Authorization rules provide critical security boundaries—disabling them
+  removes these protections
+- All sessions gain full access to all repositories and items
+- The security model shifts from GoatDB's authorization system to your
+  application's security layer
+- This mode should only be used when you have equivalent or better security
+  controls at a different layer
+
+Use trusted mode with extreme caution and only in environments where you can
+guarantee security through other means.
+
+:::
 
 For more on security, durability, and distributed design, see
 [Architecture](/architecture), [FAQ](/faq), and

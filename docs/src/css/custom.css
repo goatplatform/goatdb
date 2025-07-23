@@ -1,0 +1,93 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* Import KaTeX CSS for math rendering */
+@import url('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css');
+
+/* You can override the default Infima variables here. */
+:root {
+  --ifm-color-primary: #7c4dff;
+  --ifm-color-primary-dark: #651fff;
+  --ifm-color-primary-darker: #6200ea;
+  --ifm-color-primary-darkest: #4a00b4;
+  --ifm-color-primary-light: #9775ff;
+  --ifm-color-primary-lighter: #a891ff;
+  --ifm-color-primary-lightest: #c2b0ff;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+/* For readability concerns, you should choose a lighter palette in dark mode. */
+[data-theme='dark'] {
+  --ifm-color-primary: #9775ff;
+  --ifm-color-primary-dark: #7c4dff;
+  --ifm-color-primary-darker: #651fff;
+  --ifm-color-primary-darkest: #6200ea;
+  --ifm-color-primary-light: #a891ff;
+  --ifm-color-primary-lighter: #b9a4ff;
+  --ifm-color-primary-lightest: #c2b0ff;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+/* Override admonition colors to use purple theme */
+:root {
+  /* Tip admonition (replacing green) */
+  --ifm-color-success: #7c4dff;
+  --ifm-color-success-dark: #651fff;
+  --ifm-color-success-darker: #6200ea;
+  --ifm-color-success-darkest: #4a00b4;
+  --ifm-color-success-light: #9775ff;
+  --ifm-color-success-lighter: #a891ff;
+  --ifm-color-success-lightest: #c2b0ff;
+  
+  /* Info admonition */
+  --ifm-color-info: #5e35b1;
+  --ifm-color-info-dark: #512da8;
+  --ifm-color-info-darker: #4527a0;
+  --ifm-color-info-darkest: #311b92;
+  --ifm-color-info-light: #7e57c2;
+  --ifm-color-info-lighter: #9575cd;
+  --ifm-color-info-lightest: #b39ddb;
+}
+
+[data-theme='dark'] {
+  /* Tip admonition (replacing green) in dark mode */
+  --ifm-color-success: #9775ff;
+  --ifm-color-success-dark: #7c4dff;
+  --ifm-color-success-darker: #651fff;
+  --ifm-color-success-darkest: #6200ea;
+  --ifm-color-success-light: #a891ff;
+  --ifm-color-success-lighter: #b9a4ff;
+  --ifm-color-success-lightest: #c2b0ff;
+  
+  /* Info admonition in dark mode */
+  --ifm-color-info: #9575cd;
+  --ifm-color-info-dark: #7e57c2;
+  --ifm-color-info-darker: #673ab7;
+  --ifm-color-info-darkest: #5e35b1;
+  --ifm-color-info-light: #b39ddb;
+  --ifm-color-info-lighter: #c5b3e6;
+  --ifm-color-info-lightest: #d1c4e9;
+}
+
+/* Override admonition backgrounds */
+.admonition-tip,
+.admonition-success,
+.alert--success {
+  --ifm-alert-background-color: rgba(124, 77, 255, 0.1);
+  --ifm-alert-background-color-highlight: rgba(124, 77, 255, 0.15);
+  --ifm-alert-foreground-color: var(--ifm-color-success-darkest);
+  --ifm-alert-border-color: var(--ifm-color-success-dark);
+}
+
+[data-theme='dark'] .admonition-tip,
+[data-theme='dark'] .admonition-success,
+[data-theme='dark'] .alert--success {
+  --ifm-alert-background-color: rgba(151, 117, 255, 0.1);
+  --ifm-alert-background-color-highlight: rgba(151, 117, 255, 0.15);
+  --ifm-alert-foreground-color: var(--ifm-color-success-lightest);
+  --ifm-alert-border-color: var(--ifm-color-success);
+}

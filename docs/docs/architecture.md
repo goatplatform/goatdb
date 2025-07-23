@@ -1,9 +1,10 @@
 ---
-permalink: /architecture/
-layout: default
+id: architecture
 title: Architecture
-nav_order: 2
+sidebar_position: 2
+slug: /architecture
 ---
+
 
 # GoatDB Architecture
 
@@ -15,7 +16,9 @@ foundations and design decisions that shape GoatDB's architecture.
 
 ## Repository-Centric Design
 
-![Repository-Centric Design](/assets/repository-model.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/repository-model.svg" alt="Repository-Centric Design" />
+</div>
 
 The [repository model](/repositories) in [GoatDB](/) takes inspiration from DVCS
 systems but adapts it for database operations. Each [repository](/repositories)
@@ -44,7 +47,9 @@ need to be designed with performance in mind.
 
 ## Memory Management
 
-![Memory Management](/assets/memory-management.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/memory-management.svg" alt="Memory Management" />
+</div>
 
 GoatDB's memory management approach prioritizes explicit control over automatic
 optimization. This design decision reflects several technical tradeoffs. While
@@ -65,7 +70,9 @@ configurable policies might provide a balance between control and convenience.
 
 ## Local Query Processing
 
-![Local Query Processing](/assets/query-processing.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/query-processing.svg" alt="Local Query Processing" />
+</div>
 
 The [query system](/query) in GoatDB implements a deterministic, real-time query
 engine that processes data locally while maintaining consistency across
@@ -101,7 +108,9 @@ debugging and troubleshooting.
 
 ## Synchronization Protocol
 
-![Synchronization Protocol](/assets/sync-protocol.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/sync-protocol.svg" alt="Synchronization Protocol" />
+</div>
 
 The [synchronization protocol](/sync) implements a stateless, delta-compressed
 approach to data exchange. This design enables efficient transmission of changes
@@ -118,7 +127,9 @@ integrity during both synchronization and recovery operations.
 
 ## Garbage Collection
 
-![Garbage Collection](/assets/garbage-collection.svg)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/garbage-collection.svg" alt="Garbage Collection" />
+</div>
 
 GoatDB's garbage collection system (currently in design phase) uses a time-based
 approach to managing commit history. It takes advantage of the system's

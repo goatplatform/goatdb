@@ -1,14 +1,10 @@
 ---
-permalink: /sync/
-layout: default
+id: sync
 title: Synchronization
-nav_order: 10
+sidebar_position: 10
+slug: /sync
 ---
 
-<script
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
-  type="text/javascript"
-></script>
 
 # Synchronization Protocol
 
@@ -136,13 +132,15 @@ rate at a minimum of `0.001`, we ensure that a gap larger than three commits is
 extremely unlikely—occurring roughly once every 32 years (assuming one sync
 iteration per second).
 
-{: .note }
+:::note
 
-> The partition handling mechanism described above is currently a work in
-> progress and has not yet been fully implemented in the codebase. The current
-> implementation uses a combination of older heuristics (including strict commit
-> ordering and explicit parent references) which are being phased out in favor
-> of this more robust probabilistic approach.
+The partition handling mechanism described above is currently a work in
+progress and has not yet been fully implemented in the codebase. The current
+implementation uses a combination of older heuristics (including strict commit
+ordering and explicit parent references) which are being phased out in favor
+of this more robust probabilistic approach.
+
+:::
 
 ## Real-World Performance
 

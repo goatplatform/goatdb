@@ -1,9 +1,10 @@
 ---
-permalink: /tutorial/
-layout: default
+id: tutorial
 title: Tutorial
-nav_order: 2
+sidebar_position: 2
+slug: /tutorial
 ---
+
 
 # Building a Todo List App with GoatDB
 
@@ -112,7 +113,7 @@ export function Header() {
 ### TaskItem Component
 
 The `TaskItem` component displays and manages individual tasks
-[items](/concepts#items):
+[items](/concepts#item):
 
 ```tsx
 // client/TaskItem.tsx

@@ -1,18 +1,12 @@
 ---
-permalink: /benchmarks/
-layout: default
+id: benchmarks
 title: Benchmarks
-nav_order: 8
+sidebar_position: 8
+slug: /benchmarks
 ---
 
-# GoatDB Benchmarks
 
-- [Summary](#summary)
-- [Default Mode](#default-mode)
-- [Trusted Mode](#trusted-mode)
-- [Fast Mode](#fast-mode)
-- [SQLite Comparison](#sqlite-comparison)
-  - [synchronous = OFF](#synchronous--off)
+# GoatDB Benchmarks
 
 GoatDB's benchmarks provide a performance comparison between GoatDB's different
 operational modes and SQLite. These benchmarks help understand the performance
