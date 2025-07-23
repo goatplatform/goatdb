@@ -9,3 +9,6 @@ temp_bench_*
 .code_indexer/
 .mem
 .zed
+# ChunkHound cache directory
+.chunkhound/
+.chunkhound.json
