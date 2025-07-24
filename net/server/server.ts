@@ -311,7 +311,7 @@ export class Server<US extends Schema> {
     getGoatConfig().serverData = this;
     this._servicesByOrg = new Map();
     setGlobalLoggerStreams(options.logStreams || []);
-    if (!options.port) {
+    if (options.port === undefined) {
       options.port = 8080;
     }
     if (!options.orgId) {
@@ -572,5 +572,48 @@ export class Server<US extends Schema> {
     ).then(resolve);
 
     return result;
+  }
+
+  /**
+   * Get the actual port the server is listening on.
+   * This is useful when port 0 was specified for dynamic allocation.
+   * Returns undefined if server hasn't started yet.
+   */
+  get port(): number | undefined {
+    return this._httpServer?.port;
+  }
+
+  /**
+   * Get the full server address including dynamically allocated port.
+   * Returns undefined if server hasn't started yet.
+   */
+  get address(): { hostname: string; port: number } | undefined {
+    return this._httpServer?.address;
+  }
+
+  /**
+   * Gracefully stops the server and all its services.
+   * Safe to call multiple times.
+   */
+  async stop(): Promise<void> {
+    if (!this._abortController) {
+      return;
+    }
+
+    // Stop all services for each org
+    for (const services of this._servicesByOrg.values()) {
+      for (const v of Object.values(services)) {
+        if (v instanceof BaseService) {
+          v.stop();
+        }
+      }
+    }
+
+    // Stop HTTP server
+    this._httpServer?.stop();
+
+    // Abort any pending operations
+    this._abortController.abort();
+    this._abortController = undefined;
   }
 }

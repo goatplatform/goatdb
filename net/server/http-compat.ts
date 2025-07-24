@@ -477,6 +477,8 @@ export interface MinimalHttpServer {
     signal?: AbortSignal,
   ): Promise<void>;
   stop(): void;
+  readonly port?: number;
+  readonly address?: { hostname: string; port: number };
 }
 
 /**
@@ -530,6 +532,29 @@ export class DenoHttpServer implements MinimalHttpServer {
   stop(): void {
     this._abortController?.abort();
     this._started = false;
+  }
+
+  get port(): number | undefined {
+    if (!this._server) return undefined;
+    const addr = this._server.addr;
+    // Handle both network and Unix addresses
+    if ('port' in addr) {
+      return addr.port;
+    }
+    return undefined;
+  }
+
+  get address(): { hostname: string; port: number } | undefined {
+    if (!this._server) return undefined;
+    const addr = this._server.addr;
+    // Handle both network and Unix addresses
+    if ('port' in addr && 'hostname' in addr) {
+      return {
+        hostname: addr.hostname,
+        port: addr.port,
+      };
+    }
+    return undefined;
   }
 }
 
@@ -642,6 +667,22 @@ export class NodeHttpServer implements MinimalHttpServer {
   stop(): void {
     this._server?.close();
     this._started = false;
+  }
+
+  get port(): number | undefined {
+    if (!this._server) return undefined;
+    const addr = (this._server as any).address();
+    return addr ? addr.port : undefined;
+  }
+
+  get address(): { hostname: string; port: number } | undefined {
+    if (!this._server) return undefined;
+    const addr = (this._server as any).address();
+    if (!addr) return undefined;
+    return {
+      hostname: addr.address || 'localhost',
+      port: addr.port,
+    };
   }
 }
 
