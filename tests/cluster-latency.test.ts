@@ -1,16 +1,3 @@
-/**
- * Cluster Latency Test for GoatDB
- * 
- * This test measures server-to-server sync latency in a 3-node cluster:
- * - Creates 3 independent GoatDB servers with unique ports
- * - Each server has the other two configured as peers for automatic sync
- * - Measures how long it takes for data to propagate between servers
- * - Reports comprehensive latency statistics for all sync paths
- */
-export default function setupClusterLatency() {
-  // Test registration happens automatically when TEST() calls are executed
-}
-
 import { assertExists, assertTrue } from './asserts.ts';
 import { TEST, TestSuite } from './mod.ts';
 import { GoatDB } from '../db/db.ts';
@@ -186,8 +173,18 @@ function displayClusterStats(
   console.log(`======================================\n`);
 }
 
-// Main cluster latency test
-TEST('cluster-latency', 'measure-cluster-sync-latency', async (ctx: TestSuite) => {
+/**
+ * Cluster Latency Test for GoatDB
+ * 
+ * This test measures server-to-server sync latency in a 3-node cluster:
+ * - Creates 3 independent GoatDB servers with unique ports
+ * - Each server has the other two configured as peers for automatic sync
+ * - Measures how long it takes for data to propagate between servers
+ * - Reports comprehensive latency statistics for all sync paths
+ */
+export default function setupClusterLatency() {
+  // Main cluster latency test
+  TEST('cluster-latency', 'measure-cluster-sync-latency', async (ctx: TestSuite) => {
   const NUM_SERVERS = 3;
   const NUM_ROUNDS = 10;
   const ORG_ID = 'cluster-test';
@@ -418,4 +415,5 @@ TEST('cluster-latency', 'measure-cluster-sync-latency', async (ctx: TestSuite) =
     
     console.log('✅ Cluster cleanup completed\n');
   }
-});
+  });
+}

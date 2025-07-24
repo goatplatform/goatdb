@@ -15,6 +15,13 @@
  * All actual test code is defined below and registered via the setup function.
  */
 
+import { assertEquals, assertExists, assertTrue, assertLessThan } from './asserts.ts';
+import { TEST, TestSuite } from './mod.ts';
+import { GoatDB } from '../db/db.ts';
+import { Server } from '../net/server/server.ts';
+import { DataRegistry } from '../cfds/base/data-registry.ts';
+import { sleep } from '../base/time.ts';
+
 /**
  * Setup function required by GoatDB test infrastructure
  * 
@@ -22,12 +29,8 @@
  * It must be the default export so tests-entry.ts can import and call it.
  */
 export default function setupE2ELatency() {
-  // Test registration happens automatically when TEST() calls are executed
-  // The actual test definitions below will register themselves when this module loads
-}
-
-/**
- * End-to-End Latency Test for GoatDB
+  /**
+   * End-to-End Latency Test for GoatDB
  * 
  * MEASUREMENT METHODOLOGY:
  * This test measures "Application-Perceived Sync Latency" - the time from when
@@ -54,22 +57,15 @@ export default function setupE2ELatency() {
  * The test simulates realistic distributed application scenarios.
  */
 
-import { assertEquals, assertExists, assertTrue, assertLessThan } from './asserts.ts';
-import { TEST, TestSuite } from './mod.ts';
-import { GoatDB } from '../db/db.ts';
-import { Server } from '../net/server/server.ts';
-import { DataRegistry } from '../cfds/base/data-registry.ts';
-import { sleep } from '../base/time.ts';
-
-/**
- * Schema definition for latency test items
+  /**
+   * Schema definition for latency test items
  * 
  * Each test item contains:
  * - message: A human-readable description of the test
  * - createdAt: High-precision timestamp (performance.now()) when item was created
  * - clientId: Identifier of the client that created the item
  */
-const LatencyTestSchema = {
+  const LatencyTestSchema = {
   ns: 'latency-test',
   version: 1,
   fields: {
@@ -79,29 +75,29 @@ const LatencyTestSchema = {
   },
 } as const;
 
-// TypeScript type for better type safety in test code
-type LatencyTestItem = {
+  // TypeScript type for better type safety in test code
+  type LatencyTestItem = {
   message: string;
   createdAt: number;
   clientId: string;
 };
 
-/**
- * Test-specific data registry
+  /**
+   * Test-specific data registry
  * 
  * Each test needs its own registry to avoid conflicts with other tests.
  * The registry must be shared between server and all clients for schema consistency.
  */
-const testRegistry = new DataRegistry();
-testRegistry.registerSchema(LatencyTestSchema);
+  const testRegistry = new DataRegistry();
+  testRegistry.registerSchema(LatencyTestSchema);
 
-/**
- * Domain configuration for test environment
+  /**
+   * Domain configuration for test environment
  * 
  * GoatDB uses domain resolution to determine which organization a client belongs to.
  * For testing, we map all localhost connections to a single test organization.
  */
-function createTestDomainConfig() {
+  function createTestDomainConfig() {
   return {
     // Map organization IDs to their base URLs
     resolveOrg: (orgId: string) => `http://localhost/${orgId}`,
@@ -118,20 +114,20 @@ function createTestDomainConfig() {
   };
 }
 
-/**
- * Build information required by GoatDB server
+  /**
+   * Build information required by GoatDB server
  * 
  * In production, this would contain actual version/commit info.
  * For tests, we use placeholder values.
  */
-const buildInfo = {
+  const buildInfo = {
   version: '0.0.0',
   commit: 'test',
   buildTime: new Date().toISOString(),
 };
 
-/**
- * PRIMARY TEST: Basic End-to-End Latency Measurement
+  /**
+   * PRIMARY TEST: Basic End-to-End Latency Measurement
  * 
  * This test implements the core requirement:
  * 1. Start server
@@ -143,7 +139,7 @@ const buildInfo = {
  * 
  * The test also verifies bidirectional sync to ensure the system works symmetrically.
  */
-TEST('e2e-latency', 'measure-item-sync-latency', async (ctx: TestSuite) => {
+  TEST('e2e-latency', 'measure-item-sync-latency', async (ctx: TestSuite) => {
   // Use unique port to avoid conflicts with other tests running concurrently
   const testPort = 9877;
   
@@ -379,10 +375,10 @@ TEST('e2e-latency', 'measure-item-sync-latency', async (ctx: TestSuite) => {
     
     console.log('✅ Cleanup completed\n');
   }
-});
+  });
 
-/**
- * SECONDARY TEST: Latency Under Load
+  /**
+   * SECONDARY TEST: Latency Under Load
  * 
  * This test measures how GoatDB's sync performance scales under concurrent load by:
  * 1. Creating multiple items in rapid succession (50ms intervals)
@@ -401,7 +397,7 @@ TEST('e2e-latency', 'measure-item-sync-latency', async (ctx: TestSuite) => {
  * - 2s timeout per item (shorter than primary test)
  * - 50ms delay between creations to simulate realistic usage
  */
-TEST('e2e-latency', 'measure-latency-under-load', async (ctx: TestSuite) => {
+  TEST('e2e-latency', 'measure-latency-under-load', async (ctx: TestSuite) => {
   // Use different port to avoid conflicts with the primary test
   const testPort = 9878;
   
@@ -587,4 +583,5 @@ TEST('e2e-latency', 'measure-latency-under-load', async (ctx: TestSuite) => {
     
     console.log('✅ Load test cleanup completed\n');
   }
-});
+  });
+}
