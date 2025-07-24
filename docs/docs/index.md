@@ -64,20 +64,6 @@ If you like what we're building, please star ⭐️ our
 [GitHub project](https://github.com/goatplatform/goatdb). We really appreciate
 it! 🙏
 
-## Example Projects
-
-Explore projects built with GoatDB:
-
-- **[Todo](https://github.com/goatplatform/todo)**: A minimalist, modern, todo
-  list app specifically designed for self hosting.
-
-- **[EdgeChat](https://github.com/goatplatform/edge-chat)**: A demo of a
-  ChatGPT-like interface that runs completely in the browser, no network
-  connection needed.
-
-- **[Ovvio](https://ovvio.io)**: A productivity suite that has been powered by
-  GoatDB in production since January 2024.
-
 ## License
 
 GoatDB is licensed under the [Apache 2.0 License](https://github.com/goatplatform/goatdb/blob/main/LICENSE).
