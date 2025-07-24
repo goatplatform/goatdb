@@ -53,6 +53,29 @@ The testing system is a custom, lightweight framework designed for cross-platfor
 
 ## Writing Tests
 
+### CRITICAL: Setup Function Pattern
+
+**MANDATORY STRUCTURE - All test files must follow exactly:**
+
+```typescript
+export default function setupMyTests() {
+  TEST('suite', 'test-name', async (ctx: TestSuite) => {
+    // test code here
+  });
+}
+```
+
+**BROKEN PATTERN - Never do this:**
+```typescript
+export default function setupMyTests() {
+  // Empty function breaks test registration
+}
+
+TEST('suite', 'test', () => {}); // Outside setup = broken
+```
+
+**Rule: ALL TEST() calls must be inside the setup function.**
+
 ### Basic Test Structure
 
 Every test file must:
@@ -79,6 +102,17 @@ Each test receives a TestSuite context - see @tests/mod.ts:19-30 for available m
 - `tempDir(subPath?)` - Creates a temporary directory that's automatically cleaned up
 
 ## AI Agent Guidelines
+
+**Test File Rules:**
+1. **Setup function MUST contain all TEST() calls** - empty setup functions break registration
+2. **Export setup as default** - `export default function setupX() { ... }`
+3. **Import in tests-entry.ts** - Add `setupX()` call to main()
+4. **Follow existing patterns** - Check similar test files first
+
+**Common Failures:**
+- Empty setup functions with TEST() calls outside
+- Missing default export
+- Setup function not called in tests-entry.ts
 
 ### When Adding Tests
 
