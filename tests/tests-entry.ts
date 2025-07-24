@@ -1,5 +1,5 @@
 import { isBrowser, isDeno, isNode } from '../base/common.ts';
-import { TestsRunner } from './mod.ts';
+import { TestsRunner, type TestSummary } from './mod.ts';
 import setupUntrusted from './db-untrusted.test.ts';
 import setupTrusted from './db-trusted.test.ts';
 import setupItemPath from './item-path.ts';
@@ -62,31 +62,45 @@ function getEnvVar(key: string): string | undefined {
  * ```
  */
 async function main(): Promise<void> {
-  // Set up all test suites
-  setupUntrusted();
-  setupTrusted();
-  setupItemPath();
-  setupOrderstamp();
-  setupGoatRequestTest();
-  setupSession();
-  setupCommit();
-  await setupServerArchitectureTest();
-  setupStaticAssetsEndpointTest();
-  setupHealthCheckEndpointTest();
-  setupMinimalSync();
-  setupE2ELatency();
-  setupClusterLatency();
+  // Test execution order optimized for developer feedback speed:
+  // Run fast tests first so developers get immediate pass/fail results,
+  // then progressively run slower tests. This follows the test pyramid principle.
+
+  // FAST UNIT TESTS (0-1ms each) - Pure logic, no I/O
+  setupOrderstamp();        // Utility functions for distributed timestamps
+  setupItemPath();          // Path validation and parsing logic  
+  setupHealthCheckEndpointTest(); // Simple HTTP endpoint check
+
+  // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
+  setupCommit();            // Core commit/versioning logic
+  setupSession();           // Authentication and session management
+  setupGoatRequestTest();   // HTTP request processing
+
+  // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
+  setupTrusted();           // Database operations in trusted mode
+  setupUntrusted();         // Database operations in untrusted mode
+  await setupServerArchitectureTest(); // Server initialization and configuration
+  setupStaticAssetsEndpointTest(); // File serving and asset management
+
+  // SYNC INTEGRATION TESTS (1-2s each) - Network operations, client-server
+  setupMinimalSync();       // Basic client-server synchronization
+
+  // HEAVY END-TO-END TESTS (10-30s each) - Full system, network latency, multi-node
+  setupE2ELatency();        // Client-to-client sync latency measurement
+  setupClusterLatency();    // Multi-server cluster sync performance
 
   // Get test configuration from environment
   const suiteName = getEnvVar('GOATDB_SUITE');
   const testName = getEnvVar('GOATDB_TEST');
 
   // Run the tests
-  await TestsRunner.default.run(suiteName, testName);
+  const summary: TestSummary = await TestsRunner.default.run(suiteName, testName);
 
   // Exit if not in browser environment
   if (!isBrowser()) {
-    await exit(0);
+    // Exit with code 1 if any tests failed, 0 if all passed
+    const exitCode = summary.failed > 0 ? 1 : 0;
+    await exit(exitCode);
   }
 }
 
