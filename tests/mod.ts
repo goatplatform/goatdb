@@ -32,6 +32,28 @@ import { FileImplGet } from '../base/json-log/file-impl.ts';
 export type TestFunc = (ctx: TestSuite) => Promise<void> | void;
 
 /**
+ * Result of a single test execution.
+ */
+export interface TestResult {
+  readonly suiteName: string;
+  readonly testName: string;
+  readonly passed: boolean;
+  readonly duration: number;
+  readonly error?: Error;
+}
+
+/**
+ * Summary of all test execution results.
+ */
+export interface TestSummary {
+  readonly totalTests: number;
+  readonly passed: number;
+  readonly failed: number;
+  readonly duration: number;
+  readonly results: TestResult[];
+}
+
+/**
  * Represents a collection of related test cases that can be run together.
  * Each test suite has a name and maintains a map of test functions.
  * The suite manages a temporary directory that is:
@@ -66,9 +88,12 @@ export class TestSuite {
    * Runs all test cases in the suite sequentially.
    * Logs the results and timing for each test.
    * Cleans up temporary directory after all tests complete.
+   * @returns Array of test results
    */
-  async run() {
+  async run(): Promise<TestResult[]> {
     console.log(`Running suite: ${this.name}`);
+    const results: TestResult[] = [];
+    
     for (const [name, test] of this._tests.entries()) {
       const start = performance.now();
       try {
@@ -78,18 +103,34 @@ export class TestSuite {
           `✅ ${this.name}/${name} passed %c(${Math.round(duration)}ms)`,
           'color: gray',
         );
+        results.push({
+          suiteName: this.name,
+          testName: name,
+          passed: true,
+          duration,
+        });
       } catch (error) {
         const duration = performance.now() - start;
         console.log(
           `❌ ${this.name}/${name} failed %c(${Math.round(duration)}ms)`,
           'color: gray',
         );
-        console.log(error);
+        formatError(error);
+        results.push({
+          suiteName: this.name,
+          testName: name,
+          passed: false,
+          duration,
+          error: error instanceof Error ? error : new Error(error ? String(error) : 'Unknown error'),
+        });
       }
     }
+    
     if (this._tempDir) {
       await (await FileImplGet()).remove(this._tempDir);
     }
+    
+    return results;
   }
 
   /**
@@ -142,10 +183,15 @@ export class TestsRunner {
    * Can run all suites, a specific suite, or a specific test within a suite.
    * @param suiteName - Optional name of suite to run
    * @param testName - Optional name of specific test to run
+   * @returns Test execution summary
    */
-  async run(suiteName?: string, testName?: string) {
+  async run(suiteName?: string, testName?: string): Promise<TestSummary> {
+    const allResults: TestResult[] = [];
+    const runStart = performance.now();
+    
     for (const [name, suite] of this._suites.entries()) {
       if (suiteName && name !== suiteName) continue;
+      
       if (testName) {
         // Run only the specific test in the suite
         const test = suite['_tests'].get(testName);
@@ -160,6 +206,12 @@ export class TestsRunner {
               }ms)`,
               'color: gray',
             );
+            allResults.push({
+              suiteName: suite.name,
+              testName,
+              passed: true,
+              duration,
+            });
           } catch (error) {
             const duration = performance.now() - start;
             console.log(
@@ -168,7 +220,14 @@ export class TestsRunner {
               }ms)`,
               'color: gray',
             );
-            console.log(error);
+            formatError(error);
+            allResults.push({
+              suiteName: suite.name,
+              testName,
+              passed: false,
+              duration,
+              error: error instanceof Error ? error : new Error(error ? String(error) : 'Unknown error'),
+            });
           }
         } else {
           console.log(`Test '${testName}' not found in suite '${suite.name}'.`);
@@ -177,10 +236,81 @@ export class TestsRunner {
           await (await FileImplGet()).remove(suite['_tempDir']);
         }
       } else {
-        await suite.run();
+        const results = await suite.run();
+        allResults.push(...results);
       }
     }
+    
+    const totalDuration = performance.now() - runStart;
+    const summary = this.createSummary(allResults, totalDuration);
+    this.printSummary(summary);
+    
+    return summary;
   }
+  /**
+   * Creates a test summary from results.
+   * @param results - All test results
+   * @param duration - Total execution duration
+   * @returns Test summary
+   */
+  private createSummary(results: TestResult[], duration: number): TestSummary {
+    const passed = results.filter(r => r.passed).length;
+    const failed = results.length - passed;
+    
+    return {
+      totalTests: results.length,
+      passed,
+      failed,
+      duration,
+      results,
+    };
+  }
+  
+  /**
+   * Prints a summary of test results.
+   * @param summary - The test summary to print
+   */
+  private printSummary(summary: TestSummary) {
+    if (summary.totalTests === 0) return;
+    
+    console.log();
+    console.log('=== Test Summary ===');
+    console.log(`Total: ${summary.totalTests} tests`);
+    console.log(`✅ Passed: ${summary.passed}`);
+    if (summary.failed > 0) {
+      console.log(`❌ Failed: ${summary.failed}`);
+      console.log();
+      console.log('Failed tests:');
+      const failures = summary.results.filter(r => !r.passed);
+      for (let i = 0; i < failures.length; i++) {
+        const result = failures[i];
+        console.log(`${i + 1}. ${result.suiteName}/${result.testName} (${Math.round(result.duration)}ms)`);
+        if (result.error) {
+          console.log(`   ${result.error.name}: ${result.error.message}`);
+        }
+      }
+    }
+    console.log(`⏱️ Duration: ${(summary.duration / 1000).toFixed(2)}s`);
+    console.log();
+  }
+}
+
+/**
+ * Formats and displays an error with full stack trace.
+ * @param error - The error to format
+ */
+function formatError(error: unknown) {
+  if (error instanceof Error) {
+    console.log(`   ${error.name}: ${error.message}`);
+    if (error.stack) {
+      console.log(error.stack);
+    }
+  } else if (error) {
+    console.log(`   Error: ${String(error)}`);
+  } else {
+    console.log(`   Error: Unknown error`);
+  }
+  console.log(); // Empty line for readability
 }
 
 /**
@@ -189,6 +319,7 @@ export class TestsRunner {
  * @param name - The name of the test
  * @param test - The test function to run
  */
+
 export function TEST(suite: string, name: string, test: TestFunc) {
   TestsRunner.default.suite(suite).add(name, test);
 }
