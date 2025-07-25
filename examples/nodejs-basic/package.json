@@ -1,0 +1,21 @@
+{
+  "name": "goatdb-nodejs-example",
+  "version": "1.0.0",
+  "description": "Basic Node.js example using GoatDB",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@goatdb/goatdb": "npm:@jsr/goatdb__goatdb@^0.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

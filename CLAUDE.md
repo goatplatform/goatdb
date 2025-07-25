@@ -86,8 +86,8 @@ await db.readyPromise();
 
 ### Creating and Updating Items
 ```typescript
-// Create a new item - path format: /type/repo/item
-const task = await db.load('/data/todos/task-123', kSchemaTask, {
+// Interactive creation - returns ManagedItem for immediate use
+const task = db.create('/data/todos/task-123', kSchemaTask, {
   text: 'Complete the documentation',
   done: false,
 });
@@ -98,6 +98,12 @@ task.set('tags', new Set(['urgent', 'documentation']));
 
 // Delete an item
 task.delete();
+
+// Bulk creation - for imports/migrations, returns Promise<void>
+await db.load('/data/todos/task-456', kSchemaTask, {
+  text: 'Imported task',
+  done: false,
+});
 ```
 
 ### Querying Data
@@ -106,7 +112,7 @@ task.delete();
 const activeTasks = db.query({
   source: '/data/todos',
   schema: kSchemaTask,
-  predicate: (item) => !item.get('done'),
+  predicate: ({ item }) => !item.get('done'),
   sort: (a, b) => {
     const aDate = a.get('dateCreated');
     const bDate = b.get('dateCreated');
@@ -131,7 +137,7 @@ function TodoList() {
   const tasks = useQuery({
     schema: kSchemaTask,
     source: '/data/todos',
-    predicate: (item) => !item.get('done'),
+    predicate: ({ item }) => !item.get('done'),
   });
 
   return (
