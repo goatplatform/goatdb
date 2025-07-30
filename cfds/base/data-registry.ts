@@ -198,7 +198,7 @@ export class DataRegistry {
   }
 
   /**
-   * Encoded a schema to a marker string for storage.
+   * Encodes a schema to a marker string for storage.
    * @param schema The schema to encode.
    * @returns A string marker for this schema.
    */
