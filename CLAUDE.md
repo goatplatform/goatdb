@@ -97,7 +97,7 @@ task.set('done', true);
 task.set('tags', new Set(['urgent', 'documentation']));
 
 // Delete an item
-task.delete();
+task.isDeleted = true;
 
 // Bulk creation - for imports/migrations, returns Promise<void>
 await db.load('/data/todos/task-456', kSchemaTask, {
@@ -170,7 +170,7 @@ function TaskItem({ path }: { path: string }) {
 ### Authentication
 ```typescript
 // Login with email
-await db.loginWithEmail('user@example.com');
+await db.loginWithMagicLinkEmail('user@example.com');
 
 // Check login status
 if (db.loggedIn) {
