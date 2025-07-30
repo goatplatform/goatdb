@@ -31,7 +31,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'API Reference',
-      collapsed: false,
+      collapsed: true,
       items: [
         // Start with overview/index
         'api/index',
@@ -40,7 +40,7 @@ const sidebars: SidebarsConfig = {
         {
           type: 'category',
           label: 'Essentials',
-          collapsed: false,
+          collapsed: true,
           items: [
             'api/classes/goatdb',
             'api/classes/manageditem', 
@@ -53,7 +53,7 @@ const sidebars: SidebarsConfig = {
         {
           type: 'category',
           label: 'React Integration',
-          collapsed: false,
+          collapsed: true,
           items: [
             'api/functions-react',
             'api/interfaces/usequeryopts',
