@@ -120,14 +120,6 @@ React hooks for state management
 - Click on type references to jump to their definitions
 - Examples are provided in multiple tabs for different use cases
 
-## Getting Started
-
-New to GoatDB? Start with these resources:
-- [Installation Guide](/installation) - Set up GoatDB in your project
-- [Tutorial](/tutorial) - Complete walkthrough with examples  
-- [Core Concepts](/concepts) - Understand repositories, items, and schemas
-- [Reading and Writing Data](/reading-and-writing-data) - Basic operations
-
 ## Key Classes to Know
 
 - **[GoatDB](./classes/goatdb)** - Main database class for managing repositories and data
