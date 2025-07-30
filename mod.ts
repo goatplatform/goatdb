@@ -42,7 +42,7 @@
  * } as const;
  *
  * // Register the schema
- * DataRegistry.default.register(taskSchema);
+ * DataRegistry.default.registerSchema(taskSchema);
  *
  * // Initialize GoatDB with optional peers for replication
  * const db = new GoatDB({
@@ -62,7 +62,7 @@
  *   // Find incomplete tasks
  *   predicate: ({ item }) => !item.get('done'),
  *   // Sort by text alphabetically
- *   sortDescriptor: ({ left, right }) =>
+ *   sortBy: ({ left, right }) =>
  *     left.get('text').localeCompare(right.get('text')),
  *   // Optional context passed to predicate and sort functions
  *   ctx: { showCompleted: false }
@@ -93,6 +93,7 @@ import {
   itemPathGetRepoId,
   itemPathJoin,
   itemPathNormalize,
+  itemPathIsValid,
 } from './db/path.ts';
 import { Repository } from './repo/repo.ts';
 import { ManagedItem } from './db/managed-item.ts';
@@ -128,6 +129,7 @@ export {
   itemPathGetRepoId,
   itemPathJoin,
   itemPathNormalize,
+  itemPathIsValid,
   JSONLogStream,
   ManagedItem,
   normalizeEmail,
