@@ -1,0 +1,55 @@
+---
+title: CoreValueCloneOpts
+sidebar_label: CoreValueCloneOpts
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# CoreValueCloneOpts
+
+Options for customizing cloning behavior
+
+## Properties
+
+<Tabs>
+  <TabItem value="overview" label="Overview" default>
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `objectFilterFields` | `ObjFieldsFilterFunc` | No | - |
+| `iterableFilter` | `IterableFilterFunc` | No | - |
+| `fieldCloneOverride` | `Function` | No | - |
+| `objectOverride` | `Function` | No | - |
+| `notClonableExt` | `Function` | No | - |
+
+  </TabItem>
+  <TabItem value="details" label="Details">
+
+### objectFilterFields *(optional)*
+
+**Type:** `ObjFieldsFilterFunc`
+
+### iterableFilter *(optional)*
+
+**Type:** `IterableFilterFunc`
+
+### fieldCloneOverride *(optional)*
+
+**Type:** `Function`
+
+### objectOverride *(optional)*
+
+**Type:** `Function`
+
+### notClonableExt *(optional)*
+
+**Type:** `Function`
+
+  </TabItem>
+</Tabs>
+
+## See Also
+
+- [API Reference](/api) - Browse all APIs
+- [Getting Started Guide](/tutorial)

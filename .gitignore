@@ -12,3 +12,6 @@ temp_bench_*
 # ChunkHound cache directory
 .chunkhound/
 .chunkhound.json
+
+# API docs build artifacts
+docs/api.json

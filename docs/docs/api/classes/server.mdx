@@ -1,0 +1,296 @@
+---
+title: Server
+sidebar_label: Server
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Server
+
+A simple abstraction around an HTTP server. The server is built using two
+primitives: endpoints and middlewares.
+
+The generic parameter US defines the schema of User items throughout the
+system. Pass your custom user schema to enable type-safe user management and
+authorization. See @sessions.md and @authorization-rules.md for details on
+user authentication and access control.
+
+# Usage Examples
+
+## 1. Standalone Server
+
+```ts
+import { Server } from './net/server/server.ts';
+
+const server = new Server({
+  // ...options
+});
+
+await server.start();
+// The server now listens for HTTP requests on the default port (8080).
+```
+
+## 2. Integrating into an Existing Server
+
+If you want to use GoatDB's server as a handler within another HTTP server,
+you can call `await server.processRequest(request, info)` directly:
+
+```ts
+import { Server } from './net/server/server.ts';
+
+const server = new Server({
+  // ...options
+});
+
+// Inside your own HTTP server handler:
+async function handler(request: Request) {
+  const info = { // ...ServeHandlerInfo... };
+  return await server.processRequest(request, info);
+}
+
+// Use `handler` in your custom server framework.
+```
+
+Endpoints:
+----------
+Endpoints are the core request handlers that process specific HTTP requests.
+Each endpoint has a filter that determines which requests it handles, and a
+processRequest method that generates the response. Endpoints are executed in
+registration order until the first matching endpoint is found.
+
+Middlewares:
+-----------
+Middlewares provide cross-cutting functionality that runs before and/or after
+endpoint processing. They can:
+- Block requests before they reach endpoints (e.g. for authentication)
+- Modify responses after endpoints complete (e.g. adding headers)
+- Log requests and responses
+- Handle errors
+
+All registered middlewares run for each request in registration order.
+
+## Examples
+
+<Tabs>
+  <TabItem value="example1" label="Example 1" default>
+
+```typescript
+import { Server } from './net/server/server.ts';
+
+const server = new Server({
+  // ...options
+});
+
+await server.start();
+// The server now listens for HTTP requests on the default port (8080).
+```
+
+  </TabItem>
+  <TabItem value="example2" label="Example 2" >
+
+```typescript
+import { Server } from './net/server/server.ts';
+
+const server = new Server({
+  // ...options
+});
+
+// Inside your own HTTP server handler:
+async function handler(request: Request) {
+  const info = { // ...ServeHandlerInfo... };
+  return await server.processRequest(request, info);
+}
+
+// Use `handler` in your custom server framework.
+```
+
+  </TabItem>
+</Tabs>
+
+## Constructor
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+new Server(options: ServerOptions<US>)
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+### options
+
+**Type:** `ServerOptions<US>`
+
+  </TabItem>
+</Tabs>
+
+## Methods
+
+### servicesForOrganization()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+servicesForOrganization(orgId: string): Promise<ServerServices<US>>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### orgId
+
+**Type:** `string`
+
+The organization identifier
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<ServerServices<US>>`
+
+### registerEndpoint()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+registerEndpoint(ep: Endpoint<US>): void
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### ep
+
+**Type:** `Endpoint<US>`
+
+The endpoint handler to register
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+### registerMiddleware()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+registerMiddleware(mid: Middleware<US>): void
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### mid
+
+**Type:** `Middleware<US>`
+
+The middleware handler to register
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+### orgIds()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+orgIds(): Iterable<string>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Iterable<string>`
+
+### updateStaticAssets()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+updateStaticAssets(assets: StaticAssets): void
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### assets
+
+**Type:** `StaticAssets`
+
+The new static assets configuration to apply
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+### processRequest()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+processRequest(goatReq: GoatRequest, info: ServeHandlerInfo): Promise<Response>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### goatReq
+
+**Type:** `GoatRequest`
+
+#### info
+
+**Type:** `ServeHandlerInfo`
+
+Additional request information
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<Response>`
+
+### start()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+start(): Promise<void>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<void>`
+
+### stop()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+stop(): Promise<void>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<void>`
+
+## See Also
+
+- [Getting Started Guide](/tutorial)
+- [API Reference](/api) - Browse all APIs

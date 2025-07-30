@@ -48,7 +48,7 @@ export const kSchemeMessage = {
     },
   },
 } as const;
-DataRegistry.default.register(kSchemeMessage);
+DataRegistry.default.registerSchema(kSchemeMessage);
 type SchemeMessageType = typeof kSchemeMessage;
 ```
 
@@ -104,7 +104,7 @@ export function registerSchemas(
   registry: DataRegistry = DataRegistry.default,
 ): void {
   // Previous schema versions go in here
-  registry.default.register(kSchemeMessageV2);
+  registry.registerSchema(kSchemeMessageV2);
 }
 ```
 

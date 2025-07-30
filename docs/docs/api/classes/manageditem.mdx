@@ -1,0 +1,325 @@
+---
+title: ManagedItem
+sidebar_label: ManagedItem
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# ManagedItem
+
+A high-level interface for reading, writing, and synchronizing a single item
+in GoatDB. Manages the item's state, schema validation, and version history.
+
+**Extends:** [Emitter](./emitter)
+
+## Constructor
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+new ManagedItem(db: GoatDB<US>, path: string)
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+### db
+
+**Type:** `GoatDB<US>`
+
+### path
+
+**Type:** `string`
+
+  </TabItem>
+</Tabs>
+
+## Properties
+
+### alwaysActive *(readonly)*
+
+**Type:** `boolean`
+
+### db *(readonly)*
+
+**Type:** `GoatDB<US>`
+
+### path *(readonly)*
+
+**Type:** `string`
+
+## Methods
+
+### readyPromise()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+readyPromise(): Promise<void>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<void>`
+
+### has()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+has(key: any): boolean
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### key
+
+**Type:** `any`
+
+The key to check for
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `boolean`
+
+### get()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+get(key: any): any
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### key
+
+**Type:** `any`
+
+The key to get the value for
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `any`
+
+### set()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+set(key: any, value: any): void
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### key
+
+**Type:** `any`
+
+The key to set the value for
+
+#### value
+
+**Type:** `any`
+
+The value to associate with the key
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+### setMulti()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+setMulti(data: Partial<SchemaDataType<S>>): void
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### data
+
+**Type:** `Partial<SchemaDataType<S>>`
+
+The values to set.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+### delete()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+delete(key: any): boolean
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### key
+
+**Type:** `any`
+
+The key to delete
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `boolean`
+
+### commit()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+commit(): Promise<void>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<void>`
+
+### rebase()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+rebase(): void
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+### downloadDebugGraph()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+downloadDebugGraph(): void
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+### activate()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+activate(): void
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+### deactivate()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+deactivate(): void
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+### onChange()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+onChange(mutations: MutationPack): void
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### mutations
+
+**Type:** `MutationPack`
+
+The mutations that triggered this change
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+### loadRepoAndDoc()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+loadRepoAndDoc(): Promise<void>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<void>`
+
+### loadInitialDoc()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+loadInitialDoc(repo: Repository): void
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### repo
+
+**Type:** `Repository`
+
+The repository to load from.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+## See Also
+
+- [GoatDB](./goatdb) - Main database class
+- [Reading and Writing Data](/reading-and-writing-data) - Basic operations
+- [Schema Guide](/schema) - Define data structures
+- [Item](./item) - Lower-level item interface

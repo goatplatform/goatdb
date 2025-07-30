@@ -1,0 +1,37 @@
+---
+title: Encoder
+sidebar_label: Encoder
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Encoder
+
+Interface for objects that can encode values
+Used in serialization processes
+
+## Methods
+
+### set()
+
+```typescript
+set(key: K, value: V, options?: OT): void
+```
+
+### getOutput()
+
+```typescript
+getOutput(): T
+```
+
+### newEncoder()
+
+```typescript
+newEncoder(): Encoder<K, V, T, OT>
+```
+
+## See Also
+
+- [API Reference](/api) - Browse all APIs
+- [Getting Started Guide](/tutorial)

@@ -1,0 +1,68 @@
+---
+title: BuildInfo
+sidebar_label: BuildInfo
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# BuildInfo
+
+This interface encodes details about the build process used when compiling
+the app bundle. Used for internal configuration and later inspection.
+
+## Properties
+
+<Tabs>
+  <TabItem value="overview" label="Overview" default>
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `creationDate` | `string` | Yes | When was the binary created. |
+| `createdBy` | `string` | Yes | The username that created the binary. |
+| `builder` | `BuilderInfo` | Yes | Info about the builder runtime. |
+| `appVersion` | `string` | No | Application version, if available. Taken from the "version" field of the |
+| `debugBuild` | `boolean` | No | If true, indicates this is a debug build which turns off optimizations and |
+
+  </TabItem>
+  <TabItem value="details" label="Details">
+
+### creationDate
+
+When was the binary created.
+
+**Type:** `string`
+
+### createdBy
+
+The username that created the binary.
+
+**Type:** `string`
+
+### builder
+
+Info about the builder runtime.
+
+**Type:** `BuilderInfo`
+
+### appVersion *(optional)*
+
+Application version, if available. Taken from the "version" field of the
+project's deno.json.
+
+**Type:** `string`
+
+### debugBuild *(optional)*
+
+If true, indicates this is a debug build which turns off optimizations and
+turns on a debugging aids.
+
+**Type:** `boolean`
+
+  </TabItem>
+</Tabs>
+
+## See Also
+
+- [API Reference](/api) - Browse all APIs
+- [Getting Started Guide](/tutorial)

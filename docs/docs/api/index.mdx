@@ -1,0 +1,135 @@
+---
+sidebar_position: 1
+title: API Reference
+hide_table_of_contents: false
+---
+
+# API Reference
+
+Complete API documentation for GoatDB, automatically generated from TypeScript source code.
+
+## Core APIs
+
+### Classes
+
+| Class | Description |
+|-------|-------------|
+| [Emitter](./classes/emitter) | No description |
+| [DataRegistry](./classes/dataregistry) | The DataRegistry acts as a registry of known schemas for a given GoatDB |
+| [Item](./classes/item) | An Item instance represents a snapshot of a data item including all of its |
+| [GoatDB](./classes/goatdb) | The main database class that manages repositories, synchronization, and data |
+| [ManagedItem](./classes/manageditem) | A high-level interface for reading, writing, and synchronizing a single item |
+| [ConsoleLogStream](./classes/consolelogstream) | A LogStream implementation that writes log entries to the console. |
+| [JSONLogStream](./classes/jsonlogstream) | A LogStream implementation that writes log entries to a JSON file. |
+| [Query](./classes/query) | A Query represents a live view over a repository or another query, |
+| [Repository](./classes/repository) | No description |
+
+### Functions
+
+| Function | Description |
+|----------|-------------|
+| [`uniqueId()`](./functions-core#uniqueid) | No description |
+| [`prettyJSON()`](./functions-core#prettyjson) | No description |
+| [`normalizeEmail()`](./functions-core#normalizeemail) | No description |
+| [`SchemaGetFields()`](./functions-core#schemagetfields) | No description |
+| [`SchemaGetRequiredFields()`](./functions-core#schemagetrequiredfields) | No description |
+| [`SchemaGetFieldDef()`](./functions-core#schemagetfielddef) | No description |
+| [`SchemaEquals()`](./functions-core#schemaequals) | No description |
+| [`itemPath()`](./functions-core#itempath) | No description |
+| [`itemPathGetPart()`](./functions-core#itempathgetpart) | Given a DB path and a path component, this function returns the relevant |
+| [`itemPathGetRepoId()`](./functions-core#itempathgetrepoid) | No description |
+| [`itemPathNormalize()`](./functions-core#itempathnormalize) | No description |
+| [`itemPathJoin()`](./functions-core#itempathjoin) | No description |
+| [`itemPathIsValid()`](./functions-core#itempathisvalid) | No description |
+
+### Interfaces
+
+| Interface | Description |
+|-----------|-------------|
+| [CoreObject](./interfaces/coreobject) | A mutable object with string keys and optional type parameter for values |
+| [CoreOptions](./interfaces/coreoptions) | Options for controlling behavior of core operations |
+| [Comparable](./interfaces/comparable) | Interface for objects that can be compared for ordering |
+| [Equatable](./interfaces/equatable) | Interface for objects that can determine equality with other objects |
+| [Clonable](./interfaces/clonable) | Interface for objects that can be cloned |
+| [CoreValueCloneOpts](./interfaces/corevaluecloneopts) | Options for customizing cloning behavior |
+| [Encoder](./interfaces/encoder) | Interface for objects that can encode values |
+| [Encodable](./interfaces/encodable) | Interface for objects that can be encoded/serialized |
+| [LogStream](./interfaces/logstream) | No description |
+| [BuildInfo](./interfaces/buildinfo) | This interface encodes details about the build process used when compiling |
+
+## Server APIs
+
+### Classes
+
+| Class | Description |
+|-------|-------------|
+| [Server](./classes/server) | A simple abstraction around an HTTP server. The server is built using two |
+
+### Functions
+
+| Function | Description |
+|----------|-------------|
+| [`compile()`](./functions-server#compile) | No description |
+| [`startDebugServer()`](./functions-server#startdebugserver) | No description |
+| [`staticAssetsFromJS()`](./functions-server#staticassetsfromjs) | No description |
+
+## React APIs
+
+### Functions
+
+| Function | Description |
+|----------|-------------|
+| [`useDB()`](./functions-react#usedb) | No description |
+| [`useItem()`](./functions-react#useitem) | No description |
+| [`useDBReady()`](./functions-react#usedbready) | No description |
+| [`useQuery()`](./functions-react#usequery) | No description |
+
+### Interfaces
+
+| Interface | Description |
+|-----------|-------------|
+| [UseQueryOpts](./interfaces/usequeryopts) | Options for the useQuery hook. |
+
+## React APIs
+
+React hooks for state management
+
+### Functions
+
+| Function | Description |
+|----------|-------------|
+| [`useDB()`](./functions-react#usedb) | Opens a local DB, creating it if necessary. Once opened, the DB is available as a react context. |
+| [`useItem()`](./functions-react#useitem) | This hook monitors changes to a specific item, triggering a re-render whenever the item's state changes. |
+| [`useDBReady()`](./functions-react#usedbready) | A hook for monitoring the DB's loading process. The hook triggers whenever the loading process changes its state. |
+| [`useQuery()`](./functions-react#usequery) | Creates a new query or retrieves an existing one. |
+
+### Type Aliases
+
+| Type | Description |
+|------|-------------|
+| `UseItemOpts` | Options for the useItem hook. |
+| `DBReadyState` | Represents the state of the loading process. |
+| `UseQueryOpts` | Options for the useQuery hook. |
+| `PropsWithPath` | Convenience props type for components that accept a DB path as input. |
+
+## Navigation Tips
+
+- Use the sidebar to browse by category: Classes, Interfaces, and Functions
+- Use <kbd>Ctrl</kbd>+<kbd>K</kbd> to search for specific APIs
+- Click on type references to jump to their definitions
+- Examples are provided in multiple tabs for different use cases
+
+## Getting Started
+
+New to GoatDB? Start with these resources:
+- [Installation Guide](/installation) - Set up GoatDB in your project
+- [Tutorial](/tutorial) - Complete walkthrough with examples  
+- [Core Concepts](/concepts) - Understand repositories, items, and schemas
+- [Reading and Writing Data](/reading-and-writing-data) - Basic operations
+
+## Key Classes to Know
+
+- **[GoatDB](./classes/goatdb)** - Main database class for managing repositories and data
+- **[ManagedItem](./classes/manageditem)** - High-level interface for working with individual items
+- **[Query](./classes/query)** - Live view over repositories with real-time updates
+- **[DataRegistry](./classes/dataregistry)** - Schema registry for type safety

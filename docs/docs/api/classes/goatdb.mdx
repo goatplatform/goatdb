@@ -1,0 +1,501 @@
+---
+title: GoatDB
+sidebar_label: GoatDB
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# GoatDB
+
+The main database class that manages repositories, synchronization, and data
+access.
+
+GoatDB is the primary entry point for working with the database. It handles:
+- Repository management (opening, closing, accessing)
+- Data synchronization with peers
+- User authentication and authorization
+- Schema validation
+
+**Extends:** [Emitter](./emitter)
+
+## Constructor
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+new GoatDB(config: DBInstanceConfig)
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+### config
+
+**Type:** `DBInstanceConfig`
+
+  </TabItem>
+</Tabs>
+
+## Properties
+
+### alwaysActive *(readonly)*
+
+**Type:** `boolean`
+
+### orgId *(readonly)*
+
+**Type:** `string`
+
+### registry *(readonly)*
+
+**Type:** `DataRegistry`
+
+### trusted *(readonly)*
+
+**Type:** `boolean`
+
+### debug *(readonly)*
+
+**Type:** `boolean`
+
+### mode *(readonly)*
+
+**Type:** `DBMode`
+
+### queryPersistence
+
+**Type:** `QueryPersistence`
+
+## Methods
+
+### readyPromise()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+readyPromise(): Promise<void>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<void>`
+
+### loginWithMagicLinkEmail()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+loginWithMagicLinkEmail(email: string): Promise<boolean>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### email
+
+**Type:** `string`
+
+The target of the magic link.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<boolean>`
+
+### logout()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+logout(): Promise<void>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<void>`
+
+### open()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+open(path: string, opts?: OpenOptions): Promise<Repository<MemRepoStorage>>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### path
+
+**Type:** `string`
+
+The path to the given repository.
+
+#### opts *(optional)*
+
+**Type:** `OpenOptions`
+
+Configuration options when opening this repository.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<Repository<MemRepoStorage>>`
+
+### close()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+close(path: string): Promise<void>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### path
+
+**Type:** `string`
+
+Path to the desired repository.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<void>`
+
+### item()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+item(pathComps: string[]): ManagedItem<S>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### pathComps
+
+**Type:** `string[]`
+
+A full path or path components.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `ManagedItem<S>`
+
+### create()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+create(path: string, schema: S, data?: Partial<SchemaDataType<S>>): ManagedItem<S>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### path
+
+**Type:** `string`
+
+If a full path is provided, the item will be created with
+               the provided key. If a repository path is provided, a
+               unique item key will be automatically generated.
+
+#### schema
+
+**Type:** `S`
+
+The schema to create the item with.
+
+#### data *(optional)*
+
+**Type:** `Partial<SchemaDataType<S>>`
+
+The initial data to populate the item with.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `ManagedItem<S>`
+
+### load()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+load(path: string, schema: S, data: SchemaDataType<S>): Promise<void>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### path
+
+**Type:** `string`
+
+The path for the item to create.
+
+#### schema
+
+**Type:** `S`
+
+The schema to create the item with.
+
+#### data
+
+**Type:** `SchemaDataType<S>`
+
+The initial data for the item.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<void>`
+
+### count()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+count(path: string): number
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### path
+
+**Type:** `string`
+
+The full path to count.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `number`
+
+### keys()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+keys(path: string): Iterable<string>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### path
+
+**Type:** `string`
+
+Full path to a repository.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Iterable<string>`
+
+### query()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+query(config: Omit<QueryConfig<IS, OS, CTX>, "db">): Query<IS, OS, CTX>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### config
+
+**Type:** `Omit<QueryConfig<IS, OS, CTX>, "db">`
+
+The configuration for the desired query.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Query<IS, OS, CTX>`
+
+### flush()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+flush(path: string): Promise<void>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### path
+
+**Type:** `string`
+
+Path to the desired repository.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<void>`
+
+### flushAll()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+flushAll(): Promise<void>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<void>`
+
+### sync()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+sync(path: string): Promise<SyncResult>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### path
+
+**Type:** `string`
+
+Path to the desired repository.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<SyncResult>`
+
+### syncAll()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+syncAll(): Promise<Record<string, SyncResult>>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<Record<string, SyncResult>>`
+
+### repository()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+repository(pathComps: string[]): Repository<MemRepoStorage>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### pathComps
+
+**Type:** `string[]`
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Repository<MemRepoStorage>`
+
+### getTrustPool()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+getTrustPool(): Promise<TrustPool>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<TrustPool>`
+
+### clientsForRepo()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+clientsForRepo(pathComps: string[]): Iterable<RepoClient>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### pathComps
+
+**Type:** `string[]`
+
+Repository path.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Iterable<RepoClient>`
+
+### itemLoaded()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+itemLoaded(path: string): boolean
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### path
+
+**Type:** `string`
+
+The full path to the item to check
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `boolean`
+
+## See Also
+
+- [Getting Started Guide](/tutorial) - Learn how to use GoatDB
+- [Core Concepts](/concepts) - Understand the fundamentals
+- [ManagedItem](./manageditem) - Work with individual items
+- [Query](./query) - Create live queries
+- [DataRegistry](./dataregistry) - Manage schemas

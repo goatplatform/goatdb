@@ -22,7 +22,10 @@
   "tasks": {
     "build": "deno run -A system-assets/build-sys-assets.ts",
     "test": "deno run -A tests/run.ts",
-    "bench": "deno bench -A --no-check"
+    "bench": "deno bench -A --no-check",
+    "docs:api": "deno run -A docs-api-build.ts",
+    "docs:serve": "deno run -A docs-build.ts serve",
+    "docs:build": "deno run -A docs-build.ts build"
   },
   "imports": {
     "@goatdb/orderstamp": "jsr:@goatdb/orderstamp@^1.1.1",

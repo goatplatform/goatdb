@@ -87,12 +87,6 @@ const config: Config = {
       },
       items: [
         {
-          type: 'docSidebar',
-          sidebarId: 'docsSidebar',
-          position: 'left',
-          label: 'Docs',
-        },
-        {
           href: 'https://github.com/goatplatform/goatdb',
           label: 'GitHub',
           position: 'right',

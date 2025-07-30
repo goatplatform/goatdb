@@ -1,0 +1,101 @@
+---
+title: React Functions
+sidebar_label: React Functions
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# React Functions
+
+Functions exported by GoatDB React module.
+
+## useDB
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+useDB(): GoatDB<US>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `GoatDB<US>`
+
+---
+
+## useItem
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+useItem(pathComps: string[]): ManagedItem<S, Schema>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+### pathComps
+
+**Type:** `string[]`
+
+A full item path or separate path components.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `ManagedItem<S, Schema>`
+
+---
+
+## useDBReady
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+useDBReady(): DBReadyState
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `DBReadyState`
+
+---
+
+## useQuery
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+useQuery(config: UseQueryOpts<IS, CTX, OS>): Query<IS, OS, CTX>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+### config
+
+**Type:** `UseQueryOpts<IS, CTX, OS>`
+
+Configuration of the desired query.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Query<IS, OS, CTX>`
+
+---
+
+
+## See Also
+
+- [Reading and Writing Data](/reading-and-writing-data) - Learn how to use these functions  
+- [Core Concepts](/concepts) - Understand GoatDB's path system
+- [API Reference](/api) - Browse all APIs
+- [Schema Functions](#schemagetfields) - Work with schema definitions

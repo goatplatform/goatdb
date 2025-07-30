@@ -1,0 +1,461 @@
+---
+title: Query
+sidebar_label: Query
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Query
+
+A Query represents a live view over a repository or another query,
+supporting:
+
+- Query chaining: Queries can be chained together, where one query's results
+  become the input for another query. This allows building complex data
+  transformations through composition.
+
+- Incremental updates: When the underlying data changes, queries
+  automatically update their results. Changes propagate efficiently through
+  query chains - only the affected results are recomputed rather than
+  re-running the entire query.
+
+- Persistent caching: Results are continuously cached to disk, both during
+  the initial linear scan and as the source data changes. This allows
+  queries to be efficiently resumed after being suspended or closed,
+  without having to re-scan the entire dataset.
+
+- Efficient indexing: When sorted by a field, queries act as persistent indexes
+  enabling O(log n) lookups on that field. The index stays up-to-date as data
+  changes and results are cached for immediate availability.
+
+Query chaining example:
+```ts
+// Chain queries to find recent important todos
+const importantTodos = new Query({
+  source: repo,
+  predicate: todo => todo.important
+});
+const recentImportant = new Query({
+  source: importantTodos,
+  predicate: todo => isRecent(todo.date)
+});
+```
+
+You can also use queries as efficient indexes:
+```ts
+// Create an index over user emails
+const usersByEmail = new Query({
+  source: '/sys/users',
+  schema: kSchemaUser,
+  sortBy: 'email'
+});
+
+// O(log n) lookup by email after index is built
+await usersByEmail.loadingFinished();
+const user = usersByEmail.find('email', 'user@example.com');
+```
+
+**Extends:** [Emitter](./emitter)
+
+## Examples
+
+<Tabs>
+  <TabItem value="example1" label="Example 1" default>
+
+```typescript
+// Chain queries to find recent important todos
+const importantTodos = new Query({
+  source: repo,
+  predicate: todo => todo.important
+});
+const recentImportant = new Query({
+  source: importantTodos,
+  predicate: todo => isRecent(todo.date)
+});
+```
+
+  </TabItem>
+  <TabItem value="example2" label="Example 2" >
+
+```typescript
+// Create an index over user emails
+const usersByEmail = new Query({
+  source: '/sys/users',
+  schema: kSchemaUser,
+  sortBy: 'email'
+});
+
+// O(log n) lookup by email after index is built
+await usersByEmail.loadingFinished();
+const user = usersByEmail.find('email', 'user@example.com');
+```
+
+  </TabItem>
+</Tabs>
+
+## Constructor
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+new Query(config: QueryConfig<IS, OS, CTX>)
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+### config
+
+**Type:** `QueryConfig<IS, OS, CTX>`
+
+The query configuration object containing:
+
+  </TabItem>
+</Tabs>
+
+## Properties
+
+### alwaysActive *(readonly)*
+
+**Type:** `boolean`
+
+### id *(readonly)*
+
+Unique identifier for this query
+
+**Type:** `string`
+
+### db *(readonly)*
+
+Database instance this query operates on
+
+**Type:** `GoatDB<Schema>`
+
+### context *(readonly)*
+
+Optional context data passed to predicate and sort functions
+
+**Type:** `CTX`
+
+### scheme *(readonly)*
+
+Schema type for items in this query
+
+**Type:** `IS`
+
+### limit *(readonly)*
+
+Maximum number of results to return, 0 means unlimited
+
+**Type:** `number`
+
+### source *(readonly)*
+
+**Type:** `QuerySource<IS, OS>`
+
+### predicate *(readonly)*
+
+**Type:** `Predicate<IS, CTX>`
+
+### sortDescriptor *(readonly)*
+
+**Type:** `SortDescriptor<OS, CTX>`
+
+### sortDescending *(readonly)*
+
+**Type:** `boolean`
+
+## Methods
+
+### has()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+has(path: string): boolean
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### path
+
+**Type:** `string`
+
+The path to check.
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `boolean`
+
+### paths()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+paths(): Iterable<string>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Iterable<string>`
+
+### results()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+results(): any
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `any`
+
+### valueForPath()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+valueForPath(key: string): Item<OS>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### key
+
+**Type:** `string`
+
+The path key to look up in the repository
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Item<OS>`
+
+### entries()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+entries(): Generator<Entry<OS>>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Generator<Entry<OS>>`
+
+### onResultsChanged()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+onResultsChanged(handler: Function): Function
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### handler
+
+**Type:** `Function`
+
+The callback function to execute when results change
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Function`
+
+### onLoadingFinished()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+onLoadingFinished(handler: Function): Function
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### handler
+
+**Type:** `Function`
+
+The callback function to execute when loading finishes
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Function`
+
+### loadingFinished()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+loadingFinished(): Promise<true>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<true>`
+
+### find()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+find(fieldName: any, value: any): ManagedItem<OS, Schema>
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### fieldName
+
+**Type:** `any`
+
+The name of the field to search on
+
+#### value
+
+**Type:** `any`
+
+The value to search for
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `ManagedItem<OS, Schema>`
+
+### close()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+close(): void
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+### addPathToResults()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+addPathToResults(path: string, currentDoc: Item<IS>): void
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### path
+
+**Type:** `string`
+
+#### currentDoc
+
+**Type:** `Item<IS>`
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+### handleDocChange()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+handleDocChange(path: string, prevDoc: Item<IS>, currentDoc: Item<IS>, head?: Commit): void
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### path
+
+**Type:** `string`
+
+#### prevDoc
+
+**Type:** `Item<IS>`
+
+#### currentDoc
+
+**Type:** `Item<IS>`
+
+#### head *(optional)*
+
+**Type:** `Commit`
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+### onNewCommit()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+onNewCommit(commit: Commit): void
+```
+
+  </TabItem>
+  <TabItem value="params" label="Parameters">
+
+#### commit
+
+**Type:** `Commit`
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `void`
+
+### scanRepo()
+
+<Tabs>
+  <TabItem value="signature" label="Signature" default>
+
+```typescript
+scanRepo(): Promise<void>
+```
+
+  </TabItem>
+</Tabs>
+
+**Returns:** `Promise<void>`
+
+## See Also
+
+- [Query Guide](/query) - Learn about queries
+- [GoatDB](./goatdb) - Create queries from the database
+- [ManagedItem](./manageditem) - Query results return these
+- [React Integration](/react) - Use queries in React
