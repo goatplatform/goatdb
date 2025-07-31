@@ -15,3 +15,5 @@ temp_bench_*
 
 # API docs build artifacts
 docs/api.json
+
+.claude/agents
