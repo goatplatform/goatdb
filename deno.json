@@ -40,7 +40,8 @@
     "esbuild": "npm:esbuild@^0.25.4",
     "nodemailer": "npm:nodemailer@^6.10.0",
     "react": "npm:react@^19.1.0",
-    "yargs": "npm:yargs@^17.7.2"
+    "yargs": "npm:yargs@^17.7.2",
+    "typedoc": "npm:typedoc@^0.28.8"
   },
   "nodeModulesDir": "auto"
 }

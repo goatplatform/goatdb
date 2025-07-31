@@ -69,50 +69,38 @@ All registered middlewares run for each request in registration order.
 
 ## Constructor
 
-```typescript
-new Server(options: `ServerOptions`<`US`>)
-```
+**new Server(options: `ServerOptions`\<`US`\>)**
 
 ## Methods
 
 ### orgIds()
 
-```typescript
-orgIds(): `Iterable`<string>
-```
+**orgIds(): `Iterable`\<string\>**
 
 Returns an iterable of all organization IDs that have services initialized.
 
 ### processRequest()
 
-```typescript
-processRequest(goatReq: `GoatRequest`<>, info: `ServeHandlerInfo`): `Promise`<`Response`<>>
-```
+**processRequest(goatReq: `GoatRequest`\<\>, info: `ServeHandlerInfo`): `Promise`\<`Response`\<\>\>**
 
 Processes an incoming HTTP request through the server's middleware and
 endpoint pipeline.
 
 ### registerEndpoint()
 
-```typescript
-registerEndpoint(ep: `Endpoint`<`US`>): void
-```
+**registerEndpoint(ep: `Endpoint`\<`US`\>): void**
 
 Registers an endpoint handler with the server.
 
 ### registerMiddleware()
 
-```typescript
-registerMiddleware(mid: `Middleware`<`US`>): void
-```
+**registerMiddleware(mid: `Middleware`\<`US`\>): void**
 
 Registers a middleware handler with the server.
 
 ### servicesForOrganization()
 
-```typescript
-servicesForOrganization(orgId: string): `Promise`<`ServerServices`<`US`>>
-```
+**servicesForOrganization(orgId: string): `Promise`\<`ServerServices`\<`US`\>\>**
 
 Gets or creates server services for a given organization ID.
 
@@ -121,26 +109,20 @@ creating them on first access and caching them for subsequent requests.
 
 ### start()
 
-```typescript
-start(): `Promise`<void>
-```
+**start(): `Promise`\<void\>**
 
 Starts the server and all associated services.
 
 ### stop()
 
-```typescript
-stop(): `Promise`<void>
-```
+**stop(): `Promise`\<void\>**
 
 Gracefully stops the server and all its services.
 Safe to call multiple times.
 
 ### updateStaticAssets()
 
-```typescript
-updateStaticAssets(assets: `StaticAssets`): void
-```
+**updateStaticAssets(assets: `StaticAssets`): void**
 
 Updates the static assets configuration for the server and all existing
 organization services.

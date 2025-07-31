@@ -18,17 +18,13 @@ GoatDB is the primary entry point for working with the database. It handles:
 
 ## Constructor
 
-```typescript
-new GoatDB(config: `DBInstanceConfig`)
-```
+**new GoatDB(config: `DBInstanceConfig`)**
 
 ## Methods
 
 ### clientsForRepo()
 
-```typescript
-clientsForRepo(pathComps: string[]): `Iterable`<`RepoClient`<>>
-```
+**clientsForRepo(pathComps: string[]): `Iterable`\<`RepoClient`\<\>\>**
 
 Returns the associated RepoClient instances for the given repository.
 Each client instance handles synchronization with a different server
@@ -36,9 +32,7 @@ endpoint, enabling client-side load-balancing.
 
 ### close()
 
-```typescript
-close(path: string): `Promise`<void>
-```
+**close(path: string): `Promise`\<void\>**
 
 Closes a repository, flushing any pending writes to disk before releasing
 all memory associated with this repository.
@@ -47,9 +41,7 @@ This method does nothing if the repository isn't currently loaded.
 
 ### count()
 
-```typescript
-count(path: string): number
-```
+**count(path: string): number**
 
 Returns the number of items at the specified path, or -1 if the path
 doesn't exist.
@@ -58,9 +50,7 @@ NOTE: Currently only paths to repositories are supported.
 
 ### create()
 
-```typescript
-create(path: string, schema: S, data: `Partial<`SchemaDataType`<S>>`): [ManagedItem](./classes/manageditem)<S, `Schema`>
-```
+**create(path: string, schema: S, data: `Partial\<[SchemaDataType](./types/schemadatatype)\<S\>\>`): [ManagedItem](./classes/manageditem)\<S, [Schema](./types/schema)\>**
 
 Creates a new item at the target repository, opening it if needed. Unlike
 `GoatDB.item()` there's no need to explicitly open a repository before
@@ -73,9 +63,7 @@ the existing item without modifying it.
 
 ### flush()
 
-```typescript
-flush(path: string): `Promise`<void>
-```
+**flush(path: string): `Promise`\<void\>**
 
 Flushes all pending writes for the given repository to disk. Use this
 method when you must ensure all previously known commits are written to the
@@ -83,17 +71,13 @@ local disk.
 
 ### flushAll()
 
-```typescript
-flushAll(): `Promise`<void>
-```
+**flushAll(): `Promise`\<void\>**
 
 Flushes all pending writes for all repositories to disk.
 
 ### getTrustPool()
 
-```typescript
-getTrustPool(): `Promise`<`TrustPool`<>>
-```
+**getTrustPool(): `Promise`\<`TrustPool`\<\>\>**
 
 Returns the trust pool of this DB instance. The trust pool is a low level
 object that manages all known sessions and their public keys. It is used
@@ -104,9 +88,7 @@ Note: You almost never need to use the trust pool directly.
 
 ### item()
 
-```typescript
-item(pathComps: string[]): [ManagedItem](./classes/manageditem)<S, `Schema`>
-```
+**item(pathComps: string[]): [ManagedItem](./classes/manageditem)\<S, [Schema](./types/schema)\>**
 
 Access an item at the given path. An item's path is typically at the
 following format:
@@ -120,18 +102,14 @@ explicitly open the repository before accessing any of its items.
 
 ### itemLoaded()
 
-```typescript
-itemLoaded(path: string): boolean
-```
+**itemLoaded(path: string): boolean**
 
 Checks if an item at the given path is currently loaded in memory.
 This is a passive check that does not trigger loading the item.
 
 ### keys()
 
-```typescript
-keys(path: string): `Iterable`<string>
-```
+**keys(path: string): `Iterable`\<string\>**
 
 Returns the keys at the specified path.
 
@@ -139,9 +117,7 @@ NOTE: Currently only paths to repositories are supported.
 
 ### load()
 
-```typescript
-load(path: string, schema: S, data: `SchemaDataType`<S>): `Promise`<void>
-```
+**load(path: string, schema: S, data: [SchemaDataType](./types/schemadatatype)\<S\>): `Promise`\<void\>**
 
 Explicitly create an item, loading its repository if needed. Use this
 method for bulk load operations where you want to be notified after the
@@ -152,9 +128,7 @@ and is much more efficient for bulk creations.
 
 ### loginWithMagicLinkEmail()
 
-```typescript
-loginWithMagicLinkEmail(email: string): `Promise`<boolean>
-```
+**loginWithMagicLinkEmail(email: string): `Promise`\<boolean\>**
 
 When connecting to a new DB instance on the client, it'll start with an
 anonymous session that's not attached to any user in the system. Call this
@@ -168,9 +142,7 @@ address. Once clicked, the user item will be automatically created in
 
 ### logout()
 
-```typescript
-logout(): `Promise`<void>
-```
+**logout(): `Promise`\<void\>**
 
 Logs out the current user, closing all open repositories and clearing
 local data. On browsers, this method will also reload the page to ensure
@@ -178,18 +150,14 @@ a clean state.
 
 ### open()
 
-```typescript
-open(path: string, opts: `OpenOptions`): `Promise`<[Repository](./classes/repository)<`MemRepoStorage`<>>>
-```
+**open(path: string, opts: `OpenOptions`): `Promise`\<[Repository](./classes/repository)\<`MemRepoStorage`\<\>\>\>**
 
 Opens the given repository, loading all its items to memory.
 This method does nothing if the repository is already open.
 
 ### query()
 
-```typescript
-query(config: `Omit<`QueryConfig`<`IS`, `OS`, `CTX`>, unknown>`): [Query](./classes/query)<`IS`, `OS`, `CTX`>
-```
+**query(config: `Omit\<`QueryConfig`\<`IS`, `OS`, `CTX`\>, any\>`): [Query](./classes/query)\<`IS`, `OS`, `CTX`\>**
 
 Open a new query or access an already open one. Once opened, the query
 remains open until explicitly closed, and tracks updates to items as they
@@ -197,18 +165,14 @@ happen.
 
 ### readyPromise()
 
-```typescript
-readyPromise(): `Promise`<void>
-```
+**readyPromise(): `Promise`\<void\>**
 
 A convenience promise form of the `ready` flag. When the promise returns,
 this DB instance is ready to receive commands.
 
 ### repository()
 
-```typescript
-repository(pathComps: string[]): [Repository](./classes/repository)<`MemRepoStorage`<>>
-```
+**repository(pathComps: string[]): [Repository](./classes/repository)\<`MemRepoStorage`\<\>\>**
 
 Returns the requested repository or undefined if it wasn't opened yet.
 
@@ -217,18 +181,14 @@ repository instance directly.
 
 ### sync()
 
-```typescript
-sync(path: string): `Promise`<`SyncResult`>
-```
+**sync(path: string): `Promise`\<`SyncResult`\>**
 
 Syncs the given repository with all configured peers and waits for
 completion.
 
 ### syncAll()
 
-```typescript
-syncAll(): `Promise`<`Record<string, `SyncResult`>`>
-```
+**syncAll(): `Promise`\<`Record\<string, `SyncResult`\>`\>**
 
 Syncs all open repositories with all configured peers and waits for completion.
 

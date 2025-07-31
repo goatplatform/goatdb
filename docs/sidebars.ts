@@ -95,7 +95,23 @@ const sidebars: SidebarsConfig = {
           ],
         },
         
-        // INTERFACES & TYPES - Type definitions organized by domain
+        // SCHEMA & TYPES - Core type system
+        {
+          type: 'category',
+          label: 'Schema & Types',
+          collapsed: true,
+          items: [
+            'api/types/schema',
+            'api/types/fielddef',
+            'api/types/schemafieldsdef',
+            'api/types/schemadatatype',
+            'api/types/schemafield',
+            'api/types/fieldvalue',
+            'api/functions-schema',
+          ],
+        },
+
+        // INTERFACES & TYPES - Other type definitions organized by domain
         {
           type: 'category',
           label: 'Interfaces & Types',
@@ -112,6 +128,11 @@ const sidebars: SidebarsConfig = {
                 'api/interfaces/jsonobject',
                 'api/interfaces/readonlyitem',
                 'api/interfaces/readonlyjsonobject',
+                'api/types/corevalue',
+                'api/types/corearray',
+                'api/types/coredictionary',
+                'api/types/readonlycoreobject',
+                'api/types/readonlycorearray',
               ],
             },
             {
@@ -133,6 +154,10 @@ const sidebars: SidebarsConfig = {
               items: [
                 'api/interfaces/buildinfo',
                 'api/interfaces/logstream',
+                'api/types/authconfig',
+                'api/types/authrule',
+                'api/types/authruleinfo',
+                'api/types/authop',
               ],
             },
           ],

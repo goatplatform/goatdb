@@ -18,9 +18,7 @@ to work with.
 
 ## Constructor
 
-```typescript
-new Item(config: `ItemConfig`<S> | `ConstructorDecoderConfig`<`EncodedItem`>, registry: [DataRegistry](./classes/dataregistry)<>)
-```
+**new Item(config: `ItemConfig`\<S\> | `ConstructorDecoderConfig`\<`EncodedItem`\>, registry: [DataRegistry](./classes/dataregistry)\<\>)**
 
 Creates a new Item instance.
 
@@ -28,9 +26,7 @@ Creates a new Item instance.
 
 ### assertValidData()
 
-```typescript
-assertValidData(): void
-```
+**assertValidData(): void**
 
 Asserts that the item's data is valid according to its schema.
 
@@ -40,9 +36,7 @@ the corresponding error message.
 
 ### clone()
 
-```typescript
-clone(): [Item](./classes/item)<S>
-```
+**clone(): [Item](./classes/item)\<S\>**
 
 Clones the current item.
 
@@ -52,17 +46,13 @@ including all nested objects and arrays.
 
 ### cloneData()
 
-```typescript
-cloneData(onlyFields: unknown[]): `Readwrite`<`SchemaDataType`<S>>
-```
+**cloneData(onlyFields: keyof S[any][]): `Readwrite`\<[SchemaDataType](./types/schemadatatype)\<S\>\>**
 
 Creates a deep copy of the item's data.
 
 ### copyFrom()
 
-```typescript
-copyFrom(doc: [Item](./classes/item)<S> | [ReadonlyItem](./interfaces/readonlyitem)<S>): void
-```
+**copyFrom(doc: [Item](./classes/item)\<S\> | [ReadonlyItem](./interfaces/readonlyitem)\<S\>): void**
 
 Copies data from another item into this one.
 
@@ -71,26 +61,20 @@ of the source item's schema and data. The source item remains unchanged.
 
 ### dataUnsafe()
 
-```typescript
-dataUnsafe(): `SchemaDataType`<S>
-```
+**dataUnsafe(): [SchemaDataType](./types/schemadatatype)\<S\>**
 
 WARNING: You probably shouldn't use this. Used internally as an
 optimization to avoid unnecessary copying.
 
 ### delete()
 
-```typescript
-delete(key: T): boolean
-```
+**delete(key: T): boolean**
 
 Deletes a given field from this item.
 
 ### deserialize()
 
-```typescript
-deserialize(decoder: `Decoder`<string, `DecodedValue`>): void
-```
+**deserialize(decoder: `Decoder`\<string, `DecodedValue`\>): void**
 
 Deserializes an encoded item into this instance.
 
@@ -100,9 +84,7 @@ accordingly. The item is automatically normalized after deserialization.
 
 ### diff()
 
-```typescript
-diff(other: [Item](./classes/item)<S>, byCharacter: boolean): `DataChanges`<>
-```
+**diff(other: [Item](./classes/item)\<S\>, byCharacter: boolean): `DataChanges`\<\>**
 
 Computes the differences between this item and another item.
 
@@ -111,9 +93,7 @@ and returns an object describing the differences between them.
 
 ### diffKeys()
 
-```typescript
-diffKeys(other: [Item](./classes/item)<S>, local: boolean): string[]
-```
+**diffKeys(other: [Item](./classes/item)\<S\>, local: boolean): string[]**
 
 Returns an array of field keys that differ between this item and another
 item.
@@ -125,9 +105,7 @@ This is a much faster check than a full diff computation.
 
 ### get()
 
-```typescript
-get(key: T): unknown
-```
+**get(key: T): [SchemaDataType](./types/schemadatatype)\<S\>[T]**
 
 Returns the value for the given field or undefined.
 
@@ -136,17 +114,13 @@ Otherwise, returns the field's value, or undefined if not set.
 
 ### has()
 
-```typescript
-has(key: T): boolean
-```
+**has(key: T): boolean**
 
 Returns whether the given field is present on the current item or not.
 
 ### isEqual()
 
-```typescript
-isEqual(other: [Item](./classes/item)<S>): boolean
-```
+**isEqual(other: [Item](./classes/item)\<S\>): boolean**
 
 Compares this item with another item for equality.
 Two items are considered equal if they have the same schema and their data
@@ -154,9 +128,7 @@ is equal after normalization.
 
 ### lock()
 
-```typescript
-lock(): void
-```
+**lock(): void**
 
 Locks this item, preventing any further modifications.
 
@@ -167,9 +139,7 @@ history.
 
 ### needsSchemaUpgrade()
 
-```typescript
-needsSchemaUpgrade(): boolean
-```
+**needsSchemaUpgrade(): boolean**
 
 Checks if this item needs a schema upgrade.
 
@@ -179,9 +149,7 @@ latest schema version registered in the schema manager.
 
 ### normalize()
 
-```typescript
-normalize(): void
-```
+**normalize(): void**
 
 Normalizes the item's data according to its schema.
 
@@ -197,9 +165,7 @@ definition.
 
 ### patch()
 
-```typescript
-patch(changes: `DataChanges`<>): void
-```
+**patch(changes: `DataChanges`\<\>): void**
 
 Applies changes to this item's data.
 
@@ -209,9 +175,7 @@ will be modified in place.
 
 ### serialize()
 
-```typescript
-serialize(encoder: [Encoder](./interfaces/encoder)<string, `CoreValue`, `CoreValue`, unknown>, options: unknown): void
-```
+**serialize(encoder: [Encoder](./interfaces/encoder)\<string, [CoreValue](./types/corevalue), [CoreValue](./types/corevalue), unknown\>, options: \{ local: boolean \}): void**
 
 Serializes the item into an encoded format.
 
@@ -221,33 +185,25 @@ automatically normalized before serialization.
 
 ### set()
 
-```typescript
-set(key: T, value: unknown): void
-```
+**set(key: T, value: [SchemaDataType](./types/schemadatatype)\<S\>[T]): void**
 
 Sets the value for the given field.
 
 ### setMulti()
 
-```typescript
-setMulti(data: `Partial<`SchemaDataType`<S>>`): void
-```
+**setMulti(data: `Partial\<[SchemaDataType](./types/schemadatatype)\<S\>\>`): void**
 
 A convenience method for setting several fields and values at once.
 
 ### toJS()
 
-```typescript
-toJS(local: boolean): [ReadonlyJSONObject](./interfaces/readonlyjsonobject)
-```
+**toJS(local: boolean): [ReadonlyJSONObject](./interfaces/readonlyjsonobject)**
 
 Serializes this item to a JSON-compatible object.
 
 ### unlock()
 
-```typescript
-unlock(): void
-```
+**unlock(): void**
 
 Unlocks this item, allowing modifications.
 
@@ -260,9 +216,7 @@ inconsistencies.
 
 ### upgradeSchema()
 
-```typescript
-upgradeSchema(newSchema: `Schema`): boolean
-```
+**upgradeSchema(newSchema: [Schema](./types/schema)): boolean**
 
 Upgrades this item's data to a newer schema version.
 
@@ -276,9 +230,7 @@ will fail if any intermediate schema versions are missing.
 
 ### validate()
 
-```typescript
-validate(): unknown
-```
+**validate(): [boolean, string]**
 
 Validates the item's data against its schema.
 
@@ -287,15 +239,11 @@ requirements and returns the validation result.
 
 ### fromJS()
 
-```typescript
-fromJS(obj: [ReadonlyJSONObject](./interfaces/readonlyjsonobject)): [Item](./classes/item)<S>
-```
+**fromJS(obj: [ReadonlyJSONObject](./interfaces/readonlyjsonobject)): [Item](./classes/item)\<S\>**
 
 Deserializes a JSON-compatible object into an Item instance.
 
 ### nullItem()
 
-```typescript
-nullItem(registry: [DataRegistry](./classes/dataregistry)<>): [Item](./classes/item)<S>
-```
+**nullItem(registry: [DataRegistry](./classes/dataregistry)\<\>): [Item](./classes/item)\<S\>**
 

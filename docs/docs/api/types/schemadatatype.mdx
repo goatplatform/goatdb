@@ -1,0 +1,13 @@
+---
+title: SchemaDataType
+sidebar_label: SchemaDataType
+---
+
+# SchemaDataType
+
+Given a schema, extracts the type of its data.
+
+## Definition
+
+**Type:** `SchemaDataType` = \{ [k in K]: [SchemaValueWithOptional](./types/schemavaluewithoptional)\<[FieldValue](./types/fieldvalue)\<T[any][`k`][any]\>, T[any][`k`] extends \{ required: any \} ? any : any, T[any][`k`] extends \{ default: `Function` \} ? any : any\> \}
+

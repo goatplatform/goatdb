@@ -14,9 +14,7 @@ create multiple registries each with different schemas registered.
 
 ## Constructor
 
-```typescript
-new DataRegistry()
-```
+**new DataRegistry()**
 
 Initialize a new DataRegistry.
 
@@ -24,59 +22,45 @@ Initialize a new DataRegistry.
 
 ### authRuleForRepo()
 
-```typescript
-authRuleForRepo(inputPath: string): `AuthRule`
-```
+**authRuleForRepo(inputPath: string): [AuthRule](./types/authrule)**
 
 Finds the authorization rule for the provided path.
 
 ### decode()
 
-```typescript
-decode(str: string): `Schema`
-```
+**decode(str: string): [Schema](./types/schema)**
 
 Decodes a schema marker to an actual schema.
 
 ### encode()
 
-```typescript
-encode(schema: `Schema`): string
-```
+**encode(schema: [Schema](./types/schema)): string**
 
 Encodes a schema to a marker string for storage.
 
 ### get()
 
-```typescript
-get(ns: string, version: number): `Schema`
-```
+**get(ns: string, version: number): [Schema](./types/schema)**
 
 Find a schema that's been registered with this registry.
 
 ### registerAuthRule()
 
-```typescript
-registerAuthRule(path: string | `RegExp`<>, rule: `AuthRule`): void
-```
+**registerAuthRule(path: string | `RegExp`\<\>, rule: [AuthRule](./types/authrule)): void**
 
 Registers an authorization rule with this registry. If not provided, all
 data is considered public.
 
 ### registerSchema()
 
-```typescript
-registerSchema(schema: `Schema`): void
-```
+**registerSchema(schema: [Schema](./types/schema)): void**
 
 Registers a schema with this registry. This is a NOP if the schema had
 already been registered.
 
 ### upgrade()
 
-```typescript
-upgrade(data: [CoreObject](./interfaces/coreobject)<`CoreValue`>, dataSchema: `Schema`, targetSchema: `Schema`): unknown
-```
+**upgrade(data: [CoreObject](./interfaces/coreobject)\<[CoreValue](./types/corevalue)\>, dataSchema: [Schema](./types/schema), targetSchema: [Schema](./types/schema)): [[CoreObject](./interfaces/coreobject)\<[CoreValue](./types/corevalue)\>, [Schema](./types/schema)]**
 
 Given a data object and its schema, this method performs the upgrade
 procedure to the target schema.

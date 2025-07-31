@@ -1,0 +1,13 @@
+---
+title: FieldValue
+sidebar_label: FieldValue
+---
+
+# FieldValue
+
+A mapping between a schema type and its native variable type.
+
+## Definition
+
+**Type:** `FieldValue` = T extends any ? string : T extends any ? number : T extends any ? boolean : T extends any ? `Date` : T extends any ? `Set`\<[CoreValue](./types/corevalue)\> : T extends any ? `Dictionary`\<string, [CoreValue](./types/corevalue)\> : T extends any ? `RichText` : [CoreValue](./types/corevalue)
+

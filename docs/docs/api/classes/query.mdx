@@ -57,9 +57,7 @@ const user = usersByEmail.find('email', 'user@example.com');
 
 ## Constructor
 
-```typescript
-new Query(config: `QueryConfig`<`IS`, `OS`, `CTX`>)
-```
+**new Query(config: `QueryConfig`\<`IS`, `OS`, `CTX`\>)**
 
 Creates a new Query instance.
 
@@ -67,9 +65,7 @@ Creates a new Query instance.
 
 ### close()
 
-```typescript
-close(): void
-```
+**close(): void**
 
 Closes this query and cleans up its resources. This:
 - Emits a 'Closed' event
@@ -82,9 +78,7 @@ instead.
 
 ### entries()
 
-```typescript
-entries(): `Generator`<`Entry`<`OS`>, any, unknown>
-```
+**entries(): `Generator`\<`Entry`\<`OS`\>, any, unknown\>**
 
 Returns a generator that yields key-value pairs for all items in the query
 results. Each entry contains the item's path key and its corresponding
@@ -92,9 +86,7 @@ value.
 
 ### find()
 
-```typescript
-find(fieldName: unknown, value: unknown): [ManagedItem](./classes/manageditem)<`OS`, `Schema`>
-```
+**find(fieldName: keyof `OS`[any], value: [SchemaDataType](./types/schemadatatype)\<`OS`\>[keyof `OS`[any]]): [ManagedItem](./classes/manageditem)\<`OS`, [Schema](./types/schema)\>**
 
 Finds the first item in the query results where the specified field matches
 the given value. If the field is the sort field, uses binary search for
@@ -102,17 +94,13 @@ O(log n) lookup. Otherwise performs a linear scan.
 
 ### has()
 
-```typescript
-has(path: string): boolean
-```
+**has(path: string): boolean**
 
 Checks if a given path is included in the query results.
 
 ### loadingFinished()
 
-```typescript
-loadingFinished(): `Promise`<unknown>
-```
+**loadingFinished(): `Promise`\<any\>**
 
 Returns a promise that resolves to true when the query finishes loading
 its initial results. If loading is already finished, the promise resolves
@@ -120,9 +108,7 @@ on the next event loop cycle.
 
 ### onLoadingFinished()
 
-```typescript
-onLoadingFinished(handler: unknown): unknown
-```
+**onLoadingFinished(handler: () =\> void): () =\> void**
 
 Registers a callback to be invoked when the query finishes loading its
 initial results. If loading is already finished, the callback will be
@@ -130,26 +116,20 @@ scheduled to run on the next event loop cycle.
 
 ### onResultsChanged()
 
-```typescript
-onResultsChanged(handler: unknown): unknown
-```
+**onResultsChanged(handler: () =\> void): () =\> void**
 
 Registers a callback to be invoked when the query results change due to
 updates in the underlying data source.
 
 ### paths()
 
-```typescript
-paths(): `Iterable`<string>
-```
+**paths(): `Iterable`\<string\>**
 
 Gets an iterable of all paths included in the query results.
 
 ### results()
 
-```typescript
-results(): unknown
-```
+**results(): readonly [ManagedItem](./classes/manageditem)\<`OS`, [Schema](./types/schema)\>[]**
 
 Gets the results of the query as an array of managed items. The returned
 items are mutable - any changes made to them will automatically trigger the
@@ -157,21 +137,15 @@ query to update its results.
 
 ### resume()
 
-```typescript
-resume(): `Promise`<void>
-```
+**resume(): `Promise`\<void\>**
 
 ### suspend()
 
-```typescript
-suspend(): void
-```
+**suspend(): void**
 
 ### valueForPath()
 
-```typescript
-valueForPath(key: string): [Item](./classes/item)<`OS`>
-```
+**valueForPath(key: string): [Item](./classes/item)\<`OS`\>**
 
 Gets the item value for a given path key. The value is retrieved from the
 repository's committed head or temporary records.

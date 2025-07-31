@@ -1,0 +1,14 @@
+---
+title: SchemaValueWithOptional
+sidebar_label: SchemaValueWithOptional
+---
+
+# SchemaValueWithOptional
+
+Given a type (FieldValue) and a required + default function, this generates
+the correct type or union with undefined.
+
+## Definition
+
+**Type:** `SchemaValueWithOptional` = R extends any ? T : D extends any ? T : undefined | T
+

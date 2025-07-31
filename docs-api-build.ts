@@ -1,109 +1,28 @@
 #!/usr/bin/env -S deno run -A
 
-import { Application } from 'npm:typedoc@0.25.13';
+import { 
+  Application, 
+  type ProjectReflection, 
+  type DeclarationReflection, 
+  type Type,
+  ReferenceType,
+  UnionType,
+  ArrayType,
+  IntrinsicType,
+  ReflectionType,
+  TupleType,
+  ConditionalType,
+  MappedType,
+  IndexedAccessType,
+  TypeOperatorType,
+  QueryType,
+  NamedTupleMember,
+} from 'typedoc';
 import * as path from 'jsr:@std/path';
 import { ensureDir } from 'jsr:@std/fs';
 
-
-/**
- * Represents a comment block in TypeDoc's JSON output.
- * The `summary` field contains an array of text fragments that make up the main comment summary.
- */
-interface TypeDocComment {
-  summary?: Array<{ text: string }>;
-}
-
-/**
- * Represents the source location of a declaration in TypeDoc's JSON output.
- */
-interface TypeDocSource {
-  /** The file name where the declaration is defined. */
-  fileName: string;
-}
-
-/**
- * Represents the flags associated with a declaration in TypeDoc's JSON output.
- * The `isPrivate` flag indicates whether the declaration is marked as private.
- */
-interface TypeDocFlags {
-  isPrivate?: boolean;
-}
-
-/**
- * Represents a type in TypeDoc's JSON output.
- * The `type` field indicates the kind of type (e.g., 'intrinsic', 'reference', 'array', etc.).
- * - `name` is present for named types (e.g., 'string', 'MyType').
- * - `elementType` is used for array or similar types.
- * - `types` is used for union or intersection types.
- * - `typeArguments` is used for generic types.
- */
-interface TypeDocType {
-  type: string;
-  name?: string;
-  elementType?: TypeDocType;
-  types?: TypeDocType[];
-  typeArguments?: TypeDocType[];
-}
-
-/**
- * Represents a function or method signature in TypeDoc's JSON output.
- * - `comment`: Optional documentation for the signature.
- * - `parameters`: Optional list of parameters, each with a name and type.
- * - `type`: Optional return type of the signature.
- */
-interface TypeDocSignature {
-  /** Optional documentation comment for the signature. */
-  comment?: TypeDocComment;
-  /** Optional list of parameters for the signature. */
-  parameters?: Array<{
-    /** Name of the parameter. */
-    name: string;
-    /** Optional type of the parameter. */
-    type?: TypeDocType;
-  }>;
-  /** Optional return type of the signature. */
-  type?: TypeDocType;
-}
-
-/**
- * Represents a declaration (class, interface, function, etc.) in TypeDoc's JSON output.
- *
- * - `name`: The name of the declaration.
- * - `kind`: Numeric TypeDoc kind identifier (e.g., class, interface, function).
- * - `comment`: Optional documentation comment for the declaration.
- * - `signatures`: Optional list of function/method signatures (for functions, methods, or constructors).
- * - `sources`: Optional array of source file references where the declaration is defined.
- * - `flags`: Optional flags (e.g., visibility, static, private).
- * - `type`: Optional type information (for type aliases, properties, etc.).
- * - `children`: Optional array of child declarations (e.g., class members, interface properties).
- * - `extendedTypes`: Optional array of types this declaration extends (for classes/interfaces).
- * - `implementedTypes`: Optional array of types this declaration implements (for classes).
- * - `inheritedFrom`: Optional information about the parent declaration if this is inherited.
- */
-interface DeclarationReflection {
-  /** The name of the declaration (e.g., class name, function name). */
-  name: string;
-  /** Numeric TypeDoc kind identifier (see TypeDoc enums for mapping). */
-  kind: number;
-  /** Optional documentation comment for the declaration. */
-  comment?: TypeDocComment;
-  /** Optional list of function/method signatures. */
-  signatures?: TypeDocSignature[];
-  /** Optional array of source file references. */
-  sources?: TypeDocSource[];
-  /** Optional flags (e.g., isPrivate, isStatic). */
-  flags?: TypeDocFlags;
-  /** Optional type information for the declaration. */
-  type?: TypeDocType;
-  /** Optional array of child declarations (e.g., class members). */
-  children?: DeclarationReflection[];
-  /** Optional array of types this declaration extends. */
-  extendedTypes?: TypeDocType[];
-  /** Optional array of types this declaration implements. */
-  implementedTypes?: TypeDocType[];
-  /** Optional information about the parent declaration if inherited. */
-  inheritedFrom?: { name: string };
-}
+// Directory where generated API documentation will be stored
+const API_DOCS_DIR = path.join('docs', 'docs', 'api');
 
 /**
  * Represents inheritance information for a declaration.
@@ -114,19 +33,6 @@ interface DeclarationReflection {
 interface InheritanceInfo {
   extends: Array<{ name: string; link: string }>;
   implements: Array<{ name: string; link: string }>;
-}
-
-/**
- * Represents the root project reflection in TypeDoc's JSON output.
- *
- * - `children`: Top-level declarations (classes, interfaces, functions, etc.) in the project.
- * - `comment`: Optional documentation comment for the project/module itself.
- */
-interface ProjectReflection {
-  /** Top-level declarations in the project (e.g., classes, interfaces, functions). */
-  children?: DeclarationReflection[];
-  /** Optional documentation comment for the project/module. */
-  comment?: TypeDocComment;
 }
 
 /**
@@ -148,9 +54,6 @@ interface ApiElements {
   moduleComment: string;
 }
 
-// Directory where generated API documentation will be stored
-const API_DOCS_DIR = path.join('docs', 'docs', 'api');
-
 /**
  * Clean the docs directory and prepare for new files
  */
@@ -164,6 +67,7 @@ async function cleanOutputDirectory(): Promise<void> {
   await ensureDir(API_DOCS_DIR);
   await ensureDir(path.join(API_DOCS_DIR, 'classes'));
   await ensureDir(path.join(API_DOCS_DIR, 'interfaces'));
+  await ensureDir(path.join(API_DOCS_DIR, 'types'));
 }
 
 /**
@@ -174,6 +78,7 @@ async function extractApiElements(filePath: string): Promise<ApiElements> {
 
   const app = await Application.bootstrap({
     entryPoints: [filePath],
+    entryPointStrategy: 'expand',
     tsconfig: './tsconfig.json',
     excludeExternals: false,
     excludePrivate: true,
@@ -219,15 +124,19 @@ async function extractApiElements(filePath: string): Promise<ApiElements> {
       case 64: // Function
         elements.functions.push(child);
         break;
-      case 4194304: // TypeAlias
+      case 2097152: // TypeAlias (in newer TypeDoc versions)
+      case 4194304: // TypeAlias (in older TypeDoc versions)
         elements.types.push(child);
         break;
     }
   }
 
+  // Phase 2: With expand strategy, all types should be discovered automatically
+
   console.log(
     `   Found: ${elements.classes.length} classes, ${elements.interfaces.length} interfaces, ${elements.functions.length} functions, ${elements.types.length} types`,
   );
+  
   return elements;
 }
 
@@ -277,34 +186,12 @@ function extractDocumentation(element: DeclarationReflection): string {
 }
 
 /**
- * Format a type for display
- */
-function formatType(type: TypeDocType | undefined): string {
-  if (!type) return 'any';
-
-  switch (type.type) {
-    case 'intrinsic':
-      return type.name || 'unknown';
-    case 'reference':
-      return (type.name || 'unknown') +
-        (type.typeArguments
-          ? `<${type.typeArguments.map(formatType).join(', ')}>`
-          : '');
-    case 'union':
-      return type.types?.map(formatType).join(' | ') || 'unknown';
-    case 'array':
-      return formatType(type.elementType) + '[]';
-    default:
-      return type.name || 'unknown';
-  }
-}
-
-/**
  * Build a cross-reference map of all API elements for linking
  */
 function buildCrossReferenceMap(allElements: ApiElements[]): Map<string, string> {
   const crossRefMap = new Map<string, string>();
 
+  // Only map actually discovered and documented types
   for (const elements of allElements) {
     // Map classes
     for (const cls of elements.classes) {
@@ -324,6 +211,8 @@ function buildCrossReferenceMap(allElements: ApiElements[]): Map<string, string>
 
   return crossRefMap;
 }
+
+
 
 /**
  * Build reverse inheritance map for parent->child relationships
@@ -376,6 +265,11 @@ function extractInheritanceInfo(element: DeclarationReflection): InheritanceInfo
     for (const extendedType of element.extendedTypes) {
       if (extendedType.type === 'reference' && extendedType.name) {
         // Skip TypeScript utility types - they shouldn't be linked
+        const TYPESCRIPT_UTILITY_TYPES = new Set([
+          'Omit', 'Pick', 'Partial', 'Required', 'Record', 'Exclude', 'Extract', 
+          'NonNullable', 'Parameters', 'ConstructorParameters', 'ReturnType', 
+          'InstanceType', 'ThisParameterType', 'OmitThisParameter'
+        ]);
         if (TYPESCRIPT_UTILITY_TYPES.has(extendedType.name)) {
           continue;
         }
@@ -441,64 +335,171 @@ function separateMembers(
 }
 
 /**
- * TypeScript utility types that should not be linked
- */
-const TYPESCRIPT_UTILITY_TYPES = new Set([
-  'Omit', 'Pick', 'Partial', 'Required', 'Record', 'Exclude', 'Extract', 
-  'NonNullable', 'Parameters', 'ConstructorParameters', 'ReturnType', 
-  'InstanceType', 'ThisParameterType', 'OmitThisParameter'
-]);
-
-/**
  * Format a type with cross-reference links
  */
-function formatLinkedType(type: TypeDocType | undefined, crossRefMap: Map<string, string>): string {
+function formatLinkedType(type: Type | undefined, crossRefMap: Map<string, string>): string {
   if (!type) return 'any';
 
   switch (type.type) {
     case 'intrinsic':
-      return type.name || 'unknown';
+      if (type instanceof IntrinsicType) {
+        return type.name || throwTypeError('intrinsic type missing name', type);
+      }
+      return 'any';
+
     case 'reference': {
-      const typeName = type.name || 'unknown';
-      
-      // Don't link TypeScript utility types - render as inline code
-      if (TYPESCRIPT_UTILITY_TYPES.has(typeName)) {
+      if (type instanceof ReferenceType) {
+        const typeName = type.name || throwTypeError('reference type missing name', type);
+        
+        // Don't link TypeScript utility types - render as inline code
+        const TYPESCRIPT_UTILITY_TYPES = new Set([
+          'Omit', 'Pick', 'Partial', 'Required', 'Record', 'Exclude', 'Extract', 
+          'NonNullable', 'Parameters', 'ConstructorParameters', 'ReturnType', 
+          'InstanceType', 'ThisParameterType', 'OmitThisParameter'
+        ]);
+        if (TYPESCRIPT_UTILITY_TYPES.has(typeName)) {
+          const typeArgs = type.typeArguments
+            ? `<${type.typeArguments.map((t: Type) => formatLinkedType(t, crossRefMap)).join(', ')}>`
+            : '';
+          return `\`${typeName}${typeArgs}\``;
+        }
+        
+        // Don't link single-letter generic types (like T, U, N, etc.)
+        if (typeName.length === 1 && /[A-Z]/.test(typeName)) {
+          return typeName;
+        }
+        
+        const link = crossRefMap.get(typeName);
+        const linkedName = link ? `[${typeName}](${link})` : `\`${typeName}\``;
         const typeArgs = type.typeArguments
-          ? `<${
-            type.typeArguments.map((t: TypeDocType) => formatLinkedType(t, crossRefMap))
-              .join(', ')
-          }>`
+          ? `<${type.typeArguments.map((t: Type) => formatLinkedType(t, crossRefMap)).join(', ')}>`
           : '';
-        return `\`${typeName}${typeArgs}\``;
+        return linkedName + typeArgs;
       }
-      
-      // Don't link single-letter generic types (like T, U, N, etc.)
-      if (typeName.length === 1 && /[A-Z]/.test(typeName)) {
-        return typeName;
-      }
-      
-      const link = crossRefMap.get(typeName);
-      // Only create links if the type exists in our cross-reference map
-      const linkedName = link ? `[${typeName}](${link})` : `\`${typeName}\``;
-      const typeArgs = type.typeArguments
-        ? `<${
-          type.typeArguments.map((t: TypeDocType) => formatLinkedType(t, crossRefMap))
-            .join(', ')
-        }>`
-        : '';
-      return linkedName + typeArgs;
+      return 'any';
     }
 
     case 'union':
-      return type.types?.map((t: TypeDocType) => formatLinkedType(t, crossRefMap)).join(
-        ' | ',
-      ) || 'unknown';
+      if (type instanceof UnionType) {
+        return type.types.map((t: Type) => formatLinkedType(t, crossRefMap)).join(' | ');
+      }
+      return 'any';
+
+    case 'intersection':
+      if (type instanceof UnionType) { // UnionType is used for both union and intersection
+        return type.types.map((t: Type) => formatLinkedType(t, crossRefMap)).join(' & ');
+      }
+      return 'any';
+
     case 'array':
-      return formatLinkedType(type.elementType, crossRefMap) + '[]';
+      if (type instanceof ArrayType) {
+        return `${formatLinkedType(type.elementType, crossRefMap)}[]`;
+      }
+      return 'any[]';
+
+    case 'tuple':
+      if (type instanceof TupleType) {
+        return `[${type.elements.map((t: Type) => formatLinkedType(t, crossRefMap)).join(', ')}]`;
+      }
+      return 'any[]';
+
+    case 'namedTupleMember':
+      if (type instanceof NamedTupleMember) {
+        const elementType = formatLinkedType(type.element, crossRefMap);
+        const optionalMarker = type.isOptional ? '?' : '';
+        return `${type.name}${optionalMarker}: ${elementType}`;
+      }
+      return 'any';
+
+    case 'literal':
+      if (type instanceof IntrinsicType) {
+        return JSON.stringify(type.name);
+      }
+      return 'any';
+
+    case 'typeOperator':
+      if (type instanceof TypeOperatorType) {
+        const target = formatLinkedType(type.target, crossRefMap);
+        return `${type.operator} ${target}`;
+      }
+      return 'any';
+
+    case 'indexedAccess':
+      if (type instanceof IndexedAccessType) {
+        const objectType = formatLinkedType(type.objectType, crossRefMap);
+        const indexType = formatLinkedType(type.indexType, crossRefMap);
+        return `${objectType}[${indexType}]`;
+      }
+      return 'any';
+
+    case 'conditional':
+      if (type instanceof ConditionalType) {
+        const checkType = formatLinkedType(type.checkType, crossRefMap);
+        const extendsType = formatLinkedType(type.extendsType, crossRefMap);
+        const trueType = formatLinkedType(type.trueType, crossRefMap);
+        const falseType = formatLinkedType(type.falseType, crossRefMap);
+        return `${checkType} extends ${extendsType} ? ${trueType} : ${falseType}`;
+      }
+      return 'any';
+
+    case 'mapped':
+      if (type instanceof MappedType) {
+        const parameterType = formatLinkedType(type.parameterType, crossRefMap);
+        const templateType = formatLinkedType(type.templateType, crossRefMap);
+        return `{ [${type.parameter} in ${parameterType}]: ${templateType} }`;
+      }
+      return 'any';
+
+    case 'query':
+      if (type instanceof QueryType) {
+        const queryType = formatLinkedType(type.queryType, crossRefMap);
+        return `typeof ${queryType}`;
+      }
+      return 'any';
+
+    case 'reflection':
+      if (type instanceof ReflectionType) {
+        // For reflection types (inline object/function definitions), show a simplified representation
+        if (type.declaration?.signatures?.[0]) {
+          // Function type
+          const sig = type.declaration.signatures[0];
+          const params = sig.parameters?.map((p) => {
+            const paramType = p.type ? formatLinkedType(p.type, crossRefMap) : 'any';
+            return `${p.name}: ${paramType}`;
+          }).join(', ') || '';
+          const returnType = sig.type ? formatLinkedType(sig.type, crossRefMap) : 'void';
+          return `(${params}) => ${returnType}`;
+        } else if (type.declaration?.children) {
+          // Object type
+          const properties = type.declaration.children
+            .filter((child) => !child.flags?.isPrivate)
+            .map((child) => {
+              const propType = child.type ? formatLinkedType(child.type, crossRefMap) : 'any';
+              return `${child.name}: ${propType}`;
+            });
+          return properties.length > 0 ? `{ ${properties.join('; ')} }` : '{}';
+        }
+      }
+      return 'object';
+
     default:
-      return type.name || 'unknown';
+      throwTypeError(`unhandled type "${type.type}"`, type);
   }
 }
+
+/**
+ * Throws a descriptive error for unhandled type cases
+ */
+function throwTypeError(message: string, type: Type): never {
+  const debugInfo = {
+    type: type.type,
+    constructor: type.constructor.name,
+    keys: Object.keys(type)
+  };
+  
+  throw new Error(`TypeDoc type parsing error: ${message}. Type info: ${JSON.stringify(debugInfo, null, 2)}`);
+}
+
 
 /**
  * Format a function signature with cross-reference links
@@ -518,7 +519,15 @@ function formatLinkedTypeSignature(
   const returnType = sig.type
     ? formatLinkedType(sig.type, crossRefMap)
     : 'void';
-  return `${element.name}(${params}): ${returnType}`;
+  
+  const signature = `${element.name}(${params}): ${returnType}`;
+  
+  // Escape problematic characters to prevent MDX parsing issues
+  return signature
+    .replace(/</g, '\\<')
+    .replace(/>/g, '\\>')
+    .replace(/\{/g, '\\{')
+    .replace(/\}/g, '\\}');
 }
 
 /**
@@ -580,7 +589,8 @@ sidebar_label: ${name}
       const type = p.type ? formatLinkedType(p.type, crossRefMap) : 'any';
       return `${p.name}: ${type}`;
     }).join(', ') || '';
-    content += `\`\`\`typescript\nnew ${name}(${params})\n\`\`\`\n\n`;
+    const constructorSig = `new ${name}(${params})`;
+    content += `**${constructorSig.replace(/</g, '\\<').replace(/>/g, '\\>').replace(/\{/g, '\\{').replace(/\}/g, '\\}')}**\n\n`;
 
     if (sig.comment?.summary) {
       content += sig.comment.summary.map((s) => s.text).join('') + '\n\n';
@@ -597,7 +607,7 @@ sidebar_label: ${name}
 
       if (method.signatures?.[0]) {
         const sig = formatLinkedTypeSignature(method, crossRefMap);
-        content += `\`\`\`typescript\n${sig}\n\`\`\`\n\n`;
+        content += `**${sig}**\n\n`;
       }
 
       const methodDoc = extractDocumentation(method);
@@ -681,7 +691,8 @@ sidebar_label: ${name}
     for (const prop of ownProperties) {
       const type = prop.type ? formatLinkedType(prop.type, crossRefMap) : 'any';
       content += `### ${prop.name}\n\n`;
-      content += `\`\`\`typescript\n${prop.name}: ${type}\n\`\`\`\n\n`;
+      const propSig = `${prop.name}: ${type}`;
+      content += `\`\`\`typescript\n${propSig.replace(/</g, '\\<').replace(/>/g, '\\>').replace(/\{/g, '\\{').replace(/\}/g, '\\}')}\n\`\`\`\n\n`;
 
       const propDoc = extractDocumentation(prop);
       if (propDoc) {
@@ -699,7 +710,7 @@ sidebar_label: ${name}
 
       if (method.signatures?.[0]) {
         const sig = formatLinkedTypeSignature(method, crossRefMap);
-        content += `\`\`\`typescript\n${sig}\n\`\`\`\n\n`;
+        content += `**${sig}**\n\n`;
       }
 
       const methodDoc = extractDocumentation(method);
@@ -714,6 +725,11 @@ sidebar_label: ${name}
     content += `## Inherited Members\n\n`;
     for (const [parentName, members] of inheritedMembers) {
       // Skip TypeScript utility types in inherited members
+      const TYPESCRIPT_UTILITY_TYPES = new Set([
+        'Omit', 'Pick', 'Partial', 'Required', 'Record', 'Exclude', 'Extract', 
+        'NonNullable', 'Parameters', 'ConstructorParameters', 'ReturnType', 
+        'InstanceType', 'ThisParameterType', 'OmitThisParameter'
+      ]);
       if (TYPESCRIPT_UTILITY_TYPES.has(parentName)) {
         continue;
       }
@@ -767,13 +783,54 @@ title: ${moduleName} Functions
 
     if (fn.signatures?.[0]) {
       const sig = formatLinkedTypeSignature(fn, crossRefMap);
-      content += `\`\`\`typescript\n${sig}\n\`\`\`\n\n`;
+      content += `**${sig}**\n\n`;
     }
 
     const doc = extractDocumentation(fn);
     if (doc) {
       content += `${doc}\n\n`;
     }
+  }
+
+  return content;
+}
+
+/**
+ * Generate MDX content for a type alias
+ */
+function createTypeMDX(
+  element: DeclarationReflection,
+  crossRefMap: Map<string, string>,
+): string {
+  const name = element.name;
+  const doc = extractDocumentation(element);
+
+  let content = `---
+title: ${name}
+sidebar_label: ${name}
+---
+
+# ${name}
+
+`;
+
+  if (doc) {
+    content += `${doc}\n\n`;
+  }
+
+  // Show the type definition
+  if (element.type) {
+    const interactiveType = formatLinkedType(element.type, crossRefMap);
+    
+    // Escape the interactive type for MDX compatibility
+    const escapedInteractiveType = interactiveType
+      .replace(/</g, '\\<')
+      .replace(/>/g, '\\>')
+      .replace(/\{/g, '\\{')
+      .replace(/\}/g, '\\}');
+    
+    content += `## Definition\n\n`;
+    content += `**Type:** \`${name}\` = ${escapedInteractiveType}\n\n`;
   }
 
   return content;
@@ -813,6 +870,16 @@ async function writeApiFiles(allElements: ApiElements[]): Promise<void> {
       );
     }
 
+    // Write individual type files
+    for (const type of elements.types) {
+      const mdx = createTypeMDX(type, crossRefMap);
+      const filename = `${type.name.toLowerCase()}.mdx`;
+      await Deno.writeTextFile(
+        path.join(API_DOCS_DIR, 'types', filename),
+        mdx,
+      );
+    }
+
     // Write functions file for this module
     if (elements.functions.length > 0) {
       const mdx = createFunctionsMDX(
@@ -845,7 +912,7 @@ Complete API documentation for GoatDB.\n\n`;
   for (const elements of allElements) {
     if (
       elements.classes.length === 0 && elements.interfaces.length === 0 &&
-      elements.functions.length === 0
+      elements.functions.length === 0 && elements.types.length === 0
     ) {
       continue;
     }
@@ -880,6 +947,18 @@ Complete API documentation for GoatDB.\n\n`;
       content += '\n';
     }
 
+    // Types
+    if (elements.types.length > 0) {
+      content += `### Types\n\n`;
+      for (const type of elements.types) {
+        const doc = extractDocumentation(type).split('\n')[0] ||
+          'No description';
+        const filename = type.name.toLowerCase();
+        content += `- **[${type.name}](./types/${filename})** - ${doc}\n`;
+      }
+      content += '\n';
+    }
+
     // Functions
     if (elements.functions.length > 0) {
       content += `### Functions\n\n`;
@@ -902,7 +981,7 @@ export async function buildApiDocs(): Promise<void> {
   await cleanOutputDirectory();
 
   // Step 2: Extract API elements from each entry point
-  const entryPoints = ['mod.ts', 'server/mod.ts', 'react/hooks.ts'];
+  const entryPoints = ['mod.ts', 'server/mod.ts', 'react/hooks.ts', 'cfds/base/schema.ts'];
   const allElements: ApiElements[] = [];
 
   for (const entryPoint of entryPoints) {

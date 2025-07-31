@@ -1,0 +1,30 @@
+---
+title: schema Functions
+---
+
+# schema Functions
+
+## SchemaEquals
+
+**SchemaEquals(s1: [Schema](./types/schema), s2: [Schema](./types/schema)): boolean**
+
+Given two schemas, returns whether they're the same one or not.
+
+## SchemaGetFieldDef
+
+**SchemaGetFieldDef(s: S, field: F): [FieldDef](./types/fielddef)\<S[any][F][any]\> | undefined**
+
+Given a schema and a field, returns its
+
+## SchemaGetFields
+
+**SchemaGetFields(s: [Schema](./types/schema)): readonly [string, [FieldDef](./types/fielddef)\<`ValueType`\>][]**
+
+Given a schema, this function returns its field definitions as an iterable.
+
+## SchemaGetRequiredFields
+
+**SchemaGetRequiredFields(s: [Schema](./types/schema)): readonly string[]**
+
+Given a schema, this functions returns an iterable of its required fields.
+

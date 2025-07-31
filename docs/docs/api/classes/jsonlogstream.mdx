@@ -12,9 +12,7 @@ Supports optional throttling to reduce the number of entries written.
 
 ## Constructor
 
-```typescript
-new JSONLogStream(path: string, throttleRate: number)
-```
+**new JSONLogStream(path: string, throttleRate: number)**
 
 Creates a new JSONLogStream
 
@@ -22,17 +20,13 @@ Creates a new JSONLogStream
 
 ### appendEntry()
 
-```typescript
-appendEntry(e: `NormalizedLogEntry`<`LogEntry`>): `Promise`<void>
-```
+**appendEntry(e: `NormalizedLogEntry`\<`LogEntry`\>): `Promise`\<void\>**
 
 Appends a log entry to the JSON file, respecting the throttle rate
 
 ### close()
 
-```typescript
-close(): `Promise`<void>
-```
+**close(): `Promise`\<void\>**
 
 Closes the JSON log file if it's open. This is handled automatically by the
 stream and there's no need to call it explicitly under normal operation.

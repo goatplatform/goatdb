@@ -57,6 +57,37 @@ Check out https://goatdb.dev for additional docs.
 - **[ReadonlyItem](./interfaces/readonlyitem)** - No description
 - **[ReadonlyJSONObject](./interfaces/readonlyjsonobject)** - No description
 
+### Types
+
+- **[AppConfig](./types/appconfig)** - A configuration of a Single Page Application built on top GoatDB.
+- **[AuthConfig](./types/authconfig)** - An array of authentication rules for the full DB. The DB scans these rules
+- **[AuthOp](./types/authop)** - Denotes the type of the requested operation.
+- **[AuthRule](./types/authrule)** - A function that determines whether a specific operation is authorized.
+- **[AuthRuleInfo](./types/authruleinfo)** - Information passed to authentication rules to determine if an operation
+- **[ConcreteCoreValue](./types/concretecorevalue)** - Concrete (non-undefined) values supported by GoatDB
+- **[CoreArray](./types/corearray)** - A mutable array of CoreValues
+- **[CoreClassObject](./types/coreclassobject)** - Union type of custom class objects that can be handled by GoatDB
+- **[CoreDictionary](./types/coredictionary)** - A dictionary of CoreKeys to CoreValues
+- **[CoreKey](./types/corekey)** - A string key type for CoreObjects
+- **[CoreSet](./types/coreset)** - A Set containing CoreValues
+- **[CoreValue](./types/corevalue)** - The complete set of values supported by GoatDB, including undefined
+- **[FieldDef](./types/fielddef)** - A definition of a single field in a schema.
+- **[FieldValue](./types/fieldvalue)** - A mapping between a schema type and its native variable type.
+- **[IterableFilterFunc](./types/iterablefilterfunc)** - Function type for filtering iterable values during operations
+- **[ObjFieldsFilterFunc](./types/objfieldsfilterfunc)** - Function type for filtering object fields during operations
+- **[ReadonlyCoreArray](./types/readonlycorearray)** - A read-only array of CoreValues
+- **[ReadonlyCoreObject](./types/readonlycoreobject)** - A read-only object with string keys and CoreValue values
+- **[Schema](./types/schema)** - A Schema defines the structure of a Document. Schemas are also versioned,
+- **[SchemaDataType](./types/schemadatatype)** - Given a schema, extracts the type of its data.
+- **[SchemaField](./types/schemafield)** - Represents a field in a schema, which can be either a custom field defined
+- **[SchemaFieldsDef](./types/schemafieldsdef)** - Mapping between field name and its definition.
+- **[SchemaNullType](./types/schemanulltype)** - No description
+- **[SchemaOptionalFields](./types/schemaoptionalfields)** - Given a schema, extracts the names of all optional fields.
+- **[SchemaRequiredFields](./types/schemarequiredfields)** - Given a schema, extracts the names of all required fields.
+- **[SchemaTypeSession](./types/schematypesession)** - No description
+- **[SchemaTypeUserStats](./types/schematypeuserstats)** - No description
+- **[SchemaValueWithOptional](./types/schemavaluewithoptional)** - Given a type (FieldValue) and a required + default function, this generates
+
 ### Functions
 
 See [Core Functions](./functions-core) for all exported functions.
@@ -73,6 +104,18 @@ Check out https://goatdb.dev for additional docs.
 
 - **[Server](./classes/server)** - A simple abstraction around an HTTP server. The server is built using two
 
+### Types
+
+- **[AppConfig](./types/appconfig)** - A configuration of a Single Page Application built on top GoatDB.
+- **[CPUArch](./types/cpuarch)** - Represents the CPU architecture for compilation.
+- **[CompileOptions](./types/compileoptions)** - Options for compiling a GoatDB application into a standalone executable.
+- **[DebugServerOptions](./types/debugserveroptions)** - No description
+- **[EmailBuilder](./types/emailbuilder)** - Function type for building email messages from email info.
+- **[EmailInfo](./types/emailinfo)** - Union type for all supported email types.
+- **[ExecutableOptions](./types/executableoptions)** - No description
+- **[LiveReloadOptions](./types/livereloadoptions)** - No description
+- **[TargetOS](./types/targetos)** - Represents the target operating system for compilation.
+
 ### Functions
 
 See [Server Functions](./functions-server) for all exported functions.
@@ -88,7 +131,34 @@ Check out https://goatdb.dev for additional docs.
 
 - **[UseQueryOpts](./interfaces/usequeryopts)** - Options for the useQuery hook.
 
+### Types
+
+- **[DBReadyState](./types/dbreadystate)** - Represents the state of the loading process.
+- **[PropsWithPath](./types/propswithpath)** - Convenience props type for components that accept a DB path as input.
+- **[UseItemOpts](./types/useitemopts)** - Options for the useItem hook.
+
 ### Functions
 
 See [React Functions](./functions-react) for all exported functions.
+
+## schema
+
+### Types
+
+- **[FieldDef](./types/fielddef)** - A definition of a single field in a schema.
+- **[FieldValue](./types/fieldvalue)** - A mapping between a schema type and its native variable type.
+- **[Schema](./types/schema)** - A Schema defines the structure of a Document. Schemas are also versioned,
+- **[SchemaDataType](./types/schemadatatype)** - Given a schema, extracts the type of its data.
+- **[SchemaField](./types/schemafield)** - Represents a field in a schema, which can be either a custom field defined
+- **[SchemaFieldsDef](./types/schemafieldsdef)** - Mapping between field name and its definition.
+- **[SchemaNullType](./types/schemanulltype)** - No description
+- **[SchemaOptionalFields](./types/schemaoptionalfields)** - Given a schema, extracts the names of all optional fields.
+- **[SchemaRequiredFields](./types/schemarequiredfields)** - Given a schema, extracts the names of all required fields.
+- **[SchemaTypeSession](./types/schematypesession)** - No description
+- **[SchemaTypeUserStats](./types/schematypeuserstats)** - No description
+- **[SchemaValueWithOptional](./types/schemavaluewithoptional)** - Given a type (FieldValue) and a required + default function, this generates
+
+### Functions
+
+See [schema Functions](./functions-schema) for all exported functions.
 

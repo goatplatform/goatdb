@@ -6,66 +6,50 @@ title: Core Functions
 
 ## SchemaEquals
 
-```typescript
-SchemaEquals(s1: `Schema`, s2: `Schema`): boolean
-```
+**SchemaEquals(s1: [Schema](./types/schema), s2: [Schema](./types/schema)): boolean**
 
 Given two schemas, returns whether they're the same one or not.
 
 ## SchemaGetFieldDef
 
-```typescript
-SchemaGetFieldDef(s: S, field: F): `FieldDef`<unknown> | undefined
-```
+**SchemaGetFieldDef(s: S, field: F): [FieldDef](./types/fielddef)\<S[any][F][any]\> | undefined**
 
 Given a schema and a field, returns its
 
 ## SchemaGetFields
 
-```typescript
-SchemaGetFields(s: `Schema`): unknown
-```
+**SchemaGetFields(s: [Schema](./types/schema)): readonly [string, [FieldDef](./types/fielddef)\<`ValueType`\>][]**
 
 Given a schema, this function returns its field definitions as an iterable.
 
 ## SchemaGetRequiredFields
 
-```typescript
-SchemaGetRequiredFields(s: `Schema`): unknown
-```
+**SchemaGetRequiredFields(s: [Schema](./types/schema)): readonly string[]**
 
 Given a schema, this functions returns an iterable of its required fields.
 
 ## itemPath
 
-```typescript
-itemPath(type: T, repo: string, item: string, embed: string): string
-```
+**itemPath(type: T, repo: string, item: string, embed: string): string**
 
 Given the path parts, composes them into a GoatDB path.
 
 ## itemPathGetPart
 
-```typescript
-itemPathGetPart(path: string, part: unknown | unknown | unknown | unknown): T | undefined
-```
+**itemPathGetPart(path: string, part: any | any | any | any): T | undefined**
 
 Given a DB path and a path component, this function returns the relevant
 portion of the path.
 
 ## itemPathGetRepoId
 
-```typescript
-itemPathGetRepoId(path: string): string
-```
+**itemPathGetRepoId(path: string): string**
 
 Given a DB path, return just the repository prefix of it.
 
 ## itemPathIsValid
 
-```typescript
-itemPathIsValid(path: string): boolean
-```
+**itemPathIsValid(path: string): boolean**
 
 Checks if the given path is valid.
 Valid paths must contain lowercase letters, numbers, and the characters
@@ -74,32 +58,24 @@ characters.
 
 ## itemPathJoin
 
-```typescript
-itemPathJoin(prefix: string, suffix: string): string
-```
+**itemPathJoin(prefix: string, suffix: string): string**
 
 Joins the given prefix and suffix into a single path.
 
 ## itemPathNormalize
 
-```typescript
-itemPathNormalize(path: string): string
-```
+**itemPathNormalize(path: string): string**
 
 Normalizes the given path ensuring it has the correct number of parts
 and no trailing separator.
 
 ## normalizeEmail
 
-```typescript
-normalizeEmail(email: string): string
-```
+**normalizeEmail(email: string): string**
 
 ## prettyJSON
 
-```typescript
-prettyJSON(o: `ReadonlyJSONValue`): string
-```
+**prettyJSON(o: `ReadonlyJSONValue`): string**
 
 Converts a JSON value to a pretty-printed string.
 
@@ -108,9 +84,7 @@ the serializable representation of the object.
 
 ## uniqueId
 
-```typescript
-uniqueId(length: number): string
-```
+**uniqueId(length: number): string**
 
 Generates a random ID string.
 

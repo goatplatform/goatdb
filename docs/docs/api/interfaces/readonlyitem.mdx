@@ -35,19 +35,13 @@ schema: S
 
 ### cloneData()
 
-```typescript
-cloneData(): `SchemaDataType`<S>
-```
+**cloneData(): [SchemaDataType](./types/schemadatatype)\<S\>**
 
 ### get()
 
-```typescript
-get(key: K): unknown
-```
+**get(key: K): [SchemaDataType](./types/schemadatatype)\<S\>[K]**
 
 ### has()
 
-```typescript
-has(key: unknown): boolean
-```
+**has(key: keyof S[any]): boolean**
 

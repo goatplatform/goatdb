@@ -14,19 +14,19 @@ Options for customizing cloning behavior
 ### fieldCloneOverride
 
 ```typescript
-fieldCloneOverride: unknown
+fieldCloneOverride: (obj: [ReadonlyCoreObject](./types/readonlycoreobject) | [CoreDictionary](./types/coredictionary), key: string, opts: [CoreValueCloneOpts](./interfaces/corevaluecloneopts)) =\> [CoreValue](./types/corevalue)
 ```
 
 ### notClonableExt
 
 ```typescript
-notClonableExt: unknown
+notClonableExt: (obj: T) =\> T
 ```
 
 ### objectOverride
 
 ```typescript
-objectOverride: unknown
+objectOverride: (obj: [CoreValue](./types/corevalue)) =\> [boolean, [CoreValue](./types/corevalue)]
 ```
 
 ## Inherited Members

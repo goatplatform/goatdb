@@ -6,9 +6,7 @@ title: React Functions
 
 ## useDB
 
-```typescript
-useDB(): [GoatDB](./classes/goatdb)<`US`>
-```
+**useDB(): [GoatDB](./classes/goatdb)\<`US`\>**
 
 Opens a local DB, creating it if necessary. Once opened, the DB is available
 as a react context. All future calls return the already opened DB rather than
@@ -18,18 +16,14 @@ This hook will trigger a re-render whenever the current user changes.
 
 ## useDBReady
 
-```typescript
-useDBReady(): `DBReadyState`
-```
+**useDBReady(): [DBReadyState](./types/dbreadystate)**
 
 A hook for monitoring the DB's loading process. The hook triggers whenever
 the loading process changes its state.
 
 ## useItem
 
-```typescript
-useItem(pathComps: string[]): [ManagedItem](./classes/manageditem)<S> | undefined
-```
+**useItem(pathComps: string[]): [ManagedItem](./classes/manageditem)\<S\> | undefined**
 
 This hook monitors changes to a specific item, triggering a re-render
 whenever the item's state changes. It returns a mutable ManagedItem
@@ -40,9 +34,7 @@ local and remote updates.
 
 ## useQuery
 
-```typescript
-useQuery(config: [UseQueryOpts](./interfaces/usequeryopts)<`IS`, `CTX`, `OS`>): [Query](./classes/query)<`IS`, `OS`, `CTX`>
-```
+**useQuery(config: [UseQueryOpts](./interfaces/usequeryopts)\<`IS`, `CTX`, `OS`\>): [Query](./classes/query)\<`IS`, `OS`, `CTX`\>**
 
 Creates a new query or retrieves an existing one. On first access, GoatDB
 automatically loads the source repository either from the local disk or by

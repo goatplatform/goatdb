@@ -9,17 +9,13 @@ sidebar_label: Repository
 
 ## Constructor
 
-```typescript
-new Repository(db: [GoatDB](./classes/goatdb)<`Schema`>, path: string, trustPool: `TrustPool`<>, __namedParameters: `RepositoryConfig`<`ST`>)
-```
+**new Repository(db: [GoatDB](./classes/goatdb)\<[Schema](./types/schema)\>, path: string, trustPool: `TrustPool`\<\>, __namedParameters: `RepositoryConfig`\<`ST`\>)**
 
 ## Methods
 
 ### changedFieldsInCommit()
 
-```typescript
-changedFieldsInCommit(commit: string | `Commit`<>): string[]
-```
+**changedFieldsInCommit(commit: string | `Commit`\<\>): string[]**
 
 This method computes a quick diff between the given commit and all of its
 parents. It determines which fields were changed in this commit, rather
@@ -27,15 +23,11 @@ than what the changes were.
 
 ### commitIsCorrupted()
 
-```typescript
-commitIsCorrupted(c: `Commit`<>): boolean
-```
+**commitIsCorrupted(c: `Commit`\<\>): boolean**
 
 ### commitIsHighProbabilityLeaf()
 
-```typescript
-commitIsHighProbabilityLeaf(candidate: string | `Commit`<>): boolean
-```
+**commitIsHighProbabilityLeaf(candidate: string | `Commit`\<\>): boolean**
 
 This method determines, to a high probability, whether the given commit is
 a leaf commit or not, even when the full graph isn't available.
@@ -46,51 +38,35 @@ filters, the commit guaranteed not to be a leaf.
 
 ### commits()
 
-```typescript
-commits(session: `Session`): `Generator`<`Commit`<>, any, unknown>
-```
+**commits(session: `Session`): `Generator`\<`Commit`\<\>, any, unknown\>**
 
 ### commitsForKey()
 
-```typescript
-commitsForKey(key: string, session: `Session`): `Generator`<`Commit`<>, any, unknown>
-```
+**commitsForKey(key: string, session: `Session`): `Generator`\<`Commit`\<\>, any, unknown\>**
 
 ### create()
 
-```typescript
-create(key: string, value: [Item](./classes/item)<S>): `Promise`<`Commit`<>>
-```
+**create(key: string, value: [Item](./classes/item)\<S\>): `Promise`\<`Commit`\<\>\>**
 
 ### debugNetworkForKey()
 
-```typescript
-debugNetworkForKey(key: string): [ReadonlyJSONObject](./interfaces/readonlyjsonobject)
-```
+**debugNetworkForKey(key: string): [ReadonlyJSONObject](./interfaces/readonlyjsonobject)**
 
 ### downloadDebugNetworkForKey()
 
-```typescript
-downloadDebugNetworkForKey(key: string): void
-```
+**downloadDebugNetworkForKey(key: string): void**
 
 ### findLatestAncestorFromCommit()
 
-```typescript
-findLatestAncestorFromCommit(commit: string | `Commit`<>, filter: unknown): `Commit`<>
-```
+**findLatestAncestorFromCommit(commit: string | `Commit`\<\>, filter: (c: `Commit`\<\>) =\> boolean): `Commit`\<\>**
 
 ### findLatestNonCorruptedCommitForKey()
 
-```typescript
-findLatestNonCorruptedCommitForKey(key: string): `Commit`<>
-```
+**findLatestNonCorruptedCommitForKey(key: string): `Commit`\<\>**
 
 ### findMergeBase()
 
-```typescript
-findMergeBase(commits: `Commit`<>[]): unknown
-```
+**findMergeBase(commits: `Commit`\<\>[]): [commits: `Commit`\<\>[], base: `Commit`\<\>, scheme: [Schema](./types/schema), reachedRoot: boolean]**
 
 Given an iterable of commits, this method returns their Lowest Common
 Ancestor or undefined if no such ancestor exists (meaning the commits
@@ -98,108 +74,74 @@ belong to disconnected histories).
 
 ### findNonCorruptedParentsFromCommits()
 
-```typescript
-findNonCorruptedParentsFromCommits(parents: string | `Commit`<>[]): `Commit`<>[]
-```
+**findNonCorruptedParentsFromCommits(parents: string | `Commit`\<\>[]): `Commit`\<\>[]**
 
 ### getCommit()
 
-```typescript
-getCommit(id: string, session: `Session`): `Commit`<>
-```
+**getCommit(id: string, session: `Session`): `Commit`\<\>**
 
 ### graphForKey()
 
-```typescript
-graphForKey(key: string): `CommitGraph`[]
-```
+**graphForKey(key: string): `CommitGraph`[]**
 
 ### hasCommit()
 
-```typescript
-hasCommit(id: string): boolean
-```
+**hasCommit(id: string): boolean**
 
 ### hasItemForCommit()
 
-```typescript
-hasItemForCommit(c: string | `Commit`<>): boolean
-```
+**hasItemForCommit(c: string | `Commit`\<\>): boolean**
 
 ### hasKey()
 
-```typescript
-hasKey(key: string): boolean
-```
+**hasKey(key: string): boolean**
 
 ### headForKey()
 
-```typescript
-headForKey(key: string): `Commit`<>
-```
+**headForKey(key: string): `Commit`\<\>**
 
 This method finds and returns the head for the given key. This is a
 readonly operation and does not attempt to merge any leaves.
 
 ### itemForCommit()
 
-```typescript
-itemForCommit(c: string | `Commit`<>): [Item](./classes/item)<S>
-```
+**itemForCommit(c: string | `Commit`\<\>): [Item](./classes/item)\<S\>**
 
 ### keyExists()
 
-```typescript
-keyExists(key: string): boolean
-```
+**keyExists(key: string): boolean**
 
 ### keys()
 
-```typescript
-keys(session: `Session`): `Iterable`<string>
-```
+**keys(session: `Session`): `Iterable`\<string\>**
 
 ### leavesForKey()
 
-```typescript
-leavesForKey(key: string, session: `Session`): unknown
-```
+**leavesForKey(key: string, session: `Session`): readonly `Commit`\<\>[]**
 
 ### mergeIfNeeded()
 
-```typescript
-mergeIfNeeded(key: string): `Promise`<`Commit`<>>
-```
+**mergeIfNeeded(key: string): `Promise`\<`Commit`\<\>\>**
 
 ### numberOfCommits()
 
-```typescript
-numberOfCommits(session: `Session`): number
-```
+**numberOfCommits(session: `Session`): number**
 
 ### paths()
 
-```typescript
-paths(session: `Session`): `Iterable`<string>
-```
+**paths(session: `Session`): `Iterable`\<string\>**
 
 ### persistCommits()
 
-```typescript
-persistCommits(commits: `Iterable`<`Commit`<>>): `Promise`<`Commit`<>[]>
-```
+**persistCommits(commits: `Iterable`\<`Commit`\<\>\>): `Promise`\<`Commit`\<\>[]\>**
 
 ### persistVerifiedCommits()
 
-```typescript
-persistVerifiedCommits(commits: `Iterable`<`Commit`<>>): `Promise`<`Commit`<>[]>
-```
+**persistVerifiedCommits(commits: `Iterable`\<`Commit`\<\>\>): `Promise`\<`Commit`\<\>[]\>**
 
 ### rebase()
 
-```typescript
-rebase(key: string, record: [Item](./classes/item)<S>, headId: string | `Commit`<>): unknown
-```
+**rebase(key: string, record: [Item](./classes/item)\<S\>, headId: string | `Commit`\<\>): [[Item](./classes/item)\<S\>, string]**
 
 Given a key and an edited record for this key, this method rebases the
 changes from the record on top of the any changes made concurrently for
@@ -208,53 +150,37 @@ committing them.
 
 ### revertAllKeysToBefore()
 
-```typescript
-revertAllKeysToBefore(ts: number): void
-```
+**revertAllKeysToBefore(ts: number): void**
 
 ### revertHeadsByConnectionId()
 
-```typescript
-revertHeadsByConnectionId(connectionIds: string | string[]): void
-```
+**revertHeadsByConnectionId(connectionIds: string | string[]): void**
 
 ### setValueForKey()
 
-```typescript
-setValueForKey(key: string, value: [Item](./classes/item)<S>, parentCommit: string | `Commit`<>): `Promise`<`Commit`<>>
-```
+**setValueForKey(key: string, value: [Item](./classes/item)\<S\>, parentCommit: string | `Commit`\<\>): `Promise`\<`Commit`\<\>\>**
 
 Updates the head record for a given key.
 
 ### valueForKey()
 
-```typescript
-valueForKey(key: string): unknown
-```
+**valueForKey(key: string): [[Item](./classes/item)\<T\>, `Commit`\<\>]**
 
 ### verifyCommits()
 
-```typescript
-verifyCommits(commits: `Iterable`<`Commit`<>>): `Promise`<`Commit`<>[]>
-```
+**verifyCommits(commits: `Iterable`\<`Commit`\<\>\>): `Promise`\<`Commit`\<\>[]\>**
 
 ### normalizePath()
 
-```typescript
-normalizePath(id: string): string
-```
+**normalizePath(id: string): string**
 
 ### parseId()
 
-```typescript
-parseId(id: string): unknown
-```
+**parseId(id: string): [storage: string, id: string]**
 
 ### path()
 
-```typescript
-path(storage: string, id: string): string
-```
+**path(storage: string, id: string): string**
 
 ## Inherited Methods
 

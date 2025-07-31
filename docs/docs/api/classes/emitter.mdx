@@ -9,63 +9,43 @@ sidebar_label: Emitter
 
 ## Constructor
 
-```typescript
-new Emitter(delayedEmissionTimerConstructor: unknown, alwaysActive: boolean)
-```
+**new Emitter(delayedEmissionTimerConstructor: (callback: `TimerCallback`) =\> `Timer`, alwaysActive: boolean)**
 
 ## Methods
 
 ### attach()
 
-```typescript
-attach(e: E, c: C): unknown
-```
+**attach(e: E, c: C): () =\> void**
 
 ### detach()
 
-```typescript
-detach(e: E, c: C): void
-```
+**detach(e: E, c: C): void**
 
 ### detachAll()
 
-```typescript
-detachAll(e: E): void
-```
+**detachAll(e: E): void**
 
 ### emit()
 
-```typescript
-emit(e: E, args: unknown[]): void
-```
+**emit(e: E, args: unknown[]): void**
 
 ### mute()
 
-```typescript
-mute(): void
-```
+**mute(): void**
 
 ### once()
 
-```typescript
-once(e: E, c: C): unknown
-```
+**once(e: E, c: C): () =\> void**
 
 ### resume()
 
-```typescript
-resume(): void
-```
+**resume(): void**
 
 ### suspend()
 
-```typescript
-suspend(): void
-```
+**suspend(): void**
 
 ### unmute()
 
-```typescript
-unmute(): void
-```
+**unmute(): void**
 

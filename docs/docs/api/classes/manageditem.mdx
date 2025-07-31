@@ -12,17 +12,13 @@ in GoatDB. Manages the item's state, schema validation, and version history.
 
 ## Constructor
 
-```typescript
-new ManagedItem(db: [GoatDB](./classes/goatdb)<`US`>, path: string)
-```
+**new ManagedItem(db: [GoatDB](./classes/goatdb)\<`US`\>, path: string)**
 
 ## Methods
 
 ### activate()
 
-```typescript
-activate(): void
-```
+**activate(): void**
 
 Activates the managed item by attaching a document change listener to the
 repository. When the document changes, it will trigger a rebase of the item
@@ -34,9 +30,7 @@ directly by users.
 
 ### commit()
 
-```typescript
-commit(): `Promise`<void>
-```
+**commit(): `Promise`\<void\>**
 
 Commits the current state of this item to the database.
 
@@ -50,9 +44,7 @@ This method:
 
 ### deactivate()
 
-```typescript
-deactivate(): void
-```
+**deactivate(): void**
 
 Deactivates the managed item by removing the document change listener and
 canceling any pending commits. This method is idempotent - calling it
@@ -63,9 +55,7 @@ directly by users.
 
 ### delete()
 
-```typescript
-delete(key: unknown): boolean
-```
+**delete(key: any): boolean**
 
 Deletes a key-value pair from this item. If the field has a default value
 defined in the schema, the field will be set to that default value instead
@@ -73,9 +63,7 @@ of being deleted.
 
 ### downloadDebugGraph()
 
-```typescript
-downloadDebugGraph(): void
-```
+**downloadDebugGraph(): void**
 
 Downloads a debug graph visualization of the item's network state.
 The downloaded file is in a format compatible with Cytoscape, a network
@@ -83,34 +71,26 @@ visualization and analysis tool.
 
 ### get()
 
-```typescript
-get(key: unknown): unknown
-```
+**get(key: any): [SchemaDataType](./types/schemadatatype)\<S\>[K]**
 
 Gets the value for the given key from this item.
 
 ### has()
 
-```typescript
-has(key: unknown): boolean
-```
+**has(key: any): boolean**
 
 Checks if this item has a value for the given key.
 
 ### readyPromise()
 
-```typescript
-readyPromise(): `Promise`<void>
-```
+**readyPromise(): `Promise`\<void\>**
 
 Returns a promise that resolves when this managed item is ready to use.
 If the item is already ready, the promise resolves immediately.
 
 ### rebase()
 
-```typescript
-rebase(): void
-```
+**rebase(): void**
 
 Synchronizes the local item state with the latest version from the
 repository.
@@ -120,17 +100,13 @@ in-memory state.
 
 ### set()
 
-```typescript
-set(key: unknown, value: unknown): void
-```
+**set(key: any, value: [SchemaDataType](./types/schemadatatype)\<S\>[T]): void**
 
 Sets the value for the given key in this item.
 
 ### setMulti()
 
-```typescript
-setMulti(data: `Partial<`SchemaDataType`<S>>`): void
-```
+**setMulti(data: `Partial\<[SchemaDataType](./types/schemadatatype)\<S\>\>`): void**
 
 A convenience method for setting several fields and values at once.
 
