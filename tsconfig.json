@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "downlevelIteration": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "allowJs": true,
+    "noImplicitAny": false
+  },
+  "include": [
+    "mod.ts",
+    "server/mod.ts", 
+    "react/hooks.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "build",
+    "dist",
+    "docs",
+    "examples",
+    "tests",
+    "benchmarks",
+    "cpp"
+  ]
+}

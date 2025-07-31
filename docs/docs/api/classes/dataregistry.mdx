@@ -3,9 +3,6 @@ title: DataRegistry
 sidebar_label: DataRegistry
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # DataRegistry
 
 The DataRegistry acts as a registry of known schemas for a given GoatDB
@@ -17,214 +14,77 @@ create multiple registries each with different schemas registered.
 
 ## Constructor
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
 new DataRegistry()
 ```
 
-  </TabItem>
-</Tabs>
-
-## Properties
-
-### default *(readonly)*
-
-The default instance. Unless explicitly specified, GoatDB will default to
-this instance.
-
-**Type:** `DataRegistry`
+Initialize a new DataRegistry.
 
 ## Methods
 
-### registerSchema()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
+### authRuleForRepo()
 
 ```typescript
-registerSchema(schema: Schema): void
+authRuleForRepo(inputPath: string): `AuthRule`
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### schema
-
-**Type:** `Schema`
-
-The schema to register.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
-### registerAuthRule()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-registerAuthRule(path: string | RegExp, rule: AuthRule): void
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### path
-
-**Type:** `string | RegExp`
-
-Path to a repository or a RegExp instance.
-
-#### rule
-
-**Type:** `AuthRule`
-
-A function responsible for authorizing single items within
-            repositories that match the given path.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
-### get()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-get(ns: string, version?: number): Schema
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### ns
-
-**Type:** `string`
-
-The namespace for the schema.
-
-#### version *(optional)*
-
-**Type:** `number`
-
-If provided, searches for the specific version. Otherwise
-               this method will return the latest version for the passed
-               namespace.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Schema`
-
-### upgrade()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-upgrade(data: CoreObject, dataSchema: Schema, targetSchema?: Schema): [CoreObject<CoreValue>, Schema]
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### data
-
-**Type:** `CoreObject`
-
-The data to upgrade.
-
-#### dataSchema
-
-**Type:** `Schema`
-
-The schema of the passed data.
-
-#### targetSchema *(optional)*
-
-**Type:** `Schema`
-
-The target schema. If not provided, the latest schema
-                    for the namespace will be used.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `[CoreObject<CoreValue>, Schema]`
-
-### encode()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-encode(schema: Schema): string
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### schema
-
-**Type:** `Schema`
-
-The schema to encode.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `string`
+Finds the authorization rule for the provided path.
 
 ### decode()
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-decode(str: string): Schema
+decode(str: string): `Schema`
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+Decodes a schema marker to an actual schema.
 
-#### str
-
-**Type:** `string`
-
-The schema marker produced by a previous call to
-           `dataRegistry.encode`.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Schema`
-
-### authRuleForRepo()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
+### encode()
 
 ```typescript
-authRuleForRepo(inputPath: string): AuthRule
+encode(schema: `Schema`): string
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+Encodes a schema to a marker string for storage.
 
-#### inputPath
+### get()
 
-**Type:** `string`
+```typescript
+get(ns: string, version: number): `Schema`
+```
 
-The path to search for.
+Find a schema that's been registered with this registry.
 
-  </TabItem>
-</Tabs>
+### registerAuthRule()
 
-**Returns:** `AuthRule`
+```typescript
+registerAuthRule(path: string | `RegExp`<>, rule: `AuthRule`): void
+```
+
+Registers an authorization rule with this registry. If not provided, all
+data is considered public.
+
+### registerSchema()
+
+```typescript
+registerSchema(schema: `Schema`): void
+```
+
+Registers a schema with this registry. This is a NOP if the schema had
+already been registered.
+
+### upgrade()
+
+```typescript
+upgrade(data: [CoreObject](./interfaces/coreobject)<`CoreValue`>, dataSchema: `Schema`, targetSchema: `Schema`): unknown
+```
+
+Given a data object and its schema, this method performs the upgrade
+procedure to the target schema.
+
+This method will refuse to upgrade to the target schema if a single version
+is missing. For example, if attempting to upgrade from v1 to v3, but the
+v2 schema is missing, then the upgrade will be refused.
+
+NOTE: You shouldn't use this method directly under normal circumstances.
+The upgrade procedure will be performed automatically for you when needed.
 

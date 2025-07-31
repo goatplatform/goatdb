@@ -109,6 +109,9 @@ const sidebars: SidebarsConfig = {
                 'api/interfaces/coreobject',
                 'api/interfaces/coreoptions',
                 'api/interfaces/corevaluecloneopts',
+                'api/interfaces/jsonobject',
+                'api/interfaces/readonlyitem',
+                'api/interfaces/readonlyjsonobject',
               ],
             },
             {

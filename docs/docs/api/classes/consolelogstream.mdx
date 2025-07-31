@@ -3,66 +3,28 @@ title: ConsoleLogStream
 sidebar_label: ConsoleLogStream
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # ConsoleLogStream
 
 A LogStream implementation that writes log entries to the console.
 Different severity levels are mapped to different console methods.
 
+**Implements:** [LogStream](../interfaces/logstream)
+
 ## Constructor
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-new ConsoleLogStream(severity: number | Severity)
+new ConsoleLogStream(severity: number | `Severity`)
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### severity
-
-**Type:** `number | Severity`
-
-The minimum severity level to log. Can be provided as a
-               Severity string or numeric code. Defaults to 'DEFAULT'.
-
-  </TabItem>
-</Tabs>
-
-## Properties
-
-### severity
-
-The minimum severity level to log
-
-**Type:** `Severity`
+Creates a new ConsoleLogStream
 
 ## Methods
 
 ### appendEntry()
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-appendEntry(e: NormalizedLogEntry<LogEntry>): void
+appendEntry(e: `NormalizedLogEntry`<`LogEntry`>): void
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### e
-
-**Type:** `NormalizedLogEntry<LogEntry>`
-
-The normalized log entry to append
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
+Appends a log entry to the console
 

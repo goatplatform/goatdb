@@ -1,85 +1,36 @@
 ---
 title: Server Functions
-sidebar_label: Server Functions
 ---
-
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 # Server Functions
 
-Functions exported by GoatDB Server module.
-
 ## compile
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-compile(options: CompileOptions): Promise<void>
+compile(options: `CompileOptions`): `Promise`<void>
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+Compiles a GoatDB application into a standalone executable.
 
-### options
-
-**Type:** `CompileOptions`
-
-Configuration options for the compilation process
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<void>`
-
----
+This function performs the following steps:
+1. Bundles client-side code (JS/TS/TSX) into a single JavaScript file
+2. Processes static assets (HTML, CSS, images, etc.)
+3. Generates build information
+4. Compiles the server entry point into a native executable for the target
+   platform
 
 ## startDebugServer
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-startDebugServer(options: DebugServerOptions<US>): Promise<never>
+startDebugServer(options: `DebugServerOptions`<`US`>): `Promise`<never>
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### options
-
-**Type:** `DebugServerOptions<US>`
-
-Options for running the debug server.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<never>`
-
----
+Starts a local debug server. The debug server implements a live reload that
+automatically transpiles TypeScript and JSX using ESBuild.
 
 ## staticAssetsFromJS
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-staticAssetsFromJS(encodedAssets: ReadonlyJSONObject): StaticAssets
+staticAssetsFromJS(encodedAssets: [ReadonlyJSONObject](./interfaces/readonlyjsonobject)): `StaticAssets`
 ```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### encodedAssets
-
-**Type:** `ReadonlyJSONObject`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `StaticAssets`
-
----
 

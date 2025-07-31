@@ -24,6 +24,7 @@
     "test": "deno run -A tests/run.ts",
     "bench": "deno bench -A --no-check",
     "docs:api": "deno run -A docs-api-build.ts",
+    "docs:clean": "rm -rf docs/node_modules docs/.docusaurus docs/build docs/package-lock.json",
     "docs:serve": "deno run -A docs-build.ts serve",
     "docs:build": "deno run -A docs-build.ts build"
   },

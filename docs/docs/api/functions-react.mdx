@@ -1,94 +1,58 @@
 ---
 title: React Functions
-sidebar_label: React Functions
 ---
-
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 # React Functions
 
-Functions exported by GoatDB React module.
-
 ## useDB
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-useDB(): GoatDB<US>
+useDB(): [GoatDB](./classes/goatdb)<`US`>
 ```
 
-  </TabItem>
-</Tabs>
+Opens a local DB, creating it if necessary. Once opened, the DB is available
+as a react context. All future calls return the already opened DB rather than
+opening it again.
 
-**Returns:** `GoatDB<US>`
-
----
-
-## useItem
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-useItem(pathComps: string[]): ManagedItem<S, Schema>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### pathComps
-
-**Type:** `string[]`
-
-A full item path or separate path components.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `ManagedItem<S, Schema>`
-
----
+This hook will trigger a re-render whenever the current user changes.
 
 ## useDBReady
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-useDBReady(): DBReadyState
+useDBReady(): `DBReadyState`
 ```
 
-  </TabItem>
-</Tabs>
+A hook for monitoring the DB's loading process. The hook triggers whenever
+the loading process changes its state.
 
-**Returns:** `DBReadyState`
+## useItem
 
----
+```typescript
+useItem(pathComps: string[]): [ManagedItem](./classes/manageditem)<S> | undefined
+```
+
+This hook monitors changes to a specific item, triggering a re-render
+whenever the item's state changes. It returns a mutable ManagedItem
+instance that allows direct editing. Any changes to the item are
+automatically queued for background commit and synchronization with the
+server. Similar to the useQuery hook, useItem reacts to both
+local and remote updates.
 
 ## useQuery
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-useQuery(config: UseQueryOpts<IS, CTX, OS>): Query<IS, OS, CTX>
+useQuery(config: [UseQueryOpts](./interfaces/usequeryopts)<`IS`, `CTX`, `OS`>): [Query](./classes/query)<`IS`, `OS`, `CTX`>
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+Creates a new query or retrieves an existing one. On first access, GoatDB
+automatically loads the source repository either from the local disk or by
+fetching it from the server. The hook triggers UI re-rendering whenever the
+query results are updated, regardless of whether the changes originate from
+local or remote edits.
 
-### config
-
-**Type:** `UseQueryOpts<IS, CTX, OS>`
-
-Configuration of the desired query.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Query<IS, OS, CTX>`
-
----
+When a query is first opened, it performs a linear scan of its source using a
+Coroutine without blocking the main thread. During and after this
+initial scan, the query caches its results to disk, allowing subsequent runs
+to resume execution from the cached state.
+For additional details, refer to the mechanism documentation.
 

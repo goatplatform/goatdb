@@ -1,372 +1,127 @@
 ---
 title: Core Functions
-sidebar_label: Core Functions
 ---
-
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 # Core Functions
 
-Functions exported by GoatDB Core module.
-
-## uniqueId
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
+## SchemaEquals
 
 ```typescript
-uniqueId(length: number): string
+SchemaEquals(s1: `Schema`, s2: `Schema`): boolean
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### length
-
-**Type:** `number`
-
-The length of the ID to generate (default: 24)
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `string`
-
----
-
-## prettyJSON
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-prettyJSON(o: ReadonlyJSONValue): string
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### o
-
-**Type:** `ReadonlyJSONValue`
-
-The JSON value to pretty print
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `string`
-
----
-
-## normalizeEmail
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-normalizeEmail(email: string): string
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### email
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `string`
-
----
-
-## SchemaGetFields
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-SchemaGetFields(s: Schema): any
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### s
-
-**Type:** `Schema`
-
-A schema.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `any`
-
----
-
-## SchemaGetRequiredFields
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-SchemaGetRequiredFields(s: Schema): any
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### s
-
-**Type:** `Schema`
-
-A schema.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `any`
-
----
+Given two schemas, returns whether they're the same one or not.
 
 ## SchemaGetFieldDef
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-SchemaGetFieldDef(s: S, field: F): FieldDef
+SchemaGetFieldDef(s: S, field: F): `FieldDef`<unknown> | undefined
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+Given a schema and a field, returns its
 
-### s
-
-**Type:** `S`
-
-### field
-
-**Type:** `F`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `FieldDef`
-
----
-
-## SchemaEquals
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
+## SchemaGetFields
 
 ```typescript
-SchemaEquals(s1: Schema, s2: Schema): boolean
+SchemaGetFields(s: `Schema`): unknown
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+Given a schema, this function returns its field definitions as an iterable.
 
-### s1
+## SchemaGetRequiredFields
 
-**Type:** `Schema`
+```typescript
+SchemaGetRequiredFields(s: `Schema`): unknown
+```
 
-First schema.
-
-### s2
-
-**Type:** `Schema`
-
-Second schema.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `boolean`
-
----
+Given a schema, this functions returns an iterable of its required fields.
 
 ## itemPath
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-itemPath(type: T, repo: string, item: string, embed?: string): string
+itemPath(type: T, repo: string, item: string, embed: string): string
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### type
-
-**Type:** `T`
-
-Type of the repository, e.g "sys" / "user" / "data".
-
-### repo
-
-**Type:** `string`
-
-The id of the repository.
-
-### item
-
-**Type:** `string`
-
-The key of the item within the repository.
-
-### embed *(optional)*
-
-**Type:** `string`
-
-An optional embedded item within the main item.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `string`
-
----
+Given the path parts, composes them into a GoatDB path.
 
 ## itemPathGetPart
+
+```typescript
+itemPathGetPart(path: string, part: unknown | unknown | unknown | unknown): T | undefined
+```
 
 Given a DB path and a path component, this function returns the relevant
 portion of the path.
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-itemPathGetPart(path: string, part: "type" | "repo" | "item" | "embed"): T
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### path
-
-**Type:** `string`
-
-### part
-
-**Type:** `"type" | "repo" | "item" | "embed"`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `T`
-
----
-
 ## itemPathGetRepoId
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
 
 ```typescript
 itemPathGetRepoId(path: string): string
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### path
-
-**Type:** `string`
-
-The full DB path.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `string`
-
----
-
-## itemPathNormalize
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-itemPathNormalize(path: string): string
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### path
-
-**Type:** `string`
-
-The path to normalize.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `string`
-
----
-
-## itemPathJoin
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-itemPathJoin(prefix: string, suffix: string): string
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### prefix
-
-**Type:** `string`
-
-Path prefix.
-
-### suffix
-
-**Type:** `string`
-
-Path suffix.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `string`
-
----
+Given a DB path, return just the repository prefix of it.
 
 ## itemPathIsValid
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
 
 ```typescript
 itemPathIsValid(path: string): boolean
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+Checks if the given path is valid.
+Valid paths must contain lowercase letters, numbers, and the characters
+`-` and `_`. They must also contain at most 4 components separated by `/`
+characters.
 
-### path
+## itemPathJoin
 
-**Type:** `string`
+```typescript
+itemPathJoin(prefix: string, suffix: string): string
+```
 
-The path to validate.
+Joins the given prefix and suffix into a single path.
 
-  </TabItem>
-</Tabs>
+## itemPathNormalize
 
-**Returns:** `boolean`
+```typescript
+itemPathNormalize(path: string): string
+```
 
----
+Normalizes the given path ensuring it has the correct number of parts
+and no trailing separator.
+
+## normalizeEmail
+
+```typescript
+normalizeEmail(email: string): string
+```
+
+## prettyJSON
+
+```typescript
+prettyJSON(o: `ReadonlyJSONValue`): string
+```
+
+Converts a JSON value to a pretty-printed string.
+
+If the input object has a toJSON method, it will be called first to get
+the serializable representation of the object.
+
+## uniqueId
+
+```typescript
+uniqueId(length: number): string
+```
+
+Generates a random ID string.
+
+The generated ID is URL-safe, using only lowercase letters and numbers.
+The default length of 24 characters provides a large enough space to
+ensure a very low probability of collisions for most applications.
+
+Note: This function uses Math.random() which is not cryptographically secure.
+Do not use for security-sensitive purposes.
+
+With 36 possible characters (a-z, 0-9) and a length of 24, there are
+36^24 (approximately 2.24 * 10^37) possible unique IDs, making
+collisions extremely unlikely for most use cases.
 

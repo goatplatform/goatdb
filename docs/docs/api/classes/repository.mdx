@@ -3,1177 +3,264 @@ title: Repository
 sidebar_label: Repository
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # Repository
-
-No description available.
 
 **Extends:** [Emitter](./emitter)
 
 ## Constructor
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-new Repository(db: GoatDB, path: string, trustPool: TrustPool, __namedParameters: RepositoryConfig<ST>)
+new Repository(db: [GoatDB](./classes/goatdb)<`Schema`>, path: string, trustPool: `TrustPool`<>, __namedParameters: `RepositoryConfig`<`ST`>)
 ```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### db
-
-**Type:** `GoatDB`
-
-### path
-
-**Type:** `string`
-
-### trustPool
-
-**Type:** `TrustPool`
-
-### __namedParameters
-
-**Type:** `RepositoryConfig<ST>`
-
-  </TabItem>
-</Tabs>
-
-## Properties
-
-### alwaysActive *(readonly)*
-
-**Type:** `boolean`
-
-### priorityRepo *(readonly)*
-
-**Type:** `boolean`
-
-### storage *(readonly)*
-
-**Type:** `ST`
-
-### trustPool *(readonly)*
-
-**Type:** `TrustPool`
-
-### allowedNamespaces *(readonly)*
-
-**Type:** `string[]`
-
-### authorizer *(readonly)*
-
-**Type:** `AuthRule`
-
-### allowMerge
-
-**Type:** `boolean`
-
-### db *(readonly)*
-
-**Type:** `GoatDB`
-
-### path *(readonly)*
-
-**Type:** `string`
-
-### callCount
-
-**Type:** `number`
 
 ## Methods
 
-### path()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-path(storage: string, id: string): string
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### storage
-
-**Type:** `string`
-
-#### id
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `string`
-
-### parseId()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-parseId(id: string): [storage, id]
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### id
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `[storage, id]`
-
-### normalizePath()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-normalizePath(id: string): string
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### id
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `string`
-
-### numberOfCommits()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-numberOfCommits(session?: Session): number
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### session *(optional)*
-
-**Type:** `Session`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `number`
-
-### getCommit()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-getCommit(id: string, session?: Session): Commit
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### id
-
-**Type:** `string`
-
-#### session *(optional)*
-
-**Type:** `Session`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Commit`
-
-### hasCommit()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-hasCommit(id: string): boolean
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### id
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `boolean`
-
-### commits()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-commits(session?: Session): Generator<Commit>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### session *(optional)*
-
-**Type:** `Session`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Generator<Commit>`
-
-### commitsForKey()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-commitsForKey(key: string, session?: Session): Generator<Commit>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-#### session *(optional)*
-
-**Type:** `Session`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Generator<Commit>`
-
-### keyExists()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-keyExists(key: string): boolean
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `boolean`
-
 ### changedFieldsInCommit()
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-changedFieldsInCommit(commit: string | Commit): string[]
+changedFieldsInCommit(commit: string | `Commit`<>): string[]
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### commit
-
-**Type:** `string | Commit`
-
-The commit to inspect.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `string[]`
-
-### commitIsHighProbabilityLeaf()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-commitIsHighProbabilityLeaf(candidate: string | Commit): boolean
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### candidate
-
-**Type:** `string | Commit`
-
-The commit to inspect.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `boolean`
-
-### leavesForKey()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-leavesForKey(key: string, session?: Session): any
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-#### session *(optional)*
-
-**Type:** `Session`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `any`
-
-### keys()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-keys(session?: Session): Iterable<string>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### session *(optional)*
-
-**Type:** `Session`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Iterable<string>`
-
-### paths()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-paths(session?: Session): Iterable<string>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### session *(optional)*
-
-**Type:** `Session`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Iterable<string>`
-
-### findMergeBase()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-findMergeBase(commits: Commit[]): [commits, base, scheme, reachedRoot]
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### commits
-
-**Type:** `Commit[]`
-
-An iterable of commits.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `[commits, base, scheme, reachedRoot]`
-
-### findCommitBefore()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-findCommitBefore(key: string, ts: number, sessions?: string | Iterable<string>): Commit
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-#### ts
-
-**Type:** `number`
-
-#### sessions *(optional)*
-
-**Type:** `string | Iterable<string>`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Commit`
-
-### hasItemForCommit()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-hasItemForCommit(c: string | Commit): boolean
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### c
-
-**Type:** `string | Commit`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `boolean`
+This method computes a quick diff between the given commit and all of its
+parents. It determines which fields were changed in this commit, rather
+than what the changes were.
 
 ### commitIsCorrupted()
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-commitIsCorrupted(c: Commit): boolean
+commitIsCorrupted(c: `Commit`<>): boolean
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### c
-
-**Type:** `Commit`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `boolean`
-
-### findNonCorruptedParentsFromCommits()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
+### commitIsHighProbabilityLeaf()
 
 ```typescript
-findNonCorruptedParentsFromCommits(parents: string | Commit[]): Commit[]
+commitIsHighProbabilityLeaf(candidate: string | `Commit`<>): boolean
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+This method determines, to a high probability, whether the given commit is
+a leaf commit or not, even when the full graph isn't available.
 
-#### parents
+It works by inspecting the bloom filters of the newest 2log\[4\]\(N\) commits,
+and checking for the presence of the candidate commit. If present in all
+filters, the commit guaranteed not to be a leaf.
 
-**Type:** `string | Commit[]`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Commit[]`
-
-### findLatestNonCorruptedCommitForKey()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
+### commits()
 
 ```typescript
-findLatestNonCorruptedCommitForKey(key: string): Commit
+commits(session: `Session`): `Generator`<`Commit`<>, any, unknown>
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Commit`
-
-### itemForCommit()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
+### commitsForKey()
 
 ```typescript
-itemForCommit(c: string | Commit): Item<S>
+commitsForKey(key: string, session: `Session`): `Generator`<`Commit`<>, any, unknown>
 ```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### c
-
-**Type:** `string | Commit`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Item<S>`
-
-### cacheHeadForKey()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-cacheHeadForKey(key: string, head: Commit): Commit
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-#### head
-
-**Type:** `Commit`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Commit`
-
-### pickBestCommitForCurrentClient()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-pickBestCommitForCurrentClient(commits: Iterable<Commit>): Commit
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### commits
-
-**Type:** `Iterable<Commit>`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Commit`
-
-### headForKey()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-headForKey(key: string): Commit
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-The key to search for.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Commit`
-
-### createMergeCommit()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-createMergeCommit(commitsToMerge: Commit[], mergeLeader?: string, revert?: string, deltaCompress: boolean): Promise<Commit>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### commitsToMerge
-
-**Type:** `Commit[]`
-
-#### mergeLeader *(optional)*
-
-**Type:** `string`
-
-#### revert *(optional)*
-
-**Type:** `string`
-
-#### deltaCompress
-
-**Type:** `boolean`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<Commit>`
-
-### filterLatestCommitsByConnection()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-filterLatestCommitsByConnection(commits: Iterable<Commit>): Commit[]
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### commits
-
-**Type:** `Iterable<Commit>`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Commit[]`
-
-### createMergeRecord()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-createMergeRecord(commitsToMerge: Commit[]): [Item<Schema>, Commit]
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### commitsToMerge
-
-**Type:** `Commit[]`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `[Item<Schema>, Commit]`
-
-### ancestorsFilterForKey()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-ancestorsFilterForKey(key: string): [BloomFilter, number]
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `[BloomFilter, number]`
-
-### mergeIfNeeded()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-mergeIfNeeded(key: string): Promise<Commit>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<Commit>`
-
-### commitsWithUniqueItems()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-commitsWithUniqueItems(commits: any): Commit[]
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### commits
-
-**Type:** `any`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Commit[]`
-
-### valueForKey()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-valueForKey(key: string): [Item<T>, Commit]
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `[Item<T>, Commit]`
-
-### setValueForKey()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-setValueForKey(key: string, value: Item<S>, parentCommit: string | Commit): Promise<Commit>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-The key who's head to update.
-
-#### value
-
-**Type:** `Item<S>`
-
-The value to write.
-
-#### parentCommit
-
-**Type:** `string | Commit`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<Commit>`
 
 ### create()
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-create(key: string, value: Item<S>): Promise<Commit>
+create(key: string, value: [Item](./classes/item)<S>): `Promise`<`Commit`<>>
 ```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-#### value
-
-**Type:** `Item<S>`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<Commit>`
-
-### rebase()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-rebase(key: string, record: Item<S>, headId: string | Commit): [Item<S>, string]
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-The key to rebase.
-
-#### record
-
-**Type:** `Item<S>`
-
-The locally edited record.
-
-#### headId
-
-**Type:** `string | Commit`
-
-The commit from which the edited record was derived from.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `[Item<S>, string]`
-
-### deltaCompressIfNeeded()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-deltaCompressIfNeeded(fullCommit: Commit): Commit
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### fullCommit
-
-**Type:** `Commit`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Commit`
-
-### lastRecordCommitForKey()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-lastRecordCommitForKey(key: string): Commit
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Commit`
-
-### hasKey()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-hasKey(key: string): boolean
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `boolean`
-
-### verifyCommits()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-verifyCommits(commits: Iterable<Commit>): Promise<Commit[]>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### commits
-
-**Type:** `Iterable<Commit>`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<Commit[]>`
-
-### invalidateCachesForKey()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-invalidateCachesForKey(key: string): void
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
-### persistCommits()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-persistCommits(commits: Iterable<Commit>): Promise<Commit[]>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### commits
-
-**Type:** `Iterable<Commit>`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<Commit[]>`
-
-### persistVerifiedCommits()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-persistVerifiedCommits(commits: Iterable<Commit>): Promise<Commit[]>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### commits
-
-**Type:** `Iterable<Commit>`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<Commit[]>`
-
-### graphForKey()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-graphForKey(key: string): CommitGraph[]
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `CommitGraph[]`
-
-### subGraphForCommit()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-subGraphForCommit(id: string): CommitGraph
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### id
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `CommitGraph`
 
 ### debugNetworkForKey()
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-debugNetworkForKey(key: string): ReadonlyJSONObject
+debugNetworkForKey(key: string): [ReadonlyJSONObject](./interfaces/readonlyjsonobject)
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `string`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `ReadonlyJSONObject`
-
 ### downloadDebugNetworkForKey()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
 
 ```typescript
 downloadDebugNetworkForKey(key: string): void
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+### findLatestAncestorFromCommit()
 
-#### key
+```typescript
+findLatestAncestorFromCommit(commit: string | `Commit`<>, filter: unknown): `Commit`<>
+```
 
-**Type:** `string`
+### findLatestNonCorruptedCommitForKey()
 
-  </TabItem>
-</Tabs>
+```typescript
+findLatestNonCorruptedCommitForKey(key: string): `Commit`<>
+```
 
-**Returns:** `void`
+### findMergeBase()
+
+```typescript
+findMergeBase(commits: `Commit`<>[]): unknown
+```
+
+Given an iterable of commits, this method returns their Lowest Common
+Ancestor or undefined if no such ancestor exists (meaning the commits
+belong to disconnected histories).
+
+### findNonCorruptedParentsFromCommits()
+
+```typescript
+findNonCorruptedParentsFromCommits(parents: string | `Commit`<>[]): `Commit`<>[]
+```
+
+### getCommit()
+
+```typescript
+getCommit(id: string, session: `Session`): `Commit`<>
+```
+
+### graphForKey()
+
+```typescript
+graphForKey(key: string): `CommitGraph`[]
+```
+
+### hasCommit()
+
+```typescript
+hasCommit(id: string): boolean
+```
+
+### hasItemForCommit()
+
+```typescript
+hasItemForCommit(c: string | `Commit`<>): boolean
+```
+
+### hasKey()
+
+```typescript
+hasKey(key: string): boolean
+```
+
+### headForKey()
+
+```typescript
+headForKey(key: string): `Commit`<>
+```
+
+This method finds and returns the head for the given key. This is a
+readonly operation and does not attempt to merge any leaves.
+
+### itemForCommit()
+
+```typescript
+itemForCommit(c: string | `Commit`<>): [Item](./classes/item)<S>
+```
+
+### keyExists()
+
+```typescript
+keyExists(key: string): boolean
+```
+
+### keys()
+
+```typescript
+keys(session: `Session`): `Iterable`<string>
+```
+
+### leavesForKey()
+
+```typescript
+leavesForKey(key: string, session: `Session`): unknown
+```
+
+### mergeIfNeeded()
+
+```typescript
+mergeIfNeeded(key: string): `Promise`<`Commit`<>>
+```
+
+### numberOfCommits()
+
+```typescript
+numberOfCommits(session: `Session`): number
+```
+
+### paths()
+
+```typescript
+paths(session: `Session`): `Iterable`<string>
+```
+
+### persistCommits()
+
+```typescript
+persistCommits(commits: `Iterable`<`Commit`<>>): `Promise`<`Commit`<>[]>
+```
+
+### persistVerifiedCommits()
+
+```typescript
+persistVerifiedCommits(commits: `Iterable`<`Commit`<>>): `Promise`<`Commit`<>[]>
+```
+
+### rebase()
+
+```typescript
+rebase(key: string, record: [Item](./classes/item)<S>, headId: string | `Commit`<>): unknown
+```
+
+Given a key and an edited record for this key, this method rebases the
+changes from the record on top of the any changes made concurrently for
+this key. Use it to merge remote changes with any local edits before
+committing them.
 
 ### revertAllKeysToBefore()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
 
 ```typescript
 revertAllKeysToBefore(ts: number): void
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### ts
-
-**Type:** `number`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
-### findLatestAncestorFromCommit()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-findLatestAncestorFromCommit(commit: string | Commit, filter: Function): Commit
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### commit
-
-**Type:** `string | Commit`
-
-#### filter
-
-**Type:** `Function`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Commit`
-
 ### revertHeadsByConnectionId()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
 
 ```typescript
 revertHeadsByConnectionId(connectionIds: string | string[]): void
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+### setValueForKey()
 
-#### connectionIds
+```typescript
+setValueForKey(key: string, value: [Item](./classes/item)<S>, parentCommit: string | `Commit`<>): `Promise`<`Commit`<>>
+```
 
-**Type:** `string | string[]`
+Updates the head record for a given key.
 
-  </TabItem>
-</Tabs>
+### valueForKey()
 
-**Returns:** `void`
+```typescript
+valueForKey(key: string): unknown
+```
+
+### verifyCommits()
+
+```typescript
+verifyCommits(commits: `Iterable`<`Commit`<>>): `Promise`<`Commit`<>[]>
+```
+
+### normalizePath()
+
+```typescript
+normalizePath(id: string): string
+```
+
+### parseId()
+
+```typescript
+parseId(id: string): unknown
+```
+
+### path()
+
+```typescript
+path(storage: string, id: string): string
+```
+
+## Inherited Methods
+
+### From [Emitter](./emitter)
+
+`attach()`, `detach()`, `detachAll()`, `emit()`, `mute()`, `once()`, `resume()`, `suspend()`, `unmute()`
+
+*See [Emitter](./emitter) for detailed documentation*
 

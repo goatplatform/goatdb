@@ -3,91 +3,20 @@ title: UseQueryOpts
 sidebar_label: UseQueryOpts
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # UseQueryOpts
 
 Options for the useQuery hook.
 
 ## Properties
 
-<Tabs>
-  <TabItem value="overview" label="Overview" default>
+### showIntermittentResults
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `showIntermittentResults` | `boolean` | No | If `true`, updates UI during the initial scan. If `false`, waits until |
-| `source` | `QuerySource<IS, OS>` | Yes | The source repository, query or path to query from |
-| `predicate` | `Predicate<IS, CTX>` | No | Optional predicate function to filter items |
-| `sortBy` | `SortDescriptor<OS, CTX>` | No | Optional function or field name to determine sort order of results. |
-| `sortDescending` | `boolean` | No | Optional flag that if true, flips the natural order of the sortBy |
-| `schema` | `IS` | No | Optional schema to restrict query results to |
-| `id` | `string` | No | Optional unique identifier for this query |
-| `ctx` | `CTX` | No | Optional context data passed to predicate and sort functions |
-| `limit` | `number` | No | Optional maximum number of results to return |
-
-  </TabItem>
-  <TabItem value="details" label="Details">
-
-### showIntermittentResults *(optional)*
+```typescript
+showIntermittentResults: boolean
+```
 
 If `true`, updates UI during the initial scan. If `false`, waits until
 scanning is complete.
 
-**Type:** `boolean`
-
-### source
-
-The source repository, query or path to query from
-
-**Type:** `QuerySource<IS, OS>`
-
-### predicate *(optional)*
-
-Optional predicate function to filter items
-
-**Type:** `Predicate<IS, CTX>`
-
-### sortBy *(optional)*
-
-Optional function or field name to determine sort order of results.
-If a function is provided, it will be used as a custom comparator.
-If a field name is provided, results will be sorted by that field's values
-using standard comparison rules.
-
-**Type:** `SortDescriptor<OS, CTX>`
-
-### sortDescending *(optional)*
-
-Optional flag that if true, flips the natural order of the sortBy
-
-**Type:** `boolean`
-
-### schema *(optional)*
-
-Optional schema to restrict query results to
-
-**Type:** `IS`
-
-### id *(optional)*
-
-Optional unique identifier for this query
-
-**Type:** `string`
-
-### ctx *(optional)*
-
-Optional context data passed to predicate and sort functions
-
-**Type:** `CTX`
-
-### limit *(optional)*
-
-Optional maximum number of results to return
-
-**Type:** `number`
-
-  </TabItem>
-</Tabs>
+## Inherited Members
 

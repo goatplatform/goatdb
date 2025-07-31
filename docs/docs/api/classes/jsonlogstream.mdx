@@ -3,93 +3,42 @@ title: JSONLogStream
 sidebar_label: JSONLogStream
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # JSONLogStream
 
 A LogStream implementation that writes log entries to a JSON file.
 Supports optional throttling to reduce the number of entries written.
 
-## Constructor
+**Implements:** [LogStream](../interfaces/logstream)
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
+## Constructor
 
 ```typescript
 new JSONLogStream(path: string, throttleRate: number)
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### path
-
-**Type:** `string`
-
-Path to the JSON log file
-
-### throttleRate
-
-**Type:** `number`
-
-Optional throttling rate - only 1/throttleRate entries
-                    will be written. Default is 1 (no throttling).
-
-  </TabItem>
-</Tabs>
-
-## Properties
-
-### path *(readonly)*
-
-Path to the JSON log file
-
-**Type:** `string`
-
-### throttleRate *(readonly)*
-
-Optional throttling rate - only 1/throttleRate entries
-                    will be written. Default is 1 (no throttling).
-
-**Type:** `number`
+Creates a new JSONLogStream
 
 ## Methods
 
 ### appendEntry()
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-appendEntry(e: NormalizedLogEntry<LogEntry>): Promise<void>
+appendEntry(e: `NormalizedLogEntry`<`LogEntry`>): `Promise`<void>
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### e
-
-**Type:** `NormalizedLogEntry<LogEntry>`
-
-The normalized log entry to append
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<void>`
+Appends a log entry to the JSON file, respecting the throttle rate
 
 ### close()
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-close(): Promise<void>
+close(): `Promise`<void>
 ```
 
-  </TabItem>
-</Tabs>
+Closes the JSON log file if it's open. This is handled automatically by the
+stream and there's no need to call it explicitly under normal operation.
 
-**Returns:** `Promise<void>`
+You may want to call this explicitly when:
+- You need to ensure logs are flushed to disk immediately
+- You're shutting down the application and want to clean up resources
+- You want to release the file handle before the automatic timeout
 

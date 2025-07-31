@@ -120,6 +120,8 @@ export type {
   BuildInfo,
   LogStream,
 };
+export type { ReadonlyItem } from './cfds/base/item.ts';
+export type { JSONObject, ReadonlyJSONObject } from './base/interfaces.ts';
 export {
   ConsoleLogStream,
   DataRegistry,

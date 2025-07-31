@@ -3,9 +3,6 @@ title: GoatDB
 sidebar_label: GoatDB
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # GoatDB
 
 The main database class that manages repositories, synchronization, and data
@@ -21,474 +18,225 @@ GoatDB is the primary entry point for working with the database. It handles:
 
 ## Constructor
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-new GoatDB(config: DBInstanceConfig)
+new GoatDB(config: `DBInstanceConfig`)
 ```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### config
-
-**Type:** `DBInstanceConfig`
-
-  </TabItem>
-</Tabs>
-
-## Properties
-
-### alwaysActive *(readonly)*
-
-**Type:** `boolean`
-
-### orgId *(readonly)*
-
-**Type:** `string`
-
-### registry *(readonly)*
-
-**Type:** `DataRegistry`
-
-### trusted *(readonly)*
-
-**Type:** `boolean`
-
-### debug *(readonly)*
-
-**Type:** `boolean`
-
-### mode *(readonly)*
-
-**Type:** `DBMode`
-
-### queryPersistence
-
-**Type:** `QueryPersistence`
 
 ## Methods
 
-### readyPromise()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
+### clientsForRepo()
 
 ```typescript
-readyPromise(): Promise<void>
+clientsForRepo(pathComps: string[]): `Iterable`<`RepoClient`<>>
 ```
 
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<void>`
-
-### loginWithMagicLinkEmail()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-loginWithMagicLinkEmail(email: string): Promise<boolean>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### email
-
-**Type:** `string`
-
-The target of the magic link.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<boolean>`
-
-### logout()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-logout(): Promise<void>
-```
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<void>`
-
-### open()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-open(path: string, opts?: OpenOptions): Promise<Repository<MemRepoStorage>>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### path
-
-**Type:** `string`
-
-The path to the given repository.
-
-#### opts *(optional)*
-
-**Type:** `OpenOptions`
-
-Configuration options when opening this repository.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<Repository<MemRepoStorage>>`
+Returns the associated RepoClient instances for the given repository.
+Each client instance handles synchronization with a different server
+endpoint, enabling client-side load-balancing.
 
 ### close()
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-close(path: string): Promise<void>
+close(path: string): `Promise`<void>
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+Closes a repository, flushing any pending writes to disk before releasing
+all memory associated with this repository.
 
-#### path
-
-**Type:** `string`
-
-Path to the desired repository.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<void>`
-
-### item()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-item(pathComps: string[]): ManagedItem<S>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### pathComps
-
-**Type:** `string[]`
-
-A full path or path components.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `ManagedItem<S>`
-
-### create()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-create(path: string, schema: S, data?: Partial<SchemaDataType<S>>): ManagedItem<S>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### path
-
-**Type:** `string`
-
-If a full path is provided, the item will be created with
-               the provided key. If a repository path is provided, a
-               unique item key will be automatically generated.
-
-#### schema
-
-**Type:** `S`
-
-The schema to create the item with.
-
-#### data *(optional)*
-
-**Type:** `Partial<SchemaDataType<S>>`
-
-The initial data to populate the item with.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `ManagedItem<S>`
-
-### load()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-load(path: string, schema: S, data: SchemaDataType<S>): Promise<void>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### path
-
-**Type:** `string`
-
-The path for the item to create.
-
-#### schema
-
-**Type:** `S`
-
-The schema to create the item with.
-
-#### data
-
-**Type:** `SchemaDataType<S>`
-
-The initial data for the item.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<void>`
+This method does nothing if the repository isn't currently loaded.
 
 ### count()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
 
 ```typescript
 count(path: string): number
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+Returns the number of items at the specified path, or -1 if the path
+doesn't exist.
 
-#### path
+NOTE: Currently only paths to repositories are supported.
 
-**Type:** `string`
-
-The full path to count.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `number`
-
-### keys()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
+### create()
 
 ```typescript
-keys(path: string): Iterable<string>
+create(path: string, schema: S, data: `Partial<`SchemaDataType`<S>>`): [ManagedItem](./classes/manageditem)<S, `Schema`>
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+Creates a new item at the target repository, opening it if needed. Unlike
+`GoatDB.item()` there's no need to explicitly open a repository before
+creating items in it. Newly created items become immediately available for
+use and will get committed to the underlying repo after open completes.
 
-#### path
-
-**Type:** `string`
-
-Full path to a repository.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Iterable<string>`
-
-### query()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-query(config: Omit<QueryConfig<IS, OS, CTX>, "db">): Query<IS, OS, CTX>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### config
-
-**Type:** `Omit<QueryConfig<IS, OS, CTX>, "db">`
-
-The configuration for the desired query.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Query<IS, OS, CTX>`
+Note: This method only initializes the item if it doesn't already exist.
+If the item already exists with a valid schema, this method will return
+the existing item without modifying it.
 
 ### flush()
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-flush(path: string): Promise<void>
+flush(path: string): `Promise`<void>
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### path
-
-**Type:** `string`
-
-Path to the desired repository.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<void>`
+Flushes all pending writes for the given repository to disk. Use this
+method when you must ensure all previously known commits are written to the
+local disk.
 
 ### flushAll()
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-flushAll(): Promise<void>
+flushAll(): `Promise`<void>
 ```
 
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<void>`
-
-### sync()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-sync(path: string): Promise<SyncResult>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### path
-
-**Type:** `string`
-
-Path to the desired repository.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<SyncResult>`
-
-### syncAll()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-syncAll(): Promise<Record<string, SyncResult>>
-```
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Promise<Record<string, SyncResult>>`
-
-### repository()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-repository(pathComps: string[]): Repository<MemRepoStorage>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### pathComps
-
-**Type:** `string[]`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Repository<MemRepoStorage>`
+Flushes all pending writes for all repositories to disk.
 
 ### getTrustPool()
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-getTrustPool(): Promise<TrustPool>
+getTrustPool(): `Promise`<`TrustPool`<>>
 ```
 
-  </TabItem>
-</Tabs>
+Returns the trust pool of this DB instance. The trust pool is a low level
+object that manages all known sessions and their public keys. It is used
+to verify the authenticity of the underlying commit graph before persisting
+it to the local storage.
 
-**Returns:** `Promise<TrustPool>`
+Note: You almost never need to use the trust pool directly.
 
-### clientsForRepo()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
+### item()
 
 ```typescript
-clientsForRepo(pathComps: string[]): Iterable<RepoClient>
+item(pathComps: string[]): [ManagedItem](./classes/manageditem)<S, `Schema`>
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+Access an item at the given path. An item's path is typically at the
+following format:
+/\<data type\>/\<repo id\>/\<item key\>
 
-#### pathComps
-
-**Type:** `string[]`
-
-Repository path.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Iterable<RepoClient>`
+NOTE: If the item's repository haven't been opened yet, it'll be opened in
+the background. While open is progressing, the returned item will
+initially have a NULL scheme, and once open completes it'll be converted
+to the correct scheme if available. Typically it's easier to first
+explicitly open the repository before accessing any of its items.
 
 ### itemLoaded()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
 
 ```typescript
 itemLoaded(path: string): boolean
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
+Checks if an item at the given path is currently loaded in memory.
+This is a passive check that does not trigger loading the item.
 
-#### path
+### keys()
 
-**Type:** `string`
+```typescript
+keys(path: string): `Iterable`<string>
+```
 
-The full path to the item to check
+Returns the keys at the specified path.
 
-  </TabItem>
-</Tabs>
+NOTE: Currently only paths to repositories are supported.
 
-**Returns:** `boolean`
+### load()
+
+```typescript
+load(path: string, schema: S, data: `SchemaDataType`<S>): `Promise`<void>
+```
+
+Explicitly create an item, loading its repository if needed. Use this
+method for bulk load operations where you want to be notified after the
+write completes.
+
+NOTE: This method uses a different internal path than the Item based API,
+and is much more efficient for bulk creations.
+
+### loginWithMagicLinkEmail()
+
+```typescript
+loginWithMagicLinkEmail(email: string): `Promise`<boolean>
+```
+
+When connecting to a new DB instance on the client, it'll start with an
+anonymous session that's not attached to any user in the system. Call this
+method with a user's email, to initiate an email-based login sequence that
+will end with the current session being attached to the user owning this
+email.
+
+This login sequence sends a temporary magic link to the provided email
+address. Once clicked, the user item will be automatically created in
+/sys/users and attached to the current session.
+
+### logout()
+
+```typescript
+logout(): `Promise`<void>
+```
+
+Logs out the current user, closing all open repositories and clearing
+local data. On browsers, this method will also reload the page to ensure
+a clean state.
+
+### open()
+
+```typescript
+open(path: string, opts: `OpenOptions`): `Promise`<[Repository](./classes/repository)<`MemRepoStorage`<>>>
+```
+
+Opens the given repository, loading all its items to memory.
+This method does nothing if the repository is already open.
+
+### query()
+
+```typescript
+query(config: `Omit<`QueryConfig`<`IS`, `OS`, `CTX`>, unknown>`): [Query](./classes/query)<`IS`, `OS`, `CTX`>
+```
+
+Open a new query or access an already open one. Once opened, the query
+remains open until explicitly closed, and tracks updates to items as they
+happen.
+
+### readyPromise()
+
+```typescript
+readyPromise(): `Promise`<void>
+```
+
+A convenience promise form of the `ready` flag. When the promise returns,
+this DB instance is ready to receive commands.
+
+### repository()
+
+```typescript
+repository(pathComps: string[]): [Repository](./classes/repository)<`MemRepoStorage`<>>
+```
+
+Returns the requested repository or undefined if it wasn't opened yet.
+
+Note: Prefer to use the higher level APIs of this class rather than the
+repository instance directly.
+
+### sync()
+
+```typescript
+sync(path: string): `Promise`<`SyncResult`>
+```
+
+Syncs the given repository with all configured peers and waits for
+completion.
+
+### syncAll()
+
+```typescript
+syncAll(): `Promise`<`Record<string, `SyncResult`>`>
+```
+
+Syncs all open repositories with all configured peers and waits for completion.
+
+## Inherited Methods
+
+### From [Emitter](./emitter)
+
+`attach()`, `detach()`, `detachAll()`, `emit()`, `mute()`, `once()`, `resume()`, `suspend()`, `unmute()`
+
+*See [Emitter](./emitter) for detailed documentation*
 

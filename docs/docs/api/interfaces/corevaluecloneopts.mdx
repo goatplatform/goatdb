@@ -3,49 +3,37 @@ title: CoreValueCloneOpts
 sidebar_label: CoreValueCloneOpts
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # CoreValueCloneOpts
 
 Options for customizing cloning behavior
 
+**Extends:** [CoreOptions](./coreoptions)
+
 ## Properties
 
-<Tabs>
-  <TabItem value="overview" label="Overview" default>
+### fieldCloneOverride
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `objectFilterFields` | `ObjFieldsFilterFunc` | No | - |
-| `iterableFilter` | `IterableFilterFunc` | No | - |
-| `fieldCloneOverride` | `Function` | No | - |
-| `objectOverride` | `Function` | No | - |
-| `notClonableExt` | `Function` | No | - |
+```typescript
+fieldCloneOverride: unknown
+```
 
-  </TabItem>
-  <TabItem value="details" label="Details">
+### notClonableExt
 
-### objectFilterFields *(optional)*
+```typescript
+notClonableExt: unknown
+```
 
-**Type:** `ObjFieldsFilterFunc`
+### objectOverride
 
-### iterableFilter *(optional)*
+```typescript
+objectOverride: unknown
+```
 
-**Type:** `IterableFilterFunc`
+## Inherited Members
 
-### fieldCloneOverride *(optional)*
+### From [CoreOptions](../interfaces/coreoptions)
 
-**Type:** `Function`
+**Properties:** `iterableFilter`, `objectFilterFields`
 
-### objectOverride *(optional)*
-
-**Type:** `Function`
-
-### notClonableExt *(optional)*
-
-**Type:** `Function`
-
-  </TabItem>
-</Tabs>
+*See [CoreOptions](../interfaces/coreoptions) for detailed documentation*
 

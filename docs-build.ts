@@ -16,7 +16,7 @@ export async function buildDocs(): Promise<void> {
       '--out-dir',
       '../build/docs',
     ],
-    cwd: 'docs',
+    cwd: 'docs', // Run from docs directory where docusaurus.config.ts is located
     stdout: 'inherit',
     stderr: 'inherit',
   });
@@ -32,18 +32,33 @@ export async function buildDocs(): Promise<void> {
 }
 
 async function serveDocs(): Promise<void> {
-  // Start Docusaurus dev server using Deno's npm: specifier
-  new Deno.Command('deno', {
+  console.log('🚀 Starting Docusaurus development server...');
+  
+  // Start the dev server process
+  const serveProcess = new Deno.Command('deno', {
     args: [
       'run',
       '-A',
       'npm:@docusaurus/core',
       'start',
     ],
-    cwd: 'docs',
+    cwd: 'docs', // Run from docs directory where docusaurus.config.ts is located
     stdout: 'inherit',
     stderr: 'inherit',
-  }).spawn();
+  });
+  
+  // Spawn and don't wait - dev servers should run indefinitely
+  const child = serveProcess.spawn();
+  
+  console.log('📡 Server starting at http://localhost:3000');
+  console.log('Press Ctrl+C to stop the server');
+  
+  // Wait for the process to exit (only happens when user stops it)
+  const status = await child.status;
+  
+  if (status.code !== 0) {
+    throw new Error(`Docusaurus serve failed with code ${status.code}`);
+  }
 }
 
 if (import.meta.main) {

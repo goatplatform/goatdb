@@ -51,6 +51,22 @@ const config: Config = {
         anonymizeIP: true,
       },
     ],
+    // Disable webpack-dev-server compression to fix ERR_CONTENT_DECODING_FAILED
+    function customWebpackPlugin() {
+      return {
+        name: 'custom-webpack-plugin',
+        configureWebpack(config, isServer) {
+          if (!isServer) {
+            return {
+              devServer: {
+                compress: false,
+              },
+            };
+          }
+          return {};
+        },
+      };
+    },
   ],
 
   presets: [

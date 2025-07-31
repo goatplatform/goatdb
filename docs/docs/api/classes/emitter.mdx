@@ -3,257 +3,69 @@ title: Emitter
 sidebar_label: Emitter
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # Emitter
 
-No description available.
+**Subclasses:** [GoatDB](./goatdb), [ManagedItem](./manageditem), [Query](./query), [Repository](./repository)
 
 ## Constructor
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-new Emitter(delayedEmissionTimerConstructor?: Function, alwaysActive?: boolean)
+new Emitter(delayedEmissionTimerConstructor: unknown, alwaysActive: boolean)
 ```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### delayedEmissionTimerConstructor *(optional)*
-
-**Type:** `Function`
-
-### alwaysActive *(optional)*
-
-**Type:** `boolean`
-
-  </TabItem>
-</Tabs>
-
-## Properties
-
-### alwaysActive *(readonly)*
-
-**Type:** `boolean`
 
 ## Methods
 
-### calcIsActive()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-calcIsActive(): boolean
-```
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `boolean`
-
-### emit()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-emit(e: E, args: unknown[]): void
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### e
-
-**Type:** `E`
-
-#### args
-
-**Type:** `unknown[]`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
-### emitInPlace()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-emitInPlace(e: E, args: unknown[]): void
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### e
-
-**Type:** `E`
-
-#### args
-
-**Type:** `unknown[]`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
 ### attach()
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-attach(e: E, c: C): Function
+attach(e: E, c: C): unknown
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### e
-
-**Type:** `E`
-
-#### c
-
-**Type:** `C`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Function`
-
 ### detach()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
 
 ```typescript
 detach(e: E, c: C): void
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### e
-
-**Type:** `E`
-
-#### c
-
-**Type:** `C`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
 ### detachAll()
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-detachAll(e?: E): void
+detachAll(e: E): void
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### e *(optional)*
-
-**Type:** `E`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
-### once()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
+### emit()
 
 ```typescript
-once(e: E, c: C): Function
+emit(e: E, args: unknown[]): void
 ```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### e
-
-**Type:** `E`
-
-#### c
-
-**Type:** `C`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Function`
-
-### suspend()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-suspend(): void
-```
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
-### resume()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-resume(): void
-```
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
 
 ### mute()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
 
 ```typescript
 mute(): void
 ```
 
-  </TabItem>
-</Tabs>
+### once()
 
-**Returns:** `void`
+```typescript
+once(e: E, c: C): unknown
+```
+
+### resume()
+
+```typescript
+resume(): void
+```
+
+### suspend()
+
+```typescript
+suspend(): void
+```
 
 ### unmute()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
 
 ```typescript
 unmute(): void
 ```
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
 

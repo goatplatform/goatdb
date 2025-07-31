@@ -3,9 +3,6 @@ title: Item
 sidebar_label: Item
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # Item
 
 An Item instance represents a snapshot of a data item including all of its
@@ -17,586 +14,288 @@ Typically you never need to create instances of this class directly. Instead,
 use `GoatDB.item()` in order to get a LiveItem instance that's much easier
 to work with.
 
+**Implements:** [ReadonlyItem](../interfaces/readonlyitem), [Encodable](../interfaces/encodable)
+
 ## Constructor
 
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
 ```typescript
-new Item(config: ItemConfig<S> | ConstructorDecoderConfig<EncodedItem>, registry?: DataRegistry)
+new Item(config: `ItemConfig`<S> | `ConstructorDecoderConfig`<`EncodedItem`>, registry: [DataRegistry](./classes/dataregistry)<>)
 ```
 
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-### config
-
-**Type:** `ItemConfig<S> | ConstructorDecoderConfig<EncodedItem>`
-
-Either an ItemConfig object containing the schema and data,
-              or a ConstructorDecoderConfig for deserializing an encoded
-              item
-
-### registry *(optional)*
-
-**Type:** `DataRegistry`
-
-Optional schema manager to use. If not provided, the
-                     default schema manager will be used
-
-  </TabItem>
-</Tabs>
-
-## Properties
-
-### registry *(readonly)*
-
-**Type:** `DataRegistry`
+Creates a new Item instance.
 
 ## Methods
 
-### nullItem()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-nullItem(registry: DataRegistry): Item<S>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### registry
-
-**Type:** `DataRegistry`
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Item<S>`
-
-### validate()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-validate(): [boolean, string]
-```
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `[boolean, string]`
-
-### dataUnsafe()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-dataUnsafe(): SchemaDataType<S>
-```
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `SchemaDataType<S>`
-
-### get()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-get(key: T): any
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `T`
-
-The field's name.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `any`
-
-### has()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-has(key: T): boolean
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `T`
-
-The field's name.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `boolean`
-
-### set()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-set(key: T, value: any): void
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `T`
-
-The field's name.
-
-#### value
-
-**Type:** `any`
-
-The value to set. Must match the value defined in this item's
-             schema. If undefined is passed, this is the equivalent of
-             calling `Item.delete(key)`.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
-### setMulti()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-setMulti(data: Partial<SchemaDataType<S>>): void
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### data
-
-**Type:** `Partial<SchemaDataType<S>>`
-
-The values to set.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
-### delete()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-delete(key: T): boolean
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### key
-
-**Type:** `T`
-
-The field to delete.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `boolean`
-
-### isEqual()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-isEqual(other: Item<S>): boolean
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### other
-
-**Type:** `Item<S>`
-
-The item to compare against
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `boolean`
-
-### clone()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-clone(): Item<S>
-```
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Item<S>`
-
-### cloneData()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-cloneData(onlyFields?: any[]): Readwrite<SchemaDataType<S>>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### onlyFields *(optional)*
-
-**Type:** `any[]`
-
-Optional array of field names to copy. If provided, only
-                  the specified fields will be cloned.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Readwrite<SchemaDataType<S>>`
-
-### copyFrom()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-copyFrom(doc: Item<S> | ReadonlyItem<S>): void
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### doc
-
-**Type:** `Item<S> | ReadonlyItem<S>`
-
-The source item to copy from.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
-### diff()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-diff(other: Item<S>, byCharacter?: boolean): DataChanges
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### other
-
-**Type:** `Item<S>`
-
-The item to compare against
-
-#### byCharacter *(optional)*
-
-**Type:** `boolean`
-
-If true, rich text differences will be computed at the
-                   character level rather than at the paragraph/element
-                   level.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `DataChanges`
-
-### patch()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-patch(changes: DataChanges): void
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### changes
-
-**Type:** `DataChanges`
-
-The changes to apply to this item's data
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
-### diffKeys()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-diffKeys(other: Item<S>, local: boolean): string[]
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### other
-
-**Type:** `Item<S>`
-
-The item to compare against
-
-#### local
-
-**Type:** `boolean`
-
-If true, compare local fields. If false, ignores local fields
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `string[]`
-
-### upgradeSchema()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-upgradeSchema(newSchema?: Schema): boolean
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### newSchema *(optional)*
-
-**Type:** `Schema`
-
-Optional target schema to upgrade to
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `boolean`
-
-### needsSchemaUpgrade()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-needsSchemaUpgrade(): boolean
-```
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `boolean`
-
-### normalize()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-normalize(): void
-```
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
-### serialize()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-serialize(encoder: Encoder<string, CoreValue>, options: any): void
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### encoder
-
-**Type:** `Encoder<string, CoreValue>`
-
-The encoder to use for serialization
-
-#### options
-
-**Type:** `any`
-
-Serialization options
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
-### deserialize()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-deserialize(decoder: Decoder): void
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### decoder
-
-**Type:** `Decoder`
-
-The decoder containing the encoded item data
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `void`
-
-### toJS()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-toJS(local: boolean): ReadonlyJSONObject
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### local
-
-**Type:** `boolean`
-
-If true, serialization includes local data. If false,
-             local data is skipped.
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `ReadonlyJSONObject`
-
-### fromJS()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
-
-```typescript
-fromJS(obj: ReadonlyJSONObject): Item<S>
-```
-
-  </TabItem>
-  <TabItem value="params" label="Parameters">
-
-#### obj
-
-**Type:** `ReadonlyJSONObject`
-
-The JSON object to deserialize
-
-  </TabItem>
-</Tabs>
-
-**Returns:** `Item<S>`
-
 ### assertValidData()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
 
 ```typescript
 assertValidData(): void
 ```
 
-  </TabItem>
-</Tabs>
+Asserts that the item's data is valid according to its schema.
 
-**Returns:** `void`
+This method checks if the item's data conforms to the schema's
+requirements. If the data is invalid, it throws an assertion error with
+the corresponding error message.
 
-### invalidateCaches()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
+### clone()
 
 ```typescript
-invalidateCaches(): void
+clone(): [Item](./classes/item)<S>
 ```
 
-  </TabItem>
-</Tabs>
+Clones the current item.
 
-**Returns:** `void`
+This method creates a new Item instance with the same schema and data as
+the current item. The new item is a deep copy of the current item,
+including all nested objects and arrays.
+
+### cloneData()
+
+```typescript
+cloneData(onlyFields: unknown[]): `Readwrite`<`SchemaDataType`<S>>
+```
+
+Creates a deep copy of the item's data.
+
+### copyFrom()
+
+```typescript
+copyFrom(doc: [Item](./classes/item)<S> | [ReadonlyItem](./interfaces/readonlyitem)<S>): void
+```
+
+Copies data from another item into this one.
+
+This method replaces the current item's schema and data with a deep copy
+of the source item's schema and data. The source item remains unchanged.
+
+### dataUnsafe()
+
+```typescript
+dataUnsafe(): `SchemaDataType`<S>
+```
+
+WARNING: You probably shouldn't use this. Used internally as an
+optimization to avoid unnecessary copying.
+
+### delete()
+
+```typescript
+delete(key: T): boolean
+```
+
+Deletes a given field from this item.
+
+### deserialize()
+
+```typescript
+deserialize(decoder: `Decoder`<string, `DecodedValue`>): void
+```
+
+Deserializes an encoded item into this instance.
+
+This method decodes the item's schema, data, normalization status and
+checksum from an encoded format and updates this instance's state
+accordingly. The item is automatically normalized after deserialization.
+
+### diff()
+
+```typescript
+diff(other: [Item](./classes/item)<S>, byCharacter: boolean): `DataChanges`<>
+```
+
+Computes the differences between this item and another item.
+
+This method compares the data of this item with another item of the same schema
+and returns an object describing the differences between them.
+
+### diffKeys()
+
+```typescript
+diffKeys(other: [Item](./classes/item)<S>, local: boolean): string[]
+```
+
+Returns an array of field keys that differ between this item and another
+item.
+
+This method compares the data of this item with another item of the same
+schema and returns an array of field keys where the values differ.
+
+This is a much faster check than a full diff computation.
+
+### get()
+
+```typescript
+get(key: T): unknown
+```
+
+Returns the value for the given field or undefined.
+
+If this is a null item (has no schema), returns undefined for all fields.
+Otherwise, returns the field's value, or undefined if not set.
+
+### has()
+
+```typescript
+has(key: T): boolean
+```
+
+Returns whether the given field is present on the current item or not.
+
+### isEqual()
+
+```typescript
+isEqual(other: [Item](./classes/item)<S>): boolean
+```
+
+Compares this item with another item for equality.
+Two items are considered equal if they have the same schema and their data
+is equal after normalization.
 
 ### lock()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
 
 ```typescript
 lock(): void
 ```
 
-  </TabItem>
-</Tabs>
+Locks this item, preventing any further modifications.
 
-**Returns:** `void`
+When an item is locked, attempts to modify its data will throw errors.
+The checksum is calculated and cached before locking to ensure consistency.
+Items are typically locked when they represent a specific version in
+history.
+
+### needsSchemaUpgrade()
+
+```typescript
+needsSchemaUpgrade(): boolean
+```
+
+Checks if this item needs a schema upgrade.
+
+This method checks if there is a newer schema version available for this
+item's  namespace. It compares the item's current schema version with the
+latest schema version registered in the schema manager.
+
+### normalize()
+
+```typescript
+normalize(): void
+```
+
+Normalizes the item's data according to its schema.
+
+This method ensures that all fields in the item's data conform to the
+schema's requirements by applying normalization rules. For example, it may:
+- Convert field values to their proper types
+- Apply default values for missing required fields
+- Remove fields not defined in the schema
+
+The normalization is only performed once - subsequent calls will have no
+effect. Null items (those with a null schema) are always normalized by
+definition.
+
+### patch()
+
+```typescript
+patch(changes: `DataChanges`<>): void
+```
+
+Applies changes to this item's data.
+
+This method takes a DataChanges object (typically produced by the diff()
+method) and applies those changes to this item's data. The item's data
+will be modified in place.
+
+### serialize()
+
+```typescript
+serialize(encoder: [Encoder](./interfaces/encoder)<string, `CoreValue`, `CoreValue`, unknown>, options: unknown): void
+```
+
+Serializes the item into an encoded format.
+
+This method encodes the item's schema, data, normalization status and
+checksum into a format that can be stored or transmitted. The item is
+automatically normalized before serialization.
+
+### set()
+
+```typescript
+set(key: T, value: unknown): void
+```
+
+Sets the value for the given field.
+
+### setMulti()
+
+```typescript
+setMulti(data: `Partial<`SchemaDataType`<S>>`): void
+```
+
+A convenience method for setting several fields and values at once.
+
+### toJS()
+
+```typescript
+toJS(local: boolean): [ReadonlyJSONObject](./interfaces/readonlyjsonobject)
+```
+
+Serializes this item to a JSON-compatible object.
 
 ### unlock()
-
-<Tabs>
-  <TabItem value="signature" label="Signature" default>
 
 ```typescript
 unlock(): void
 ```
 
-  </TabItem>
-</Tabs>
+Unlocks this item, allowing modifications.
 
-**Returns:** `void`
+When an item is unlocked, its data can be modified. This reverses the
+effect of calling lock().
+
+WARNING: Unlocking items is dangerous and should never be needed in normal
+usage. Unlocking can corrupt historical versions and lead to serious data
+inconsistencies.
+
+### upgradeSchema()
+
+```typescript
+upgradeSchema(newSchema: `Schema`): boolean
+```
+
+Upgrades this item's data to a newer schema version.
+
+This method takes an optional target schema and attempts to upgrade the
+item's data to match that schema. If no target schema is provided, it will
+upgrade to the latest schema version available for this namespace.
+
+The upgrade process is performed by applying the upgrade functions defined
+in each schema version between the current and target versions. The upgrade
+will fail if any intermediate schema versions are missing.
+
+### validate()
+
+```typescript
+validate(): unknown
+```
+
+Validates the item's data against its schema.
+
+This method checks if the item's data conforms to the schema's
+requirements and returns the validation result.
+
+### fromJS()
+
+```typescript
+fromJS(obj: [ReadonlyJSONObject](./interfaces/readonlyjsonobject)): [Item](./classes/item)<S>
+```
+
+Deserializes a JSON-compatible object into an Item instance.
+
+### nullItem()
+
+```typescript
+nullItem(registry: [DataRegistry](./classes/dataregistry)<>): [Item](./classes/item)<S>
+```
 
