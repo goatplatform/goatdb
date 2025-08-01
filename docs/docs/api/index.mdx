@@ -30,6 +30,7 @@ Complete API documentation for GoatDB.
 - **[CoreObject](./interfaces/coreobject)** - A mutable object with string keys and optional type parameter for values
 - **[CoreOptions](./interfaces/coreoptions)** - Options for controlling behavior of core operations
 - **[CoreValueCloneOpts](./interfaces/corevaluecloneopts)** - Options for customizing cloning behavior
+- **[DBInstanceConfig](./interfaces/dbinstanceconfig)** - No description
 - **[Encodable](./interfaces/encodable)** - Interface for objects that can be encoded/serialized
 - **[Encoder](./interfaces/encoder)** - Interface for objects that can encode values
 - **[Equatable](./interfaces/equatable)** - Interface for objects that can determine equality with other objects
@@ -56,6 +57,7 @@ Complete API documentation for GoatDB.
 - **[FieldValue](./types/fieldvalue)** - A mapping between a schema type and its native variable type.
 - **[IterableFilterFunc](./types/iterablefilterfunc)** - Function type for filtering iterable values during operations
 - **[ObjFieldsFilterFunc](./types/objfieldsfilterfunc)** - Function type for filtering object fields during operations
+- **[QueryConfig](./types/queryconfig)** - The configuration for a query, specifying the database, source, predicate,
 - **[ReadonlyCoreArray](./types/readonlycorearray)** - A read-only array of CoreValues
 - **[ReadonlyCoreObject](./types/readonlycoreobject)** - A read-only object with string keys and CoreValue values
 - **[Schema](./types/schema)** - A Schema defines the structure of a Document. Schemas are also versioned,
@@ -79,12 +81,18 @@ Complete API documentation for GoatDB.
 
 - **[Server](./classes/server)** - A simple abstraction around an HTTP server. The server is built using two
 
+### Interfaces
+
+- **[ServerOptions](./interfaces/serveroptions)** - A server represents a logical DB with some additional configuration options.
+- **[ServerServices](./interfaces/serverservices)** - The services object is accessible to all endpoints and middlewares of the
+
 ### Types
 
 - **[AppConfig](./types/appconfig)** - A configuration of a Single Page Application built on top GoatDB.
 - **[CompileOptions](./types/compileoptions)** - Options for compiling a GoatDB application into a standalone executable.
 - **[CPUArch](./types/cpuarch)** - Represents the CPU architecture for compilation.
 - **[DebugServerOptions](./types/debugserveroptions)** - No description
+- **[DomainConfig](./types/domainconfig)** - No description
 - **[EmailBuilder](./types/emailbuilder)** - Function type for building email messages from email info.
 - **[EmailInfo](./types/emailinfo)** - Union type for all supported email types.
 - **[ExecutableOptions](./types/executableoptions)** - No description

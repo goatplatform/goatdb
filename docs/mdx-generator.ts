@@ -1,10 +1,15 @@
-import { type DeclarationReflection } from 'typedoc';
+import type { DeclarationReflection } from 'typedoc';
 import {
   extractInheritanceInfo,
   formatLinkedType,
   formatLinkedTypeSignature,
   escapeForCodeTag,
+  type InheritanceInfo,
 } from './type-formatter.ts';
+
+// ===================================================================
+// DOCUMENTATION EXTRACTION AND UTILITIES
+// ===================================================================
 
 /**
  * Extracts documentation text from a TypeDoc comment.
@@ -54,6 +59,10 @@ export function extractDocumentation(element: DeclarationReflection): string {
   
   return escapedText;
 }
+
+// ===================================================================
+// INHERITANCE MAPPING AND MEMBER ORGANIZATION
+// ===================================================================
 
 /**
  * Builds a reverse inheritance map for parent->child relationships.
@@ -140,6 +149,42 @@ export function separateMembers(
 
   return { ownMembers, inheritedMembers };
 }
+
+/**
+ * Builds the inheritance section for interface documentation.
+ * 
+ * @param inheritance - Inheritance information extracted from the element
+ * @returns Formatted MDX content for the inheritance section
+ */
+function buildInheritanceSection(inheritance: InheritanceInfo): string {
+  if (inheritance.extends.length === 0) return '';
+
+  const extendsLinks = inheritance.extends.map((parent) => {
+    if (parent.utilityTypeInfo) {
+      // Enhanced display for utility types
+      const parentDisplay = parent.link 
+        ? `[${parent.name}](${parent.link})` 
+        : parent.name; // No link for cross-module references
+      return `${parentDisplay} (${parent.utilityTypeInfo.operation.description})`;
+    }
+    // Standard display for simple inheritance  
+    return `[${parent.name}](${parent.link})`;
+  }).join(', ');
+  
+  let section = `**Extends:** ${extendsLinks}\n\n`;
+  
+  // Show utility type context if available
+  const utilityParent = inheritance.extends.find(p => p.utilityTypeInfo);
+  if (utilityParent?.utilityTypeInfo) {
+    section += `*Type composition: \`${utilityParent.utilityTypeInfo.displayType}\`*\n\n`;
+  }
+  
+  return section;
+}
+
+// ===================================================================
+// MDX CONTENT GENERATION
+// ===================================================================
 
 /**
  * Generates MDX content for a class.
@@ -273,10 +318,11 @@ export function createInterfaceMDX(
   element: DeclarationReflection,
   crossRefMap: Map<string, string>,
   reverseInheritanceMap: Map<string, string[]>,
+  allDeclarations?: Map<string, DeclarationReflection>,
 ): string {
   const name = element.name;
   const doc = extractDocumentation(element);
-  const inheritance = extractInheritanceInfo(element, crossRefMap);
+  const inheritance = extractInheritanceInfo(element, crossRefMap, allDeclarations);
   const { ownMembers, inheritedMembers } = separateMembers(element);
 
   let content = `---
@@ -293,12 +339,7 @@ sidebar_label: ${name}
   }
 
   // Show inheritance (interfaces extend other interfaces)
-  if (inheritance.extends.length > 0) {
-    const extendsLinks = inheritance.extends.map((parent) =>
-      `[${parent.name}](${parent.link})`
-    ).join(', ');
-    content += `**Extends:** ${extendsLinks}\n\n`;
-  }
+  content += buildInheritanceSection(inheritance);
 
   // Show subinterfaces (interfaces that extend this interface)
   const subinterfaces = reverseInheritanceMap.get(name);
@@ -346,9 +387,73 @@ sidebar_label: ${name}
   }
 
   // Inherited properties/methods
-  if (inheritedMembers.size > 0) {
+  const hasUtilityTypeParent = inheritance.extends.some(p => p.utilityTypeInfo);
+  
+  if (inheritedMembers.size > 0 || hasUtilityTypeParent) {
     content += `## Inherited Members\n\n`;
+    
+    // Handle utility type inheritance
+    if (hasUtilityTypeParent) {
+      const utilityParent = inheritance.extends.find(p => p.utilityTypeInfo)!;
+      const parentDisplay = utilityParent.link 
+        ? `[${utilityParent.name}](${utilityParent.link})`
+        : utilityParent.name;
+      
+      content += `### From ${parentDisplay}\n\n`;
+      
+      // Show resolved properties if available
+      const utilityInfo = utilityParent.utilityTypeInfo;
+      if (utilityInfo?.resolvedProperties && utilityInfo.resolvedProperties.length > 0) {
+        const properties = utilityInfo.resolvedProperties.filter(p => p.source === 'inherited');
+        
+        if (properties.length > 0) {
+          const propNames = properties.map(p => `\`${p.name}\``).join(', ');
+          content += `**Properties:** ${propNames}\n\n`;
+          
+          // Show details for each property
+          for (const prop of properties) {
+            content += `- **\`${prop.name}${prop.isOptional ? '?' : ''}: ${prop.type}\`**`;
+            if (prop.documentation) {
+              content += ` - ${prop.documentation}`;
+            }
+            content += `\n`;
+          }
+          content += `\n`;
+        }
+      } else if (utilityInfo) {
+        // Fallback to generic description
+        if (utilityInfo.operation.type === 'omit') {
+          const omittedKeys = utilityInfo.operation.keys || [];
+          content += `*All properties and methods from ${utilityParent.name}`;
+          if (omittedKeys.length > 0) {
+            content += ` except: ${omittedKeys.map(k => `\`${k}\``).join(', ')}`;
+          }
+          content += `*\n\n`;
+        } else if (utilityInfo.operation.type === 'pick') {
+          const pickedKeys = utilityInfo.operation.keys || [];
+          if (pickedKeys.length > 0) {
+            content += `*Only these properties: ${pickedKeys.map(k => `\`${k}\``).join(', ')}*\n\n`;
+          }
+        } else {
+          content += `*${utilityInfo.operation.description}*\n\n`;
+        }
+      }
+      
+      content += `*See ${parentDisplay} for detailed documentation*\n\n`;
+    }
+    
+    // Handle regular inherited members
     for (const [parentName, members] of inheritedMembers) {
+      // Skip if this is a utility type that we already handled above
+      const isUtilityTypeParent = inheritance.extends.some(p => 
+        p.utilityTypeInfo && 
+        (parentName === 'Omit' || parentName === 'Pick' || parentName === 'Partial' || parentName === 'Required')
+      );
+      
+      if (isUtilityTypeParent) {
+        continue; // Already handled above
+      }
+      
       // Skip if no parent link is available (external interfaces)
       const parentLink = crossRefMap.get(parentName);
       if (!parentLink) {

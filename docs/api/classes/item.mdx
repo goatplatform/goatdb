@@ -1,0 +1,249 @@
+---
+title: Item
+sidebar_label: Item
+---
+
+# Item
+
+An Item instance represents a snapshot of a data item including all of its
+fields. An item is a map like object that tracks both the data and its
+schema. Items are the contents of specific versions (commits) in the version
+graph (history).
+
+Typically you never need to create instances of this class directly. Instead,
+use `GoatDB.item()` in order to get a LiveItem instance that's much easier
+to work with.
+
+**Implements:** [ReadonlyItem](/api/interfaces/readonlyitem), [Encodable](/api/interfaces/encodable)
+
+## Constructor
+
+**<code>new Item(config: ItemConfig&lt;S&gt; | ConstructorDecoderConfig&lt;EncodedItem&gt;, registry: [DataRegistry](/api/classes/dataregistry)&lt;&gt;)</code>**
+
+Creates a new Item instance.
+
+## Methods
+
+### assertValidData()
+
+**<code>assertValidData(): void</code>**
+
+Asserts that the item's data is valid according to its schema.
+
+This method checks if the item's data conforms to the schema's
+requirements. If the data is invalid, it throws an assertion error with
+the corresponding error message.
+
+### clone()
+
+**<code>clone(): [Item](/api/classes/item)&lt;S&gt;</code>**
+
+Clones the current item.
+
+This method creates a new Item instance with the same schema and data as
+the current item. The new item is a deep copy of the current item,
+including all nested objects and arrays.
+
+### cloneData()
+
+**<code>cloneData(onlyFields: keyof S['fields'][]): Readwrite&lt;[SchemaDataType](/api/types/schemadatatype)&lt;S&gt;&gt;</code>**
+
+Creates a deep copy of the item's data.
+
+### copyFrom()
+
+**<code>copyFrom(doc: [Item](/api/classes/item)&lt;S&gt; | [ReadonlyItem](/api/interfaces/readonlyitem)&lt;S&gt;): void</code>**
+
+Copies data from another item into this one.
+
+This method replaces the current item's schema and data with a deep copy
+of the source item's schema and data. The source item remains unchanged.
+
+### dataUnsafe()
+
+**<code>dataUnsafe(): [SchemaDataType](/api/types/schemadatatype)&lt;S&gt;</code>**
+
+WARNING: You probably shouldn't use this. Used internally as an
+optimization to avoid unnecessary copying.
+
+### delete()
+
+**<code>delete(key: T): boolean</code>**
+
+Deletes a given field from this item.
+
+### deserialize()
+
+**<code>deserialize(decoder: Decoder&lt;&gt;): void</code>**
+
+Deserializes an encoded item into this instance.
+
+This method decodes the item's schema, data, normalization status and
+checksum from an encoded format and updates this instance's state
+accordingly. The item is automatically normalized after deserialization.
+
+### diff()
+
+**<code>diff(other: [Item](/api/classes/item)&lt;S&gt;, byCharacter: boolean): DataChanges&lt;&gt;</code>**
+
+Computes the differences between this item and another item.
+
+This method compares the data of this item with another item of the same schema
+and returns an object describing the differences between them.
+
+### diffKeys()
+
+**<code>diffKeys(other: [Item](/api/classes/item)&lt;S&gt;, local: boolean): string[]</code>**
+
+Returns an array of field keys that differ between this item and another
+item.
+
+This method compares the data of this item with another item of the same
+schema and returns an array of field keys where the values differ.
+
+This is a much faster check than a full diff computation.
+
+### get()
+
+**<code>get(key: T): [SchemaDataType](/api/types/schemadatatype)&lt;S&gt;[T]</code>**
+
+Returns the value for the given field or undefined.
+
+If this is a null item (has no schema), returns undefined for all fields.
+Otherwise, returns the field's value, or undefined if not set.
+
+### has()
+
+**<code>has(key: T): boolean</code>**
+
+Returns whether the given field is present on the current item or not.
+
+### isEqual()
+
+**<code>isEqual(other: [Item](/api/classes/item)&lt;S&gt;): boolean</code>**
+
+Compares this item with another item for equality.
+Two items are considered equal if they have the same schema and their data
+is equal after normalization.
+
+### lock()
+
+**<code>lock(): void</code>**
+
+Locks this item, preventing any further modifications.
+
+When an item is locked, attempts to modify its data will throw errors.
+The checksum is calculated and cached before locking to ensure consistency.
+Items are typically locked when they represent a specific version in
+history.
+
+### needsSchemaUpgrade()
+
+**<code>needsSchemaUpgrade(): boolean</code>**
+
+Checks if this item needs a schema upgrade.
+
+This method checks if there is a newer schema version available for this
+item's  namespace. It compares the item's current schema version with the
+latest schema version registered in the schema manager.
+
+### normalize()
+
+**<code>normalize(): void</code>**
+
+Normalizes the item's data according to its schema.
+
+This method ensures that all fields in the item's data conform to the
+schema's requirements by applying normalization rules. For example, it may:
+- Convert field values to their proper types
+- Apply default values for missing required fields
+- Remove fields not defined in the schema
+
+The normalization is only performed once - subsequent calls will have no
+effect. Null items (those with a null schema) are always normalized by
+definition.
+
+### patch()
+
+**<code>patch(changes: DataChanges&lt;&gt;): void</code>**
+
+Applies changes to this item's data.
+
+This method takes a DataChanges object (typically produced by the diff()
+method) and applies those changes to this item's data. The item's data
+will be modified in place.
+
+### serialize()
+
+**<code>serialize(encoder: [Encoder](/api/interfaces/encoder)&lt;string, [CoreValue](/api/types/corevalue)&gt;, options: &#123; local: boolean &#125;): void</code>**
+
+Serializes the item into an encoded format.
+
+This method encodes the item's schema, data, normalization status and
+checksum into a format that can be stored or transmitted. The item is
+automatically normalized before serialization.
+
+### set()
+
+**<code>set(key: T, value: [SchemaDataType](/api/types/schemadatatype)&lt;S&gt;[T]): void</code>**
+
+Sets the value for the given field.
+
+### setMulti()
+
+**<code>setMulti(data: Partial&lt;[SchemaDataType](/api/types/schemadatatype)&lt;S&gt;&gt;): void</code>**
+
+A convenience method for setting several fields and values at once.
+
+### toJS()
+
+**<code>toJS(local: boolean): [ReadonlyJSONObject](/api/interfaces/readonlyjsonobject)</code>**
+
+Serializes this item to a JSON-compatible object.
+
+### unlock()
+
+**<code>unlock(): void</code>**
+
+Unlocks this item, allowing modifications.
+
+When an item is unlocked, its data can be modified. This reverses the
+effect of calling lock().
+
+WARNING: Unlocking items is dangerous and should never be needed in normal
+usage. Unlocking can corrupt historical versions and lead to serious data
+inconsistencies.
+
+### upgradeSchema()
+
+**<code>upgradeSchema(newSchema: [Schema](/api/types/schema)): boolean</code>**
+
+Upgrades this item's data to a newer schema version.
+
+This method takes an optional target schema and attempts to upgrade the
+item's data to match that schema. If no target schema is provided, it will
+upgrade to the latest schema version available for this namespace.
+
+The upgrade process is performed by applying the upgrade functions defined
+in each schema version between the current and target versions. The upgrade
+will fail if any intermediate schema versions are missing.
+
+### validate()
+
+**<code>validate(): [boolean, string]</code>**
+
+Validates the item's data against its schema.
+
+This method checks if the item's data conforms to the schema's
+requirements and returns the validation result.
+
+### fromJS()
+
+**<code>fromJS(obj: [ReadonlyJSONObject](/api/interfaces/readonlyjsonobject)): [Item](/api/classes/item)&lt;S&gt;</code>**
+
+Deserializes a JSON-compatible object into an Item instance.
+
+### nullItem()
+
+**<code>nullItem(registry: [DataRegistry](/api/classes/dataregistry)&lt;&gt;): [Item](/api/classes/item)&lt;S&gt;</code>**
+

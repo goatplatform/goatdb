@@ -1,0 +1,51 @@
+---
+title: Emitter
+sidebar_label: Emitter
+---
+
+# Emitter
+
+**Subclasses:** [GoatDB](/api/classes/goatdb), [ManagedItem](/api/classes/manageditem), [Query](/api/classes/query), [Repository](/api/classes/repository)
+
+## Constructor
+
+**<code>new Emitter(delayedEmissionTimerConstructor: (callback: TimerCallback) =&gt; Timer, alwaysActive: boolean)</code>**
+
+## Methods
+
+### attach()
+
+**<code>attach(e: E, c: C): () =&gt; void</code>**
+
+### detach()
+
+**<code>detach(e: E, c: C): void</code>**
+
+### detachAll()
+
+**<code>detachAll(e: E): void</code>**
+
+### emit()
+
+**<code>emit(e: E, args: unknown[]): void</code>**
+
+### mute()
+
+**<code>mute(): void</code>**
+
+### once()
+
+**<code>once(e: E, c: C): () =&gt; void</code>**
+
+### resume()
+
+**<code>resume(): void</code>**
+
+### suspend()
+
+**<code>suspend(): void</code>**
+
+### unmute()
+
+**<code>unmute(): void</code>**
+

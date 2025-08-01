@@ -1,0 +1,115 @@
+---
+sidebar_position: 1
+title: API Reference
+---
+
+# API Reference
+
+Complete API documentation for GoatDB.
+
+## Core
+
+### Classes
+
+- **[ConsoleLogStream](./classes/consolelogstream)** - A LogStream implementation that writes log entries to the console.
+- **[DataRegistry](./classes/dataregistry)** - The DataRegistry acts as a registry of known schemas for a given GoatDB
+- **[Emitter](./classes/emitter)** - No description
+- **[GoatDB](./classes/goatdb)** - The main database class that manages repositories, synchronization, and data
+- **[Item](./classes/item)** - An Item instance represents a snapshot of a data item including all of its
+- **[JSONLogStream](./classes/jsonlogstream)** - A LogStream implementation that writes log entries to a JSON file.
+- **[ManagedItem](./classes/manageditem)** - A high-level interface for reading, writing, and synchronizing a single item
+- **[Query](./classes/query)** - A Query represents a live view over a repository or another query,
+- **[Repository](./classes/repository)** - No description
+- **[TrustPool](./classes/trustpool)** - Each commit in the graph is signed with the private key of the session that
+
+### Interfaces
+
+- **[BuildInfo](./interfaces/buildinfo)** - This interface encodes details about the build process used when compiling
+- **[Clonable](./interfaces/clonable)** - Interface for objects that can be cloned
+- **[Comparable](./interfaces/comparable)** - Interface for objects that can be compared for ordering
+- **[CoreObject](./interfaces/coreobject)** - A mutable object with string keys and optional type parameter for values
+- **[CoreOptions](./interfaces/coreoptions)** - Options for controlling behavior of core operations
+- **[CoreValueCloneOpts](./interfaces/corevaluecloneopts)** - Options for customizing cloning behavior
+- **[DBInstanceConfig](./interfaces/dbinstanceconfig)** - No description
+- **[Encodable](./interfaces/encodable)** - Interface for objects that can be encoded/serialized
+- **[Encoder](./interfaces/encoder)** - Interface for objects that can encode values
+- **[Equatable](./interfaces/equatable)** - Interface for objects that can determine equality with other objects
+- **[JSONObject](./interfaces/jsonobject)** - No description
+- **[LogStream](./interfaces/logstream)** - No description
+- **[ReadonlyItem](./interfaces/readonlyitem)** - No description
+- **[ReadonlyJSONObject](./interfaces/readonlyjsonobject)** - No description
+
+### Types
+
+- **[AppConfig](./types/appconfig)** - A configuration of a Single Page Application built on top GoatDB.
+- **[AuthConfig](./types/authconfig)** - An array of authentication rules for the full DB. The DB scans these rules
+- **[AuthOp](./types/authop)** - Denotes the type of the requested operation.
+- **[AuthRule](./types/authrule)** - A function that determines whether a specific operation is authorized.
+- **[AuthRuleInfo](./types/authruleinfo)** - Information passed to authentication rules to determine if an operation
+- **[ConcreteCoreValue](./types/concretecorevalue)** - Concrete (non-undefined) values supported by GoatDB
+- **[CoreArray](./types/corearray)** - A mutable array of CoreValues
+- **[CoreClassObject](./types/coreclassobject)** - Union type of custom class objects that can be handled by GoatDB
+- **[CoreDictionary](./types/coredictionary)** - A dictionary of CoreKeys to CoreValues
+- **[CoreKey](./types/corekey)** - A string key type for CoreObjects
+- **[CoreSet](./types/coreset)** - A Set containing CoreValues
+- **[CoreValue](./types/corevalue)** - The complete set of values supported by GoatDB, including undefined
+- **[FieldDef](./types/fielddef)** - A definition of a single field in a schema.
+- **[FieldValue](./types/fieldvalue)** - A mapping between a schema type and its native variable type.
+- **[IterableFilterFunc](./types/iterablefilterfunc)** - Function type for filtering iterable values during operations
+- **[ObjFieldsFilterFunc](./types/objfieldsfilterfunc)** - Function type for filtering object fields during operations
+- **[QueryConfig](./types/queryconfig)** - The configuration for a query, specifying the database, source, predicate,
+- **[ReadonlyCoreArray](./types/readonlycorearray)** - A read-only array of CoreValues
+- **[ReadonlyCoreObject](./types/readonlycoreobject)** - A read-only object with string keys and CoreValue values
+- **[Schema](./types/schema)** - A Schema defines the structure of a Document. Schemas are also versioned,
+- **[SchemaDataType](./types/schemadatatype)** - Given a schema, extracts the type of its data.
+- **[SchemaField](./types/schemafield)** - Represents a field in a schema, which can be either a custom field defined
+- **[SchemaFieldsDef](./types/schemafieldsdef)** - Mapping between field name and its definition.
+- **[SchemaNullType](./types/schemanulltype)** - No description
+- **[SchemaOptionalFields](./types/schemaoptionalfields)** - Given a schema, extracts the names of all optional fields.
+- **[SchemaRequiredFields](./types/schemarequiredfields)** - Given a schema, extracts the names of all required fields.
+- **[SchemaTypeSession](./types/schematypesession)** - No description
+- **[SchemaTypeUserStats](./types/schematypeuserstats)** - No description
+- **[SchemaValueWithOptional](./types/schemavaluewithoptional)** - Given a type (FieldValue) and a required + default function, this generates
+
+### Functions
+
+- **[Core Functions](./functions-core)**
+
+## Server
+
+### Classes
+
+- **[Server](./classes/server)** - A simple abstraction around an HTTP server. The server is built using two
+
+### Types
+
+- **[AppConfig](./types/appconfig)** - A configuration of a Single Page Application built on top GoatDB.
+- **[CompileOptions](./types/compileoptions)** - Options for compiling a GoatDB application into a standalone executable.
+- **[CPUArch](./types/cpuarch)** - Represents the CPU architecture for compilation.
+- **[DebugServerOptions](./types/debugserveroptions)** - No description
+- **[EmailBuilder](./types/emailbuilder)** - Function type for building email messages from email info.
+- **[EmailInfo](./types/emailinfo)** - Union type for all supported email types.
+- **[ExecutableOptions](./types/executableoptions)** - No description
+- **[LiveReloadOptions](./types/livereloadoptions)** - No description
+- **[TargetOS](./types/targetos)** - Represents the target operating system for compilation.
+
+### Functions
+
+- **[Server Functions](./functions-server)**
+
+## React
+
+### Interfaces
+
+- **[UseQueryOpts](./interfaces/usequeryopts)** - Options for the useQuery hook.
+
+### Types
+
+- **[DBReadyState](./types/dbreadystate)** - Represents the state of the loading process.
+- **[PropsWithPath](./types/propswithpath)** - Convenience props type for components that accept a DB path as input.
+- **[UseItemOpts](./types/useitemopts)** - Options for the useItem hook.
+
+### Functions
+
+- **[React Functions](./functions-react)**
+

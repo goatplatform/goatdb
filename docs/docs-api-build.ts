@@ -1,5 +1,4 @@
 #!/usr/bin/env -S deno run -A
-
 import { 
   Application, 
   type DeclarationReflection, 
@@ -12,7 +11,7 @@ import {
   buildCrossReferenceMap,
   collectTypeReferences,
   classifyType,
-} from './docs/type-formatter.ts';
+} from './type-formatter.ts';
 import {
   buildReverseInheritanceMap,
   createClassMDX,
@@ -20,7 +19,7 @@ import {
   createFunctionsMDX,
   createTypeMDX,
   extractDocumentation,
-} from './docs/mdx-generator.ts';
+} from './mdx-generator.ts';
 
 // Directory where generated API documentation will be stored
 const API_DOCS_DIR = path.join('docs', 'docs', 'api');
@@ -211,6 +210,21 @@ async function writeApiFiles(allElements: ApiElements[]): Promise<void> {
 
   // Build reverse inheritance map for parent->child relationships
   const reverseInheritanceMap = buildReverseInheritanceMap(allElements, crossRefMap);
+
+  // Build declarations map for property resolution
+  const allDeclarations = new Map<string, DeclarationReflection>();
+  for (const elements of allElements) {
+    for (const cls of elements.classes) {
+      allDeclarations.set(cls.name, cls);
+    }
+    for (const iface of elements.interfaces) {
+      allDeclarations.set(iface.name, iface);
+    }
+    for (const type of elements.types) {
+      allDeclarations.set(type.name, type);
+    }
+  }
+  console.log(`🗂️ Built declarations map with ${allDeclarations.size} entries`);
 
   // Write individual class files
   for (const elements of allElements) {

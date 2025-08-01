@@ -1,0 +1,22 @@
+{
+  "name": "@goatdb/docs",
+  "version": "0.1.0",
+  "exports": {
+    "./docs-api-build": "./docs-api-build.ts",
+    "./docs-build": "./docs-build.ts",
+    "./mdx-generator": "./mdx-generator.ts",
+    "./type-formatter": "./type-formatter.ts"
+  },
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "dom.asynciterable", "deno.ns"]
+  },
+  "imports": {
+    "typedoc": "npm:typedoc@^0.28.8"
+  },
+  "tasks": {
+    "api": "deno run -A docs-api-build.ts",
+    "build": "deno run -A docs-build.ts build",
+    "serve": "deno run -A docs-build.ts serve"
+  },
+  "exclude": ["node_modules/", ".docusaurus/", "build/", "docs/"]
+}

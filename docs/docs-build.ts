@@ -1,4 +1,4 @@
-import { cli } from './base/development.ts';
+import { cli } from '../base/development.ts';
 import { zip } from 'jsr:@deno-library/compress';
 
 export async function buildDocs(): Promise<void> {

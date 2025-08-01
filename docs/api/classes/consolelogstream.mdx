@@ -1,0 +1,26 @@
+---
+title: ConsoleLogStream
+sidebar_label: ConsoleLogStream
+---
+
+# ConsoleLogStream
+
+A LogStream implementation that writes log entries to the console.
+Different severity levels are mapped to different console methods.
+
+**Implements:** [LogStream](/api/interfaces/logstream)
+
+## Constructor
+
+**<code>new ConsoleLogStream(severity: number | Severity)</code>**
+
+Creates a new ConsoleLogStream
+
+## Methods
+
+### appendEntry()
+
+**<code>appendEntry(e: NormalizedLogEntry&lt;LogEntry&gt;): void</code>**
+
+Appends a log entry to the console
+

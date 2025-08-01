@@ -1,0 +1,159 @@
+---
+title: ServerOptions
+sidebar_label: ServerOptions
+---
+
+# ServerOptions
+
+A server represents a logical DB with some additional configuration options.
+
+**Extends:** [DBInstanceConfig](/api/interfaces/dbinstanceconfig)
+
+**Extended by:** [ServerServices](/api/interfaces/serverservices)
+
+## Properties
+
+### appName
+
+```typescript
+appName: string
+```
+
+The application name to use in emails and other user-facing content.
+If not provided, a default name will be used.
+
+### buildInfo
+
+```typescript
+buildInfo: [BuildInfo](/api/interfaces/buildinfo)
+```
+
+Info about the build process.
+
+### denoJson
+
+```typescript
+denoJson: string
+```
+
+Path to deno.json. Defaults to 'deno.json' inside the current directory.
+
+### disableDefaultEndpoints
+
+```typescript
+disableDefaultEndpoints: boolean
+```
+
+If true, disables all default endpoints and middlewares (health, auth, static, etc).
+
+### domain
+
+```typescript
+domain: [DomainConfig](/api/types/domainconfig)
+```
+
+Configuration for mapping custom domains to organizations and vice versa.
+This enables multi-tenant deployments where each organization can have its
+own domain or subdomain. For example:
+- org1.example.com -&gt; maps to organization "org1"
+- org2.example.com -&gt; maps to organization "org2"
+The mapping is bidirectional - domains can be resolved to org IDs and
+org IDs can be resolved to their domains.
+
+### emailConfig
+
+```typescript
+emailConfig: EmailConfig<>
+```
+
+Configuration for the email service. Can use either SMTP or AWS SES via
+https://nodemailer.com/|NodeMailer.
+
+Example SMTP configuration (see https://nodemailer.com/smtp/):
+```ts
+{
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: true,
+  auth: {
+    user: "user@gmail.com",
+    pass: "app-specific-password"
+  },
+  debugEmails: true, // Enable email sending in development
+  from: "system@my.domain.com",
+}
+```
+
+Example Amazon SES configuration (see https://nodemailer.com/ses/):
+```ts
+import { SendRawEmailCommand, SES } from "npm:@aws-sdk/client-ses";
+
+{
+  SES: {
+    ses: new SES({ region: "us-east-1" }),
+    aws: { SendRawEmailCommand },
+  },
+  debugEmails: true, // Enable email sending in development
+  from: "system@my.domain.com",
+}
+```
+
+### fetchUserByEmail
+
+```typescript
+fetchUserByEmail: (db: [GoatDB](/api/classes/goatdb)<US>, email: string) => [ManagedItem](/api/classes/manageditem)<US, [Schema](/api/types/schema)> | Promise<[ManagedItem](/api/classes/manageditem)<US, [Schema](/api/types/schema)>>
+```
+
+A hook that's used during email-based authentication flows to look up or create users.
+This function is called when a user attempts to log in with an email address.
+
+Implementing this hook allows you to:
+- Integrate with external user management systems
+- Implement custom user lookup logic
+- Lazily create users when they first authenticate
+- Apply organization-specific policies for user creation
+
+If not provided, the system won't handle email-based authentication and authorization.
+
+### logStreams
+
+```typescript
+logStreams: [LogStream](/api/interfaces/logstream)[]
+```
+
+Optional array of log streams. All of the server binary's outputs will be
+directed to these streams.
+
+### path
+
+```typescript
+path: string
+```
+
+The directory under which all server data will be stored.
+This includes database files, logs, and other persistent data.
+
+### port
+
+```typescript
+port: number
+```
+
+The port the server will listen to. Defaults to 8080.
+
+### staticAssets
+
+```typescript
+staticAssets: StaticAssets
+```
+
+Compiled static assets the server will serve.
+
+## Inherited Members
+
+### From [DBInstanceConfig](/api/interfaces/dbinstanceconfig)
+
+**Properties:** `debug`, `mode`, `orgId`, `peers`, `registry`, `trusted`
+
+*See [DBInstanceConfig](/api/interfaces/dbinstanceconfig) for detailed documentation*
+

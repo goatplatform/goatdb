@@ -1,0 +1,74 @@
+---
+title: DataRegistry
+sidebar_label: DataRegistry
+---
+
+# DataRegistry
+
+The DataRegistry acts as a registry of known schemas for a given GoatDB
+instance. It's initialized when the app starts and stays fixed during its
+execution.
+
+Typically, apps use the `DataRegistry.default` instance, but are free to
+create multiple registries each with different schemas registered.
+
+## Constructor
+
+**<code>new DataRegistry()</code>**
+
+Initialize a new DataRegistry.
+
+## Methods
+
+### authRuleForRepo()
+
+**<code>authRuleForRepo(inputPath: string): [AuthRule](/api/types/authrule)</code>**
+
+Finds the authorization rule for the provided path.
+
+### decode()
+
+**<code>decode(str: string): [Schema](/api/types/schema)</code>**
+
+Decodes a schema marker to an actual schema.
+
+### encode()
+
+**<code>encode(schema: [Schema](/api/types/schema)): string</code>**
+
+Encodes a schema to a marker string for storage.
+
+### get()
+
+**<code>get(ns: string, version: number): [Schema](/api/types/schema)</code>**
+
+Find a schema that's been registered with this registry.
+
+### registerAuthRule()
+
+**<code>registerAuthRule(path: string | RegExp&lt;&gt;, rule: [AuthRule](/api/types/authrule)): void</code>**
+
+Registers an authorization rule with this registry. If not provided, all
+data is considered public.
+
+### registerSchema()
+
+**<code>registerSchema(schema: [Schema](/api/types/schema)): void</code>**
+
+Registers a schema with this registry. This is a NOP if the schema had
+already been registered.
+
+### upgrade()
+
+**<code>upgrade(data: [CoreObject](/api/interfaces/coreobject)&lt;&gt;, dataSchema: [Schema](/api/types/schema), targetSchema: [Schema](/api/types/schema)): [[CoreObject](/api/interfaces/coreobject)&lt;[CoreValue](/api/types/corevalue)&gt;, [Schema](/api/types/schema)]</code>**
+
+Given a data object and its schema, this method performs the upgrade
+procedure to the target schema.
+
+This method will refuse to upgrade to the target schema if a single version
+is missing. For example, if attempting to upgrade from v1 to v3, but the
+v2 schema is missing, then the upgrade will be refused.
+
+NOTE: You shouldn't use this method directly under normal circumstances.
+The upgrade procedure will be performed automatically for you when needed.
+

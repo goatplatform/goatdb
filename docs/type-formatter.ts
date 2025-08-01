@@ -25,9 +25,49 @@ import {
  *   and a link to the interface.
  */
 export interface InheritanceInfo {
-  extends: Array<{ name: string; link: string }>;
+  extends: Array<{ 
+    name: string; 
+    link: string;
+    utilityTypeInfo?: UtilityTypeAnalysis; // Only present for utility types
+  }>;
   implements: Array<{ name: string; link: string }>;
 }
+
+/**
+ * Analysis result for TypeScript utility types like Omit, Pick, etc.
+ */
+export interface UtilityTypeAnalysis {
+  utilityType: string;
+  displayType: string;
+  baseInterface: { name: string; link: string };
+  operation: UtilityOperation;
+  resolvedProperties?: ResolvedProperty[];
+}
+
+/**
+ * Represents a resolved property with its documentation.
+ */
+export interface ResolvedProperty {
+  name: string;
+  type: string;
+  documentation: string;
+  isOptional: boolean;
+  source: 'inherited' | 'own';
+  sourceInterface?: string;
+}
+
+/**
+ * Describes the operation performed by a utility type.
+ */
+export interface UtilityOperation {
+  type: 'omit' | 'pick' | 'partial' | 'required';
+  keys?: string[];
+  description: string;
+}
+
+// ===================================================================
+// CROSS-REFERENCE MAP BUILDING
+// ===================================================================
 
 /**
  * Builds a cross-reference map of all API elements for linking.
@@ -66,6 +106,10 @@ export function buildCrossReferenceMap(allElements: Array<{
   return crossRefMap;
 }
 
+// ===================================================================
+// INHERITANCE ANALYSIS
+// ===================================================================
+
 /**
  * Extracts inheritance information from a class or interface.
  *
@@ -75,7 +119,7 @@ export function buildCrossReferenceMap(allElements: Array<{
  *                      paths for proper linking.
  * @returns An InheritanceInfo object containing the inheritance information.
  */
-export function extractInheritanceInfo(element: DeclarationReflection, crossRefMap: Map<string, string>): InheritanceInfo {
+export function extractInheritanceInfo(element: DeclarationReflection, crossRefMap: Map<string, string>, allDeclarations?: Map<string, DeclarationReflection>): InheritanceInfo {
   const inheritance: InheritanceInfo = {
     extends: [],
     implements: [],
@@ -90,16 +134,30 @@ export function extractInheritanceInfo(element: DeclarationReflection, crossRefM
           continue;
         }
         
-        // Use crossRefMap to get the correct link path (interfaces, classes, or types)
-        const linkPath = crossRefMap.get(extendedType.name) || 
+        // Try utility type analysis first (for Omit, Pick, etc.)
+        if (extendedType instanceof ReferenceType) {
+          const utilityTypeResolution = analyzeUtilityTypeInheritance(extendedType, crossRefMap, allDeclarations);
+          
+          if (utilityTypeResolution?.baseInterface) {
+            // Show the meaningful parent interface instead of the utility type
+            inheritance.extends.push({
+              name: utilityTypeResolution.baseInterface.name,
+              link: utilityTypeResolution.baseInterface.link,
+              utilityTypeInfo: utilityTypeResolution
+            });
+            continue;
+          }
+        }
+        
+        // Fallback to simple inheritance (existing logic)
+        const parentInterfaceLink = crossRefMap.get(extendedType.name) || 
           (element.kind === 256 
             ? `/api/interfaces/${extendedType.name.toLowerCase()}`
             : `/api/classes/${extendedType.name.toLowerCase()}`);
 
-
         inheritance.extends.push({
           name: extendedType.name,
-          link: linkPath,
+          link: parentInterfaceLink,
         });
       }
     }
@@ -109,12 +167,12 @@ export function extractInheritanceInfo(element: DeclarationReflection, crossRefM
   if (element.implementedTypes) {
     for (const implementedType of element.implementedTypes) {
       if (implementedType.type === 'reference' && implementedType.name) {
-        const linkPath = crossRefMap.get(implementedType.name) || 
+        const implementedInterfaceLink = crossRefMap.get(implementedType.name) || 
           `/api/interfaces/${implementedType.name.toLowerCase()}`;
         
         inheritance.implements.push({
           name: implementedType.name,
-          link: linkPath,
+          link: implementedInterfaceLink,
         });
       }
     }
@@ -122,6 +180,10 @@ export function extractInheritanceInfo(element: DeclarationReflection, crossRefM
 
   return inheritance;
 }
+
+// ===================================================================
+// TYPE FORMATTING AND LINKING
+// ===================================================================
 
 /**
  * Formats a type with cross-reference links.
@@ -443,6 +505,361 @@ export function collectTypeReferences(type: Type, referencedTypes: Set<string>):
     // For other types (intrinsic, literal, etc.), no references to collect
   }
 }
+
+// ===================================================================
+// UTILITY TYPE ANALYSIS
+// ===================================================================
+
+/**
+ * Supported TypeScript utility types for inheritance analysis.
+ */
+const SUPPORTED_UTILITY_TYPES = new Set(['Omit', 'Pick', 'Partial', 'Required']);
+
+/**
+ * Analyzes utility type inheritance to extract meaningful parent relationships.
+ * Handles common TypeScript utility types like Omit, Pick, Partial, Required.
+ * 
+ * @param extendedType - The TypeDoc reference type to analyze
+ * @param crossRefMap - Cross-reference map for link resolution
+ * @returns Analysis result or null if not a supported utility type
+ */
+export function analyzeUtilityTypeInheritance(
+  extendedType: ReferenceType,
+  crossRefMap: Map<string, string>,
+  allDeclarations?: Map<string, DeclarationReflection>
+): UtilityTypeAnalysis | null {
+  const utilityTypeName = extendedType.name;
+  
+  if (!SUPPORTED_UTILITY_TYPES.has(utilityTypeName) || !extendedType.typeArguments) {
+    return null;
+  }
+
+  try {
+    const analysis: Partial<UtilityTypeAnalysis> = {
+      utilityType: utilityTypeName,
+      displayType: formatLinkedType(extendedType, crossRefMap),
+    };
+
+    switch (utilityTypeName) {
+      case 'Omit':
+        return analyzeOmitType(extendedType, analysis, crossRefMap, allDeclarations);
+      case 'Pick':
+        return analyzePickType(extendedType, analysis, crossRefMap, allDeclarations);
+      case 'Partial':
+        return analyzePartialType(extendedType, analysis, crossRefMap, allDeclarations);
+      case 'Required':
+        return analyzeRequiredType(extendedType, analysis, crossRefMap, allDeclarations);
+      default:
+        return null;
+    }
+  } catch (error) {
+    console.warn(`Warning: Failed to analyze utility type ${utilityTypeName}:`, error instanceof Error ? error.message : String(error));
+    return null;
+  }
+}
+
+/**
+ * Analyzes Omit<BaseType, Keys> utility type.
+ */
+function analyzeOmitType(
+  extendedType: ReferenceType,
+  analysis: Partial<UtilityTypeAnalysis>,
+  crossRefMap: Map<string, string>,
+  allDeclarations?: Map<string, DeclarationReflection>
+): UtilityTypeAnalysis | null {
+  const typeArgs = extendedType.typeArguments!;
+  if (typeArgs.length !== 2) {
+    console.warn(`Warning: Omit type has ${typeArgs.length} arguments, expected 2`);
+    return null;
+  }
+
+  const [baseType, keysType] = typeArgs;
+
+  const baseInterface = extractBaseInterface(baseType, crossRefMap);
+  if (!baseInterface) {
+    return null;
+  }
+
+  const omittedKeys = extractStringLiteralKeys(keysType);
+  
+  const result = {
+    ...analysis,
+    baseInterface,
+    operation: {
+      type: 'omit',
+      keys: omittedKeys,
+      description: omittedKeys.length > 0 
+        ? `excluding ${omittedKeys.map(k => `'${k}'`).join(', ')}`
+        : 'excluding specified keys'
+    }
+  } as UtilityTypeAnalysis;
+
+  // Resolve actual properties if declarations are available
+  if (allDeclarations) {
+    result.resolvedProperties = resolveUtilityTypeProperties(result, crossRefMap, allDeclarations);
+  }
+  
+  return result;
+}
+
+/**
+ * Analyzes Pick<BaseType, Keys> utility type.
+ */
+function analyzePickType(
+  extendedType: ReferenceType,
+  analysis: Partial<UtilityTypeAnalysis>,
+  crossRefMap: Map<string, string>,
+  allDeclarations?: Map<string, DeclarationReflection>
+): UtilityTypeAnalysis | null {
+  const typeArgs = extendedType.typeArguments!;
+  if (typeArgs.length !== 2) {
+    console.warn(`Warning: Pick type has ${typeArgs.length} arguments, expected 2`);
+    return null;
+  }
+
+  const [baseType, keysType] = typeArgs;
+
+  const baseInterface = extractBaseInterface(baseType, crossRefMap);
+  if (!baseInterface) {
+    console.warn('Warning: Could not extract base interface for Pick type');
+    return null;
+  }
+
+  const pickedKeys = extractStringLiteralKeys(keysType);
+  
+  const result = {
+    ...analysis,
+    baseInterface,
+    operation: {
+      type: 'pick',
+      keys: pickedKeys,
+      description: pickedKeys.length > 0
+        ? `selecting only ${pickedKeys.map(k => `'${k}'`).join(', ')}`
+        : 'selecting specified keys'
+    }
+  } as UtilityTypeAnalysis;
+
+  if (allDeclarations) {
+    result.resolvedProperties = resolveUtilityTypeProperties(result, crossRefMap, allDeclarations);
+  }
+  
+  return result;
+}
+
+/**
+ * Analyzes Partial<BaseType> utility type.
+ */
+function analyzePartialType(
+  extendedType: ReferenceType,
+  analysis: Partial<UtilityTypeAnalysis>,
+  crossRefMap: Map<string, string>,
+  allDeclarations?: Map<string, DeclarationReflection>
+): UtilityTypeAnalysis | null {
+  const typeArgs = extendedType.typeArguments!;
+  if (typeArgs.length !== 1) {
+    console.warn(`Warning: Partial type has ${typeArgs.length} arguments, expected 1`);
+    return null;
+  }
+
+  const baseInterface = extractBaseInterface(typeArgs[0], crossRefMap);
+  if (!baseInterface) {
+    console.warn('Warning: Could not extract base interface for Partial type');
+    return null;
+  }
+  
+  const result = {
+    ...analysis,
+    baseInterface,
+    operation: {
+      type: 'partial',
+      description: 'making all properties optional'
+    }
+  } as UtilityTypeAnalysis;
+
+  if (allDeclarations) {
+    result.resolvedProperties = resolveUtilityTypeProperties(result, crossRefMap, allDeclarations);
+  }
+  
+  return result;
+}
+
+/**
+ * Analyzes Required<BaseType> utility type.
+ */
+function analyzeRequiredType(
+  extendedType: ReferenceType,
+  analysis: Partial<UtilityTypeAnalysis>,
+  crossRefMap: Map<string, string>,
+  allDeclarations?: Map<string, DeclarationReflection>
+): UtilityTypeAnalysis | null {
+  const typeArgs = extendedType.typeArguments!;
+  if (typeArgs.length !== 1) {
+    console.warn(`Warning: Required type has ${typeArgs.length} arguments, expected 1`);
+    return null;
+  }
+
+  const baseInterface = extractBaseInterface(typeArgs[0], crossRefMap);
+  if (!baseInterface) {
+    console.warn('Warning: Could not extract base interface for Required type');
+    return null;
+  }
+  
+  const result = {
+    ...analysis,
+    baseInterface,
+    operation: {
+      type: 'required',
+      description: 'making all properties required'
+    }
+  } as UtilityTypeAnalysis;
+
+  if (allDeclarations) {
+    result.resolvedProperties = resolveUtilityTypeProperties(result, crossRefMap, allDeclarations);
+  }
+  
+  return result;
+}
+
+/**
+ * Extracts base interface information from a TypeDoc Type.
+ */
+function extractBaseInterface(
+  type: Type,
+  crossRefMap: Map<string, string>
+): { name: string; link: string } | null {
+  if (type.type !== 'reference' || !(type instanceof ReferenceType) || !type.name) {
+    return null;
+  }
+
+  // Skip external types (contain dots) or built-in types
+  if (type.name.includes('.') || isBuiltInType(type.name)) {
+    return null;
+  }
+
+  const link = crossRefMap.get(type.name);
+  if (!link) {
+    // Type not in crossRefMap - might be from another module
+    // Return the name without a link for cross-module references
+    return {
+      name: type.name,
+      link: '' // No link available
+    };
+  }
+
+  return {
+    name: type.name,
+    link
+  };
+}
+
+/**
+ * Extracts string literal keys from a union or single literal type.
+ */
+function extractStringLiteralKeys(type: Type): string[] {
+  const keys: string[] = [];
+
+  if (type.type === 'literal' && type instanceof LiteralType) {
+    if (typeof type.value === 'string') {
+      keys.push(type.value);
+    }
+  } else if (type.type === 'union' && type instanceof UnionType) {
+    for (const unionMember of type.types) {
+      if (unionMember.type === 'literal' && unionMember instanceof LiteralType) {
+        if (typeof unionMember.value === 'string') {
+          keys.push(unionMember.value);
+        }
+      }
+    }
+  }
+
+  return keys;
+}
+
+/**
+ * Resolves actual properties from a base interface and applies utility type operations.
+ * This function dynamically looks up the base type in TypeDoc's reflection system.
+ */
+function resolveUtilityTypeProperties(
+  analysis: UtilityTypeAnalysis,
+  crossRefMap: Map<string, string>,
+  allDeclarations: Map<string, DeclarationReflection>
+): ResolvedProperty[] {
+  const baseInterfaceName = analysis.baseInterface.name;
+  const baseDeclaration = allDeclarations.get(baseInterfaceName);
+  
+  if (!baseDeclaration) {
+    // Base interface not found - this is common for internal/cross-module types
+    // Return empty array so we fall back to generic description
+    return [];
+  }
+  
+  let baseProperties: ResolvedProperty[] = [];
+  
+  // Handle type aliases with reflection types
+  if (baseDeclaration.type?.type === 'reflection' && baseDeclaration.type.declaration?.children) {
+    baseProperties = extractPropertiesFromChildren(baseDeclaration.type.declaration.children, baseInterfaceName, crossRefMap);
+  }
+  // Handle interfaces with direct children
+  else if (baseDeclaration.children) {
+    baseProperties = extractPropertiesFromChildren(baseDeclaration.children, baseInterfaceName, crossRefMap);
+  }
+  
+  // Apply utility type operation (Omit, Pick, etc.)
+  return applyUtilityOperation(baseProperties, analysis.operation);
+}
+
+/**
+ * Extracts properties from TypeDoc children (works for both interfaces and type aliases)
+ */
+function extractPropertiesFromChildren(
+  children: DeclarationReflection[],
+  sourceInterface: string,
+  crossRefMap: Map<string, string>
+): ResolvedProperty[] {
+  return children
+    .filter(child => child.kind === 1024) // Property kind
+    .map(prop => ({
+      name: prop.name,
+      type: prop.type ? formatLinkedType(prop.type, crossRefMap) : 'any',
+      documentation: prop.comment?.summary?.map(s => s.text).join('') || '',
+      isOptional: prop.flags?.isOptional || false,
+      source: 'inherited' as const,
+      sourceInterface
+    }));
+}
+
+/**
+ * Applies utility type operations to a list of properties.
+ */
+function applyUtilityOperation(
+  properties: ResolvedProperty[],
+  operation: UtilityOperation
+): ResolvedProperty[] {
+  switch (operation.type) {
+    case 'omit': {
+      const omittedKeys = new Set(operation.keys || []);
+      return properties.filter(prop => !omittedKeys.has(prop.name));
+    }
+    
+    case 'pick': {
+      const pickedKeys = new Set(operation.keys || []);
+      return properties.filter(prop => pickedKeys.has(prop.name));
+    }
+    
+    case 'partial':
+      return properties.map(prop => ({ ...prop, isOptional: true }));
+    
+    case 'required':
+      return properties.map(prop => ({ ...prop, isOptional: false }));
+    
+    default:
+      return properties;
+  }
+}
+
+// ===================================================================
+// TYPE CLASSIFICATION AND VALIDATION
+// ===================================================================
 
 /**
  * Classification result for a type name.

@@ -1,0 +1,101 @@
+---
+title: Core Functions
+---
+
+# Core Functions
+
+## itemPath
+
+**<code>itemPath(type: T, repo: string, item: string, embed: string): string</code>**
+
+Given the path parts, composes them into a GoatDB path.
+
+## itemPathGetPart
+
+**<code>itemPathGetPart(path: string, part: 'type' | 'repo' | 'item' | 'embed'): T</code>**
+
+Given a DB path and a path component, this function returns the relevant
+portion of the path.
+
+## itemPathGetRepoId
+
+**<code>itemPathGetRepoId(path: string): string</code>**
+
+Given a DB path, return just the repository prefix of it.
+
+## itemPathIsValid
+
+**<code>itemPathIsValid(path: string): boolean</code>**
+
+Checks if the given path is valid.
+Valid paths must contain lowercase letters, numbers, and the characters
+`-` and `_`. They must also contain at most 4 components separated by `/`
+characters.
+
+## itemPathJoin
+
+**<code>itemPathJoin(prefix: string, suffix: string): string</code>**
+
+Joins the given prefix and suffix into a single path.
+
+## itemPathNormalize
+
+**<code>itemPathNormalize(path: string): string</code>**
+
+Normalizes the given path ensuring it has the correct number of parts
+and no trailing separator.
+
+## normalizeEmail
+
+**<code>normalizeEmail(email: string): string</code>**
+
+## prettyJSON
+
+**<code>prettyJSON(o: ReadonlyJSONValue): string</code>**
+
+Converts a JSON value to a pretty-printed string.
+
+If the input object has a toJSON method, it will be called first to get
+the serializable representation of the object.
+
+## SchemaEquals
+
+**<code>SchemaEquals(s1: [Schema](/api/types/schema), s2: [Schema](/api/types/schema)): boolean</code>**
+
+Given two schemas, returns whether they're the same one or not.
+
+## SchemaGetFieldDef
+
+**<code>SchemaGetFieldDef(s: S, field: F): [FieldDef](/api/types/fielddef)&lt;S['fields'][F]['type']&gt;</code>**
+
+Given a schema and a field, returns its
+
+## SchemaGetFields
+
+**<code>SchemaGetFields(s: [Schema](/api/types/schema)): readonly [string, [FieldDef](/api/types/fielddef)&lt;ValueType&gt;][]</code>**
+
+Given a schema, this function returns its field definitions as an iterable.
+
+## SchemaGetRequiredFields
+
+**<code>SchemaGetRequiredFields(s: [Schema](/api/types/schema)): readonly string[]</code>**
+
+Given a schema, this functions returns an iterable of its required fields.
+
+## uniqueId
+
+**<code>uniqueId(length: number): string</code>**
+
+Generates a random ID string.
+
+The generated ID is URL-safe, using only lowercase letters and numbers.
+The default length of 24 characters provides a large enough space to
+ensure a very low probability of collisions for most applications.
+
+Note: This function uses Math.random() which is not cryptographically secure.
+Do not use for security-sensitive purposes.
+
+With 36 possible characters (a-z, 0-9) and a length of 24, there are
+36^24 (approximately 2.24 * 10^37) possible unique IDs, making
+collisions extremely unlikely for most use cases.
+

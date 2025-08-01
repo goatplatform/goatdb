@@ -70,7 +70,10 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           items: [
             'api/classes/server',
+            'api/interfaces/serveroptions',
+            'api/interfaces/serverservices',
             'api/functions-server',
+            'api/types/domainconfig',
             'api/types/appconfig',
             'api/types/compileoptions',
             'api/types/debugserveroptions',
@@ -103,8 +106,10 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           items: [
             // Essential interfaces
+            'api/interfaces/dbinstanceconfig',
             'api/interfaces/coreobject',
             'api/interfaces/coreoptions',
+            'api/types/queryconfig',
             'api/interfaces/jsonobject',
             'api/interfaces/readonlyitem',
             'api/interfaces/readonlyjsonobject',

@@ -1,0 +1,48 @@
+---
+title: TrustPool
+sidebar_label: TrustPool
+---
+
+# TrustPool
+
+Each commit in the graph is signed with the private key of the session that
+generated it. The trust pool manages all known sessions and their public keys
+which are later used to verify that the commits in the graph make only
+modifications that are valid. Each commit's signature is checked against its
+session's public key, and then the modifications themselves are checked to
+ensure the creator only made changes within their scope of permissions.
+
+## Constructor
+
+**<code>new TrustPool(orgId: string, currentSession: OwnedSession, roots: Session[], trustedSessions: Session[], changeCallback: () =&gt; void)</code>**
+
+## Methods
+
+### addSession()
+
+**<code>addSession(s: Session, commit: Commit&lt;&gt;): Promise&lt;boolean&gt;</code>**
+
+When a commit containing a session is discovered, use this method to add
+it to the trust pool. This method does the necessary checks to ensure the
+integrity of this commit, then if all checks pass it adds the session to
+the trust pool.
+
+### addSessionUnsafe()
+
+**<code>addSessionUnsafe(s: Session): boolean</code>**
+
+Adds the given session to the trust pool, without verifying its origin
+commit. Be very careful to only use this method for verified sessions.
+
+### getSession()
+
+**<code>getSession(id: string): Session</code>**
+
+### sessions()
+
+**<code>sessions(): Generator&lt;Session&gt;</code>**
+
+### verify()
+
+**<code>verify(commit: Commit&lt;&gt;): Promise&lt;boolean&gt;</code>**
+
