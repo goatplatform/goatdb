@@ -25,7 +25,8 @@ export async function buildDocs(): Promise<void> {
     throw new Error(`Docusaurus build failed with code ${code}`);
   }
   
-  await zip.compress('build/docs', 'build/docs.zip');
+  // Compress the contents of build/docs, not the folder itself
+  await zip.compress('build/docs', 'build/docs.zip', { excludeSrc: true });
   console.log('Docs built successfully under build/docs');
 }
 
