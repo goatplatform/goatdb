@@ -1,0 +1,31 @@
+---
+title: Change
+sidebar_label: Change
+---
+
+# Change
+
+**Implements:** [Encodable](/api/interfaces/encodable), [Equatable](/api/interfaces/equatable), [Clonable](/api/interfaces/clonable)
+
+## Constructor
+
+**<code>new Change(config: [ChangeValueConfig](/api/interfaces/changevalueconfig) | [ConstructorDecoderConfig](/api/interfaces/constructordecoderconfig)&lt;EC&gt;)</code>**
+
+## Methods
+
+### clone()
+
+**<code>clone(opts: [CoreValueCloneOpts](/api/interfaces/corevaluecloneopts)): T</code>**
+
+### getType()
+
+**<code>getType(): [ChangeType](/api/types/changetype)</code>**
+
+### isEqual()
+
+**<code>isEqual(other: [Change](/api/classes/change)&lt;EC&gt;): boolean</code>**
+
+### serialize()
+
+**<code>serialize(encoder: [Encoder](/api/interfaces/encoder)&lt;keyof EC, [CoreValue](/api/types/corevalue)&gt;, _options: unknown): void</code>**
+

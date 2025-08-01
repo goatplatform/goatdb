@@ -14,11 +14,11 @@ Typically you never need to create instances of this class directly. Instead,
 use `GoatDB.item()` in order to get a LiveItem instance that's much easier
 to work with.
 
-**Implements:** [ReadonlyItem](../interfaces/readonlyitem), [Encodable](../interfaces/encodable)
+**Implements:** [ReadonlyItem](/api/interfaces/readonlyitem), [Encodable](/api/interfaces/encodable)
 
 ## Constructor
 
-**new Item(config: `ItemConfig`\<S\> | `ConstructorDecoderConfig`\<`EncodedItem`\>, registry: [DataRegistry](./classes/dataregistry)\<\>)**
+**<code>new Item(config: ItemConfig&lt;S&gt; | [ConstructorDecoderConfig](/api/interfaces/constructordecoderconfig)&lt;EncodedItem&gt;, registry: [DataRegistry](/api/classes/dataregistry)&lt;&gt;)</code>**
 
 Creates a new Item instance.
 
@@ -26,7 +26,7 @@ Creates a new Item instance.
 
 ### assertValidData()
 
-**assertValidData(): void**
+**<code>assertValidData(): void</code>**
 
 Asserts that the item's data is valid according to its schema.
 
@@ -36,7 +36,7 @@ the corresponding error message.
 
 ### clone()
 
-**clone(): [Item](./classes/item)\<S\>**
+**<code>clone(): [Item](/api/classes/item)&lt;S&gt;</code>**
 
 Clones the current item.
 
@@ -46,13 +46,13 @@ including all nested objects and arrays.
 
 ### cloneData()
 
-**cloneData(onlyFields: keyof S[any][]): `Readwrite`\<[SchemaDataType](./types/schemadatatype)\<S\>\>**
+**<code>cloneData(onlyFields: keyof S[any][]): Readwrite&lt;[SchemaDataType](/api/types/schemadatatype)&lt;S&gt;&gt;</code>**
 
 Creates a deep copy of the item's data.
 
 ### copyFrom()
 
-**copyFrom(doc: [Item](./classes/item)\<S\> | [ReadonlyItem](./interfaces/readonlyitem)\<S\>): void**
+**<code>copyFrom(doc: [Item](/api/classes/item)&lt;S&gt; | [ReadonlyItem](/api/interfaces/readonlyitem)&lt;S&gt;): void</code>**
 
 Copies data from another item into this one.
 
@@ -61,20 +61,20 @@ of the source item's schema and data. The source item remains unchanged.
 
 ### dataUnsafe()
 
-**dataUnsafe(): [SchemaDataType](./types/schemadatatype)\<S\>**
+**<code>dataUnsafe(): [SchemaDataType](/api/types/schemadatatype)&lt;S&gt;</code>**
 
 WARNING: You probably shouldn't use this. Used internally as an
 optimization to avoid unnecessary copying.
 
 ### delete()
 
-**delete(key: T): boolean**
+**<code>delete(key: T): boolean</code>**
 
 Deletes a given field from this item.
 
 ### deserialize()
 
-**deserialize(decoder: `Decoder`\<string, `DecodedValue`\>): void**
+**<code>deserialize(decoder: [Decoder](/api/interfaces/decoder)&lt;&gt;): void</code>**
 
 Deserializes an encoded item into this instance.
 
@@ -84,7 +84,7 @@ accordingly. The item is automatically normalized after deserialization.
 
 ### diff()
 
-**diff(other: [Item](./classes/item)\<S\>, byCharacter: boolean): `DataChanges`\<\>**
+**<code>diff(other: [Item](/api/classes/item)&lt;S&gt;, byCharacter: boolean): DataChanges&lt;&gt;</code>**
 
 Computes the differences between this item and another item.
 
@@ -93,7 +93,7 @@ and returns an object describing the differences between them.
 
 ### diffKeys()
 
-**diffKeys(other: [Item](./classes/item)\<S\>, local: boolean): string[]**
+**<code>diffKeys(other: [Item](/api/classes/item)&lt;S&gt;, local: boolean): string[]</code>**
 
 Returns an array of field keys that differ between this item and another
 item.
@@ -105,7 +105,7 @@ This is a much faster check than a full diff computation.
 
 ### get()
 
-**get(key: T): [SchemaDataType](./types/schemadatatype)\<S\>[T]**
+**<code>get(key: T): [SchemaDataType](/api/types/schemadatatype)&lt;S&gt;[T]</code>**
 
 Returns the value for the given field or undefined.
 
@@ -114,13 +114,13 @@ Otherwise, returns the field's value, or undefined if not set.
 
 ### has()
 
-**has(key: T): boolean**
+**<code>has(key: T): boolean</code>**
 
 Returns whether the given field is present on the current item or not.
 
 ### isEqual()
 
-**isEqual(other: [Item](./classes/item)\<S\>): boolean**
+**<code>isEqual(other: [Item](/api/classes/item)&lt;S&gt;): boolean</code>**
 
 Compares this item with another item for equality.
 Two items are considered equal if they have the same schema and their data
@@ -128,7 +128,7 @@ is equal after normalization.
 
 ### lock()
 
-**lock(): void**
+**<code>lock(): void</code>**
 
 Locks this item, preventing any further modifications.
 
@@ -139,7 +139,7 @@ history.
 
 ### needsSchemaUpgrade()
 
-**needsSchemaUpgrade(): boolean**
+**<code>needsSchemaUpgrade(): boolean</code>**
 
 Checks if this item needs a schema upgrade.
 
@@ -149,7 +149,7 @@ latest schema version registered in the schema manager.
 
 ### normalize()
 
-**normalize(): void**
+**<code>normalize(): void</code>**
 
 Normalizes the item's data according to its schema.
 
@@ -165,7 +165,7 @@ definition.
 
 ### patch()
 
-**patch(changes: `DataChanges`\<\>): void**
+**<code>patch(changes: DataChanges&lt;&gt;): void</code>**
 
 Applies changes to this item's data.
 
@@ -175,7 +175,7 @@ will be modified in place.
 
 ### serialize()
 
-**serialize(encoder: [Encoder](./interfaces/encoder)\<string, [CoreValue](./types/corevalue), [CoreValue](./types/corevalue), unknown\>, options: \{ local: boolean \}): void**
+**<code>serialize(encoder: [Encoder](/api/interfaces/encoder)&lt;string, [CoreValue](/api/types/corevalue)&gt;, options: &#123; local: boolean &#125;): void</code>**
 
 Serializes the item into an encoded format.
 
@@ -185,25 +185,25 @@ automatically normalized before serialization.
 
 ### set()
 
-**set(key: T, value: [SchemaDataType](./types/schemadatatype)\<S\>[T]): void**
+**<code>set(key: T, value: [SchemaDataType](/api/types/schemadatatype)&lt;S&gt;[T]): void</code>**
 
 Sets the value for the given field.
 
 ### setMulti()
 
-**setMulti(data: `Partial\<[SchemaDataType](./types/schemadatatype)\<S\>\>`): void**
+**<code>setMulti(data: Partial&lt;[SchemaDataType](/api/types/schemadatatype)&lt;S&gt;&gt;): void</code>**
 
 A convenience method for setting several fields and values at once.
 
 ### toJS()
 
-**toJS(local: boolean): [ReadonlyJSONObject](./interfaces/readonlyjsonobject)**
+**<code>toJS(local: boolean): [ReadonlyJSONObject](/api/interfaces/readonlyjsonobject)</code>**
 
 Serializes this item to a JSON-compatible object.
 
 ### unlock()
 
-**unlock(): void**
+**<code>unlock(): void</code>**
 
 Unlocks this item, allowing modifications.
 
@@ -216,7 +216,7 @@ inconsistencies.
 
 ### upgradeSchema()
 
-**upgradeSchema(newSchema: [Schema](./types/schema)): boolean**
+**<code>upgradeSchema(newSchema: [Schema](/api/types/schema)): boolean</code>**
 
 Upgrades this item's data to a newer schema version.
 
@@ -230,7 +230,7 @@ will fail if any intermediate schema versions are missing.
 
 ### validate()
 
-**validate(): [boolean, string]**
+**<code>validate(): [boolean, string]</code>**
 
 Validates the item's data against its schema.
 
@@ -239,11 +239,11 @@ requirements and returns the validation result.
 
 ### fromJS()
 
-**fromJS(obj: [ReadonlyJSONObject](./interfaces/readonlyjsonobject)): [Item](./classes/item)\<S\>**
+**<code>fromJS(obj: [ReadonlyJSONObject](/api/interfaces/readonlyjsonobject)): [Item](/api/classes/item)&lt;S&gt;</code>**
 
 Deserializes a JSON-compatible object into an Item instance.
 
 ### nullItem()
 
-**nullItem(registry: [DataRegistry](./classes/dataregistry)\<\>): [Item](./classes/item)\<S\>**
+**<code>nullItem(registry: [DataRegistry](/api/classes/dataregistry)&lt;&gt;): [Item](/api/classes/item)&lt;S&gt;</code>**
 

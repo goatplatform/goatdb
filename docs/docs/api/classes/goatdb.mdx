@@ -14,17 +14,17 @@ GoatDB is the primary entry point for working with the database. It handles:
 - User authentication and authorization
 - Schema validation
 
-**Extends:** [Emitter](./emitter)
+**Extends:** [Emitter](/api/classes/emitter)
 
 ## Constructor
 
-**new GoatDB(config: `DBInstanceConfig`)**
+**<code>new GoatDB(config: [DBInstanceConfig](/api/interfaces/dbinstanceconfig))</code>**
 
 ## Methods
 
 ### clientsForRepo()
 
-**clientsForRepo(pathComps: string[]): `Iterable`\<`RepoClient`\<\>\>**
+**<code>clientsForRepo(pathComps: string[]): Iterable&lt;RepoClient&lt;&gt;&gt;</code>**
 
 Returns the associated RepoClient instances for the given repository.
 Each client instance handles synchronization with a different server
@@ -32,7 +32,7 @@ endpoint, enabling client-side load-balancing.
 
 ### close()
 
-**close(path: string): `Promise`\<void\>**
+**<code>close(path: string): Promise&lt;void&gt;</code>**
 
 Closes a repository, flushing any pending writes to disk before releasing
 all memory associated with this repository.
@@ -41,7 +41,7 @@ This method does nothing if the repository isn't currently loaded.
 
 ### count()
 
-**count(path: string): number**
+**<code>count(path: string): number</code>**
 
 Returns the number of items at the specified path, or -1 if the path
 doesn't exist.
@@ -50,7 +50,7 @@ NOTE: Currently only paths to repositories are supported.
 
 ### create()
 
-**create(path: string, schema: S, data: `Partial\<[SchemaDataType](./types/schemadatatype)\<S\>\>`): [ManagedItem](./classes/manageditem)\<S, [Schema](./types/schema)\>**
+**<code>create(path: string, schema: S, data: Partial&lt;[SchemaDataType](/api/types/schemadatatype)&lt;S&gt;&gt;): [ManagedItem](/api/classes/manageditem)&lt;S&gt;</code>**
 
 Creates a new item at the target repository, opening it if needed. Unlike
 `GoatDB.item()` there's no need to explicitly open a repository before
@@ -63,7 +63,7 @@ the existing item without modifying it.
 
 ### flush()
 
-**flush(path: string): `Promise`\<void\>**
+**<code>flush(path: string): Promise&lt;void&gt;</code>**
 
 Flushes all pending writes for the given repository to disk. Use this
 method when you must ensure all previously known commits are written to the
@@ -71,13 +71,13 @@ local disk.
 
 ### flushAll()
 
-**flushAll(): `Promise`\<void\>**
+**<code>flushAll(): Promise&lt;void&gt;</code>**
 
 Flushes all pending writes for all repositories to disk.
 
 ### getTrustPool()
 
-**getTrustPool(): `Promise`\<`TrustPool`\<\>\>**
+**<code>getTrustPool(): Promise&lt;[TrustPool](/api/classes/trustpool)&lt;&gt;&gt;</code>**
 
 Returns the trust pool of this DB instance. The trust pool is a low level
 object that manages all known sessions and their public keys. It is used
@@ -88,7 +88,7 @@ Note: You almost never need to use the trust pool directly.
 
 ### item()
 
-**item(pathComps: string[]): [ManagedItem](./classes/manageditem)\<S, [Schema](./types/schema)\>**
+**<code>item(pathComps: string[]): [ManagedItem](/api/classes/manageditem)&lt;S&gt;</code>**
 
 Access an item at the given path. An item's path is typically at the
 following format:
@@ -102,14 +102,14 @@ explicitly open the repository before accessing any of its items.
 
 ### itemLoaded()
 
-**itemLoaded(path: string): boolean**
+**<code>itemLoaded(path: string): boolean</code>**
 
 Checks if an item at the given path is currently loaded in memory.
 This is a passive check that does not trigger loading the item.
 
 ### keys()
 
-**keys(path: string): `Iterable`\<string\>**
+**<code>keys(path: string): Iterable&lt;string&gt;</code>**
 
 Returns the keys at the specified path.
 
@@ -117,7 +117,7 @@ NOTE: Currently only paths to repositories are supported.
 
 ### load()
 
-**load(path: string, schema: S, data: [SchemaDataType](./types/schemadatatype)\<S\>): `Promise`\<void\>**
+**<code>load(path: string, schema: S, data: [SchemaDataType](/api/types/schemadatatype)&lt;S&gt;): Promise&lt;void&gt;</code>**
 
 Explicitly create an item, loading its repository if needed. Use this
 method for bulk load operations where you want to be notified after the
@@ -128,7 +128,7 @@ and is much more efficient for bulk creations.
 
 ### loginWithMagicLinkEmail()
 
-**loginWithMagicLinkEmail(email: string): `Promise`\<boolean\>**
+**<code>loginWithMagicLinkEmail(email: string): Promise&lt;boolean&gt;</code>**
 
 When connecting to a new DB instance on the client, it'll start with an
 anonymous session that's not attached to any user in the system. Call this
@@ -142,7 +142,7 @@ address. Once clicked, the user item will be automatically created in
 
 ### logout()
 
-**logout(): `Promise`\<void\>**
+**<code>logout(): Promise&lt;void&gt;</code>**
 
 Logs out the current user, closing all open repositories and clearing
 local data. On browsers, this method will also reload the page to ensure
@@ -150,14 +150,14 @@ a clean state.
 
 ### open()
 
-**open(path: string, opts: `OpenOptions`): `Promise`\<[Repository](./classes/repository)\<`MemRepoStorage`\<\>\>\>**
+**<code>open(path: string, opts: [OpenOptions](/api/types/openoptions)): Promise&lt;[Repository](/api/classes/repository)&lt;[MemRepoStorage](/api/classes/memrepostorage)&lt;&gt;&gt;&gt;</code>**
 
 Opens the given repository, loading all its items to memory.
 This method does nothing if the repository is already open.
 
 ### query()
 
-**query(config: `Omit\<`QueryConfig`\<`IS`, `OS`, `CTX`\>, any\>`): [Query](./classes/query)\<`IS`, `OS`, `CTX`\>**
+**<code>query(config: Omit&lt;[QueryConfig](/api/types/queryconfig)&lt;IS, OS, CTX&gt;, any&gt;): [Query](/api/classes/query)&lt;IS, OS, CTX&gt;</code>**
 
 Open a new query or access an already open one. Once opened, the query
 remains open until explicitly closed, and tracks updates to items as they
@@ -165,14 +165,14 @@ happen.
 
 ### readyPromise()
 
-**readyPromise(): `Promise`\<void\>**
+**<code>readyPromise(): Promise&lt;void&gt;</code>**
 
 A convenience promise form of the `ready` flag. When the promise returns,
 this DB instance is ready to receive commands.
 
 ### repository()
 
-**repository(pathComps: string[]): [Repository](./classes/repository)\<`MemRepoStorage`\<\>\>**
+**<code>repository(pathComps: string[]): [Repository](/api/classes/repository)&lt;[MemRepoStorage](/api/classes/memrepostorage)&lt;&gt;&gt;</code>**
 
 Returns the requested repository or undefined if it wasn't opened yet.
 
@@ -181,22 +181,22 @@ repository instance directly.
 
 ### sync()
 
-**sync(path: string): `Promise`\<`SyncResult`\>**
+**<code>sync(path: string): Promise&lt;[SyncResult](/api/types/syncresult)&gt;</code>**
 
 Syncs the given repository with all configured peers and waits for
 completion.
 
 ### syncAll()
 
-**syncAll(): `Promise`\<`Record\<string, `SyncResult`\>`\>**
+**<code>syncAll(): Promise&lt;Record&lt;string, [SyncResult](/api/types/syncresult)&gt;&gt;</code>**
 
 Syncs all open repositories with all configured peers and waits for completion.
 
 ## Inherited Methods
 
-### From [Emitter](./emitter)
+### From [Emitter](/api/classes/emitter)
 
 `attach()`, `detach()`, `detachAll()`, `emit()`, `mute()`, `once()`, `resume()`, `suspend()`, `unmute()`
 
-*See [Emitter](./emitter) for detailed documentation*
+*See [Emitter](/api/classes/emitter) for detailed documentation*
 

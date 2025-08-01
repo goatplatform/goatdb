@@ -4,52 +4,28 @@ title: Core Functions
 
 # Core Functions
 
-## SchemaEquals
-
-**SchemaEquals(s1: [Schema](./types/schema), s2: [Schema](./types/schema)): boolean**
-
-Given two schemas, returns whether they're the same one or not.
-
-## SchemaGetFieldDef
-
-**SchemaGetFieldDef(s: S, field: F): [FieldDef](./types/fielddef)\<S[any][F][any]\> | undefined**
-
-Given a schema and a field, returns its
-
-## SchemaGetFields
-
-**SchemaGetFields(s: [Schema](./types/schema)): readonly [string, [FieldDef](./types/fielddef)\<`ValueType`\>][]**
-
-Given a schema, this function returns its field definitions as an iterable.
-
-## SchemaGetRequiredFields
-
-**SchemaGetRequiredFields(s: [Schema](./types/schema)): readonly string[]**
-
-Given a schema, this functions returns an iterable of its required fields.
-
 ## itemPath
 
-**itemPath(type: T, repo: string, item: string, embed: string): string**
+**<code>itemPath(type: T, repo: string, item: string, embed: string): string</code>**
 
 Given the path parts, composes them into a GoatDB path.
 
 ## itemPathGetPart
 
-**itemPathGetPart(path: string, part: any | any | any | any): T | undefined**
+**<code>itemPathGetPart(path: string, part: any | any | any | any): T</code>**
 
 Given a DB path and a path component, this function returns the relevant
 portion of the path.
 
 ## itemPathGetRepoId
 
-**itemPathGetRepoId(path: string): string**
+**<code>itemPathGetRepoId(path: string): string</code>**
 
 Given a DB path, return just the repository prefix of it.
 
 ## itemPathIsValid
 
-**itemPathIsValid(path: string): boolean**
+**<code>itemPathIsValid(path: string): boolean</code>**
 
 Checks if the given path is valid.
 Valid paths must contain lowercase letters, numbers, and the characters
@@ -58,33 +34,57 @@ characters.
 
 ## itemPathJoin
 
-**itemPathJoin(prefix: string, suffix: string): string**
+**<code>itemPathJoin(prefix: string, suffix: string): string</code>**
 
 Joins the given prefix and suffix into a single path.
 
 ## itemPathNormalize
 
-**itemPathNormalize(path: string): string**
+**<code>itemPathNormalize(path: string): string</code>**
 
 Normalizes the given path ensuring it has the correct number of parts
 and no trailing separator.
 
 ## normalizeEmail
 
-**normalizeEmail(email: string): string**
+**<code>normalizeEmail(email: string): string</code>**
 
 ## prettyJSON
 
-**prettyJSON(o: `ReadonlyJSONValue`): string**
+**<code>prettyJSON(o: [ReadonlyJSONValue](/api/types/readonlyjsonvalue)): string</code>**
 
 Converts a JSON value to a pretty-printed string.
 
 If the input object has a toJSON method, it will be called first to get
 the serializable representation of the object.
 
+## SchemaEquals
+
+**<code>SchemaEquals(s1: [Schema](/api/types/schema), s2: [Schema](/api/types/schema)): boolean</code>**
+
+Given two schemas, returns whether they're the same one or not.
+
+## SchemaGetFieldDef
+
+**<code>SchemaGetFieldDef(s: S, field: F): [FieldDef](/api/types/fielddef)&lt;S[any][F][any]&gt;</code>**
+
+Given a schema and a field, returns its
+
+## SchemaGetFields
+
+**<code>SchemaGetFields(s: [Schema](/api/types/schema)): readonly [string, [FieldDef](/api/types/fielddef)&lt;[ValueType](/api/types/valuetype)&gt;][]</code>**
+
+Given a schema, this function returns its field definitions as an iterable.
+
+## SchemaGetRequiredFields
+
+**<code>SchemaGetRequiredFields(s: [Schema](/api/types/schema)): readonly string[]</code>**
+
+Given a schema, this functions returns an iterable of its required fields.
+
 ## uniqueId
 
-**uniqueId(length: number): string**
+**<code>uniqueId(length: number): string</code>**
 
 Generates a random ID string.
 

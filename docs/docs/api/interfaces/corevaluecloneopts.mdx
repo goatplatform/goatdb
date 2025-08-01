@@ -7,33 +7,33 @@ sidebar_label: CoreValueCloneOpts
 
 Options for customizing cloning behavior
 
-**Extends:** [CoreOptions](./coreoptions)
+**Extends:** [CoreOptions](/api/interfaces/coreoptions)
 
 ## Properties
 
 ### fieldCloneOverride
 
 ```typescript
-fieldCloneOverride: (obj: [ReadonlyCoreObject](./types/readonlycoreobject) | [CoreDictionary](./types/coredictionary), key: string, opts: [CoreValueCloneOpts](./interfaces/corevaluecloneopts)) =\> [CoreValue](./types/corevalue)
+fieldCloneOverride: (obj: [ReadonlyCoreObject](/api/types/readonlycoreobject) | [CoreDictionary](/api/types/coredictionary), key: string, opts: [CoreValueCloneOpts](/api/interfaces/corevaluecloneopts)) => [CoreValue](/api/types/corevalue)
 ```
 
 ### notClonableExt
 
 ```typescript
-notClonableExt: (obj: T) =\> T
+notClonableExt: (obj: T) => T
 ```
 
 ### objectOverride
 
 ```typescript
-objectOverride: (obj: [CoreValue](./types/corevalue)) =\> [boolean, [CoreValue](./types/corevalue)]
+objectOverride: (obj: [CoreValue](/api/types/corevalue)) => [boolean, [CoreValue](/api/types/corevalue)]
 ```
 
 ## Inherited Members
 
-### From [CoreOptions](../interfaces/coreoptions)
+### From [CoreOptions](/api/interfaces/coreoptions)
 
 **Properties:** `iterableFilter`, `objectFilterFields`
 
-*See [CoreOptions](../interfaces/coreoptions) for detailed documentation*
+*See [CoreOptions](/api/interfaces/coreoptions) for detailed documentation*
 

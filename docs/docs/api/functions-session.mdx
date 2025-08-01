@@ -1,0 +1,101 @@
+---
+title: session Functions
+---
+
+# session Functions
+
+## decodeSession
+
+**<code>decodeSession(session: [EncodedOwnedSession](/api/interfaces/encodedownedsession)): Promise&lt;[OwnedSession](/api/interfaces/ownedsession)&gt;</code>**
+
+## decodeSignature
+
+**<code>decodeSignature(str: string): [Signature](/api/interfaces/signature)&lt;T&gt;</code>**
+
+Decodes a given signature string to a Signature structure.
+
+## encodedSessionFromItem
+
+**<code>encodedSessionFromItem(item: [Item](/api/classes/item)&lt;&#123; fields: &#123; expiration: &#123; required: any; type: any &#125;; id: &#123; required: any; type: any &#125;; owner: &#123; type: any &#125;; publicKey: &#123; required: any; type: any &#125; &#125;; ns: any; version: any &#125;&gt;): [EncodedSession](/api/interfaces/encodedsession)</code>**
+
+## encodedSessionToItem
+
+**<code>encodedSessionToItem(encodedSession: [EncodedSession](/api/interfaces/encodedsession), registry: [DataRegistry](/api/classes/dataregistry)&lt;&gt;): [Item](/api/classes/item)&lt;&#123; fields: &#123; expiration: &#123; required: any; type: any &#125;; id: &#123; required: any; type: any &#125;; owner: &#123; type: any &#125;; publicKey: &#123; required: any; type: any &#125; &#125;; ns: any; version: any &#125;&gt;</code>**
+
+## encodeSession
+
+**<code>encodeSession(session: [OwnedSession](/api/interfaces/ownedsession)): Promise&lt;[EncodedOwnedSession](/api/interfaces/encodedownedsession)&gt;</code>**
+
+## encodeSignature
+
+**<code>encodeSignature(sig: [Signature](/api/interfaces/signature)&lt;T&gt;): string</code>**
+
+Encodes a given signature to a URL-safe string.
+
+## generateKeyPair
+
+**<code>generateKeyPair(): Promise&lt;CryptoKeyPair&gt;</code>**
+
+## generateRequestSignature
+
+**<code>generateRequestSignature(session: [OwnedSession](/api/interfaces/ownedsession)): Promise&lt;string&gt;</code>**
+
+## generateSession
+
+**<code>generateSession(owner: string, ttlMs: number): Promise&lt;[OwnedSession](/api/interfaces/ownedsession)&gt;</code>**
+
+## isOwnedSession
+
+**<code>isOwnedSession(session: [Session](/api/interfaces/session)): boolean</code>**
+
+## sessionFromItem
+
+**<code>sessionFromItem(record: [Item](/api/classes/item)&lt;&#123; fields: &#123; expiration: &#123; required: any; type: any &#125;; id: &#123; required: any; type: any &#125;; owner: &#123; type: any &#125;; publicKey: &#123; required: any; type: any &#125; &#125;; ns: any; version: any &#125;&gt;): Promise&lt;[Session](/api/interfaces/session)&gt;</code>**
+
+## sessionIdFromSignature
+
+**<code>sessionIdFromSignature(sig: string): string</code>**
+
+## sessionToItem
+
+**<code>sessionToItem(session: [Session](/api/interfaces/session), registry: [DataRegistry](/api/classes/dataregistry)&lt;&gt;): Promise&lt;[Item](/api/classes/item)&lt;&#123; fields: &#123; expiration: &#123; required: any; type: any &#125;; id: &#123; required: any; type: any &#125;; owner: &#123; type: any &#125;; publicKey: &#123; required: any; type: any &#125; &#125;; ns: any; version: any &#125;&gt;&gt;</code>**
+
+## signCommit
+
+**<code>signCommit(session: [OwnedSession](/api/interfaces/ownedsession), commit: [Commit](/api/classes/commit)&lt;&gt;): Promise&lt;[Commit](/api/classes/commit)&lt;&gt;&gt;</code>**
+
+## signData
+
+**<code>signData(session: [OwnedSession](/api/interfaces/ownedsession), externalData: [JSONValue](/api/types/jsonvalue), embeddedData: [ReadonlyJSONObject](/api/interfaces/readonlyjsonobject)): Promise&lt;string&gt;</code>**
+
+This is our lowest-level signing primitive. It takes two kinds of optional
+data:
+1. External data, that's provided alongside the signature. This is useful
+   when the data is potentially big such as commit data.
+
+2. Embedded data, that's embedded into the signature string itself. Useful
+   for short values that need to be easy to handle as a single string. Used
+   for example for temporary login tokens.
+
+Both forms of data are signed together to form a single signature.]
+
+## signerIdFromCommit
+
+**<code>signerIdFromCommit(commit: [Commit](/api/classes/commit)&lt;&gt;): string</code>**
+
+## verifyCommit
+
+**<code>verifyCommit(expectedSigner: [Session](/api/interfaces/session), commit: [Commit](/api/classes/commit)&lt;&gt;): Promise&lt;boolean&gt;</code>**
+
+## verifyData
+
+**<code>verifyData(expectedSigner: [Session](/api/interfaces/session), signature: string | [Signature](/api/interfaces/signature)&lt;T&gt;, externalData: [JSONValue](/api/types/jsonvalue)): Promise&lt;boolean&gt;</code>**
+
+This is the lowest-level verification primitive. Given an expected signer,
+an encoded signature string, and an optional external data, this function
+verifies they all match.
+
+## verifyRequestSignature
+
+**<code>verifyRequestSignature(session: [Session](/api/interfaces/session), signature: string): Promise&lt;boolean&gt;</code>**
+

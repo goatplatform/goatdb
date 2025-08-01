@@ -1,0 +1,27 @@
+---
+title: QueryPersistenceStorage
+sidebar_label: QueryPersistenceStorage
+---
+
+# QueryPersistenceStorage
+
+Interface for storage backends that persist query results.
+
+Implementations of this interface handle loading and storing query cache data
+for repositories. This enables query results to be persisted across sessions
+and restored when the database is reopened.
+
+## Methods
+
+### load()
+
+**<code>load(repoId: string): Promise&lt;[EncodedRepoCache](/api/interfaces/encodedrepocache)&gt;</code>**
+
+Loads cached query data for a repository
+
+### store()
+
+**<code>store(repoId: string, value: [EncodedRepoCache](/api/interfaces/encodedrepocache)): Promise&lt;boolean&gt;</code>**
+
+Stores query cache data for a repository
+

@@ -1,0 +1,53 @@
+---
+title: ServerServices
+sidebar_label: ServerServices
+---
+
+# ServerServices
+
+The services object is accessible to all endpoints and middlewares of the
+server. Several services instances exist in the server. First a base instance
+corresponding to the root level of the server's data dir. Second, an
+organization specific services and DB instance is created inside the root
+data dir so all organization data is contained in a single DB/directory on
+disk.
+
+**Extends:** [ServerOptions](/api/interfaces/serveroptions)
+
+## Properties
+
+### db
+
+```typescript
+db: [GoatDB](/api/classes/goatdb)<US>
+```
+
+### email
+
+```typescript
+email: EmailService<US>
+```
+
+### logger
+
+```typescript
+logger: Logger
+```
+
+### orgId
+
+```typescript
+orgId: string
+```
+
+Optional organization id used to sandbox the data of a specific
+organization in a multi-tenant deployment. Defaults to "localhost".
+
+## Inherited Members
+
+### From [ServerOptions](/api/interfaces/serveroptions)
+
+**Properties:** `appName`, `buildInfo`, `debug`, `denoJson`, `disableDefaultEndpoints`, `domain`, `emailConfig`, `fetchUserByEmail`, `logStreams`, `mode`, `path`, `peers`, `port`, `registry`, `staticAssets`, `trusted`
+
+*See [ServerOptions](/api/interfaces/serveroptions) for detailed documentation*
+

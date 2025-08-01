@@ -1,0 +1,29 @@
+---
+title: EncodedRepoCache
+sidebar_label: EncodedRepoCache
+---
+
+# EncodedRepoCache
+
+Represents a serialized repository cache that can be stored and loaded.
+
+**Extends:** [JSONObject](/api/interfaces/jsonobject)
+
+## Properties
+
+### queries
+
+```typescript
+queries: Record<string, [EncodedQueryCache](/api/interfaces/encodedquerycache)>
+```
+
+Map of query IDs to their cached results
+
+### version
+
+```typescript
+version: any
+```
+
+The version of the cache format, used for migration
+

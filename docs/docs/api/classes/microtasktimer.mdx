@@ -1,0 +1,33 @@
+---
+title: MicroTaskTimer
+sidebar_label: MicroTaskTimer
+---
+
+# MicroTaskTimer
+
+A timer like implementation of a micro task. This timer fires at the end of
+the current event loop. The exact fire timing between two micro task timers
+is undefined.
+
+**Implements:** [Timer](/api/interfaces/timer)
+
+## Constructor
+
+**<code>new MicroTaskTimer(callback: [TimerCallback](/api/interfaces/timercallback))</code>**
+
+## Methods
+
+### schedule()
+
+**<code>schedule(): [Timer](/api/interfaces/timer)</code>**
+
+Schedules this timer to fire based on its configuration.
+If the timer is already scheduled, this is a no-op.
+
+### unschedule()
+
+**<code>unschedule(): [Timer](/api/interfaces/timer)</code>**
+
+Unschedules this timer if it is currently scheduled.
+If the timer is not scheduled, this is a no-op.
+

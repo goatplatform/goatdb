@@ -6,7 +6,7 @@ title: React Functions
 
 ## useDB
 
-**useDB(): [GoatDB](./classes/goatdb)\<`US`\>**
+**<code>useDB(): [GoatDB](/api/classes/goatdb)&lt;US&gt;</code>**
 
 Opens a local DB, creating it if necessary. Once opened, the DB is available
 as a react context. All future calls return the already opened DB rather than
@@ -16,14 +16,14 @@ This hook will trigger a re-render whenever the current user changes.
 
 ## useDBReady
 
-**useDBReady(): [DBReadyState](./types/dbreadystate)**
+**<code>useDBReady(): [DBReadyState](/api/types/dbreadystate)</code>**
 
 A hook for monitoring the DB's loading process. The hook triggers whenever
 the loading process changes its state.
 
 ## useItem
 
-**useItem(pathComps: string[]): [ManagedItem](./classes/manageditem)\<S\> | undefined**
+**<code>useItem(pathComps: string[]): [ManagedItem](/api/classes/manageditem)&lt;S, [Schema](/api/types/schema)&gt;</code>**
 
 This hook monitors changes to a specific item, triggering a re-render
 whenever the item's state changes. It returns a mutable ManagedItem
@@ -34,7 +34,7 @@ local and remote updates.
 
 ## useQuery
 
-**useQuery(config: [UseQueryOpts](./interfaces/usequeryopts)\<`IS`, `CTX`, `OS`\>): [Query](./classes/query)\<`IS`, `OS`, `CTX`\>**
+**<code>useQuery(config: [UseQueryOpts](/api/interfaces/usequeryopts)&lt;IS, CTX, OS&gt;): [Query](/api/classes/query)&lt;IS, OS, CTX&gt;</code>**
 
 Creates a new query or retrieves an existing one. On first access, GoatDB
 automatically loads the source repository either from the local disk or by

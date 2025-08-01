@@ -5,47 +5,47 @@ sidebar_label: Emitter
 
 # Emitter
 
-**Subclasses:** [GoatDB](./goatdb), [ManagedItem](./manageditem), [Query](./query), [Repository](./repository)
+**Subclasses:** [GoatDB](/api/classes/goatdb), [ManagedItem](/api/classes/manageditem), [Query](/api/classes/query), [Repository](/api/classes/repository), [Repository](/api/classes/repository), [Query](/api/classes/query), [GoatDB](/api/classes/goatdb), [ManagedItem](/api/classes/manageditem)
 
 ## Constructor
 
-**new Emitter(delayedEmissionTimerConstructor: (callback: `TimerCallback`) =\> `Timer`, alwaysActive: boolean)**
+**<code>new Emitter(delayedEmissionTimerConstructor: (callback: [TimerCallback](/api/interfaces/timercallback)) =&gt; [Timer](/api/interfaces/timer), alwaysActive: boolean)</code>**
 
 ## Methods
 
 ### attach()
 
-**attach(e: E, c: C): () =\> void**
+**<code>attach(e: E, c: C): () =&gt; void</code>**
 
 ### detach()
 
-**detach(e: E, c: C): void**
+**<code>detach(e: E, c: C): void</code>**
 
 ### detachAll()
 
-**detachAll(e: E): void**
+**<code>detachAll(e: E): void</code>**
 
 ### emit()
 
-**emit(e: E, args: unknown[]): void**
+**<code>emit(e: E, args: unknown[]): void</code>**
 
 ### mute()
 
-**mute(): void**
+**<code>mute(): void</code>**
 
 ### once()
 
-**once(e: E, c: C): () =\> void**
+**<code>once(e: E, c: C): () =&gt; void</code>**
 
 ### resume()
 
-**resume(): void**
+**<code>resume(): void</code>**
 
 ### suspend()
 
-**suspend(): void**
+**<code>suspend(): void</code>**
 
 ### unmute()
 
-**unmute(): void**
+**<code>unmute(): void</code>**
 

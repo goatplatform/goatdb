@@ -8,17 +8,17 @@ sidebar_label: ManagedItem
 A high-level interface for reading, writing, and synchronizing a single item
 in GoatDB. Manages the item's state, schema validation, and version history.
 
-**Extends:** [Emitter](./emitter)
+**Extends:** [Emitter](/api/classes/emitter)
 
 ## Constructor
 
-**new ManagedItem(db: [GoatDB](./classes/goatdb)\<`US`\>, path: string)**
+**<code>new ManagedItem(db: [GoatDB](/api/classes/goatdb)&lt;US&gt;, path: string)</code>**
 
 ## Methods
 
 ### activate()
 
-**activate(): void**
+**<code>activate(): void</code>**
 
 Activates the managed item by attaching a document change listener to the
 repository. When the document changes, it will trigger a rebase of the item
@@ -30,7 +30,7 @@ directly by users.
 
 ### commit()
 
-**commit(): `Promise`\<void\>**
+**<code>commit(): Promise&lt;void&gt;</code>**
 
 Commits the current state of this item to the database.
 
@@ -44,7 +44,7 @@ This method:
 
 ### deactivate()
 
-**deactivate(): void**
+**<code>deactivate(): void</code>**
 
 Deactivates the managed item by removing the document change listener and
 canceling any pending commits. This method is idempotent - calling it
@@ -55,7 +55,7 @@ directly by users.
 
 ### delete()
 
-**delete(key: any): boolean**
+**<code>delete(key: any): boolean</code>**
 
 Deletes a key-value pair from this item. If the field has a default value
 defined in the schema, the field will be set to that default value instead
@@ -63,7 +63,7 @@ of being deleted.
 
 ### downloadDebugGraph()
 
-**downloadDebugGraph(): void**
+**<code>downloadDebugGraph(): void</code>**
 
 Downloads a debug graph visualization of the item's network state.
 The downloaded file is in a format compatible with Cytoscape, a network
@@ -71,26 +71,26 @@ visualization and analysis tool.
 
 ### get()
 
-**get(key: any): [SchemaDataType](./types/schemadatatype)\<S\>[K]**
+**<code>get(key: any): [SchemaDataType](/api/types/schemadatatype)&lt;S&gt;[K]</code>**
 
 Gets the value for the given key from this item.
 
 ### has()
 
-**has(key: any): boolean**
+**<code>has(key: any): boolean</code>**
 
 Checks if this item has a value for the given key.
 
 ### readyPromise()
 
-**readyPromise(): `Promise`\<void\>**
+**<code>readyPromise(): Promise&lt;void&gt;</code>**
 
 Returns a promise that resolves when this managed item is ready to use.
 If the item is already ready, the promise resolves immediately.
 
 ### rebase()
 
-**rebase(): void**
+**<code>rebase(): void</code>**
 
 Synchronizes the local item state with the latest version from the
 repository.
@@ -100,21 +100,21 @@ in-memory state.
 
 ### set()
 
-**set(key: any, value: [SchemaDataType](./types/schemadatatype)\<S\>[T]): void**
+**<code>set(key: any, value: [SchemaDataType](/api/types/schemadatatype)&lt;S&gt;[T]): void</code>**
 
 Sets the value for the given key in this item.
 
 ### setMulti()
 
-**setMulti(data: `Partial\<[SchemaDataType](./types/schemadatatype)\<S\>\>`): void**
+**<code>setMulti(data: Partial&lt;[SchemaDataType](/api/types/schemadatatype)&lt;S&gt;&gt;): void</code>**
 
 A convenience method for setting several fields and values at once.
 
 ## Inherited Methods
 
-### From [Emitter](./emitter)
+### From [Emitter](/api/classes/emitter)
 
 `attach()`, `detach()`, `detachAll()`, `emit()`, `mute()`, `once()`, `resume()`, `suspend()`, `unmute()`
 
-*See [Emitter](./emitter) for detailed documentation*
+*See [Emitter](/api/classes/emitter) for detailed documentation*
 

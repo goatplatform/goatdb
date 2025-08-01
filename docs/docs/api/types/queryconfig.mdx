@@ -1,0 +1,14 @@
+---
+title: QueryConfig
+sidebar_label: QueryConfig
+---
+
+# QueryConfig
+
+The configuration for a query, specifying the database, source, predicate,
+sort descriptor, schema, id, context, and limit.
+
+## Definition
+
+**Type:** <code>QueryConfig = &#123; ctx?: CTX; db: [GoatDB](/api/classes/goatdb)&lt;[Schema](/api/types/schema)&gt;; id?: string; limit?: number; predicate?: [Predicate](/api/types/predicate)&lt;IS, CTX&gt;; schema?: IS; sortBy?: [SortDescriptor](/api/types/sortdescriptor)&lt;OS, CTX&gt; | keyof [SchemaDataType](/api/types/schemadatatype)&lt;OS&gt;; sortDescending?: boolean; source: [QuerySource](/api/types/querysource)&lt;IS, OS&gt; &#125;</code>
+

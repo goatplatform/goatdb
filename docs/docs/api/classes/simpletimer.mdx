@@ -1,0 +1,44 @@
+---
+title: SimpleTimer
+sidebar_label: SimpleTimer
+---
+
+# SimpleTimer
+
+A simple fixed timer. It'll fire either once or repeatedly until explicitly
+unscheduled.
+
+**Extends:** [BaseTimer](/api/classes/basetimer)
+
+## Constructor
+
+**<code>new SimpleTimer(intervalMs: number, repeat: boolean, callback: [TimerCallback](/api/interfaces/timercallback), name: string)</code>**
+
+## Methods
+
+### calcNextFireDate()
+
+**<code>calcNextFireDate(): number</code>**
+
+Calculates the next timestamp in milliseconds when this timer should fire.
+This is called internally by schedule() to determine when to fire the
+timer.
+
+### run()
+
+**<code>run(): boolean</code>**
+
+Executes the timer's callback and handles rescheduling if necessary.
+
+### once()
+
+**<code>once(delayMs: number, callback: [TimerCallback](/api/interfaces/timercallback), name: string): [SimpleTimer](/api/classes/simpletimer)&lt;&gt;</code>**
+
+## Inherited Methods
+
+### From [BaseTimer](/api/classes/basetimer)
+
+`compare()`, `fire()`, `reset()`, `schedule()`, `unschedule()`
+
+*See [BaseTimer](/api/classes/basetimer) for detailed documentation*
+

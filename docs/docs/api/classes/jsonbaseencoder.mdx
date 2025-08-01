@@ -1,0 +1,87 @@
+---
+title: JSONBaseEncoder
+sidebar_label: JSONBaseEncoder
+---
+
+# JSONBaseEncoder
+
+**Extends:** [BaseEncoder](/api/classes/baseencoder)
+
+## Methods
+
+### convertArray()
+
+**<code>convertArray(arr: [ReadonlyCoreArray](/api/types/readonlycorearray), options: OT): [ReadonlyJSONValue](/api/types/readonlyjsonvalue)</code>**
+
+### convertBoolean()
+
+**<code>convertBoolean(b: boolean, _options: OT): [ReadonlyJSONValue](/api/types/readonlyjsonvalue)</code>**
+
+### convertDate()
+
+**<code>convertDate(date: Date, _options: OT): [EncodedDate](/api/interfaces/encodeddate)</code>**
+
+### convertDictionary()
+
+**<code>convertDictionary(value: Dictionary&lt;string, [CoreValue](/api/types/corevalue)&gt;, _options: OT): PrimitiveMap&lt;any&gt;</code>**
+
+### convertEncodable()
+
+**<code>convertEncodable(value: [Encodable](/api/interfaces/encodable)&lt;string, [CoreValue](/api/types/corevalue)&gt;, options: OT): [EncodedEncodable](/api/interfaces/encodedencodable)</code>**
+
+### convertGenerator()
+
+**<code>convertGenerator(g: Generator&lt;[CoreValue](/api/types/corevalue)&gt;, options: OT): [JSONArray](/api/types/jsonarray)</code>**
+
+### convertNull()
+
+**<code>convertNull(_options: OT): [ReadonlyJSONValue](/api/types/readonlyjsonvalue)</code>**
+
+### convertNumber()
+
+**<code>convertNumber(n: number, _options: OT): [ReadonlyJSONValue](/api/types/readonlyjsonvalue)</code>**
+
+### convertObject()
+
+**<code>convertObject(obj: [ReadonlyCoreObject](/api/types/readonlycoreobject), options: OT): [ReadonlyJSONObject](/api/interfaces/readonlyjsonobject)</code>**
+
+### convertSet()
+
+**<code>convertSet(set: Set&lt;[CoreValue](/api/types/corevalue)&gt;, options: OT): [EncodedSet](/api/interfaces/encodedset)</code>**
+
+### convertString()
+
+**<code>convertString(str: string, _options: OT): [ReadonlyJSONValue](/api/types/readonlyjsonvalue)</code>**
+
+### convertUndefined()
+
+**<code>convertUndefined(_options: OT): [ReadonlyJSONValue](/api/types/readonlyjsonvalue)</code>**
+
+### getOutput()
+
+**<code>getOutput(): T</code>**
+
+### isNativeValue()
+
+**<code>isNativeValue(value: [CoreValue](/api/types/corevalue), options: OT): boolean</code>**
+
+### newEncoder()
+
+**<code>newEncoder(): [JSONBaseEncoder](/api/classes/jsonbaseencoder)&lt;T, OT&gt;</code>**
+
+### set()
+
+**<code>set(key: string, value: [CoreValue](/api/types/corevalue), options: OT): void</code>**
+
+### setPrimitive()
+
+**<code>setPrimitive(key: string, value: [ReadonlyJSONValue](/api/types/readonlyjsonvalue), options: OT): void</code>**
+
+## Inherited Methods
+
+### From [BaseEncoder](/api/classes/baseencoder)
+
+`convertKey()`, `convertValue()`
+
+*See [BaseEncoder](/api/classes/baseencoder) for detailed documentation*
+

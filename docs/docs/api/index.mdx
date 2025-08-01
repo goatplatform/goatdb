@@ -107,8 +107,8 @@ Check out https://goatdb.dev for additional docs.
 ### Types
 
 - **[AppConfig](./types/appconfig)** - A configuration of a Single Page Application built on top GoatDB.
-- **[CPUArch](./types/cpuarch)** - Represents the CPU architecture for compilation.
 - **[CompileOptions](./types/compileoptions)** - Options for compiling a GoatDB application into a standalone executable.
+- **[CPUArch](./types/cpuarch)** - Represents the CPU architecture for compilation.
 - **[DebugServerOptions](./types/debugserveroptions)** - No description
 - **[EmailBuilder](./types/emailbuilder)** - Function type for building email messages from email info.
 - **[EmailInfo](./types/emailinfo)** - Union type for all supported email types.
@@ -120,26 +120,179 @@ Check out https://goatdb.dev for additional docs.
 
 See [Server Functions](./functions-server) for all exported functions.
 
-## React
-
-This module exposes high level React hooks that act as a full state
-management package on top of GoatDB.
-
-Check out https://goatdb.dev for additional docs.
+## index
 
 ### Interfaces
 
-- **[UseQueryOpts](./interfaces/usequeryopts)** - Options for the useQuery hook.
+- **[Clonable](./interfaces/clonable)** - Interface for objects that can be cloned
+- **[Comparable](./interfaces/comparable)** - Interface for objects that can be compared for ordering
+- **[CoreObject](./interfaces/coreobject)** - A mutable object with string keys and optional type parameter for values
+- **[CoreOptions](./interfaces/coreoptions)** - Options for controlling behavior of core operations
+- **[CoreValueCloneOpts](./interfaces/corevaluecloneopts)** - Options for customizing cloning behavior
+- **[Encodable](./interfaces/encodable)** - Interface for objects that can be encoded/serialized
+- **[Encoder](./interfaces/encoder)** - Interface for objects that can encode values
+- **[Equatable](./interfaces/equatable)** - Interface for objects that can determine equality with other objects
 
 ### Types
 
-- **[DBReadyState](./types/dbreadystate)** - Represents the state of the loading process.
-- **[PropsWithPath](./types/propswithpath)** - Convenience props type for components that accept a DB path as input.
-- **[UseItemOpts](./types/useitemopts)** - Options for the useItem hook.
+- **[ConcreteCoreValue](./types/concretecorevalue)** - Concrete (non-undefined) values supported by GoatDB
+- **[CoreArray](./types/corearray)** - A mutable array of CoreValues
+- **[CoreClassObject](./types/coreclassobject)** - Union type of custom class objects that can be handled by GoatDB
+- **[CoreDictionary](./types/coredictionary)** - A dictionary of CoreKeys to CoreValues
+- **[CoreKey](./types/corekey)** - A string key type for CoreObjects
+- **[CoreSet](./types/coreset)** - A Set containing CoreValues
+- **[CoreValue](./types/corevalue)** - The complete set of values supported by GoatDB, including undefined
+- **[ReadonlyCoreArray](./types/readonlycorearray)** - A read-only array of CoreValues
+- **[ReadonlyCoreObject](./types/readonlycoreobject)** - A read-only object with string keys and CoreValue values
 
 ### Functions
 
-See [React Functions](./functions-react) for all exported functions.
+See [index Functions](./functions-index) for all exported functions.
+
+## base
+
+### Interfaces
+
+- **[Clonable](./interfaces/clonable)** - Interface for objects that can be cloned
+- **[Comparable](./interfaces/comparable)** - Interface for objects that can be compared for ordering
+- **[CoreObject](./interfaces/coreobject)** - A mutable object with string keys and optional type parameter for values
+- **[CoreOptions](./interfaces/coreoptions)** - Options for controlling behavior of core operations
+- **[CoreValueCloneOpts](./interfaces/corevaluecloneopts)** - Options for customizing cloning behavior
+- **[Encodable](./interfaces/encodable)** - Interface for objects that can be encoded/serialized
+- **[Encoder](./interfaces/encoder)** - Interface for objects that can encode values
+- **[Equatable](./interfaces/equatable)** - Interface for objects that can determine equality with other objects
+
+### Types
+
+- **[ConcreteCoreValue](./types/concretecorevalue)** - Concrete (non-undefined) values supported by GoatDB
+- **[CoreArray](./types/corearray)** - A mutable array of CoreValues
+- **[CoreClassObject](./types/coreclassobject)** - Union type of custom class objects that can be handled by GoatDB
+- **[CoreDictionary](./types/coredictionary)** - A dictionary of CoreKeys to CoreValues
+- **[CoreKey](./types/corekey)** - A string key type for CoreObjects
+- **[CoreSet](./types/coreset)** - A Set containing CoreValues
+- **[CoreValue](./types/corevalue)** - The complete set of values supported by GoatDB, including undefined
+- **[IterableFilterFunc](./types/iterablefilterfunc)** - Function type for filtering iterable values during operations
+- **[ObjFieldsFilterFunc](./types/objfieldsfilterfunc)** - Function type for filtering object fields during operations
+- **[ReadonlyCoreArray](./types/readonlycorearray)** - A read-only array of CoreValues
+- **[ReadonlyCoreObject](./types/readonlycoreobject)** - A read-only object with string keys and CoreValue values
+
+## index
+
+### Interfaces
+
+- **[ConstructorDecoderConfig](./interfaces/constructordecoderconfig)** - No description
+- **[Decodable](./interfaces/decodable)** - No description
+- **[Decoder](./interfaces/decoder)** - No description
+
+### Types
+
+- **[DecodableKey](./types/decodablekey)** - No description
+- **[DecodedValue](./types/decodedvalue)** - No description
+- **[ReadonlyDecodedArray](./types/readonlydecodedarray)** - No description
+- **[ReadonlyDecodedObject](./types/readonlydecodedobject)** - No description
+
+### Functions
+
+See [index Functions](./functions-index) for all exported functions.
+
+## checksum
+
+### Classes
+
+- **[ChecksumEncoder](./classes/checksumencoder)** - No description
+- **[MD5Checksum](./classes/md5checksum)** - No description
+- **[Murmur3Checksum](./classes/murmur3checksum)** - No description
+
+### Interfaces
+
+- **[ChecksumEncoderOpts](./interfaces/checksumencoderopts)** - No description
+- **[Murmur3Opts](./interfaces/murmur3opts)** - No description
+
+## base-encoder
+
+### Classes
+
+- **[BaseEncoder](./classes/baseencoder)** - No description
+- **[JSONBaseEncoder](./classes/jsonbaseencoder)** - No description
+
+### Interfaces
+
+- **[EncodedDate](./interfaces/encodeddate)** - No description
+- **[EncodedEncodable](./interfaces/encodedencodable)** - No description
+- **[EncodedSet](./interfaces/encodedset)** - No description
+
+### Types
+
+- **[EncodedJSONValue](./types/encodedjsonvalue)** - No description
+
+### Functions
+
+See [base-encoder Functions](./functions-base-encoder) for all exported functions.
+
+## interfaces
+
+### Interfaces
+
+- **[JSONObject](./interfaces/jsonobject)** - No description
+- **[ReadonlyJSONObject](./interfaces/readonlyjsonobject)** - No description
+
+### Types
+
+- **[JSONArray](./types/jsonarray)** - No description
+- **[JSONValue](./types/jsonvalue)** - No description
+- **[ReadonlyJSONArray](./types/readonlyjsonarray)** - No description
+- **[ReadonlyJSONValue](./types/readonlyjsonvalue)** - No description
+
+## common
+
+### Functions
+
+See [common Functions](./functions-common) for all exported functions.
+
+## bloom
+
+### Classes
+
+- **[BloomFilter](./classes/bloomfilter)** - A simple Bloom Filter implementation using MurmurHash3.
+
+### Interfaces
+
+- **[BloomFilterDecoderConfig](./interfaces/bloomfilterdecoderconfig)** - No description
+- **[BloomFilterOptions](./interfaces/bloomfilteroptions)** - No description
+- **[EncodedBloomFilter](./interfaces/encodedbloomfilter)** - No description
+
+## timer
+
+### Classes
+
+- **[BaseDynamicTimer](./classes/basedynamictimer)** - Base timer for timers that dynamically change their fire interval between
+- **[BaseTimer](./classes/basetimer)** - An application level timer that internally uses a single setTimeout.
+- **[EaseInExpoTimer](./classes/easeinexpotimer)** - Base timer for timers that dynamically change their fire interval between
+- **[EaseInOutSineTimer](./classes/easeinoutsinetimer)** - A dynamic timer that uses a sine function to adjust its fire interval.
+- **[MicroTaskTimer](./classes/microtasktimer)** - A timer like implementation of a micro task. This timer fires at the end of
+- **[NextEventLoopCycleTimer](./classes/nexteventloopcycletimer)** - A timer like implementation of a micro task. This timer fires at the end of
+- **[SimpleTimer](./classes/simpletimer)** - A simple fixed timer. It'll fire either once or repeatedly until explicitly
+
+### Interfaces
+
+- **[Timer](./interfaces/timer)** - Interface for a timer that can be scheduled and unscheduled.
+- **[TimerCallback](./interfaces/timercallback)** - A callback function that is executed when a timer fires.
+
+## index
+
+### Interfaces
+
+- **[IValueTypeOperations](./interfaces/ivaluetypeoperations)** - No description
+- **[SerializeValueTypeOptions](./interfaces/serializevaluetypeoptions)** - No description
+- **[ValueTypeOptions](./interfaces/valuetypeoptions)** - No description
+
+### Types
+
+- **[ValueType](./types/valuetype)** - No description
+
+### Functions
+
+See [index Functions](./functions-index) for all exported functions.
 
 ## schema
 
@@ -161,4 +314,246 @@ See [React Functions](./functions-react) for all exported functions.
 ### Functions
 
 See [schema Functions](./functions-schema) for all exported functions.
+
+## index
+
+### Classes
+
+- **[Change](./classes/change)** - No description
+
+### Interfaces
+
+- **[ChangeValueConfig](./interfaces/changevalueconfig)** - No description
+- **[EncodedChange](./interfaces/encodedchange)** - No description
+
+### Types
+
+- **[ChangeType](./types/changetype)** - No description
+
+## model
+
+### Interfaces
+
+- **[Header1Node](./interfaces/header1node)** - No description
+- **[Header2Node](./interfaces/header2node)** - No description
+- **[Header3Node](./interfaces/header3node)** - No description
+- **[Header4Node](./interfaces/header4node)** - No description
+- **[Header5Node](./interfaces/header5node)** - No description
+- **[Header6Node](./interfaces/header6node)** - No description
+- **[HyperlinkNode](./interfaces/hyperlinknode)** - No description
+- **[ImageNode](./interfaces/imagenode)** - No description
+- **[InlineTaskNode](./interfaces/inlinetasknode)** - No description
+- **[ListItemNode](./interfaces/listitemnode)** - No description
+- **[MentionElement](./interfaces/mentionelement)** - No description
+- **[NodeWithDirection](./interfaces/nodewithdirection)** - No description
+- **[ObjectNode](./interfaces/objectnode)** - No description
+- **[OrderedListNode](./interfaces/orderedlistnode)** - No description
+- **[ParagraphNode](./interfaces/paragraphnode)** - No description
+- **[RefMarker](./interfaces/refmarker)** - A leaf node marker for a reference. It is used in the following cases:
+- **[RefNode](./interfaces/refnode)** - A composited reference node as an element. Its children hold a
+- **[SpanNode](./interfaces/spannode)** - No description
+- **[TableCellNode](./interfaces/tablecellnode)** - No description
+- **[TableNode](./interfaces/tablenode)** - No description
+- **[TableRowNode](./interfaces/tablerownode)** - No description
+- **[UnorderedListNode](./interfaces/unorderedlistnode)** - No description
+
+### Types
+
+- **[MarkupElement](./types/markupelement)** - No description
+- **[MarkupNode](./types/markupnode)** - No description
+
+### Functions
+
+See [model Functions](./functions-model) for all exported functions.
+
+## tree
+
+### Interfaces
+
+- **[ElementNode](./interfaces/elementnode)** - Base type for all rich text values in both tree and flat representations.
+- **[Point](./interfaces/point)** - No description
+- **[Pointer](./interfaces/pointer)** - No description
+- **[RichText](./interfaces/richtext)** - No description
+- **[RichTextValue](./interfaces/richtextvalue)** - Base type for all rich text values in both tree and flat representations.
+- **[TextNode](./interfaces/textnode)** - Base type for all rich text values in both tree and flat representations.
+
+### Types
+
+- **[PointerType](./types/pointertype)** - No description
+- **[TreeNode](./types/treenode)** - No description
+
+### Functions
+
+See [tree Functions](./functions-tree) for all exported functions.
+
+## commit
+
+### Classes
+
+- **[Commit](./classes/commit)** - No description
+
+### Interfaces
+
+- **[CommitConfig](./interfaces/commitconfig)** - No description
+- **[CommitDecoderConfig](./interfaces/commitdecoderconfig)** - No description
+- **[CommitSerializeOptions](./interfaces/commitserializeoptions)** - No description
+- **[DeltaContents](./interfaces/deltacontents)** - No description
+- **[DocContents](./interfaces/doccontents)** - No description
+
+### Types
+
+- **[CommitContents](./types/commitcontents)** - No description
+- **[CommitResolver](./types/commitresolver)** - No description
+
+### Functions
+
+See [commit Functions](./functions-commit) for all exported functions.
+
+## repo
+
+### Classes
+
+- **[MemRepoStorage](./classes/memrepostorage)** - No description
+- **[Repository](./classes/repository)** - No description
+
+### Interfaces
+
+- **[CommitGraph](./interfaces/commitgraph)** - No description
+- **[RepositoryConfig](./interfaces/repositoryconfig)** - No description
+- **[RepoStorage](./interfaces/repostorage)** - No description
+
+### Types
+
+- **[EventDocumentChanged](./types/eventdocumentchanged)** - Fired when the value of a document changes (the head of the commit graph
+- **[EventNewCommit](./types/eventnewcommit)** - Fired when a new commit is added to this repository. A lot of these events
+- **[EventNewCommitSync](./types/eventnewcommitsync)** - The same as EventNewCommit, except fired immediately and not in a coroutine.
+- **[RepositoryEvent](./types/repositoryevent)** - A union type of all the events Repository instances emits.
+
+## query
+
+### Classes
+
+- **[Query](./classes/query)** - A Query represents a live view over a repository or another query,
+
+### Types
+
+- **[Entry](./types/entry)** - A tuple representing a query result entry, containing a path and an item.
+- **[Predicate](./types/predicate)** - A predicate function used to determine if an item matches the query.
+- **[PredicateInfo](./types/predicateinfo)** - Information passed to a query predicate function to help determine if an
+- **[QueryConfig](./types/queryconfig)** - The configuration for a query, specifying the database, source, predicate,
+- **[QueryEvent](./types/queryevent)** - The events that can be emitted by a Query.
+- **[QuerySource](./types/querysource)** - The source of a query, which can be a repository, another query, or a string
+- **[SortDescriptor](./types/sortdescriptor)** - A sort descriptor function used to determine the order of items in a query.
+- **[SortInfo](./types/sortinfo)** - Information passed to a query sort descriptor function to help determine
+
+### Functions
+
+See [query Functions](./functions-query) for all exported functions.
+
+## query-persistance
+
+### Classes
+
+- **[QueryPersistence](./classes/querypersistence)** - Manages persistence of query results across sessions.
+
+### Interfaces
+
+- **[EncodedQueryCache](./interfaces/encodedquerycache)** - Represents a serialized query cache that can be stored and loaded.
+- **[EncodedRepoCache](./interfaces/encodedrepocache)** - Represents a serialized repository cache that can be stored and loaded.
+- **[QueryCache](./interfaces/querycache)** - Represents a cached query result with metadata.
+- **[QueryPersistenceStorage](./interfaces/querypersistencestorage)** - Interface for storage backends that persist query results.
+
+## session
+
+### Classes
+
+- **[TrustPool](./classes/trustpool)** - Each commit in the graph is signed with the private key of the session that
+
+### Interfaces
+
+- **[EncodedOwnedSession](./interfaces/encodedownedsession)** - No description
+- **[EncodedSession](./interfaces/encodedsession)** - No description
+- **[OwnedSession](./interfaces/ownedsession)** - No description
+- **[Session](./interfaces/session)** - No description
+- **[Signature](./interfaces/signature)** - No description
+
+### Functions
+
+See [session Functions](./functions-session) for all exported functions.
+
+## db
+
+### Classes
+
+- **[GoatDB](./classes/goatdb)** - The main database class that manages repositories, synchronization, and data
+
+### Interfaces
+
+- **[DBInstanceConfig](./interfaces/dbinstanceconfig)** - No description
+
+### Types
+
+- **[DBMode](./types/dbmode)** - The mode of operation for a database instance.
+- **[EventUserChanged](./types/eventuserchanged)** - Emitted by GoatDB whenever the current user changes.
+- **[OpenOptions](./types/openoptions)** - Options for opening a repository. These match the options exposed by the
+- **[SyncResult](./types/syncresult)** - The result of a sync operation with all peers for a repository.
+
+## managed-item
+
+### Classes
+
+- **[ManagedItem](./classes/manageditem)** - A high-level interface for reading, writing, and synchronizing a single item
+
+## build-info
+
+### Interfaces
+
+- **[BuildInfo](./interfaces/buildinfo)** - This interface encodes details about the build process used when compiling
+
+### Types
+
+- **[BuilderInfo](./types/builderinfo)** - Information about the runtime environment where the build was performed.
+
+### Functions
+
+See [build-info Functions](./functions-build-info) for all exported functions.
+
+## server
+
+### Classes
+
+- **[Server](./classes/server)** - A simple abstraction around an HTTP server. The server is built using two
+
+### Interfaces
+
+- **[Endpoint](./interfaces/endpoint)** - An Endpoint catches a request using its filter, and generates an appropriate
+- **[Middleware](./interfaces/middleware)** - A middleware runs before and/or after the selected endpoint. A middleware
+- **[ServerOptions](./interfaces/serveroptions)** - A server represents a logical DB with some additional configuration options.
+- **[ServerServices](./interfaces/serverservices)** - The services object is accessible to all endpoints and middlewares of the
+
+### Types
+
+- **[AutoCreateUserInfo](./types/autocreateuserinfo)** - Information about a user attempting to log in for the first time.
+- **[DomainConfig](./types/domainconfig)** - No description
+
+## React
+
+This module exposes high level React hooks that act as a full state
+management package on top of GoatDB.
+
+Check out https://goatdb.dev for additional docs.
+
+### Interfaces
+
+- **[UseQueryOpts](./interfaces/usequeryopts)** - Options for the useQuery hook.
+
+### Types
+
+- **[DBReadyState](./types/dbreadystate)** - Represents the state of the loading process.
+- **[PropsWithPath](./types/propswithpath)** - Convenience props type for components that accept a DB path as input.
+- **[UseItemOpts](./types/useitemopts)** - Options for the useItem hook.
+
+### Functions
+
+See [React Functions](./functions-react) for all exported functions.
 

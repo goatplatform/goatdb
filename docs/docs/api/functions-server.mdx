@@ -6,7 +6,7 @@ title: Server Functions
 
 ## compile
 
-**compile(options: [CompileOptions](./types/compileoptions)): `Promise`\<void\>**
+**<code>compile(options: [CompileOptions](/api/types/compileoptions)): Promise&lt;void&gt;</code>**
 
 Compiles a GoatDB application into a standalone executable.
 
@@ -19,12 +19,12 @@ This function performs the following steps:
 
 ## startDebugServer
 
-**startDebugServer(options: [DebugServerOptions](./types/debugserveroptions)\<`US`\>): `Promise`\<never\>**
+**<code>startDebugServer(options: [DebugServerOptions](/api/types/debugserveroptions)&lt;US&gt;): Promise&lt;never&gt;</code>**
 
 Starts a local debug server. The debug server implements a live reload that
 automatically transpiles TypeScript and JSX using ESBuild.
 
 ## staticAssetsFromJS
 
-**staticAssetsFromJS(encodedAssets: [ReadonlyJSONObject](./interfaces/readonlyjsonobject)): `StaticAssets`**
+**<code>staticAssetsFromJS(encodedAssets: [ReadonlyJSONObject](/api/interfaces/readonlyjsonobject)): StaticAssets</code>**
 

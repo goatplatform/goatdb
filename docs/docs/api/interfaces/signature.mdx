@@ -1,0 +1,43 @@
+---
+title: Signature
+sidebar_label: Signature
+---
+
+# Signature
+
+**Extends:** [ReadonlyJSONObject](/api/interfaces/readonlyjsonobject)
+
+## Properties
+
+### data
+
+```typescript
+data: T
+```
+
+Any additional data to sign that's embedded into the signature string.
+
+### sessionId
+
+```typescript
+sessionId: string
+```
+
+The id of the signer session.
+
+### signature
+
+```typescript
+signature: string
+```
+
+URL safe Base-64 encoded signature of the data
+
+### timestamp
+
+```typescript
+timestamp: number
+```
+
+When was this signature generated
+

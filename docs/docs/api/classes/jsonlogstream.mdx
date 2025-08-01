@@ -8,11 +8,11 @@ sidebar_label: JSONLogStream
 A LogStream implementation that writes log entries to a JSON file.
 Supports optional throttling to reduce the number of entries written.
 
-**Implements:** [LogStream](../interfaces/logstream)
+**Implements:** [LogStream](/api/interfaces/logstream)
 
 ## Constructor
 
-**new JSONLogStream(path: string, throttleRate: number)**
+**<code>new JSONLogStream(path: string, throttleRate: number)</code>**
 
 Creates a new JSONLogStream
 
@@ -20,13 +20,13 @@ Creates a new JSONLogStream
 
 ### appendEntry()
 
-**appendEntry(e: `NormalizedLogEntry`\<`LogEntry`\>): `Promise`\<void\>**
+**<code>appendEntry(e: NormalizedLogEntry&lt;LogEntry&gt;): Promise&lt;void&gt;</code>**
 
 Appends a log entry to the JSON file, respecting the throttle rate
 
 ### close()
 
-**close(): `Promise`\<void\>**
+**<code>close(): Promise&lt;void&gt;</code>**
 
 Closes the JSON log file if it's open. This is handled automatically by the
 stream and there's no need to call it explicitly under normal operation.

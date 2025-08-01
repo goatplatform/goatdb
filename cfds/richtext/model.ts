@@ -1,9 +1,9 @@
 import {
-  CoreValue,
+  type CoreValue,
   isReadonlyCoreObject,
 } from '../../base/core-types/index.ts';
-import { ElementNode, isTextNode, RichTextValue, TextNode } from './tree.ts';
-import { WritingDirection } from '../../base/string.ts';
+import { type ElementNode, isTextNode, type RichTextValue, type TextNode } from './tree.ts';
+import type { WritingDirection } from '../../base/string.ts';
 
 export type MarkupElement =
   | ParagraphNode
@@ -29,7 +29,7 @@ export type MarkupNode = MarkupElement | TextNode;
 
 export const STICKY_ELEMENT_TAGS = ['li'] as readonly (string | undefined)[];
 
-interface NodeWithDirection {
+export interface NodeWithDirection {
   dir?: WritingDirection;
 }
 

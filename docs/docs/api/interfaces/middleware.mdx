@@ -1,0 +1,28 @@
+---
+title: Middleware
+sidebar_label: Middleware
+---
+
+# Middleware
+
+A middleware runs before and/or after the selected endpoint. A middleware
+may either block the request entirely (to enforce permissions, etc) or modify
+the response after the endpoint finished execution.
+
+Note that all registered middlewares get a chance to run for each request.
+Execution order follows registration order, just like endpoints.
+
+## Properties
+
+### didProcess
+
+```typescript
+didProcess: (services: [ServerServices](/api/interfaces/serverservices)<US>, req: GoatRequest<>, info: ServeHandlerInfo, resp: Response<>) => Promise<Response<>>
+```
+
+### shouldProcess
+
+```typescript
+shouldProcess: (services: [ServerServices](/api/interfaces/serverservices)<US>, req: GoatRequest<>, info: ServeHandlerInfo) => Promise<Response<>>
+```
+

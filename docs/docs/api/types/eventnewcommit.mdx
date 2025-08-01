@@ -1,0 +1,17 @@
+---
+title: EventNewCommit
+sidebar_label: EventNewCommit
+---
+
+# EventNewCommit
+
+Fired when a new commit is added to this repository. A lot of these events
+won't actually affect the value of the document since their historical
+commits that don't change the graph's head.
+
+This event is being fired in a coroutine as to not block the main thread.
+
+## Definition
+
+**Type:** <code>EventNewCommit = any</code>
+

@@ -1,67 +1,146 @@
 import { assert, notReached } from '../../base/error.ts';
-import { Dictionary } from '../../base/collections/dict.ts';
+import type { Dictionary } from '../../base/collections/dict.ts';
 import {
-  CoreDictionary,
-  CoreObject,
+  type CoreDictionary,
+  type CoreObject,
   CoreType,
-  CoreValue,
+  type CoreValue,
   coreValueClone,
-  CoreValueCloneOpts,
+  type CoreValueCloneOpts,
   getCoreType,
   isReadonlyCoreObject,
-  ReadonlyCoreObject,
+  type ReadonlyCoreObject,
 } from '../../base/core-types/index.ts';
-import { OrderedMap } from '../../base/collections/orderedmap.ts';
-import { FlatRepAtom, kElementSpacer } from './flat-rep.ts';
+import type { OrderedMap } from '../../base/collections/orderedmap.ts';
+import { type FlatRepAtom, kElementSpacer } from './flat-rep.ts';
 
 export const kCoreValueTreeNodeOpts = {
   objectFilterFields: treeAtomKeyFilterIgnoreText,
 };
 
+/**
+ * The root object for a rich text document in tree form.
+ * 
+ * - `root`: The root element node of the document tree.
+ * - `pointers`: (Optional) A set of pointers (such as selections or cursors)
+ *               within the document.
+ */
 export interface RichText extends CoreObject {
   root: ElementNode;
   pointers?: Set<Pointer>;
 }
 
+/**
+ * Checks if a value is a valid rich text document.
+ * @param v The value to check.
+ * @returns True if the value is a valid rich text document, false otherwise.
+ */
 export function isRichText(v: CoreValue): v is RichText {
   return isReadonlyCoreObject(v) && isElementNode(v.root);
 }
 
+/**
+ * Checks if a value is not local.
+ * @param v The value to check.
+ * @returns True if the value is not local, false otherwise.
+ */
 export function onlyNoneLocal(v: CoreValue) {
   return isReadonlyCoreObject(v) && v.isLocal !== true;
 }
 
+
 /**
- * Base type for all rich text values in both tree and flat representations.
+ * Base interface for all values in the rich text tree.
+ * 
+ * Extends CoreObject and adds an optional `isLocal` property,
+ * which indicates whether the value is local (will not be synced or persisted).
  */
 export interface RichTextValue extends CoreObject {
+  /**
+   * Indicates if the value is local (will not be synced or persisted).
+   */
   isLocal?: boolean;
 }
 
+/**
+ * Base type for all tree nodes in the rich text document.
+ */
 export type TreeNode = TextNode | ElementNode | RichTextValue;
 
+/**
+ * Represents a text node in the rich text tree.
+ * 
+ * Extends RichTextValue and adds a `text` property,
+ * which contains the actual text content of the node.
+ */
 export interface TextNode extends RichTextValue {
   text: string;
 }
 
+/**
+ * Represents an element node in the rich text tree.
+ * 
+ * Extends RichTextValue and adds a `children` property,
+ * which contains an array of child nodes.
+ */
 export interface ElementNode extends RichTextValue {
   children: TreeNode[];
 }
 
+/**
+ * Represents the type of a pointer in the rich text document.
+ * 
+ * - `anchor`: The anchor pointer (start of the selection).
+ * - `focus`: The focus pointer (end of the selection).
+ */
 export type PointerType = 'anchor' | 'focus';
 
+/**
+ * Enum representing the direction of a pointer in the rich text document.
+ * 
+ * - Forward (1): The pointer is moving forward (e.g., right or down).
+ * - Backward (-1): The pointer is moving backward (e.g., left or up).
+ * - None (0): The pointer has no direction (e.g., a collapsed selection).
+ */
 export enum PointerDirection {
   Forward = 1,
   Backward = -1,
   None = 0,
 }
 
+/**
+ * Represents a position within a text node in the rich text tree.
+ *
+ * A Point identifies a specific offset within a given TextNode.
+ * - `node`: The TextNode this point refers to.
+ * - `offset`: The character offset within the text of the node.
+ * - `local` (optional): If true, this point is local to the current context
+ *            (e.g., will not be synced or persisted).
+ */
 export interface Point extends CoreObject {
+  /**
+   * Indicates whether this point is local to the current context.
+   * If true, the point may not be synchronized with remote state.
+   */
   local?: boolean;
+
+  /**
+   * The TextNode in which this point resides.
+   */
   node: TextNode;
+
+  /**
+   * The character offset within the text of the node.
+   */
   offset: number;
 }
 
+/**
+ * Represents a pointer in the rich text document.
+ * 
+ * A Pointer is a specific position within a TextNode,
+ * identified by a key, type, direction, and optional expiration.
+ */
 export interface Pointer extends Point {
   key: string;
   type: PointerType;
@@ -69,16 +148,34 @@ export interface Pointer extends Point {
   expiration?: Date;
 }
 
+/**
+ * Determines whether a given key of a tree atom (rich text node) should be
+ * ignored when filtering, ignoring the 'text' property of text nodes.
+ *
+ * This function is used to filter out certain keys from tree atoms, except for:
+ *   - The 'children' key of element nodes (which should not be filtered out)
+ *   - The 'node' and 'offset' keys of pointer objects (which should not be
+ *     filtered out)
+ *
+ * @param key - The property key being considered.
+ * @param obj - The CoreValue object (tree atom) the key belongs to.
+ * @returns {boolean} - Returns false if the key should NOT be filtered out
+ *                      (i.e., should be included), true if the key should be
+ *                      filtered out.
+ */
 export function treeAtomKeyFilterIgnoreText(
   key: string,
   obj: CoreValue,
 ): boolean {
+  // Do not filter out the 'children' key of element nodes
   if (key === 'children' && isElementNode(obj)) {
     return false;
   }
+  // Do not filter out the 'node' or 'offset' keys of pointer objects
   if ((key === 'node' || key === 'offset') && isPointer(obj)) {
     return false;
   }
+  // Filter out all other keys
   return true;
 }
 

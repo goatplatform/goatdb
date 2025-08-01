@@ -18,11 +18,11 @@ user authentication and access control.
 ## 1. Standalone Server
 
 ```ts
-import { Server } from './net/server/server.ts';
+import \{ Server \} from './net/server/server.ts';
 
-const server = new Server({
+const server = new Server(\{
   // ...options
-});
+\});
 
 await server.start();
 // The server now listens for HTTP requests on the default port (8080).
@@ -34,17 +34,17 @@ If you want to use GoatDB's server as a handler within another HTTP server,
 you can call `await server.processRequest(request, info)` directly:
 
 ```ts
-import { Server } from './net/server/server.ts';
+import \{ Server \} from './net/server/server.ts';
 
-const server = new Server({
+const server = new Server(\{
   // ...options
-});
+\});
 
 // Inside your own HTTP server handler:
-async function handler(request: Request) {
-  const info = { // ...ServeHandlerInfo... };
+async function handler(request: Request) \{
+  const info = \{ // ...ServeHandlerInfo... \};
   return await server.processRequest(request, info);
-}
+\}
 
 // Use `handler` in your custom server framework.
 ```
@@ -69,38 +69,38 @@ All registered middlewares run for each request in registration order.
 
 ## Constructor
 
-**new Server(options: `ServerOptions`\<`US`\>)**
+**<code>new Server(options: [ServerOptions](/api/interfaces/serveroptions)&lt;US&gt;)</code>**
 
 ## Methods
 
 ### orgIds()
 
-**orgIds(): `Iterable`\<string\>**
+**<code>orgIds(): Iterable&lt;string&gt;</code>**
 
 Returns an iterable of all organization IDs that have services initialized.
 
 ### processRequest()
 
-**processRequest(goatReq: `GoatRequest`\<\>, info: `ServeHandlerInfo`): `Promise`\<`Response`\<\>\>**
+**<code>processRequest(goatReq: GoatRequest&lt;&gt;, info: ServeHandlerInfo): Promise&lt;Response&lt;&gt;&gt;</code>**
 
 Processes an incoming HTTP request through the server's middleware and
 endpoint pipeline.
 
 ### registerEndpoint()
 
-**registerEndpoint(ep: `Endpoint`\<`US`\>): void**
+**<code>registerEndpoint(ep: [Endpoint](/api/interfaces/endpoint)&lt;US&gt;): void</code>**
 
 Registers an endpoint handler with the server.
 
 ### registerMiddleware()
 
-**registerMiddleware(mid: `Middleware`\<`US`\>): void**
+**<code>registerMiddleware(mid: [Middleware](/api/interfaces/middleware)&lt;US&gt;): void</code>**
 
 Registers a middleware handler with the server.
 
 ### servicesForOrganization()
 
-**servicesForOrganization(orgId: string): `Promise`\<`ServerServices`\<`US`\>\>**
+**<code>servicesForOrganization(orgId: string): Promise&lt;[ServerServices](/api/interfaces/serverservices)&lt;US&gt;&gt;</code>**
 
 Gets or creates server services for a given organization ID.
 
@@ -109,20 +109,20 @@ creating them on first access and caching them for subsequent requests.
 
 ### start()
 
-**start(): `Promise`\<void\>**
+**<code>start(): Promise&lt;void&gt;</code>**
 
 Starts the server and all associated services.
 
 ### stop()
 
-**stop(): `Promise`\<void\>**
+**<code>stop(): Promise&lt;void&gt;</code>**
 
 Gracefully stops the server and all its services.
 Safe to call multiple times.
 
 ### updateStaticAssets()
 
-**updateStaticAssets(assets: `StaticAssets`): void**
+**<code>updateStaticAssets(assets: StaticAssets): void</code>**
 
 Updates the static assets configuration for the server and all existing
 organization services.
