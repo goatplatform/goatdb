@@ -9,13 +9,13 @@ sidebar_label: Repository
 
 ## Constructor
 
-**<code>new Repository(db: [GoatDB](/api/classes/goatdb)&lt;&gt;, path: string, trustPool: [TrustPool](/api/classes/trustpool)&lt;&gt;, __namedParameters: [RepositoryConfig](/api/interfaces/repositoryconfig)&lt;ST&gt;)</code>**
+**<code>new Repository(db: [GoatDB](/api/classes/goatdb)&lt;&gt;, path: string, trustPool: [TrustPool](/api/classes/trustpool)&lt;&gt;, __namedParameters: RepositoryConfig&lt;ST&gt;)</code>**
 
 ## Methods
 
 ### changedFieldsInCommit()
 
-**<code>changedFieldsInCommit(commit: string | [Commit](/api/classes/commit)&lt;&gt;): string[]</code>**
+**<code>changedFieldsInCommit(commit: string | Commit&lt;&gt;): string[]</code>**
 
 This method computes a quick diff between the given commit and all of its
 parents. It determines which fields were changed in this commit, rather
@@ -23,11 +23,11 @@ than what the changes were.
 
 ### commitIsCorrupted()
 
-**<code>commitIsCorrupted(c: [Commit](/api/classes/commit)&lt;&gt;): boolean</code>**
+**<code>commitIsCorrupted(c: Commit&lt;&gt;): boolean</code>**
 
 ### commitIsHighProbabilityLeaf()
 
-**<code>commitIsHighProbabilityLeaf(candidate: string | [Commit](/api/classes/commit)&lt;&gt;): boolean</code>**
+**<code>commitIsHighProbabilityLeaf(candidate: string | Commit&lt;&gt;): boolean</code>**
 
 This method determines, to a high probability, whether the given commit is
 a leaf commit or not, even when the full graph isn't available.
@@ -38,15 +38,15 @@ filters, the commit guaranteed not to be a leaf.
 
 ### commits()
 
-**<code>commits(session: [Session](/api/interfaces/session)): Generator&lt;[Commit](/api/classes/commit)&lt;&gt;&gt;</code>**
+**<code>commits(session: Session): Generator&lt;Commit&lt;&gt;&gt;</code>**
 
 ### commitsForKey()
 
-**<code>commitsForKey(key: string, session: [Session](/api/interfaces/session)): Generator&lt;[Commit](/api/classes/commit)&lt;&gt;&gt;</code>**
+**<code>commitsForKey(key: string, session: Session): Generator&lt;Commit&lt;&gt;&gt;</code>**
 
 ### create()
 
-**<code>create(key: string, value: [Item](/api/classes/item)&lt;S&gt;): Promise&lt;[Commit](/api/classes/commit)&lt;&gt;&gt;</code>**
+**<code>create(key: string, value: [Item](/api/classes/item)&lt;S&gt;): Promise&lt;Commit&lt;&gt;&gt;</code>**
 
 ### debugNetworkForKey()
 
@@ -58,15 +58,15 @@ filters, the commit guaranteed not to be a leaf.
 
 ### findLatestAncestorFromCommit()
 
-**<code>findLatestAncestorFromCommit(commit: string | [Commit](/api/classes/commit)&lt;&gt;, filter: (c: [Commit](/api/classes/commit)&lt;&gt;) =&gt; boolean): [Commit](/api/classes/commit)&lt;&gt;</code>**
+**<code>findLatestAncestorFromCommit(commit: string | Commit&lt;&gt;, filter: (c: Commit&lt;&gt;) =&gt; boolean): Commit&lt;&gt;</code>**
 
 ### findLatestNonCorruptedCommitForKey()
 
-**<code>findLatestNonCorruptedCommitForKey(key: string): [Commit](/api/classes/commit)&lt;&gt;</code>**
+**<code>findLatestNonCorruptedCommitForKey(key: string): Commit&lt;&gt;</code>**
 
 ### findMergeBase()
 
-**<code>findMergeBase(commits: [Commit](/api/classes/commit)&lt;&gt;[]): [commits: [Commit](/api/classes/commit)&lt;&gt;[], base: [Commit](/api/classes/commit)&lt;&gt;, scheme: [Schema](/api/types/schema), reachedRoot: boolean]</code>**
+**<code>findMergeBase(commits: Commit&lt;&gt;[]): [commits: Commit&lt;&gt;[], base: Commit&lt;&gt;, scheme: [Schema](/api/types/schema), reachedRoot: boolean]</code>**
 
 Given an iterable of commits, this method returns their Lowest Common
 Ancestor or undefined if no such ancestor exists (meaning the commits
@@ -74,15 +74,15 @@ belong to disconnected histories).
 
 ### findNonCorruptedParentsFromCommits()
 
-**<code>findNonCorruptedParentsFromCommits(parents: string | [Commit](/api/classes/commit)&lt;&gt;[]): [Commit](/api/classes/commit)&lt;&gt;[]</code>**
+**<code>findNonCorruptedParentsFromCommits(parents: string | Commit&lt;&gt;[]): Commit&lt;&gt;[]</code>**
 
 ### getCommit()
 
-**<code>getCommit(id: string, session: [Session](/api/interfaces/session)): [Commit](/api/classes/commit)&lt;&gt;</code>**
+**<code>getCommit(id: string, session: Session): Commit&lt;&gt;</code>**
 
 ### graphForKey()
 
-**<code>graphForKey(key: string): [CommitGraph](/api/interfaces/commitgraph)[]</code>**
+**<code>graphForKey(key: string): CommitGraph[]</code>**
 
 ### hasCommit()
 
@@ -90,7 +90,7 @@ belong to disconnected histories).
 
 ### hasItemForCommit()
 
-**<code>hasItemForCommit(c: string | [Commit](/api/classes/commit)&lt;&gt;): boolean</code>**
+**<code>hasItemForCommit(c: string | Commit&lt;&gt;): boolean</code>**
 
 ### hasKey()
 
@@ -98,14 +98,14 @@ belong to disconnected histories).
 
 ### headForKey()
 
-**<code>headForKey(key: string): [Commit](/api/classes/commit)&lt;&gt;</code>**
+**<code>headForKey(key: string): Commit&lt;&gt;</code>**
 
 This method finds and returns the head for the given key. This is a
 readonly operation and does not attempt to merge any leaves.
 
 ### itemForCommit()
 
-**<code>itemForCommit(c: string | [Commit](/api/classes/commit)&lt;&gt;): [Item](/api/classes/item)&lt;S&gt;</code>**
+**<code>itemForCommit(c: string | Commit&lt;&gt;): [Item](/api/classes/item)&lt;S&gt;</code>**
 
 ### keyExists()
 
@@ -113,35 +113,35 @@ readonly operation and does not attempt to merge any leaves.
 
 ### keys()
 
-**<code>keys(session: [Session](/api/interfaces/session)): Iterable&lt;string&gt;</code>**
+**<code>keys(session: Session): Iterable&lt;string&gt;</code>**
 
 ### leavesForKey()
 
-**<code>leavesForKey(key: string, session: [Session](/api/interfaces/session)): readonly [Commit](/api/classes/commit)&lt;&gt;[]</code>**
+**<code>leavesForKey(key: string, session: Session): readonly Commit&lt;&gt;[]</code>**
 
 ### mergeIfNeeded()
 
-**<code>mergeIfNeeded(key: string): Promise&lt;[Commit](/api/classes/commit)&lt;&gt;&gt;</code>**
+**<code>mergeIfNeeded(key: string): Promise&lt;Commit&lt;&gt;&gt;</code>**
 
 ### numberOfCommits()
 
-**<code>numberOfCommits(session: [Session](/api/interfaces/session)): number</code>**
+**<code>numberOfCommits(session: Session): number</code>**
 
 ### paths()
 
-**<code>paths(session: [Session](/api/interfaces/session)): Iterable&lt;string&gt;</code>**
+**<code>paths(session: Session): Iterable&lt;string&gt;</code>**
 
 ### persistCommits()
 
-**<code>persistCommits(commits: Iterable&lt;[Commit](/api/classes/commit)&lt;&gt;&gt;): Promise&lt;[Commit](/api/classes/commit)&lt;&gt;[]&gt;</code>**
+**<code>persistCommits(commits: Iterable&lt;Commit&lt;&gt;&gt;): Promise&lt;Commit&lt;&gt;[]&gt;</code>**
 
 ### persistVerifiedCommits()
 
-**<code>persistVerifiedCommits(commits: Iterable&lt;[Commit](/api/classes/commit)&lt;&gt;&gt;): Promise&lt;[Commit](/api/classes/commit)&lt;&gt;[]&gt;</code>**
+**<code>persistVerifiedCommits(commits: Iterable&lt;Commit&lt;&gt;&gt;): Promise&lt;Commit&lt;&gt;[]&gt;</code>**
 
 ### rebase()
 
-**<code>rebase(key: string, record: [Item](/api/classes/item)&lt;S&gt;, headId: string | [Commit](/api/classes/commit)&lt;&gt;): [[Item](/api/classes/item)&lt;S&gt;, string]</code>**
+**<code>rebase(key: string, record: [Item](/api/classes/item)&lt;S&gt;, headId: string | Commit&lt;&gt;): [[Item](/api/classes/item)&lt;S&gt;, string]</code>**
 
 Given a key and an edited record for this key, this method rebases the
 changes from the record on top of the any changes made concurrently for
@@ -158,17 +158,17 @@ committing them.
 
 ### setValueForKey()
 
-**<code>setValueForKey(key: string, value: [Item](/api/classes/item)&lt;S&gt;, parentCommit: string | [Commit](/api/classes/commit)&lt;&gt;): Promise&lt;[Commit](/api/classes/commit)&lt;&gt;&gt;</code>**
+**<code>setValueForKey(key: string, value: [Item](/api/classes/item)&lt;S&gt;, parentCommit: string | Commit&lt;&gt;): Promise&lt;Commit&lt;&gt;&gt;</code>**
 
 Updates the head record for a given key.
 
 ### valueForKey()
 
-**<code>valueForKey(key: string): [[Item](/api/classes/item)&lt;T&gt;, [Commit](/api/classes/commit)&lt;&gt;]</code>**
+**<code>valueForKey(key: string): [[Item](/api/classes/item)&lt;T&gt;, Commit&lt;&gt;]</code>**
 
 ### verifyCommits()
 
-**<code>verifyCommits(commits: Iterable&lt;[Commit](/api/classes/commit)&lt;&gt;&gt;): Promise&lt;[Commit](/api/classes/commit)&lt;&gt;[]&gt;</code>**
+**<code>verifyCommits(commits: Iterable&lt;Commit&lt;&gt;&gt;): Promise&lt;Commit&lt;&gt;[]&gt;</code>**
 
 ### normalizePath()
 

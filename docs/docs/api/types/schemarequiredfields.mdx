@@ -11,5 +11,5 @@ as required from the type system.
 
 ## Definition
 
-**Type:** <code>SchemaRequiredFields = T[any][K][any] extends any ? T[any][K][any] extends Function ? never : K : never</code>
+**Type:** <code>SchemaRequiredFields = T['fields'][K]['required'] extends true ? T['fields'][K]['default'] extends Function ? never : K : never</code>
 

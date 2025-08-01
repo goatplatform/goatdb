@@ -12,7 +12,7 @@ Given the path parts, composes them into a GoatDB path.
 
 ## itemPathGetPart
 
-**<code>itemPathGetPart(path: string, part: any | any | any | any): T</code>**
+**<code>itemPathGetPart(path: string, part: 'type' | 'repo' | 'item' | 'embed'): T</code>**
 
 Given a DB path and a path component, this function returns the relevant
 portion of the path.
@@ -51,7 +51,7 @@ and no trailing separator.
 
 ## prettyJSON
 
-**<code>prettyJSON(o: [ReadonlyJSONValue](/api/types/readonlyjsonvalue)): string</code>**
+**<code>prettyJSON(o: ReadonlyJSONValue): string</code>**
 
 Converts a JSON value to a pretty-printed string.
 
@@ -66,13 +66,13 @@ Given two schemas, returns whether they're the same one or not.
 
 ## SchemaGetFieldDef
 
-**<code>SchemaGetFieldDef(s: S, field: F): [FieldDef](/api/types/fielddef)&lt;S[any][F][any]&gt;</code>**
+**<code>SchemaGetFieldDef(s: S, field: F): [FieldDef](/api/types/fielddef)&lt;S['fields'][F]['type']&gt;</code>**
 
 Given a schema and a field, returns its
 
 ## SchemaGetFields
 
-**<code>SchemaGetFields(s: [Schema](/api/types/schema)): readonly [string, [FieldDef](/api/types/fielddef)&lt;[ValueType](/api/types/valuetype)&gt;][]</code>**
+**<code>SchemaGetFields(s: [Schema](/api/types/schema)): readonly [string, [FieldDef](/api/types/fielddef)&lt;ValueType&gt;][]</code>**
 
 Given a schema, this function returns its field definitions as an iterable.
 

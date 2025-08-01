@@ -9,5 +9,5 @@ Given a schema, extracts the type of its data.
 
 ## Definition
 
-**Type:** <code>SchemaDataType = &#123; [k in K]: [SchemaValueWithOptional](/api/types/schemavaluewithoptional)&lt;[FieldValue](/api/types/fieldvalue)&lt;T[any][k][any]&gt;, T[any][k] extends &#123; required: any &#125; ? any : any, T[any][k] extends &#123; default: Function &#125; ? any : any&gt; &#125;</code>
+**Type:** <code>SchemaDataType = &#123; [k in K]: [SchemaValueWithOptional](/api/types/schemavaluewithoptional)&lt;[FieldValue](/api/types/fieldvalue)&lt;T['fields'][k]['type']&gt;, T['fields'][k] extends &#123; required: true &#125; ? true : false, T['fields'][k] extends &#123; default: Function &#125; ? true : false&gt; &#125;</code>
 

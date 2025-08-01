@@ -9,5 +9,5 @@ Given a schema, extracts the names of all optional fields.
 
 ## Definition
 
-**Type:** <code>SchemaOptionalFields = T[any][K][any] extends any | undefined ? K : never</code>
+**Type:** <code>SchemaOptionalFields = T['fields'][K]['required'] extends false | undefined ? K : never</code>
 

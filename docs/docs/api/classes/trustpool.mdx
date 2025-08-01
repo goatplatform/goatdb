@@ -14,13 +14,13 @@ ensure the creator only made changes within their scope of permissions.
 
 ## Constructor
 
-**<code>new TrustPool(orgId: string, currentSession: [OwnedSession](/api/interfaces/ownedsession), roots: [Session](/api/interfaces/session)[], trustedSessions: [Session](/api/interfaces/session)[], changeCallback: () =&gt; void)</code>**
+**<code>new TrustPool(orgId: string, currentSession: OwnedSession, roots: Session[], trustedSessions: Session[], changeCallback: () =&gt; void)</code>**
 
 ## Methods
 
 ### addSession()
 
-**<code>addSession(s: [Session](/api/interfaces/session), commit: [Commit](/api/classes/commit)&lt;&gt;): Promise&lt;boolean&gt;</code>**
+**<code>addSession(s: Session, commit: Commit&lt;&gt;): Promise&lt;boolean&gt;</code>**
 
 When a commit containing a session is discovered, use this method to add
 it to the trust pool. This method does the necessary checks to ensure the
@@ -29,20 +29,20 @@ the trust pool.
 
 ### addSessionUnsafe()
 
-**<code>addSessionUnsafe(s: [Session](/api/interfaces/session)): boolean</code>**
+**<code>addSessionUnsafe(s: Session): boolean</code>**
 
 Adds the given session to the trust pool, without verifying its origin
 commit. Be very careful to only use this method for verified sessions.
 
 ### getSession()
 
-**<code>getSession(id: string): [Session](/api/interfaces/session)</code>**
+**<code>getSession(id: string): Session</code>**
 
 ### sessions()
 
-**<code>sessions(): Generator&lt;[Session](/api/interfaces/session)&gt;</code>**
+**<code>sessions(): Generator&lt;Session&gt;</code>**
 
 ### verify()
 
-**<code>verify(commit: [Commit](/api/classes/commit)&lt;&gt;): Promise&lt;boolean&gt;</code>**
+**<code>verify(commit: Commit&lt;&gt;): Promise&lt;boolean&gt;</code>**
 

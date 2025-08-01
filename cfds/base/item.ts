@@ -57,6 +57,10 @@ export interface ItemConfig<S extends Schema> {
   normalized?: boolean;
 }
 
+/**
+ * Internal encoded representation of an item for serialization.
+ * @internal
+ */
 export interface EncodedItem {
   s: Decoder;
   data: ReadonlyDecodedObject;

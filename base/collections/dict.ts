@@ -36,6 +36,7 @@ export interface ReadonlyDict<K = any, V = any> extends Iterable<[K, V]> {
  * - JavaScript's built-in Map: General-purpose key-value collection
  * - HashMap: Custom implementation optimized for specific use cases
  *
+ * @internal
  * @template K - The type of keys in the dictionary
  * @template V - The type of values in the dictionary
  */

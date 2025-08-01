@@ -18,11 +18,11 @@ user authentication and access control.
 ## 1. Standalone Server
 
 ```ts
-import \{ Server \} from './net/server/server.ts';
+import { Server } from './net/server/server.ts';
 
-const server = new Server(\{
+const server = new Server({
   // ...options
-\});
+});
 
 await server.start();
 // The server now listens for HTTP requests on the default port (8080).
@@ -34,17 +34,17 @@ If you want to use GoatDB's server as a handler within another HTTP server,
 you can call `await server.processRequest(request, info)` directly:
 
 ```ts
-import \{ Server \} from './net/server/server.ts';
+import { Server } from './net/server/server.ts';
 
-const server = new Server(\{
+const server = new Server({
   // ...options
-\});
+});
 
 // Inside your own HTTP server handler:
-async function handler(request: Request) \{
-  const info = \{ // ...ServeHandlerInfo... \};
+async function handler(request: Request) {
+  const info = { // ...ServeHandlerInfo... };
   return await server.processRequest(request, info);
-\}
+}
 
 // Use `handler` in your custom server framework.
 ```
@@ -69,7 +69,7 @@ All registered middlewares run for each request in registration order.
 
 ## Constructor
 
-**<code>new Server(options: [ServerOptions](/api/interfaces/serveroptions)&lt;US&gt;)</code>**
+**<code>new Server(options: ServerOptions&lt;US&gt;)</code>**
 
 ## Methods
 
@@ -88,19 +88,19 @@ endpoint pipeline.
 
 ### registerEndpoint()
 
-**<code>registerEndpoint(ep: [Endpoint](/api/interfaces/endpoint)&lt;US&gt;): void</code>**
+**<code>registerEndpoint(ep: Endpoint&lt;US&gt;): void</code>**
 
 Registers an endpoint handler with the server.
 
 ### registerMiddleware()
 
-**<code>registerMiddleware(mid: [Middleware](/api/interfaces/middleware)&lt;US&gt;): void</code>**
+**<code>registerMiddleware(mid: Middleware&lt;US&gt;): void</code>**
 
 Registers a middleware handler with the server.
 
 ### servicesForOrganization()
 
-**<code>servicesForOrganization(orgId: string): Promise&lt;[ServerServices](/api/interfaces/serverservices)&lt;US&gt;&gt;</code>**
+**<code>servicesForOrganization(orgId: string): Promise&lt;ServerServices&lt;US&gt;&gt;</code>**
 
 Gets or creates server services for a given organization ID.
 

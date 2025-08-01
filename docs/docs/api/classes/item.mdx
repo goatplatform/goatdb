@@ -18,7 +18,7 @@ to work with.
 
 ## Constructor
 
-**<code>new Item(config: ItemConfig&lt;S&gt; | [ConstructorDecoderConfig](/api/interfaces/constructordecoderconfig)&lt;EncodedItem&gt;, registry: [DataRegistry](/api/classes/dataregistry)&lt;&gt;)</code>**
+**<code>new Item(config: ItemConfig&lt;S&gt; | ConstructorDecoderConfig&lt;EncodedItem&gt;, registry: [DataRegistry](/api/classes/dataregistry)&lt;&gt;)</code>**
 
 Creates a new Item instance.
 
@@ -46,7 +46,7 @@ including all nested objects and arrays.
 
 ### cloneData()
 
-**<code>cloneData(onlyFields: keyof S[any][]): Readwrite&lt;[SchemaDataType](/api/types/schemadatatype)&lt;S&gt;&gt;</code>**
+**<code>cloneData(onlyFields: keyof S['fields'][]): Readwrite&lt;[SchemaDataType](/api/types/schemadatatype)&lt;S&gt;&gt;</code>**
 
 Creates a deep copy of the item's data.
 
@@ -74,7 +74,7 @@ Deletes a given field from this item.
 
 ### deserialize()
 
-**<code>deserialize(decoder: [Decoder](/api/interfaces/decoder)&lt;&gt;): void</code>**
+**<code>deserialize(decoder: Decoder&lt;&gt;): void</code>**
 
 Deserializes an encoded item into this instance.
 

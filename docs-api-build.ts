@@ -2,40 +2,64 @@
 
 import { 
   Application, 
-  type ProjectReflection, 
   type DeclarationReflection, 
-  type Type,
-  ReferenceType,
-  UnionType,
-  ArrayType,
-  IntrinsicType,
-  ReflectionType,
-  TupleType,
-  ConditionalType,
-  MappedType,
-  IndexedAccessType,
-  TypeOperatorType,
-  QueryType,
-  NamedTupleMember,
 } from 'typedoc';
 import * as path from 'jsr:@std/path';
 import { ensureDir } from 'jsr:@std/fs';
+
+// Import functions from our new modules
+import {
+  buildCrossReferenceMap,
+  collectTypeReferences,
+  classifyType,
+} from './docs/type-formatter.ts';
+import {
+  buildReverseInheritanceMap,
+  createClassMDX,
+  createInterfaceMDX,
+  createFunctionsMDX,
+  createTypeMDX,
+  extractDocumentation,
+} from './docs/mdx-generator.ts';
 
 // Directory where generated API documentation will be stored
 const API_DOCS_DIR = path.join('docs', 'docs', 'api');
 
 /**
- * Represents inheritance information for a declaration.
- *
- * - `extends`: Array of parent types this declaration extends, each with a name
- *   and a link to the parent type.
- * - `implements`: Array of interfaces this declaration implements, each with a name
- *   and a link to the interface.
+ * Configuration for a GoatDB module that should be documented.
  */
-interface InheritanceInfo {
-  extends: Array<{ name: string; link: string }>;
-  implements: Array<{ name: string; link: string }>;
+interface ModuleConfig {
+  /** Unique module name (e.g., 'core', 'server', 'react') */
+  name: string;
+  /** Path to the module's entry point */
+  entryPoint: string;
+  /** API stability level */
+  stability: 'stable' | 'beta' | 'internal';
+  /** Modules this module can reference types from */
+  dependencies?: string[];
 }
+
+
+// List of GoatDB modules to document
+const GOATDB_MODULES: ModuleConfig[] = [
+  {
+    name: 'core',
+    entryPoint: 'mod.ts',
+    stability: 'stable',
+  },
+  {
+    name: 'server',
+    entryPoint: 'server/mod.ts',
+    stability: 'stable',
+    dependencies: ['core'],
+  },
+  {
+    name: 'react',
+    entryPoint: 'react/hooks.ts',
+    stability: 'stable',
+    dependencies: ['core'],
+  },
+];
 
 /**
  * Represents the categorized API elements extracted from a TypeScript module.
@@ -47,6 +71,7 @@ interface InheritanceInfo {
  * - `moduleName`: The name of the module (usually derived from the file path).
  * - `moduleComment`: The documentation comment associated with the module, if
  *    any.
+ * - `moduleConfig`: Configuration for this module.
  */
 interface ApiElements {
   classes: DeclarationReflection[];
@@ -55,6 +80,7 @@ interface ApiElements {
   types: DeclarationReflection[];
   moduleName: string;
   moduleComment: string;
+  moduleConfig: ModuleConfig;
 }
 
 /**
@@ -73,17 +99,17 @@ async function cleanOutputDirectory(): Promise<void> {
   await ensureDir(path.join(API_DOCS_DIR, 'types'));
 }
 
-
 /**
  * Extracts categorized API elements (classes, interfaces, functions, types)
  * from a TypeScript file using TypeDoc. Filters out private and external
  * (node_modules, jsr:, npm:) exports.
  *
- * @param filePath - Path to the TypeScript file to analyze.
+ * @param moduleConfig - Configuration for the module being processed.
  * @returns An ApiElements object containing discovered API elements and module
  *          metadata.
  */
-async function extractApiElements(filePath: string): Promise<ApiElements> {
+async function extractApiElements(moduleConfig: ModuleConfig): Promise<ApiElements> {
+  const filePath = moduleConfig.entryPoint;
   console.log(`🔍 Extracting API elements from ${filePath}...`);
 
   // Initialize TypeDoc application for the given file
@@ -110,7 +136,8 @@ async function extractApiElements(filePath: string): Promise<ApiElements> {
     functions: [],
     types: [],
     moduleName: getModuleName(filePath),
-    moduleComment: extractModuleComment(project),
+    moduleComment: '', // Skip module comments - they're for JSR registry, not API docs
+    moduleConfig,
   };
 
   // Iterate over all top-level exported children
@@ -155,7 +182,6 @@ async function extractApiElements(filePath: string): Promise<ApiElements> {
   return elements;
 }
 
-
 /**
  * Returns a human-friendly module name for a given file path.
  *
@@ -170,778 +196,6 @@ function getModuleName(filePath: string): string {
   if (filePath === 'react/hooks.ts') return 'React';
   return path.basename(filePath, '.ts');
 }
-
-/**
- * Extracts the module-level documentation comment from a TypeDoc project.
- *
- * @param project - The TypeDoc project to extract the comment from.
- * @returns The module-level documentation comment, or an empty string if no
- *          comment is found.
- */
-function extractModuleComment(project: ProjectReflection): string {
-  const comment = project.comment;
-  if (!comment?.summary) return '';
-  return comment.summary.map((part) => part.text).join('').trim();
-}
-
-/**
- * Extracts documentation text from a TypeDoc comment.
- *
- * @param element - The TypeDoc element to extract the documentation from.
- * @returns The documentation text, or an empty string if no documentation is
- *          found.
- */
-function extractDocumentation(element: DeclarationReflection): string {
-  // Try element comment first (classes, interfaces, etc.)
-  let comment = element.comment;
-
-  // For functions, try the signature comment
-  if (!comment && element.signatures?.[0]?.comment) {
-    comment = element.signatures[0].comment;
-  }
-
-  if (!comment?.summary) return '';
-  const text = comment.summary.map((part) => part.text).join('').trim();
-
-  // Escape angle brackets that could be mistaken for HTML tags in MDX
-  // Only escape < followed by word characters (potential HTML tags)
-  let escapedText = text.replace(/<(\w)/g, '\\<$1').replace(/(\w)>/g, '$1\\>');
-  
-  // Escape mathematical expressions that could be parsed as markdown links
-  // Pattern: number/letter followed by [content](content)
-  escapedText = escapedText.replace(/(\w+)\[([^\]]+)\]\(([^)]+)\)/g, '$1\\[$2\\]\\($3\\)');
-  
-  // Escape curly braces that could be mistaken for JSX expressions in MDX
-  escapedText = escapedText.replace(/\{/g, '\\{').replace(/\}/g, '\\}');
-  
-  return escapedText;
-}
-
-/**
- * Builds a cross-reference map of all API elements for linking.
- *
- * @param allElements - An array of ApiElements objects containing the API
- *                      elements to build the cross-reference map for.
- * @returns A Map of element names to their corresponding file paths.
- */
-function buildCrossReferenceMap(allElements: ApiElements[]): Map<string, string> {
-  const crossRefMap = new Map<string, string>();
-
-  // Only map actually discovered and documented types
-  for (const elements of allElements) {
-    // Map classes - use absolute paths from API root
-    for (const cls of elements.classes) {
-      crossRefMap.set(cls.name, `/api/classes/${cls.name.toLowerCase()}`);
-    }
-
-    // Map interfaces - use absolute paths from API root
-    for (const iface of elements.interfaces) {
-      crossRefMap.set(iface.name, `/api/interfaces/${iface.name.toLowerCase()}`);
-    }
-
-    // Map types - use absolute paths from API root
-    for (const type of elements.types) {
-      crossRefMap.set(type.name, `/api/types/${type.name.toLowerCase()}`);
-    }
-  }
-
-  return crossRefMap;
-}
-
-
-
-/**
- * Builds a reverse inheritance map for parent->child relationships.
- *
- * @param allElements - An array of ApiElements objects containing the API
- *                      elements to build the reverse inheritance map for.
- * @returns A Map of parent element names to their corresponding child
- *          element names.
- */
-function buildReverseInheritanceMap(allElements: ApiElements[], crossRefMap: Map<string, string>): Map<string, string[]> {
-  const reverseMap = new Map<string, string[]>();
-
-  for (const elements of allElements) {
-    // Process classes
-    for (const cls of elements.classes) {
-      const inheritance = extractInheritanceInfo(cls, crossRefMap);
-
-      // Add this class as a child of its parent classes
-      for (const parent of inheritance.extends) {
-        if (!reverseMap.has(parent.name)) {
-          reverseMap.set(parent.name, []);
-        }
-        reverseMap.get(parent.name)!.push(cls.name);
-      }
-    }
-
-    // Process interfaces
-    for (const iface of elements.interfaces) {
-      const inheritance = extractInheritanceInfo(iface, crossRefMap);
-
-      // Add this interface as a child of its parent interfaces
-      for (const parent of inheritance.extends) {
-        if (!reverseMap.has(parent.name)) {
-          reverseMap.set(parent.name, []);
-        }
-        reverseMap.get(parent.name)!.push(iface.name);
-      }
-    }
-  }
-
-  return reverseMap;
-}
-
-/**
- * Extracts inheritance information from a class or interface.
- *
- * @param element - The TypeDoc element to extract the inheritance information
- *                  from.
- * @param crossRefMap - A Map of element names to their corresponding file
- *                      paths for proper linking.
- * @returns An InheritanceInfo object containing the inheritance information.
- */
-function extractInheritanceInfo(element: DeclarationReflection, crossRefMap: Map<string, string>): InheritanceInfo {
-  const inheritance: InheritanceInfo = {
-    extends: [],
-    implements: [],
-  };
-
-  // Extract extended types (parent classes/interfaces)
-  if (element.extendedTypes) {
-    for (const extendedType of element.extendedTypes) {
-      if (extendedType.type === 'reference' && extendedType.name) {
-        // Skip TypeScript utility types - they shouldn't be linked
-        const TYPESCRIPT_UTILITY_TYPES = new Set([
-          'Omit', 'Pick', 'Partial', 'Required', 'Record', 'Exclude', 'Extract', 
-          'NonNullable', 'Parameters', 'ConstructorParameters', 'ReturnType', 
-          'InstanceType', 'ThisParameterType', 'OmitThisParameter'
-        ]);
-        if (TYPESCRIPT_UTILITY_TYPES.has(extendedType.name)) {
-          continue;
-        }
-        
-        // Use crossRefMap to get the correct link path (interfaces, classes, or types)
-        const linkPath = crossRefMap.get(extendedType.name) || 
-          (element.kind === 256 
-            ? `/api/interfaces/${extendedType.name.toLowerCase()}`
-            : `/api/classes/${extendedType.name.toLowerCase()}`);
-
-
-        inheritance.extends.push({
-          name: extendedType.name,
-          link: linkPath,
-        });
-      }
-    }
-  }
-
-  // Extract implemented interfaces (for classes)
-  if (element.implementedTypes) {
-    for (const implementedType of element.implementedTypes) {
-      if (implementedType.type === 'reference' && implementedType.name) {
-        const linkPath = crossRefMap.get(implementedType.name) || 
-          `/api/interfaces/${implementedType.name.toLowerCase()}`;
-        
-        inheritance.implements.push({
-          name: implementedType.name,
-          link: linkPath,
-        });
-      }
-    }
-  }
-
-  return inheritance;
-}
-
-/**
- * Separates own members from inherited members.
- *
- * @param element - The TypeDoc element to separate the members from.
- * @returns An object containing two arrays:
- *          - `ownMembers`: An array of own members.
- *          - `inheritedMembers`: A Map of parent element names to their
- *            corresponding child members.
- */
-function separateMembers(
-  element: DeclarationReflection,
-): { ownMembers: DeclarationReflection[]; inheritedMembers: Map<string, DeclarationReflection[]> } {
-  const ownMembers: DeclarationReflection[] = [];
-  const inheritedMembers: Map<string, DeclarationReflection[]> = new Map();
-
-  for (const child of element.children || []) {
-    if (child.inheritedFrom) {
-      // Extract parent class name - inheritedFrom may be nested
-      let parentName = child.inheritedFrom.name;
-
-      // Handle cases where inheritedFrom might reference a method like "Emitter.attach"
-      if (parentName && parentName.includes('.')) {
-        parentName = parentName.split('.')[0];
-      }
-
-      if (!inheritedMembers.has(parentName)) {
-        inheritedMembers.set(parentName, []);
-      }
-      inheritedMembers.get(parentName)!.push(child);
-    } else {
-      ownMembers.push(child);
-    }
-  }
-
-  return { ownMembers, inheritedMembers };
-}
-
-/**
- * Formats a type with cross-reference links.
- *
- * @param type - The TypeDoc type to format.
- * @param crossRefMap - A Map of element names to their corresponding file
- *                      paths.
- * @returns The formatted type string.
- */
-function formatLinkedType(type: Type | undefined, crossRefMap: Map<string, string>): string {
-  if (!type) return 'any';
-
-  switch (type.type) {
-    case 'intrinsic':
-      if (type instanceof IntrinsicType) {
-        return type.name || throwTypeError('intrinsic type missing name', type);
-      }
-      return 'any';
-
-    case 'reference': {
-      if (type instanceof ReferenceType) {
-        const typeName = type.name || throwTypeError('reference type missing name', type);
-        
-        // Don't link TypeScript utility types - render as inline code
-        const TYPESCRIPT_UTILITY_TYPES = new Set([
-          'Omit', 'Pick', 'Partial', 'Required', 'Record', 'Exclude', 'Extract', 
-          'NonNullable', 'Parameters', 'ConstructorParameters', 'ReturnType', 
-          'InstanceType', 'ThisParameterType', 'OmitThisParameter'
-        ]);
-        if (TYPESCRIPT_UTILITY_TYPES.has(typeName)) {
-          const typeArgs = type.typeArguments
-            ? `<${type.typeArguments.map((t: Type) => formatLinkedType(t, crossRefMap)).join(', ')}>`
-            : '';
-          return `${typeName}${typeArgs}`;
-        }
-        
-        // Don't link single-letter generic types (like T, U, N, etc.)
-        if (typeName.length === 1 && /[A-Z]/.test(typeName)) {
-          return typeName;
-        }
-        
-        const link = crossRefMap.get(typeName);
-        const linkedName = link ? `[${typeName}](${link})` : typeName;
-        const typeArgs = type.typeArguments
-          ? `<${type.typeArguments.map((t: Type) => formatLinkedType(t, crossRefMap)).join(', ')}>`
-          : '';
-        return linkedName + typeArgs;
-      }
-      return 'any';
-    }
-
-    case 'union':
-      if (type instanceof UnionType) {
-        return type.types.map((t: Type) => formatLinkedType(t, crossRefMap)).join(' | ');
-      }
-      return 'any';
-
-    case 'intersection':
-      if (type instanceof UnionType) { // UnionType is used for both union and intersection
-        return type.types.map((t: Type) => formatLinkedType(t, crossRefMap)).join(' & ');
-      }
-      return 'any';
-
-    case 'array':
-      if (type instanceof ArrayType) {
-        return `${formatLinkedType(type.elementType, crossRefMap)}[]`;
-      }
-      return 'any[]';
-
-    case 'tuple':
-      if (type instanceof TupleType) {
-        return `[${type.elements.map((t: Type) => formatLinkedType(t, crossRefMap)).join(', ')}]`;
-      }
-      return 'any[]';
-
-    case 'namedTupleMember':
-      if (type instanceof NamedTupleMember) {
-        const elementType = formatLinkedType(type.element, crossRefMap);
-        const optionalMarker = type.isOptional ? '?' : '';
-        return `${type.name}${optionalMarker}: ${elementType}`;
-      }
-      return 'any';
-
-    case 'literal':
-      if (type instanceof IntrinsicType) {
-        return JSON.stringify(type.name);
-      }
-      return 'any';
-
-    case 'typeOperator':
-      if (type instanceof TypeOperatorType) {
-        const target = formatLinkedType(type.target, crossRefMap);
-        return `${type.operator} ${target}`;
-      }
-      return 'any';
-
-    case 'indexedAccess':
-      if (type instanceof IndexedAccessType) {
-        const objectType = formatLinkedType(type.objectType, crossRefMap);
-        const indexType = formatLinkedType(type.indexType, crossRefMap);
-        return `${objectType}[${indexType}]`;
-      }
-      return 'any';
-
-    case 'conditional':
-      if (type instanceof ConditionalType) {
-        const checkType = formatLinkedType(type.checkType, crossRefMap);
-        const extendsType = formatLinkedType(type.extendsType, crossRefMap);
-        const trueType = formatLinkedType(type.trueType, crossRefMap);
-        const falseType = formatLinkedType(type.falseType, crossRefMap);
-        return `${checkType} extends ${extendsType} ? ${trueType} : ${falseType}`;
-      }
-      return 'any';
-
-    case 'mapped':
-      if (type instanceof MappedType) {
-        const parameterType = formatLinkedType(type.parameterType, crossRefMap);
-        const templateType = formatLinkedType(type.templateType, crossRefMap);
-        return `{ [${type.parameter} in ${parameterType}]: ${templateType} }`;
-      }
-      return 'any';
-
-    case 'query':
-      if (type instanceof QueryType) {
-        const queryType = formatLinkedType(type.queryType, crossRefMap);
-        return `typeof ${queryType}`;
-      }
-      return 'any';
-
-    case 'predicate':
-      // TypeScript predicate types (e.g., "arg is Type")
-      return 'boolean';
-
-    case 'reflection':
-      if (type instanceof ReflectionType) {
-        // For reflection types (inline object/function definitions), show a simplified representation
-        if (type.declaration?.signatures?.[0]) {
-          // Function type
-          const sig = type.declaration.signatures[0];
-          const params = sig.parameters?.map((p) => {
-            const paramType = p.type ? formatLinkedType(p.type, crossRefMap) : 'any';
-            return `${p.name}: ${paramType}`;
-          }).join(', ') || '';
-          const returnType = sig.type ? formatLinkedType(sig.type, crossRefMap) : 'void';
-          return `(${params}) => ${returnType}`;
-        } else if (type.declaration?.children) {
-          // Object type
-          const properties = type.declaration.children
-            .filter((child) => !child.flags?.isPrivate)
-            .map((child) => {
-              const propType = child.type ? formatLinkedType(child.type, crossRefMap) : 'any';
-              return `${child.name}: ${propType}`;
-            });
-          return properties.length > 0 ? `{ ${properties.join('; ')} }` : '{}';
-        }
-      }
-      return 'object';
-
-    default:
-      throwTypeError(`unhandled type "${type.type}"`, type);
-  }
-}
-
-/**
- * Throws a descriptive error for unhandled type cases
- */
-function throwTypeError(message: string, type: Type): never {
-  const debugInfo = {
-    type: type.type,
-    constructor: type.constructor.name,
-    keys: Object.keys(type)
-  };
-  
-  throw new Error(`TypeDoc type parsing error: ${message}. Type info: ${JSON.stringify(debugInfo, null, 2)}`);
-}
-
-
-/**
- * Format a function signature with cross-reference links
- */
-function formatLinkedTypeSignature(
-  element: DeclarationReflection,
-  crossRefMap: Map<string, string>,
-): string {
-  if (!element.signatures?.[0]) return '';
-
-  const sig = element.signatures[0];
-  const params = sig.parameters?.map((p) => {
-    const type = p.type ? formatLinkedType(p.type, crossRefMap) : 'any';
-    return `${p.name}: ${type}`;
-  }).join(', ') || '';
-
-  const returnType = sig.type
-    ? formatLinkedType(sig.type, crossRefMap)
-    : 'void';
-  
-  return `${element.name}(${params}): ${returnType}`;
-}
-
-/**
- * Escape content for use inside HTML <code> tags to prevent MDX JSX conflicts
- */
-function escapeForCodeTag(content: string): string {
-  return content
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\{/g, '&#123;')
-    .replace(/\}/g, '&#125;');
-}
-
-/**
- * Generates MDX content for a class.
- *
- * @param element - The TypeDoc element to generate the MDX content for.
- * @param crossRefMap - A Map of element names to their corresponding file
- *                      paths.
- * @param reverseInheritanceMap - A Map of parent element names to their
- *                                corresponding child element names.
- * @returns The MDX content for the class.
- */
-function createClassMDX(
-  element: DeclarationReflection,
-  crossRefMap: Map<string, string>,
-  reverseInheritanceMap: Map<string, string[]>,
-): string {
-  const name = element.name;
-  const doc = extractDocumentation(element);
-  const inheritance = extractInheritanceInfo(element, crossRefMap);
-  const { ownMembers, inheritedMembers } = separateMembers(element);
-
-  let content = `---
-title: ${name}
-sidebar_label: ${name}
----
-
-# ${name}
-
-`;
-
-  if (doc) {
-    content += `${doc}\n\n`;
-  }
-
-  // Show inheritance
-  if (inheritance.extends.length > 0) {
-    const extendsLinks = inheritance.extends.map((parent) =>
-      `[${parent.name}](${parent.link})`
-    ).join(', ');
-    content += `**Extends:** ${extendsLinks}\n\n`;
-  }
-
-  if (inheritance.implements.length > 0) {
-    const implementsLinks = inheritance.implements.map((iface) =>
-      `[${iface.name}](${iface.link})`
-    ).join(', ');
-    content += `**Implements:** ${implementsLinks}\n\n`;
-  }
-
-  // Show subclasses (classes that extend this class)
-  const subclasses = reverseInheritanceMap.get(name);
-  if (subclasses && subclasses.length > 0) {
-    const subclassLinks = subclasses.map((subclass) =>
-      `[${subclass}](/api/classes/${subclass.toLowerCase()})`
-    ).join(', ');
-    content += `**Subclasses:** ${subclassLinks}\n\n`;
-  }
-
-  // Constructor (always own, never inherited)
-  const constructor = ownMembers.find((c) => c.kind === 512); // Constructor
-  if (constructor?.signatures?.[0]) {
-    content += `## Constructor\n\n`;
-    const sig = constructor.signatures[0];
-    const params = sig.parameters?.map((p) => {
-      const type = p.type ? formatLinkedType(p.type, crossRefMap) : 'any';
-      return `${p.name}: ${type}`;
-    }).join(', ') || '';
-    const constructorSig = `new ${name}(${params})`;
-    content += `**<code>${escapeForCodeTag(constructorSig)}</code>**\n\n`;
-
-    if (sig.comment?.summary) {
-      content += sig.comment.summary.map((s) => s.text).join('') + '\n\n';
-    }
-  }
-
-  // Own methods
-  const ownMethods = ownMembers.filter((c) => c.kind === 2048); // Method
-  if (ownMethods.length > 0) {
-    content += `## Methods\n\n`;
-    for (const method of ownMethods) {
-      if (method.flags?.isPrivate) continue;
-      content += `### ${method.name}()\n\n`;
-
-      if (method.signatures?.[0]) {
-        const sig = formatLinkedTypeSignature(method, crossRefMap);
-        content += `**<code>${escapeForCodeTag(sig)}</code>**\n\n`;
-      }
-
-      const methodDoc = extractDocumentation(method);
-      if (methodDoc) {
-        content += `${methodDoc}\n\n`;
-      }
-    }
-  }
-
-  // Inherited methods
-  if (inheritedMembers.size > 0) {
-    content += `## Inherited Methods\n\n`;
-    for (const [parentName, members] of inheritedMembers) {
-      const parentLink = `/api/classes/${parentName.toLowerCase()}`;
-      content += `### From [${parentName}](${parentLink})\n\n`;
-
-      const methods = members.filter((m) =>
-        m.kind === 2048 && !m.flags?.isPrivate
-      );
-      if (methods.length > 0) {
-        const methodNames = methods.map((m) => `\`${m.name}()\``).join(
-          ', ',
-        );
-        content += `${methodNames}\n\n`;
-        content +=
-          `*See [${parentName}](${parentLink}) for detailed documentation*\n\n`;
-      }
-    }
-  }
-
-  return content;
-}
-
-/**
- * Generates MDX content for an interface.
- *
- * @param element - The TypeDoc element to generate the MDX content for.
- * @param crossRefMap - A Map of element names to their corresponding file
- *                      paths.
- * @param reverseInheritanceMap - A Map of parent element names to their
- *                                corresponding child element names.
- * @returns The MDX content for the interface.
- */
-function createInterfaceMDX(
-  element: DeclarationReflection,
-  crossRefMap: Map<string, string>,
-  reverseInheritanceMap: Map<string, string[]>,
-): string {
-  const name = element.name;
-  const doc = extractDocumentation(element);
-  const inheritance = extractInheritanceInfo(element, crossRefMap);
-  const { ownMembers, inheritedMembers } = separateMembers(element);
-
-  let content = `---
-title: ${name}
-sidebar_label: ${name}
----
-
-# ${name}
-
-`;
-
-  if (doc) {
-    content += `${doc}\n\n`;
-  }
-
-  // Show inheritance (interfaces extend other interfaces)
-  if (inheritance.extends.length > 0) {
-    const extendsLinks = inheritance.extends.map((parent) =>
-      `[${parent.name}](${parent.link})`
-    ).join(', ');
-    content += `**Extends:** ${extendsLinks}\n\n`;
-  }
-
-  // Show subinterfaces (interfaces that extend this interface)
-  const subinterfaces = reverseInheritanceMap.get(name);
-  if (subinterfaces && subinterfaces.length > 0) {
-    const subinterfaceLinks = subinterfaces.map((subinterface) =>
-      `[${subinterface}](/api/interfaces/${subinterface.toLowerCase()})`
-    ).join(', ');
-    content += `**Extended by:** ${subinterfaceLinks}\n\n`;
-  }
-
-  // Own properties
-  const ownProperties = ownMembers.filter((c) => c.kind === 1024); // Property
-  if (ownProperties.length > 0) {
-    content += `## Properties\n\n`;
-    for (const prop of ownProperties) {
-      const type = prop.type ? formatLinkedType(prop.type, crossRefMap) : 'any';
-      content += `### ${prop.name}\n\n`;
-      const propSig = `${prop.name}: ${type}`;
-      content += `\`\`\`typescript\n${propSig}\n\`\`\`\n\n`;
-
-      const propDoc = extractDocumentation(prop);
-      if (propDoc) {
-        content += `${propDoc}\n\n`;
-      }
-    }
-  }
-
-  // Own methods (interfaces can have method signatures)
-  const ownMethods = ownMembers.filter((c) => c.kind === 2048); // Method
-  if (ownMethods.length > 0) {
-    content += `## Methods\n\n`;
-    for (const method of ownMethods) {
-      content += `### ${method.name}()\n\n`;
-
-      if (method.signatures?.[0]) {
-        const sig = formatLinkedTypeSignature(method, crossRefMap);
-        content += `**<code>${escapeForCodeTag(sig)}</code>**\n\n`;
-      }
-
-      const methodDoc = extractDocumentation(method);
-      if (methodDoc) {
-        content += `${methodDoc}\n\n`;
-      }
-    }
-  }
-
-  // Inherited properties and methods
-  if (inheritedMembers.size > 0) {
-    content += `## Inherited Members\n\n`;
-    for (const [parentName, members] of inheritedMembers) {
-      // Skip TypeScript utility types in inherited members
-      const TYPESCRIPT_UTILITY_TYPES = new Set([
-        'Omit', 'Pick', 'Partial', 'Required', 'Record', 'Exclude', 'Extract', 
-        'NonNullable', 'Parameters', 'ConstructorParameters', 'ReturnType', 
-        'InstanceType', 'ThisParameterType', 'OmitThisParameter'
-      ]);
-      if (TYPESCRIPT_UTILITY_TYPES.has(parentName)) {
-        continue;
-      }
-      
-      const parentLink = `/api/interfaces/${parentName.toLowerCase()}`;
-      content += `### From [${parentName}](${parentLink})\n\n`;
-
-      const properties = members.filter((m) => m.kind === 1024);
-      const methods = members.filter((m) => m.kind === 2048);
-
-      if (properties.length > 0) {
-        const propNames = properties.map((p) => `\`${p.name}\``).join(
-          ', ',
-        );
-        content += `**Properties:** ${propNames}\n\n`;
-      }
-
-      if (methods.length > 0) {
-        const methodNames = methods.map((m) => `\`${m.name}()\``).join(
-          ', ',
-        );
-        content += `**Methods:** ${methodNames}\n\n`;
-      }
-
-      content +=
-        `*See [${parentName}](${parentLink}) for detailed documentation*\n\n`;
-    }
-  }
-
-  return content;
-}
-
-/**
- * Generates MDX content for functions.
- *
- * @param functions - An array of TypeDoc function elements to generate the
- *                    MDX content for.
- * @param moduleName - The name of the module to generate the MDX content for.
- * @param crossRefMap - A Map of element names to their corresponding file
- *                      paths.
- * @returns The MDX content for the functions.
- */
-function createFunctionsMDX(
-  functions: DeclarationReflection[],
-  moduleName: string,
-  crossRefMap: Map<string, string>,
-): string {
-  let content = `---
-title: ${moduleName} Functions
----
-
-# ${moduleName} Functions
-
-`;
-
-  for (const fn of functions) {
-    content += `## ${fn.name}\n\n`;
-
-    if (fn.signatures?.[0]) {
-      const sig = formatLinkedTypeSignature(fn, crossRefMap);
-      content += `**<code>${escapeForCodeTag(sig)}</code>**\n\n`;
-    }
-
-    const doc = extractDocumentation(fn);
-    if (doc) {
-      content += `${doc}\n\n`;
-    }
-  }
-
-  return content;
-}
-
-/**
- * Generates MDX content for a type alias.
- *
- * @param element - The TypeDoc element to generate the MDX content for.
- * @param crossRefMap - A Map of element names to their corresponding file
- *                      paths.
- * @returns The MDX content for the type alias.
- */
-function createTypeMDX(
-  element: DeclarationReflection,
-  crossRefMap: Map<string, string>,
-): string {
-  const name = element.name;
-  const doc = extractDocumentation(element);
-
-  let content = `---
-title: ${name}
-sidebar_label: ${name}
----
-
-# ${name}
-
-`;
-
-  if (doc) {
-    content += `${doc}\n\n`;
-  }
-
-  // Show the type definition
-  if (element.type) {
-    const interactiveType = formatLinkedType(element.type, crossRefMap);
-    
-    content += `## Definition\n\n`;
-    content += `**Type:** <code>${escapeForCodeTag(`${name} = ${interactiveType}`)}</code>\n\n`;
-  } else if (element.children && element.children.length > 0) {
-    // Handle interface-like types that have properties as children
-    content += `## Definition\n\n`;
-    
-    const properties = element.children
-      .filter((child) => child.kind === 1024) // Property kind
-      .map((prop) => {
-        const propType = prop.type ? formatLinkedType(prop.type, crossRefMap) : 'any';
-        const optional = prop.flags?.isOptional ? '?' : '';
-        return `${prop.name}${optional}: ${propType}`;
-      })
-      .join('; ');
-    
-    if (properties) {
-      const typeDefinition = `${name} = \{ ${properties} \}`;
-      content += `**Type:** <code>${escapeForCodeTag(typeDefinition)}</code>\n\n`;
-    }
-  }
-
-  return content;
-}
-
 
 /**
  * Writes all API files to disk.
@@ -1000,7 +254,6 @@ async function writeApiFiles(allElements: ApiElements[]): Promise<void> {
       await Deno.writeTextFile(path.join(API_DOCS_DIR, filename), mdx);
     }
   }
-
 }
 
 /**
@@ -1074,9 +327,8 @@ Complete API documentation for GoatDB.\n\n`;
     // Functions
     if (elements.functions.length > 0) {
       content += `### Functions\n\n`;
-      const moduleFile = elements.moduleName.toLowerCase();
-      content +=
-        `See [${elements.moduleName} Functions](./functions-${moduleFile}) for all exported functions.\n\n`;
+      const filename = `functions-${elements.moduleName.toLowerCase()}`;
+      content += `- **[${elements.moduleName} Functions](./${filename})**\n\n`;
     }
   }
 
@@ -1084,137 +336,158 @@ Complete API documentation for GoatDB.\n\n`;
 }
 
 /**
- * Discovers all TypeScript entry points that should be included in API documentation.
- * Automatically finds module exports and key type definition files.
+ * Validates configured modules and returns available module configurations.
+ * Checks that entry points exist and logs warnings for missing modules.
  */
-async function discoverEntryPoints(): Promise<string[]> {
-  console.log('🔍 Discovering API entry points...');
+async function validateModuleConfigs(): Promise<ModuleConfig[]> {
+  console.log('🔍 Validating module configurations...');
   
-  const entryPoints: string[] = [];
+  const validModules: ModuleConfig[] = [];
   
-  // Main module export
-  entryPoints.push('mod.ts');
-  
-  // Discover all mod.ts files (module entry points), but exclude test files
-  try {
-    for await (const entry of Deno.readDir('.')) {
-      if (entry.isDirectory && entry.name !== 'node_modules' && entry.name !== '.git' && entry.name !== 'tests') {
-        const modPath = `${entry.name}/mod.ts`;
-        try {
-          await Deno.stat(modPath);
-          entryPoints.push(modPath);
-        } catch {
-          // File doesn't exist, skip
-        }
-      }
-    }
-  } catch (error) {
-    console.warn('⚠️  Failed to scan for mod.ts files:', error);
-  }
-  
-  // Core type definitions - these contain fundamental types referenced throughout
-  const coreTypeFiles = [
-    'base/core-types/index.ts',     // CoreValue, CoreObject, etc.
-    'base/core-types/base.ts',      // CoreType enum, Dictionary
-    'base/core-types/encoding/index.ts', // Encoder, Decoder, etc.
-    'base/core-types/encoding/checksum.ts', // ChecksumEncoderOpts
-    'base/core-types/encoding/base-encoder.ts', // BaseEncoder
-    'base/interfaces.ts',           // Common interfaces like JSONValue
-    'base/common.ts',               // Common types
-    'base/bloom.ts',                // BloomFilter
-    'base/timer.ts',                // Timer, TimerCallback
-    'cfds/base/types/index.ts',     // ValueType, IValueTypeOperations, etc.
-    'cfds/base/schema.ts',          // Schema, SchemaDataType, etc.
-    'cfds/base/defs.ts',            // Core definitions
-    'cfds/change/index.ts',         // Change types
-    'cfds/richtext/model.ts',       // RichText, related interfaces
-    'cfds/richtext/tree.ts',        // RichTextValue, ElementNode, TextNode
-    'repo/commit.ts',               // Commit types
-    'repo/repo.ts',                 // Repository types
-    'repo/query.ts',                // Query types
-    'repo/query-persistance.ts',    // QueryPersistence
-    'db/session.ts',                // Session types
-    'db/db.ts',                     // Database types
-    'db/managed-item.ts',           // ItemConfig
-    'server/build-info.ts',         // BuilderInfo
-    'net/server/server.ts',         // ServerOptions
-    'react/hooks.ts',               // React hooks
-  ];
-  
-  // Add core type files that exist
-  for (const file of coreTypeFiles) {
+  for (const moduleConfig of GOATDB_MODULES) {
     try {
-      await Deno.stat(file);
-      entryPoints.push(file);
+      await Deno.stat(moduleConfig.entryPoint);
+      validModules.push(moduleConfig);
+      console.log(`   ✅ ${moduleConfig.name}: ${moduleConfig.entryPoint}`);
     } catch {
-      console.warn(`⚠️  Core type file not found: ${file}`);
+      console.warn(`   ⚠️  Module ${moduleConfig.name} entry point not found: ${moduleConfig.entryPoint}`);
     }
   }
   
-  const uniqueEntryPoints = [...new Set(entryPoints)];
-  console.log(`   Found ${uniqueEntryPoints.length} entry points:`, uniqueEntryPoints);
-  
-  return uniqueEntryPoints;
+  console.log(`   Found ${validModules.length} valid modules`);
+  return validModules;
 }
 
 /**
- * Validates that all type references in the documentation have corresponding
- * documented types. Throws an error if any references are broken.
+ * Validates cross-references within module boundaries. Each module can only
+ * reference types from itself and its declared dependencies.
  */
-async function validateCrossReferences(allElements: ApiElements[]): Promise<void> {
-  console.log('🔍 Validating cross-references...');
+function validateModularCrossReferences(allElements: ApiElements[]): void {
+  console.log('🔍 Validating cross-references with module awareness...');
   
-  const crossRefMap = buildCrossReferenceMap(allElements);
-  const documentedTypes = new Set<string>();
-  const referencedTypes = new Set<string>();
+  // Create a map of module name to documented types
+  const moduleTypes = new Map<string, Set<string>>();
   
-  // Collect all documented types
+  // Collect documented types by module
   for (const elements of allElements) {
-    elements.classes.forEach(cls => documentedTypes.add(cls.name));
-    elements.interfaces.forEach(iface => documentedTypes.add(iface.name));
-    elements.types.forEach(type => documentedTypes.add(type.name));
+    const types = new Set<string>();
+    elements.classes.forEach(cls => types.add(cls.name));
+    elements.interfaces.forEach(iface => types.add(iface.name));
+    elements.types.forEach(type => types.add(type.name));
+    moduleTypes.set(elements.moduleName, types);
   }
   
-  // Collect all referenced types by scanning type information
+  let totalIssues = 0;
+  
+  // Validate each module's references
   for (const elements of allElements) {
-    // Scan classes
+    const moduleName = elements.moduleName;
+    const moduleConfig = elements.moduleConfig;
+    
+    console.log(`   📦 Validating ${moduleName} module...`);
+    
+    // Collect allowed types (from this module and its dependencies)
+    const allowedTypes = new Set<string>();
+    
+    // Add types from this module
+    const thisModuleTypes = moduleTypes.get(moduleName);
+    if (thisModuleTypes) {
+      for (const type of thisModuleTypes) {
+        allowedTypes.add(type);
+      }
+    }
+    
+    // Add types from dependency modules
+    if (moduleConfig.dependencies) {
+      for (const depModule of moduleConfig.dependencies) {
+        const depTypes = moduleTypes.get(depModule);
+        if (depTypes) {
+          for (const type of depTypes) {
+            allowedTypes.add(type);
+          }
+        }
+      }
+    }
+    
+    // Collect referenced types from this module
+    const referencedTypes = new Set<string>();
+    
+    // Scan all elements in this module
     for (const cls of elements.classes) {
       scanElementForTypeReferences(cls, referencedTypes);
     }
-    
-    // Scan interfaces
     for (const iface of elements.interfaces) {
       scanElementForTypeReferences(iface, referencedTypes);
     }
-    
-    // Scan types
     for (const type of elements.types) {
       scanElementForTypeReferences(type, referencedTypes);
     }
-    
-    // Scan functions
     for (const fn of elements.functions) {
       scanElementForTypeReferences(fn, referencedTypes);
     }
-  }
-  
-  // Find missing types (referenced but not documented)
-  const missingTypes = new Set<string>();
-  for (const refType of referencedTypes) {
-    if (!documentedTypes.has(refType) && !isBuiltInType(refType)) {
-      missingTypes.add(refType);
+    
+    // Find problematic references
+    const problematicTypes: string[] = [];
+    const internalTypes: string[] = [];
+    
+    for (const refType of referencedTypes) {
+      const classification = classifyType(refType, moduleName);
+      
+      if (classification.classification === 'builtin') {
+        // Built-in types are always OK
+        continue;
+      }
+      
+      if (classification.classification === 'internal') {
+        // Internal types should not be referenced in public APIs
+        internalTypes.push(refType);
+        continue;
+      }
+      
+      // Check if the type is allowed in this module's scope
+      if (!allowedTypes.has(refType)) {
+        // Check if it's a legitimate cross-module reference
+        if (classification.module && classification.module !== moduleName) {
+          const allowedModules = [moduleName, ...(moduleConfig.dependencies || [])];
+          if (!allowedModules.includes(classification.module)) {
+            problematicTypes.push(`${refType} (from ${classification.module} module)`);
+          }
+        } else {
+          problematicTypes.push(refType);
+        }
+      }
+    }
+    
+    // Report issues for this module
+    if (internalTypes.length > 0) {
+      console.warn(`   ⚠️  ${moduleName}: ${internalTypes.length} internal types referenced in public API:`);
+      for (const type of internalTypes.sort()) {
+        console.warn(`      - ${type} (internal implementation detail)`);
+      }
+      totalIssues += internalTypes.length;
+    }
+    
+    if (problematicTypes.length > 0) {
+      console.warn(`   ⚠️  ${moduleName}: ${problematicTypes.length} cross-module references without proper dependencies:`);
+      for (const type of problematicTypes.sort()) {
+        console.warn(`      - ${type}`);
+      }
+      totalIssues += problematicTypes.length;
+    }
+    
+    if (internalTypes.length === 0 && problematicTypes.length === 0) {
+      console.log(`      ✅ ${allowedTypes.size} types available, ${referencedTypes.size} types referenced, all valid`);
     }
   }
   
-  if (missingTypes.size > 0) {
-    console.error(`❌ Found ${missingTypes.size} undocumented type references:`);
-    for (const missing of Array.from(missingTypes).sort()) {
-      console.error(`   - ${missing}`);
-    }
-    throw new Error(`API documentation is incomplete. ${missingTypes.size} referenced types are not documented. Add missing entry points or ensure types are properly exported.`);
+  if (totalIssues > 0) {
+    console.warn(`\n⚠️  Found ${totalIssues} cross-reference issues. These indicate API design issues:`);
+    console.warn('   - Internal types: Mark with @internal or refactor to avoid exposing in public API');
+    console.warn('   - Cross-module types: Add module dependencies or re-export types properly');
+    console.warn('   This is a warning only - documentation will still be generated.');
+  } else {
+    console.log(`\n✅ Cross-reference validation passed. All module boundaries respected.`);
   }
-  
-  console.log(`✅ Cross-reference validation passed. ${documentedTypes.size} types documented, ${referencedTypes.size} types referenced.`);
 }
 
 /**
@@ -1239,14 +512,7 @@ function scanElementForTypeReferences(element: DeclarationReflection, referenced
     }
   }
   
-  // Scan children (properties, methods, etc.)
-  if (element.children) {
-    for (const child of element.children) {
-      scanElementForTypeReferences(child, referencedTypes);
-    }
-  }
-  
-  // Scan signatures (for functions/methods)
+  // Scan signatures (functions, methods)
   if (element.signatures) {
     for (const sig of element.signatures) {
       if (sig.type) {
@@ -1261,184 +527,56 @@ function scanElementForTypeReferences(element: DeclarationReflection, referenced
       }
     }
   }
-}
-
-/**
- * Recursively collects type references from a TypeDoc Type.
- */
-function collectTypeReferences(type: Type, referencedTypes: Set<string>): void {
-  switch (type.type) {
-    case 'reference':
-      if (type instanceof ReferenceType && type.name) {
-        referencedTypes.add(type.name);
-        if (type.typeArguments) {
-          for (const arg of type.typeArguments) {
-            collectTypeReferences(arg, referencedTypes);
-          }
-        }
-      }
-      break;
-      
-    case 'union':
-    case 'intersection':
-      if (type instanceof UnionType) {
-        for (const subType of type.types) {
-          collectTypeReferences(subType, referencedTypes);
-        }
-      }
-      break;
-      
-    case 'array':
-      if (type instanceof ArrayType) {
-        collectTypeReferences(type.elementType, referencedTypes);
-      }
-      break;
-      
-    case 'tuple':
-      if (type instanceof TupleType) {
-        for (const element of type.elements) {
-          collectTypeReferences(element, referencedTypes);
-        }
-      }
-      break;
-      
-    case 'reflection':
-      if (type instanceof ReflectionType && type.declaration) {
-        scanElementForTypeReferences(type.declaration, referencedTypes);
-      }
-      break;
-      
-    case 'conditional':
-      if (type instanceof ConditionalType) {
-        collectTypeReferences(type.checkType, referencedTypes);
-        collectTypeReferences(type.extendsType, referencedTypes);
-        collectTypeReferences(type.trueType, referencedTypes);
-        collectTypeReferences(type.falseType, referencedTypes);
-      }
-      break;
-      
-    case 'mapped':
-      if (type instanceof MappedType) {
-        collectTypeReferences(type.parameterType, referencedTypes);
-        collectTypeReferences(type.templateType, referencedTypes);
-      }
-      break;
-      
-    case 'indexedAccess':
-      if (type instanceof IndexedAccessType) {
-        collectTypeReferences(type.objectType, referencedTypes);
-        collectTypeReferences(type.indexType, referencedTypes);
-      }
-      break;
-      
-    case 'typeOperator':
-      if (type instanceof TypeOperatorType) {
-        collectTypeReferences(type.target, referencedTypes);
-      }
-      break;
-      
-    case 'query':
-      if (type instanceof QueryType) {
-        collectTypeReferences(type.queryType, referencedTypes);
-      }
-      break;
-  }
-}
-
-/**
- * Checks if a type name is a built-in TypeScript type that doesn't need documentation.
- */
-function isBuiltInType(typeName: string): boolean {
-  const builtInTypes = new Set([
-    // Primitive types
-    'string', 'number', 'boolean', 'undefined', 'null', 'void', 'any', 'unknown', 'never',
-    'object', 'symbol', 'bigint',
-    
-    // Built-in objects
-    'Array', 'Object', 'Function', 'String', 'Number', 'Boolean', 'Date', 'RegExp',
-    'Error', 'Promise', 'Map', 'Set', 'WeakMap', 'WeakSet',
-    
-    // Web APIs / Node.js / Deno built-ins
-    'Response', 'Crypto', 'CryptoKey', 'CryptoKeyPair', 'Iterable', 'Generator',
-    
-    // TypeScript utility types
-    'Omit', 'Pick', 'Partial', 'Required', 'Record', 'Exclude', 'Extract',
-    'NonNullable', 'Parameters', 'ConstructorParameters', 'ReturnType',
-    'InstanceType', 'ThisParameterType', 'OmitThisParameter',
-    
-    // Single-letter generics
-    'T', 'U', 'V', 'K', 'P', 'R', 'S', 'N', 'E',
-  ]);
   
-  // Built-in types
-  if (builtInTypes.has(typeName)) return true;
-  
-  // Single-letter generics
-  if (/^[A-Z]$/.test(typeName)) return true;
-  
-  // Constants (starting with k)
-  if (typeName.startsWith('k')) return true;
-  
-  // Internal/private types (containing dots, indicating nested access)
-  if (typeName.includes('.')) return true;
-  
-  // Short generic-like names (often internal)
-  if (/^[A-Z]{2,3}$/.test(typeName)) return true;
-  
-  return false;
-}
-
-/**
- * Main function - orchestrates the entire documentation build process.
- *
- * @returns A promise that resolves when the documentation build process is
- *          complete.
- */
-export async function buildApiDocs(): Promise<void> {
-  console.log('🚀 Building API documentation...');
-
-  // Step 1: Prepare output directory
-  await cleanOutputDirectory();
-
-  // Step 2: Discover and extract API elements from entry points
-  const entryPoints = await discoverEntryPoints();
-  const allElements: ApiElements[] = [];
-
-  for (const entryPoint of entryPoints) {
-    try {
-      const elements = await extractApiElements(entryPoint);
-      allElements.push(elements);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.warn(`⚠️  Failed to process ${entryPoint}: ${errorMessage}`);
+  // Scan children (properties, methods)
+  if (element.children) {
+    for (const child of element.children) {
+      scanElementForTypeReferences(child, referencedTypes);
     }
   }
-
-  if (allElements.length === 0) {
-    throw new Error('No API elements extracted from any entry point');
-  }
-
-  // Step 3: Validate that all referenced types are documented
-  // TODO: Re-enable validation once all types are properly documented
-  // await validateCrossReferences(allElements);
-
-  // Step 4: Write all documentation files
-  await writeApiFiles(allElements);
-
-  // Step 5: Generate the index page
-  await writeIndexPage(allElements);
-
-  console.log('✅ API documentation generated successfully!');
-  console.log(`📁 Output: ${API_DOCS_DIR}`);
 }
 
-// Run if this file is executed directly
-if (import.meta.main) {
+/**
+ * Main function - orchestrates the entire documentation build process
+ */
+async function main(): Promise<void> {
   try {
-    await buildApiDocs();
+    console.log('🚀 Starting API documentation build process...\n');
+
+    // Step 1: Clean output directory
+    await cleanOutputDirectory();
+
+    // Step 2: Validate module configurations
+    const validModules = await validateModuleConfigs();
+
+    // Step 3: Extract API elements from all modules
+    const allElements: ApiElements[] = [];
+    for (const moduleConfig of validModules) {
+      try {
+        const elements = await extractApiElements(moduleConfig);
+        allElements.push(elements);
+      } catch (error) {
+        console.warn(`⚠️  Failed to process ${moduleConfig.name}: ${(error as Error).message}`);
+      }
+    }
+
+    // Step 4: Validate cross-references with module awareness
+    validateModularCrossReferences(allElements);
+
+    // Step 5: Write API files
+    await writeApiFiles(allElements);
+
+    // Step 6: Write index page
+    await writeIndexPage(allElements);
+
+    console.log('\n✅ API documentation build completed successfully!');
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('❌ Error building API documentation:', errorMessage);
+    console.error('\n❌ API documentation build failed:', error);
     Deno.exit(1);
   }
+}
+
+// Run main function when script is executed directly
+if (import.meta.main) {
+  await main();
 }

@@ -351,6 +351,10 @@ export function diffKeys<S extends Schema>(
   return Array.from(result);
 }
 
+/**
+ * Internal representation of data changes for CRDT operations.
+ * @internal
+ */
 export interface DataChanges extends CoreObject {
   [key: string]: Change<EncodedChange>[];
 }

@@ -29,24 +29,24 @@ supporting:
 Query chaining example:
 ```ts
 // Chain queries to find recent important todos
-const importantTodos = new Query(\{
+const importantTodos = new Query({
   source: repo,
   predicate: todo => todo.important
-\});
-const recentImportant = new Query(\{
+});
+const recentImportant = new Query({
   source: importantTodos,
   predicate: todo => isRecent(todo.date)
-\});
+});
 ```
 
 You can also use queries as efficient indexes:
 ```ts
 // Create an index over user emails
-const usersByEmail = new Query(\{
+const usersByEmail = new Query({
   source: '/sys/users',
   schema: kSchemaUser,
   sortBy: 'email'
-\});
+});
 
 // O(log n) lookup by email after index is built
 await usersByEmail.loadingFinished();
@@ -57,7 +57,7 @@ const user = usersByEmail.find('email', 'user@example.com');
 
 ## Constructor
 
-**<code>new Query(config: [QueryConfig](/api/types/queryconfig)&lt;IS, OS, CTX&gt;)</code>**
+**<code>new Query(config: QueryConfig&lt;IS, OS, CTX&gt;)</code>**
 
 Creates a new Query instance.
 
@@ -78,7 +78,7 @@ instead.
 
 ### entries()
 
-**<code>entries(): Generator&lt;[Entry](/api/types/entry)&lt;OS&gt;&gt;</code>**
+**<code>entries(): Generator&lt;Entry&lt;OS&gt;&gt;</code>**
 
 Returns a generator that yields key-value pairs for all items in the query
 results. Each entry contains the item's path key and its corresponding
@@ -86,7 +86,7 @@ value.
 
 ### find()
 
-**<code>find(fieldName: keyof OS[any], value: [SchemaDataType](/api/types/schemadatatype)&lt;OS&gt;[keyof OS[any]]): [ManagedItem](/api/classes/manageditem)&lt;OS, [Schema](/api/types/schema)&gt;</code>**
+**<code>find(fieldName: keyof OS['fields'], value: [SchemaDataType](/api/types/schemadatatype)&lt;OS&gt;[keyof OS['fields']]): [ManagedItem](/api/classes/manageditem)&lt;OS, [Schema](/api/types/schema)&gt;</code>**
 
 Finds the first item in the query results where the specified field matches
 the given value. If the field is the sort field, uses binary search for
@@ -100,7 +100,7 @@ Checks if a given path is included in the query results.
 
 ### loadingFinished()
 
-**<code>loadingFinished(): Promise&lt;any&gt;</code>**
+**<code>loadingFinished(): Promise&lt;true&gt;</code>**
 
 Returns a promise that resolves to true when the query finishes loading
 its initial results. If loading is already finished, the promise resolves

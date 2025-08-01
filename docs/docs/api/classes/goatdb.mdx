@@ -18,7 +18,7 @@ GoatDB is the primary entry point for working with the database. It handles:
 
 ## Constructor
 
-**<code>new GoatDB(config: [DBInstanceConfig](/api/interfaces/dbinstanceconfig))</code>**
+**<code>new GoatDB(config: DBInstanceConfig)</code>**
 
 ## Methods
 
@@ -92,7 +92,7 @@ Note: You almost never need to use the trust pool directly.
 
 Access an item at the given path. An item's path is typically at the
 following format:
-/\<data type\>/\<repo id\>/\<item key\>
+/&lt;data type&gt;/&lt;repo id&gt;/&lt;item key&gt;
 
 NOTE: If the item's repository haven't been opened yet, it'll be opened in
 the background. While open is progressing, the returned item will
@@ -150,14 +150,14 @@ a clean state.
 
 ### open()
 
-**<code>open(path: string, opts: [OpenOptions](/api/types/openoptions)): Promise&lt;[Repository](/api/classes/repository)&lt;[MemRepoStorage](/api/classes/memrepostorage)&lt;&gt;&gt;&gt;</code>**
+**<code>open(path: string, opts: OpenOptions): Promise&lt;[Repository](/api/classes/repository)&lt;MemRepoStorage&lt;&gt;&gt;&gt;</code>**
 
 Opens the given repository, loading all its items to memory.
 This method does nothing if the repository is already open.
 
 ### query()
 
-**<code>query(config: Omit&lt;[QueryConfig](/api/types/queryconfig)&lt;IS, OS, CTX&gt;, any&gt;): [Query](/api/classes/query)&lt;IS, OS, CTX&gt;</code>**
+**<code>query(config: Omit&lt;QueryConfig&lt;IS, OS, CTX&gt;, 'db'&gt;): [Query](/api/classes/query)&lt;IS, OS, CTX&gt;</code>**
 
 Open a new query or access an already open one. Once opened, the query
 remains open until explicitly closed, and tracks updates to items as they
@@ -172,7 +172,7 @@ this DB instance is ready to receive commands.
 
 ### repository()
 
-**<code>repository(pathComps: string[]): [Repository](/api/classes/repository)&lt;[MemRepoStorage](/api/classes/memrepostorage)&lt;&gt;&gt;</code>**
+**<code>repository(pathComps: string[]): [Repository](/api/classes/repository)&lt;MemRepoStorage&lt;&gt;&gt;</code>**
 
 Returns the requested repository or undefined if it wasn't opened yet.
 
@@ -181,14 +181,14 @@ repository instance directly.
 
 ### sync()
 
-**<code>sync(path: string): Promise&lt;[SyncResult](/api/types/syncresult)&gt;</code>**
+**<code>sync(path: string): Promise&lt;SyncResult&gt;</code>**
 
 Syncs the given repository with all configured peers and waits for
 completion.
 
 ### syncAll()
 
-**<code>syncAll(): Promise&lt;Record&lt;string, [SyncResult](/api/types/syncresult)&gt;&gt;</code>**
+**<code>syncAll(): Promise&lt;Record&lt;string, SyncResult&gt;&gt;</code>**
 
 Syncs all open repositories with all configured peers and waits for completion.
 

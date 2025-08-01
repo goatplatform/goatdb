@@ -1,5 +1,4 @@
 import { cli } from './base/development.ts';
-import * as path from 'jsr:@std/path';
 import { zip } from 'jsr:@deno-library/compress';
 
 export async function buildDocs(): Promise<void> {
@@ -27,7 +26,6 @@ export async function buildDocs(): Promise<void> {
   }
   
   await zip.compress('build/docs', 'build/docs.zip');
-  await cli('cp', './llms.txt', 'build/docs/');
   console.log('Docs built successfully under build/docs');
 }
 
