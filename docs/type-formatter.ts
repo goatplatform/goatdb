@@ -88,17 +88,17 @@ export function buildCrossReferenceMap(allElements: Array<{
   for (const elements of allElements) {
     // Map classes - use absolute paths from API root
     for (const cls of elements.classes) {
-      crossRefMap.set(cls.name, `/api/classes/${cls.name.toLowerCase()}`);
+      crossRefMap.set(cls.name, `/docs/api/classes/${cls.name.toLowerCase()}`);
     }
 
     // Map interfaces - use absolute paths from API root
     for (const iface of elements.interfaces) {
-      crossRefMap.set(iface.name, `/api/interfaces/${iface.name.toLowerCase()}`);
+      crossRefMap.set(iface.name, `/docs/api/interfaces/${iface.name.toLowerCase()}`);
     }
 
     // Map types - use absolute paths from API root
     for (const type of elements.types) {
-      crossRefMap.set(type.name, `/api/types/${type.name.toLowerCase()}`);
+      crossRefMap.set(type.name, `/docs/api/types/${type.name.toLowerCase()}`);
     }
   }
 
@@ -152,8 +152,8 @@ export function extractInheritanceInfo(element: DeclarationReflection, crossRefM
         // Fallback to simple inheritance (existing logic)
         const parentInterfaceLink = crossRefMap.get(extendedType.name) || 
           (element.kind === 256 
-            ? `/api/interfaces/${extendedType.name.toLowerCase()}`
-            : `/api/classes/${extendedType.name.toLowerCase()}`);
+            ? `/docs/api/interfaces/${extendedType.name.toLowerCase()}`
+            : `/docs/api/classes/${extendedType.name.toLowerCase()}`);
 
         inheritance.extends.push({
           name: extendedType.name,
@@ -168,7 +168,7 @@ export function extractInheritanceInfo(element: DeclarationReflection, crossRefM
     for (const implementedType of element.implementedTypes) {
       if (implementedType.type === 'reference' && implementedType.name) {
         const implementedInterfaceLink = crossRefMap.get(implementedType.name) || 
-          `/api/interfaces/${implementedType.name.toLowerCase()}`;
+          `/docs/api/interfaces/${implementedType.name.toLowerCase()}`;
         
         inheritance.implements.push({
           name: implementedType.name,

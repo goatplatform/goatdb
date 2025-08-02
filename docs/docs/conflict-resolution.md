@@ -9,7 +9,7 @@ slug: /conflict-resolution
 # Conflict Resolution
 
 Whenever a peer in the network detects more than one differing value at the
-leaves of the [commit graph](/commit-graph), it performs a
+leaves of the [commit graph](/docs/commit-graph), it performs a
 [three-way merge](https://en.wikipedia.org/wiki/Merge_(version_control)#Three-way_merge)
 to resolve the conflict. Internally, a conflict-free patch function is used
 temporarily during the merge process.

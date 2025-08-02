@@ -91,3 +91,37 @@
   --ifm-alert-foreground-color: var(--ifm-color-success-lightest);
   --ifm-alert-border-color: var(--ifm-color-success);
 }
+
+/* Homepage improvements */
+
+/* Better button styles */
+.button {
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Code block improvements */
+pre {
+  position: relative;
+}
+
+/* Copy button styling */
+.theme-code-block:hover .copyButton_Tacv {
+  opacity: 1;
+}
+
+/* Responsive text sizing */
+@media screen and (max-width: 996px) {
+  h1 {
+    font-size: 2rem;
+  }
+  
+  h2 {
+    font-size: 1.5rem;
+  }
+}

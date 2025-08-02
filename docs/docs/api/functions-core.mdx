@@ -60,25 +60,25 @@ the serializable representation of the object.
 
 ## SchemaEquals
 
-**<code>SchemaEquals(s1: [Schema](/api/types/schema), s2: [Schema](/api/types/schema)): boolean</code>**
+**<code>SchemaEquals(s1: [Schema](/docs/api/types/schema), s2: [Schema](/docs/api/types/schema)): boolean</code>**
 
 Given two schemas, returns whether they're the same one or not.
 
 ## SchemaGetFieldDef
 
-**<code>SchemaGetFieldDef(s: S, field: F): [FieldDef](/api/types/fielddef)&lt;S['fields'][F]['type']&gt;</code>**
+**<code>SchemaGetFieldDef(s: S, field: F): [FieldDef](/docs/api/types/fielddef)&lt;S['fields'][F]['type']&gt;</code>**
 
 Given a schema and a field, returns its
 
 ## SchemaGetFields
 
-**<code>SchemaGetFields(s: [Schema](/api/types/schema)): readonly [string, [FieldDef](/api/types/fielddef)&lt;ValueType&gt;][]</code>**
+**<code>SchemaGetFields(s: [Schema](/docs/api/types/schema)): readonly [string, [FieldDef](/docs/api/types/fielddef)&lt;ValueType&gt;][]</code>**
 
 Given a schema, this function returns its field definitions as an iterable.
 
 ## SchemaGetRequiredFields
 
-**<code>SchemaGetRequiredFields(s: [Schema](/api/types/schema)): readonly string[]</code>**
+**<code>SchemaGetRequiredFields(s: [Schema](/docs/api/types/schema)): readonly string[]</code>**
 
 Given a schema, this functions returns an iterable of its required fields.
 

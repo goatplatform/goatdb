@@ -9,21 +9,21 @@ slug: /tutorial
 # Building a Todo List App with GoatDB
 
 This tutorial walks you through building a Todo List app with
-[GoatDB](https://goatdb.dev/) using [React](/react). It demonstrates how to
-leverage GoatDB's distributed, edge-native [architecture](/architecture) and
-real-time [synchronization](/sync) features.
+[GoatDB](https://goatdb.dev/) using [React](/docs/react). It demonstrates how to
+leverage GoatDB's distributed, edge-native [architecture](/docs/architecture) and
+real-time [synchronization](/docs/sync) features.
 
 ## Prerequisites
 
 Before starting, make sure you have:
 
-1. Completed the [Installation](/install) steps
-2. Read the [Concepts](/concepts) documentation
+1. Completed the [Installation](/docs/install) steps
+2. Read the [Concepts](/docs/concepts) documentation
 
 ## Define the Task Schema
 
-Edit the file `common/registry.ts` to define our [schemas](/schema) and
-[authorization](/authorization) rules:
+Edit the file `common/registry.ts` to define our [schemas](/docs/schema) and
+[authorization](/docs/authorization) rules:
 
 ```typescript
 import { DataRegistry, itemPathGetPart } from '@goatdb/goatdb';
@@ -65,7 +65,7 @@ export function registerSchemas(
 }
 ```
 
-This [schema](/schema) defines:
+This [schema](/docs/schema) defines:
 
 - A required `text` field for the task description
 - A `done` boolean field that defaults to false
@@ -77,7 +77,7 @@ This [schema](/schema) defines:
 ### Header Component
 
 The `Header` component provides an input field for adding new task
-[items](/concepts#item):
+[items](/docs/concepts#item):
 
 ```tsx
 // client/Header.tsx
@@ -113,7 +113,7 @@ export function Header() {
 ### TaskItem Component
 
 The `TaskItem` component displays and manages individual tasks
-[items](/concepts#item):
+[items](/docs/concepts#item):
 
 ```tsx
 // client/TaskItem.tsx
@@ -157,7 +157,7 @@ export function TaskItem({ path }: TaskItemProps) {
 ### Contents Component
 
 The `Contents` component manages the task list and
-[filtering](/query/#filtering-data):
+[filtering](/docs/query/#filtering-data):
 
 ```tsx
 // client/Contents.tsx
@@ -203,7 +203,7 @@ export function Contents() {
 
 ### Login Component
 
-The `Login` component handles user [authentication](/sessions):
+The `Login` component handles user [authentication](/docs/sessions):
 
 ```tsx
 // client/Login.tsx

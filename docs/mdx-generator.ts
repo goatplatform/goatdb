@@ -238,7 +238,7 @@ sidebar_label: ${name}
   const subclasses = reverseInheritanceMap.get(name);
   if (subclasses && subclasses.length > 0) {
     const subclassLinks = subclasses.map((subclass) =>
-      `[${subclass}](/api/classes/${subclass.toLowerCase()})`
+      `[${subclass}](/docs/api/classes/${subclass.toLowerCase()})`
     ).join(', ');
     content += `**Subclasses:** ${subclassLinks}\n\n`;
   }
@@ -284,7 +284,7 @@ sidebar_label: ${name}
   if (inheritedMembers.size > 0) {
     content += `## Inherited Methods\n\n`;
     for (const [parentName, members] of inheritedMembers) {
-      const parentLink = `/api/classes/${parentName.toLowerCase()}`;
+      const parentLink = `/docs/api/classes/${parentName.toLowerCase()}`;
       content += `### From [${parentName}](${parentLink})\n\n`;
 
       const methods = members.filter((m) =>
@@ -345,7 +345,7 @@ sidebar_label: ${name}
   const subinterfaces = reverseInheritanceMap.get(name);
   if (subinterfaces && subinterfaces.length > 0) {
     const subinterfaceLinks = subinterfaces.map((subinterface) =>
-      `[${subinterface}](/api/interfaces/${subinterface.toLowerCase()})`
+      `[${subinterface}](/docs/api/interfaces/${subinterface.toLowerCase()})`
     ).join(', ');
     content += `**Extended by:** ${subinterfaceLinks}\n\n`;
   }
@@ -460,7 +460,7 @@ sidebar_label: ${name}
         continue;
       }
       
-      const parentLink2 = `/api/interfaces/${parentName.toLowerCase()}`;
+      const parentLink2 = `/docs/api/interfaces/${parentName.toLowerCase()}`;
       content += `### From [${parentName}](${parentLink2})\n\n`;
 
       const properties = members.filter((m) => m.kind === 1024);

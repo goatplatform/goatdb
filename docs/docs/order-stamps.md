@@ -27,29 +27,29 @@ the common problem of maintaining ordered lists in databases by:
 While [order stamps](https://github.com/goatplatform/orderstamp-js) can be used
 with any database, they were originally created alongside
 [GoatDB](https://goatdb.dev) and are designed to complement its
-[architecture](/architecture) and [features](/concepts).
+[architecture](/docs/architecture) and [features](/docs/concepts).
 
 ## API Reference
 
 | Function    | Purpose                           | Use Case                                    |
 | ----------- | --------------------------------- | ------------------------------------------- |
-| `start()`   | Stamp for the start of the list   | Prepend [item](/concepts/#item)             |
-| `end()`     | Stamp for the end of the list     | Append [item](/concepts/#item)              |
+| `start()`   | Stamp for the start of the list   | Prepend [item](/docs/concepts/#item)             |
+| `end()`     | Stamp for the end of the list     | Append [item](/docs/concepts/#item)              |
 | `from()`    | Encode a number as an order stamp | Numeric ordering, custom keys               |
-| `between()` | Stamp between two existing stamps | Insert between two [items](/concepts/#item) |
+| `between()` | Stamp between two existing stamps | Insert between two [items](/docs/concepts/#item) |
 
 - **`start()`**: Returns a
   [stamp](https://github.com/goatplatform/orderstamp-js) for the start of the
-  list, ensuring new [items](/concepts/#item) are ordered before existing ones.
+  list, ensuring new [items](/docs/concepts/#item) are ordered before existing ones.
 - **`end()`**: Returns a [stamp](https://github.com/goatplatform/orderstamp-js)
-  for the end of the list, ensuring new [items](/concepts/#item) are ordered
+  for the end of the list, ensuring new [items](/docs/concepts/#item) are ordered
   after existing ones.
 - **`from()`**: Encodes a numeric value (and optional key) as an
   [order stamp](https://github.com/goatplatform/orderstamp-js), maintaining
   numeric order in string form.
 - **`between()`**: Generates a stamp lexicographically between two existing
   [stamps](https://github.com/goatplatform/orderstamp-js), for inserting between
-  [items](/concepts/#item).
+  [items](/docs/concepts/#item).
 
 ## Using Order Stamps in GoatDB
 

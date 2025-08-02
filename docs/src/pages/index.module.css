@@ -1,0 +1,156 @@
+.heroBanner {
+  padding: 2rem 0 3rem;
+  text-align: center;
+  background: var(--ifm-background-surface-color);
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.heroTitle {
+  font-size: 3rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+}
+
+.heroSubtitle {
+  font-size: 1.25rem;
+  color: var(--ifm-color-emphasis-700);
+  margin: 0 auto 2rem;
+  max-width: 600px;
+  line-height: 1.5;
+}
+
+@media screen and (max-width: 996px) {
+  .heroBanner {
+    padding: 1.5rem;
+  }
+  
+  .heroTitle {
+    font-size: 2.5rem;
+  }
+  
+  .heroSubtitle {
+    font-size: 1.1rem;
+  }
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.useCases {
+  padding: 3rem 0;
+  background-color: var(--ifm-color-emphasis-100);
+}
+
+.useCases h2 {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 2rem;
+}
+
+.useCaseGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.useCase {
+  text-align: center;
+  padding: 1.5rem;
+  background: var(--ifm-background-surface-color);
+  border-radius: 8px;
+  border: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.useCaseEmoji {
+  font-size: 2.5rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.useCase h3 {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.useCase p {
+  color: var(--ifm-color-emphasis-700);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.tradeoffNote {
+  text-align: center;
+  margin-top: 2rem;
+  font-size: 1rem;
+  color: var(--ifm-color-emphasis-700);
+  line-height: 1.6;
+}
+
+/* Open Source Section */
+.openSource {
+  padding: 4rem 0;
+  background: var(--ifm-background-surface-color);
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.openSourceContent {
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.openSource h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.openSourceDescription {
+  font-size: 1.1rem;
+  color: var(--ifm-color-emphasis-700);
+  margin-bottom: 2rem;
+  line-height: 1.6;
+}
+
+.openSourceButtons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.openSourceStats {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin: 0;
+}
+
+.openSourceStats img {
+  height: 28px;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 768px) {
+  .useCaseGrid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .openSourceButtons {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .openSourceButtons .button {
+    width: 200px;
+  }
+}

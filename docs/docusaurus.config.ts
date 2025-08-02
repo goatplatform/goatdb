@@ -7,8 +7,8 @@ import rehypeKatex from 'rehype-katex';
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
 const config: Config = {
-  title: 'GoatDB Docs',
-  tagline: 'GoatDB the embedded, distributed, document database',
+  title: 'GoatDB',
+  tagline: 'Embedded database with real-time sync and automatic conflict resolution',
   favicon: 'img/favicon.png',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
@@ -74,7 +74,7 @@ const config: Config = {
       'classic',
       {
         docs: {
-          routeBasePath: '/', // Serve docs at the site's root
+          routeBasePath: 'docs', // Normal docs path
           sidebarPath: './sidebars.ts',
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
@@ -103,6 +103,27 @@ const config: Config = {
       },
       items: [
         {
+          type: 'doc',
+          docId: 'overview',
+          position: 'left',
+          label: 'Docs',
+        },
+        {
+          to: '/docs/api',
+          position: 'left',
+          label: 'API',
+        },
+        {
+          href: 'https://discord.gg/SAt3cbUqxr',
+          label: 'Discord',
+          position: 'right',
+        },
+        {
+          href: 'https://www.reddit.com/r/zbdb/s/jx1jAbEqtj',
+          label: 'Reddit',
+          position: 'right',
+        },
+        {
           href: 'https://github.com/goatplatform/goatdb',
           label: 'GitHub',
           position: 'right',
@@ -113,11 +134,32 @@ const config: Config = {
       style: 'dark',
       links: [
         {
+          title: 'Documentation',
+          items: [
+            {
+              label: 'Getting Started',
+              to: '/docs/tutorial',
+            },
+            {
+              label: 'Architecture',
+              to: '/docs/architecture',
+            },
+            {
+              label: 'API Reference',
+              to: '/docs/api',
+            },
+          ],
+        },
+        {
           title: 'Community',
           items: [
             {
               label: 'Discord',
               href: 'https://discord.gg/SAt3cbUqxr',
+            },
+            {
+              label: 'Reddit',
+              href: 'https://www.reddit.com/r/zbdb/s/jx1jAbEqtj',
             },
             {
               label: 'GitHub Discussions',
@@ -126,16 +168,24 @@ const config: Config = {
           ],
         },
         {
-          title: 'More',
+          title: 'Resources',
           items: [
             {
               label: 'GitHub',
               href: 'https://github.com/goatplatform/goatdb',
             },
+            {
+              label: 'Benchmarks',
+              to: '/docs/benchmarks',
+            },
+            {
+              label: 'FAQ',
+              to: '/docs/faq',
+            },
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} GoatDB. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} GoatDB · Apache 2.0 License`,
     },
     prism: {
       theme: prismThemes.github,

@@ -8,8 +8,8 @@ slug: /schema
 
 # GoatDB Schemas
 
-A [schema](/concepts) in GoatDB defines the structure of an
-[item](/concepts#item). Schemas are plain JavaScript objects that are compiled
+A [schema](/docs/concepts) in GoatDB defines the structure of an
+[item](/docs/concepts#item). Schemas are plain JavaScript objects that are compiled
 into the resulting executable and are not stored directly in the database's
 storage. Schemas are versioned, allowing multiple versions of the same schema to
 coexist on different branches, which simplifies rolling deployments.

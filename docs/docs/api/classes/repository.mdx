@@ -5,11 +5,11 @@ sidebar_label: Repository
 
 # Repository
 
-**Extends:** [Emitter](/api/classes/emitter)
+**Extends:** [Emitter](/docs/api/classes/emitter)
 
 ## Constructor
 
-**<code>new Repository(db: [GoatDB](/api/classes/goatdb)&lt;&gt;, path: string, trustPool: [TrustPool](/api/classes/trustpool)&lt;&gt;, __namedParameters: RepositoryConfig&lt;ST&gt;)</code>**
+**<code>new Repository(db: [GoatDB](/docs/api/classes/goatdb)&lt;&gt;, path: string, trustPool: [TrustPool](/docs/api/classes/trustpool)&lt;&gt;, __namedParameters: RepositoryConfig&lt;ST&gt;)</code>**
 
 ## Methods
 
@@ -46,11 +46,11 @@ filters, the commit guaranteed not to be a leaf.
 
 ### create()
 
-**<code>create(key: string, value: [Item](/api/classes/item)&lt;S&gt;): Promise&lt;Commit&lt;&gt;&gt;</code>**
+**<code>create(key: string, value: [Item](/docs/api/classes/item)&lt;S&gt;): Promise&lt;Commit&lt;&gt;&gt;</code>**
 
 ### debugNetworkForKey()
 
-**<code>debugNetworkForKey(key: string): [ReadonlyJSONObject](/api/interfaces/readonlyjsonobject)</code>**
+**<code>debugNetworkForKey(key: string): [ReadonlyJSONObject](/docs/api/interfaces/readonlyjsonobject)</code>**
 
 ### downloadDebugNetworkForKey()
 
@@ -66,7 +66,7 @@ filters, the commit guaranteed not to be a leaf.
 
 ### findMergeBase()
 
-**<code>findMergeBase(commits: Commit&lt;&gt;[]): [commits: Commit&lt;&gt;[], base: Commit&lt;&gt;, scheme: [Schema](/api/types/schema), reachedRoot: boolean]</code>**
+**<code>findMergeBase(commits: Commit&lt;&gt;[]): [commits: Commit&lt;&gt;[], base: Commit&lt;&gt;, scheme: [Schema](/docs/api/types/schema), reachedRoot: boolean]</code>**
 
 Given an iterable of commits, this method returns their Lowest Common
 Ancestor or undefined if no such ancestor exists (meaning the commits
@@ -105,7 +105,7 @@ readonly operation and does not attempt to merge any leaves.
 
 ### itemForCommit()
 
-**<code>itemForCommit(c: string | Commit&lt;&gt;): [Item](/api/classes/item)&lt;S&gt;</code>**
+**<code>itemForCommit(c: string | Commit&lt;&gt;): [Item](/docs/api/classes/item)&lt;S&gt;</code>**
 
 ### keyExists()
 
@@ -141,7 +141,7 @@ readonly operation and does not attempt to merge any leaves.
 
 ### rebase()
 
-**<code>rebase(key: string, record: [Item](/api/classes/item)&lt;S&gt;, headId: string | Commit&lt;&gt;): [[Item](/api/classes/item)&lt;S&gt;, string]</code>**
+**<code>rebase(key: string, record: [Item](/docs/api/classes/item)&lt;S&gt;, headId: string | Commit&lt;&gt;): [[Item](/docs/api/classes/item)&lt;S&gt;, string]</code>**
 
 Given a key and an edited record for this key, this method rebases the
 changes from the record on top of the any changes made concurrently for
@@ -158,13 +158,13 @@ committing them.
 
 ### setValueForKey()
 
-**<code>setValueForKey(key: string, value: [Item](/api/classes/item)&lt;S&gt;, parentCommit: string | Commit&lt;&gt;): Promise&lt;Commit&lt;&gt;&gt;</code>**
+**<code>setValueForKey(key: string, value: [Item](/docs/api/classes/item)&lt;S&gt;, parentCommit: string | Commit&lt;&gt;): Promise&lt;Commit&lt;&gt;&gt;</code>**
 
 Updates the head record for a given key.
 
 ### valueForKey()
 
-**<code>valueForKey(key: string): [[Item](/api/classes/item)&lt;T&gt;, Commit&lt;&gt;]</code>**
+**<code>valueForKey(key: string): [[Item](/docs/api/classes/item)&lt;T&gt;, Commit&lt;&gt;]</code>**
 
 ### verifyCommits()
 
@@ -184,9 +184,9 @@ Updates the head record for a given key.
 
 ## Inherited Methods
 
-### From [Emitter](/api/classes/emitter)
+### From [Emitter](/docs/api/classes/emitter)
 
 `attach()`, `detach()`, `detachAll()`, `emit()`, `mute()`, `once()`, `resume()`, `suspend()`, `unmute()`
 
-*See [Emitter](/api/classes/emitter) for detailed documentation*
+*See [Emitter](/docs/api/classes/emitter) for detailed documentation*
 

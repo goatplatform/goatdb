@@ -34,20 +34,20 @@ adhering to the same principles as cloud-first applications.
 
 GoatDB is optimized for read-heavy workloads, where reads significantly
 outnumber writes. For the occasional writes, GoatDB supports concurrent
-operations with distributed, lockless [concurrency control](/architecture). It
+operations with distributed, lockless [concurrency control](/docs/architecture). It
 is ideal for use cases that naturally segment into logical data repositories.
 
 ## Can you delete data from GoatDB?
 
 Yes. Although the underlying structure is an
-[append-only commit graph](/commit-graph), GoatDB employs garbage collection.
+[append-only commit graph](/docs/commit-graph), GoatDB employs garbage collection.
 Data deletion involves marking items as deleted, with garbage collection
 handling eventual removal. Note that the garbage collection feature is still a
 work in progress and will be fully implemented in upcoming releases.
 
 ## How does synchronization work in GoatDB?
 
-GoatDB employs a soft [real-time synchronization](/sync) mechanism that captures
+GoatDB employs a soft [real-time synchronization](/docs/sync) mechanism that captures
 in-memory states of peers up to three times per second. These states are
 packaged into signed commits and appended to an append-only commit graph.
 Synchronization uses a probabilistic protocol with Bloom Filters to minimize
@@ -71,7 +71,7 @@ introduce WebRTC-based peer-to-peer synchronization for added resilience.
 
 Conflict resolution is automated and optimized for real-time operations.
 Detailed strategies for resolving conflicts are outlined in the
-[Conflict Resolution documentation](/conflict-resolution). By leveraging
+[Conflict Resolution documentation](/docs/conflict-resolution). By leveraging
 distributed version control principles, GoatDB ensures that conflicts are
 resolved efficiently and transparently.
 
@@ -126,7 +126,7 @@ precise analysis of data changes over time.
 
 ## How does GoatDB ensure compliance and auditability?
 
-The append-only signed [commit graph](/commit-graph) acts as a built-in audit
+The append-only signed [commit graph](/docs/commit-graph) acts as a built-in audit
 log. This log provides full traceability for data modifications, ensuring
 transparency and compliance with regulatory requirements. Additionally, it
 allows reversion to the last valid state if needed.
@@ -136,7 +136,7 @@ allows reversion to the last valid state if needed.
 GoatDB is optimized for lightweight operations on client devices. The
 append-only storage model and delta-compressed synchronization reduce
 computational overhead while maintaining real-time responsiveness. For detailed
-performance metrics and benchmarks, see our [benchmarks page](/benchmarks).
+performance metrics and benchmarks, see our [benchmarks page](/docs/benchmarks).
 
 ## How does distributed local querying differ from centralized queries?
 

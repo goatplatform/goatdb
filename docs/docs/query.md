@@ -10,10 +10,10 @@ slug: /query
 
 :::tip
 
-If you're building a [React](/react) UI, we recommend using the
-[React Hooks](/react) instead of working with [queries](/query) directly. The
-[hooks](/react) provide a more ergonomic interface for [React](/react)
-components and handle all the complexity of data [synchronization](/sync) and
+If you're building a [React](/docs/react) UI, we recommend using the
+[React Hooks](/docs/react) instead of working with [queries](/docs/query) directly. The
+[hooks](/docs/react) provide a more ergonomic interface for [React](/docs/react)
+components and handle all the complexity of data [synchronization](/docs/sync) and
 updates.
 
 :::
@@ -263,8 +263,8 @@ activeUsers.onResultsChanged(() => {
 ## Technical Details
 
 GoatDB's query system is designed for responsiveness and efficiency while being
-super easy to use without explicit indexing. The [architecture](/architecture)
-prioritizes developer experience without sacrificing [performance](/benchmarks):
+super easy to use without explicit indexing. The [architecture](/docs/architecture)
+prioritizes developer experience without sacrificing [performance](/docs/benchmarks):
 
 - **No Manual Indexing**: Unlike traditional databases, GoatDB doesn't require
   developers to define and maintain explicit indexes
@@ -277,7 +277,7 @@ prioritizes developer experience without sacrificing [performance](/benchmarks):
 </div>
 
 Each peer maintains a complete local copy of the database, enabling offline
-operation and low-latency access. The local copy is [synchronized](/sync) with
+operation and low-latency access. The local copy is [synchronized](/docs/sync) with
 the network when online, ensuring consistency across all peers.
 
 <div style={{textAlign: 'center'}}>

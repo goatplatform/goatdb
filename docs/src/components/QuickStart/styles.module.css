@@ -1,0 +1,37 @@
+.quickstart {
+  padding: 3rem 0;
+  background-color: var(--ifm-color-emphasis-100);
+}
+
+.quickstartHeader {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.quickstartHeader h2 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.quickstartHeader p {
+  font-size: 1.1rem;
+  color: var(--ifm-color-emphasis-700);
+  margin: 0;
+}
+
+.codeTabs {
+  margin-top: 2rem;
+}
+
+/* Make code blocks more prominent */
+.quickstart pre {
+  font-size: 0.875rem;
+  border-radius: var(--ifm-code-border-radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin: 0;
+}
+
+/* Dark mode adjustments */
+[data-theme='dark'] .quickstart pre {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}

@@ -9,9 +9,9 @@ slug: /sessions
 # Sessions and Users
 
 [GoatDB](/) implements a robust session-based authentication system that
-provides secure and flexible [user management](/authorization). This document
+provides secure and flexible [user management](/docs/authorization). This document
 explains how sessions work, their security implications, and how they integrate
-with [user management](/authorization).
+with [user management](/docs/authorization).
 
 ## Understanding Session-Based Authentication
 
@@ -55,7 +55,7 @@ integrity and accountability.
 The public/private key design enables a powerful distributed security model.
 Every operation in [GoatDB](/) is cryptographically signed, allowing all peers
 in the network to verify its authenticity. This creates a tamper-proof
-[commit graph](/commit-graph) where each change can be traced back to its
+[commit graph](/docs/commit-graph) where each change can be traced back to its
 authorized source, with invalid or unauthorized changes being automatically
 rejected by the network.
 
@@ -64,7 +64,7 @@ rejected by the network.
 </div>
 
 A key feature of this architecture is the client-as-replica design. Clients
-maintain their own copy of the [commit graph](/commit-graph) and verify all
+maintain their own copy of the [commit graph](/docs/commit-graph) and verify all
 operations independently. This enables clients to act as replicas of the
 database state, providing resilience against peer failures. If a peer crashes,
 any client can safely restore the peer's state by replaying the verified commit
@@ -81,7 +81,7 @@ For applications where security is handled at a different layer or in trusted
 environments (such as microservices running in the cloud without direct client
 interaction), [GoatDB](/) offers a trusted mode that bypasses cryptographic
 verification and security controls. This mode can significantly
-[improve performance](/benchmarks/#trusted-mode) by skipping commit signing and
+[improve performance](/docs/benchmarks/#trusted-mode) by skipping commit signing and
 verification.
 
 :::note

@@ -53,11 +53,11 @@ await usersByEmail.loadingFinished();
 const user = usersByEmail.find('email', 'user@example.com');
 ```
 
-**Extends:** [Emitter](/api/classes/emitter)
+**Extends:** [Emitter](/docs/api/classes/emitter)
 
 ## Constructor
 
-**<code>new Query(config: [QueryConfig](/api/types/queryconfig)&lt;IS, OS, CTX&gt;)</code>**
+**<code>new Query(config: [QueryConfig](/docs/api/types/queryconfig)&lt;IS, OS, CTX&gt;)</code>**
 
 Creates a new Query instance.
 
@@ -86,7 +86,7 @@ value.
 
 ### find()
 
-**<code>find(fieldName: keyof OS['fields'], value: [SchemaDataType](/api/types/schemadatatype)&lt;OS&gt;[keyof OS['fields']]): [ManagedItem](/api/classes/manageditem)&lt;OS, [Schema](/api/types/schema)&gt;</code>**
+**<code>find(fieldName: keyof OS['fields'], value: [SchemaDataType](/docs/api/types/schemadatatype)&lt;OS&gt;[keyof OS['fields']]): [ManagedItem](/docs/api/classes/manageditem)&lt;OS, [Schema](/docs/api/types/schema)&gt;</code>**
 
 Finds the first item in the query results where the specified field matches
 the given value. If the field is the sort field, uses binary search for
@@ -129,7 +129,7 @@ Gets an iterable of all paths included in the query results.
 
 ### results()
 
-**<code>results(): readonly [ManagedItem](/api/classes/manageditem)&lt;OS, [Schema](/api/types/schema)&gt;[]</code>**
+**<code>results(): readonly [ManagedItem](/docs/api/classes/manageditem)&lt;OS, [Schema](/docs/api/types/schema)&gt;[]</code>**
 
 Gets the results of the query as an array of managed items. The returned
 items are mutable - any changes made to them will automatically trigger the
@@ -145,16 +145,16 @@ query to update its results.
 
 ### valueForPath()
 
-**<code>valueForPath(key: string): [Item](/api/classes/item)&lt;OS&gt;</code>**
+**<code>valueForPath(key: string): [Item](/docs/api/classes/item)&lt;OS&gt;</code>**
 
 Gets the item value for a given path key. The value is retrieved from the
 repository's committed head or temporary records.
 
 ## Inherited Methods
 
-### From [Emitter](/api/classes/emitter)
+### From [Emitter](/docs/api/classes/emitter)
 
 `attach()`, `detach()`, `detachAll()`, `emit()`, `mute()`, `once()`, `unmute()`
 
-*See [Emitter](/api/classes/emitter) for detailed documentation*
+*See [Emitter](/docs/api/classes/emitter) for detailed documentation*
 

@@ -81,9 +81,9 @@ back to its authorized source.
 
 For performance-critical applications or trusted environments (like backend
 services), GoatDB offers a trusted mode that bypasses cryptographic
-verification. This mode can significantly [improve performance](/benchmarks)
+verification. This mode can significantly [improve performance](/docs/benchmarks)
 by skipping commit signing and verification. However, it should only be used
-in controlled, trusted environments where [security](/sessions) is handled at
+in controlled, trusted environments where [security](/docs/sessions) is handled at
 a different layer.
 
 :::
@@ -95,7 +95,7 @@ a different layer.
 :::tip
 
 For more details on reading and writing data, see
-[Reading and Writing Data](/read-write-data).
+[Reading and Writing Data](/docs/read-write-data).
 
 :::
 
@@ -132,7 +132,7 @@ const repo = await db.open('/users/john');
 ```
 
 While GoatDB will open repositories on demand, this can introduce a
-[performance penalty](/benchmarks) the first time you access data in a
+[performance penalty](/docs/benchmarks) the first time you access data in a
 repository, especially in interactive applications. If you know your application
 will need a repository (for example, when loading a user profile or switching
 workspaces), it is recommended to manually open (preload) the repository in
@@ -187,7 +187,7 @@ GoatDB provides strong durability through:
 2. **Parallel Writes**: Changes are written simultaneously to both local storage
    and replicated to other peers
 3. **Automatic Recovery**: After a crash, the system automatically recovers
-   missing commits through the [synchronization protocol](/sync), ensuring all
+   missing commits through the [synchronization protocol](/docs/sync), ensuring all
    peers converge to the same state. The P2P design enables both clients and
    servers to act as active replicas, providing redundancy and resilience
 

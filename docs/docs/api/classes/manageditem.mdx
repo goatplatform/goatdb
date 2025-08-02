@@ -8,11 +8,11 @@ sidebar_label: ManagedItem
 A high-level interface for reading, writing, and synchronizing a single item
 in GoatDB. Manages the item's state, schema validation, and version history.
 
-**Extends:** [Emitter](/api/classes/emitter)
+**Extends:** [Emitter](/docs/api/classes/emitter)
 
 ## Constructor
 
-**<code>new ManagedItem(db: [GoatDB](/api/classes/goatdb)&lt;US&gt;, path: string)</code>**
+**<code>new ManagedItem(db: [GoatDB](/docs/api/classes/goatdb)&lt;US&gt;, path: string)</code>**
 
 ## Methods
 
@@ -71,7 +71,7 @@ visualization and analysis tool.
 
 ### get()
 
-**<code>get(key: any): [SchemaDataType](/api/types/schemadatatype)&lt;S&gt;[K]</code>**
+**<code>get(key: any): [SchemaDataType](/docs/api/types/schemadatatype)&lt;S&gt;[K]</code>**
 
 Gets the value for the given key from this item.
 
@@ -100,21 +100,21 @@ in-memory state.
 
 ### set()
 
-**<code>set(key: any, value: [SchemaDataType](/api/types/schemadatatype)&lt;S&gt;[T]): void</code>**
+**<code>set(key: any, value: [SchemaDataType](/docs/api/types/schemadatatype)&lt;S&gt;[T]): void</code>**
 
 Sets the value for the given key in this item.
 
 ### setMulti()
 
-**<code>setMulti(data: Partial&lt;[SchemaDataType](/api/types/schemadatatype)&lt;S&gt;&gt;): void</code>**
+**<code>setMulti(data: Partial&lt;[SchemaDataType](/docs/api/types/schemadatatype)&lt;S&gt;&gt;): void</code>**
 
 A convenience method for setting several fields and values at once.
 
 ## Inherited Methods
 
-### From [Emitter](/api/classes/emitter)
+### From [Emitter](/docs/api/classes/emitter)
 
 `attach()`, `detach()`, `detachAll()`, `emit()`, `mute()`, `once()`, `resume()`, `suspend()`, `unmute()`
 
-*See [Emitter](/api/classes/emitter) for detailed documentation*
+*See [Emitter](/docs/api/classes/emitter) for detailed documentation*
 

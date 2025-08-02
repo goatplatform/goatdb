@@ -14,11 +14,11 @@ GoatDB is the primary entry point for working with the database. It handles:
 - User authentication and authorization
 - Schema validation
 
-**Extends:** [Emitter](/api/classes/emitter)
+**Extends:** [Emitter](/docs/api/classes/emitter)
 
 ## Constructor
 
-**<code>new GoatDB(config: [DBInstanceConfig](/api/interfaces/dbinstanceconfig))</code>**
+**<code>new GoatDB(config: [DBInstanceConfig](/docs/api/interfaces/dbinstanceconfig))</code>**
 
 ## Methods
 
@@ -50,7 +50,7 @@ NOTE: Currently only paths to repositories are supported.
 
 ### create()
 
-**<code>create(path: string, schema: S, data: Partial&lt;[SchemaDataType](/api/types/schemadatatype)&lt;S&gt;&gt;): [ManagedItem](/api/classes/manageditem)&lt;S&gt;</code>**
+**<code>create(path: string, schema: S, data: Partial&lt;[SchemaDataType](/docs/api/types/schemadatatype)&lt;S&gt;&gt;): [ManagedItem](/docs/api/classes/manageditem)&lt;S&gt;</code>**
 
 Creates a new item at the target repository, opening it if needed. Unlike
 `GoatDB.item()` there's no need to explicitly open a repository before
@@ -77,7 +77,7 @@ Flushes all pending writes for all repositories to disk.
 
 ### getTrustPool()
 
-**<code>getTrustPool(): Promise&lt;[TrustPool](/api/classes/trustpool)&lt;&gt;&gt;</code>**
+**<code>getTrustPool(): Promise&lt;[TrustPool](/docs/api/classes/trustpool)&lt;&gt;&gt;</code>**
 
 Returns the trust pool of this DB instance. The trust pool is a low level
 object that manages all known sessions and their public keys. It is used
@@ -88,7 +88,7 @@ Note: You almost never need to use the trust pool directly.
 
 ### item()
 
-**<code>item(pathComps: string[]): [ManagedItem](/api/classes/manageditem)&lt;S&gt;</code>**
+**<code>item(pathComps: string[]): [ManagedItem](/docs/api/classes/manageditem)&lt;S&gt;</code>**
 
 Access an item at the given path. An item's path is typically at the
 following format:
@@ -117,7 +117,7 @@ NOTE: Currently only paths to repositories are supported.
 
 ### load()
 
-**<code>load(path: string, schema: S, data: [SchemaDataType](/api/types/schemadatatype)&lt;S&gt;): Promise&lt;void&gt;</code>**
+**<code>load(path: string, schema: S, data: [SchemaDataType](/docs/api/types/schemadatatype)&lt;S&gt;): Promise&lt;void&gt;</code>**
 
 Explicitly create an item, loading its repository if needed. Use this
 method for bulk load operations where you want to be notified after the
@@ -150,14 +150,14 @@ a clean state.
 
 ### open()
 
-**<code>open(path: string, opts: OpenOptions): Promise&lt;[Repository](/api/classes/repository)&lt;MemRepoStorage&lt;&gt;&gt;&gt;</code>**
+**<code>open(path: string, opts: OpenOptions): Promise&lt;[Repository](/docs/api/classes/repository)&lt;MemRepoStorage&lt;&gt;&gt;&gt;</code>**
 
 Opens the given repository, loading all its items to memory.
 This method does nothing if the repository is already open.
 
 ### query()
 
-**<code>query(config: Omit&lt;[QueryConfig](/api/types/queryconfig)&lt;IS, OS, CTX&gt;, 'db'&gt;): [Query](/api/classes/query)&lt;IS, OS, CTX&gt;</code>**
+**<code>query(config: Omit&lt;[QueryConfig](/docs/api/types/queryconfig)&lt;IS, OS, CTX&gt;, 'db'&gt;): [Query](/docs/api/classes/query)&lt;IS, OS, CTX&gt;</code>**
 
 Open a new query or access an already open one. Once opened, the query
 remains open until explicitly closed, and tracks updates to items as they
@@ -172,7 +172,7 @@ this DB instance is ready to receive commands.
 
 ### repository()
 
-**<code>repository(pathComps: string[]): [Repository](/api/classes/repository)&lt;MemRepoStorage&lt;&gt;&gt;</code>**
+**<code>repository(pathComps: string[]): [Repository](/docs/api/classes/repository)&lt;MemRepoStorage&lt;&gt;&gt;</code>**
 
 Returns the requested repository or undefined if it wasn't opened yet.
 
@@ -194,9 +194,9 @@ Syncs all open repositories with all configured peers and waits for completion.
 
 ## Inherited Methods
 
-### From [Emitter](/api/classes/emitter)
+### From [Emitter](/docs/api/classes/emitter)
 
 `attach()`, `detach()`, `detachAll()`, `emit()`, `mute()`, `once()`, `resume()`, `suspend()`, `unmute()`
 
-*See [Emitter](/api/classes/emitter) for detailed documentation*
+*See [Emitter](/docs/api/classes/emitter) for detailed documentation*
 

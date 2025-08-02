@@ -8,7 +8,7 @@ slug: /sync
 
 # Synchronization Protocol
 
-At the heart of GoatDB lies a [distributed commit graph](/commit-graph). This
+At the heart of GoatDB lies a [distributed commit graph](/docs/commit-graph). This
 graph must be synchronized across all peers in the network to converge into a
 single version of truth.
 
@@ -37,7 +37,7 @@ converge to an identical commit graph.
 
 GoatDB's synchronization process is agnostic of the history it syncs. It treats
 the data as two abstract maps of random strings and opaque data objects (commits
-and their IDs). Since the [commit graph](/commit-graph) is append-only,
+and their IDs). Since the [commit graph](/docs/commit-graph) is append-only,
 previously incorporated commits are immutable and cannot be edited
 retroactively. Any "edit" involves appending a new commit to the graph.
 

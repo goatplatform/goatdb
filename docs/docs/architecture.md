@@ -8,9 +8,9 @@ slug: /architecture
 
 # GoatDB Architecture
 
-[GoatDB](/) is a distributed, [schema-based](/schema) database that implements
-novel approaches to data [synchronization](/sync) and
-[conflict resolution](/conflict-resolution), drawing inspiration from
+[GoatDB](/) is a distributed, [schema-based](/docs/schema) database that implements
+novel approaches to data [synchronization](/docs/sync) and
+[conflict resolution](/docs/conflict-resolution), drawing inspiration from
 distributed version control systems (DVCS). This document explores the technical
 foundations and design decisions that shape GoatDB's architecture.
 
@@ -20,29 +20,29 @@ foundations and design decisions that shape GoatDB's architecture.
   <img src="/img/repository-model.svg" alt="Repository-Centric Design" />
 </div>
 
-The [repository model](/repositories) in [GoatDB](/) takes inspiration from DVCS
-systems but adapts it for database operations. Each [repository](/repositories)
-functions as an independent unit of data [synchronization](/sync) and
-[access control](/authorization), providing natural boundaries for data
-isolation. This design enables independent [synchronization](/sync) operations
+The [repository model](/docs/repositories) in [GoatDB](/) takes inspiration from DVCS
+systems but adapts it for database operations. Each [repository](/docs/repositories)
+functions as an independent unit of data [synchronization](/docs/sync) and
+[access control](/docs/authorization), providing natural boundaries for data
+isolation. This design enables independent [synchronization](/docs/sync) operations
 and gives applications fine-grained control over which data sets are loaded into
 memory.
 
 At the core of this model is the concept of item-level
-[commit graphs](/commit-graph). Each [item](/concepts#item), identified by its
-key, maintains its own independent [commit graph](/commit-graph). This approach
+[commit graphs](/docs/commit-graph). Each [item](/docs/concepts#item), identified by its
+key, maintains its own independent [commit graph](/docs/commit-graph). This approach
 enables parallel evolution of items and efficient concurrent operations.
-[Access control](/authorization) is implemented at the [item](/concepts#item)
+[Access control](/docs/authorization) is implemented at the [item](/docs/concepts#item)
 level through repository-level
-[authorization rules](/authorization/#creating-authorization-rules), striking a
-balance between granularity and [performance](/benchmarks).
+[authorization rules](/docs/authorization/#creating-authorization-rules), striking a
+balance between granularity and [performance](/docs/benchmarks).
 
-The [repository model](/repositories) presents several technical challenges that
+The [repository model](/docs/repositories) presents several technical challenges that
 require careful consideration. Managing repository
-[commit histories](/commit-graph) efficiently is crucial, as is coordinating
-cross-repository [queries](/query). The
-[repository lifecycle](/repositories/#opening-a-repository) must be carefully
-managed, and [authorization rules](/authorization/#creating-authorization-rules)
+[commit histories](/docs/commit-graph) efficiently is crucial, as is coordinating
+cross-repository [queries](/docs/query). The
+[repository lifecycle](/docs/repositories/#opening-a-repository) must be carefully
+managed, and [authorization rules](/docs/authorization/#creating-authorization-rules)
 need to be designed with performance in mind.
 
 ## Memory Management
@@ -53,18 +53,18 @@ need to be designed with performance in mind.
 
 GoatDB's memory management approach prioritizes explicit control over automatic
 optimization. This design decision reflects several technical tradeoffs. While
-only active [repositories](/repositories) consume memory, loading a
-[repository](/repositories) requires its full [commit history](/commit-graph).
+only active [repositories](/docs/repositories) consume memory, loading a
+[repository](/docs/repositories) requires its full [commit history](/docs/commit-graph).
 This explicit repository management enables
-[predictable performance](/benchmarks) characteristics and allows applications
+[predictable performance](/docs/benchmarks) characteristics and allows applications
 to implement custom caching and loading strategies.
 
 Looking ahead, several technical improvements are under consideration. Lazy
-loading of [commit history](/commit-graph) could reduce initial memory
+loading of [commit history](/docs/commit-graph) could reduce initial memory
 requirements, while zero-copy operations
 ([see GitHub issue #36](https://github.com/goatplatform/goatdb/issues/36)) could
 minimize memory overhead. Automatic
-[repository lifecycle](/repositories/#opening-a-repository) management
+[repository lifecycle](/docs/repositories/#opening-a-repository) management
 ([see GitHub issue #34](https://github.com/goatplatform/goatdb/issues/34)) with
 configurable policies might provide a balance between control and convenience.
 
@@ -74,7 +74,7 @@ configurable policies might provide a balance between control and convenience.
   <img src="/img/query-processing.svg" alt="Local Query Processing" />
 </div>
 
-The [query system](/query) in GoatDB implements a deterministic, real-time query
+The [query system](/docs/query) in GoatDB implements a deterministic, real-time query
 engine that processes data locally while maintaining consistency across
 distributed peers. At its core, the system treats queries as first-class
 citizens with their own lifecycle and state management.
@@ -112,7 +112,7 @@ debugging and troubleshooting.
   <img src="/img/sync-protocol.svg" alt="Synchronization Protocol" />
 </div>
 
-The [synchronization protocol](/sync) implements a stateless, delta-compressed
+The [synchronization protocol](/docs/sync) implements a stateless, delta-compressed
 approach to data exchange. This design enables efficient transmission of changes
 without requiring persistent sync state. The protocol is transport-independent,
 working over any communication channel, and includes automatic handling of
@@ -139,7 +139,7 @@ boundary for garbage collection.
 
 The system faces an interesting technical challenge: how to safely remove full
 snapshot commits while maintaining the integrity of
-[delta-compressed](/commit-graph/#delta-compression) commits that depend on
+[delta-compressed](/docs/commit-graph/#delta-compression) commits that depend on
 them. This requires careful coordination between garbage collection and delta
 compression to ensure atomic removal of full snapshots and their dependent
 commits. The solution lies in treating the commit graph as a unit of garbage
