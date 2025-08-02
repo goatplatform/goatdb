@@ -6,7 +6,6 @@
  *
  * @module GoatDB/React
  */
-// @deno-types="@types/react"
 import React, { useCallback, useContext, useSyncExternalStore } from 'react';
 import { GoatDB } from '../db/db.ts';
 import type { Schema } from '../cfds/base/schema.ts';

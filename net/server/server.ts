@@ -30,6 +30,7 @@ import {
   type HttpServerInstance,
   type ServeHandlerInfo,
 } from './http-compat.ts';
+import { generateSelfSignedCertificate } from './crypto-utils.ts';
 
 /**
  * Information about a user attempting to log in for the first time.
@@ -172,6 +173,27 @@ export interface ServerOptions<US extends Schema> extends DBInstanceConfig {
    * If true, disables all default endpoints and middlewares (health, auth, static, etc).
    */
   disableDefaultEndpoints?: boolean;
+  /**
+   * HTTPS configuration for secure connections.
+   * When provided, the server will use HTTPS with the specified certificate.
+   * If `selfSigned: true`, a temporary self-signed certificate will be generated.
+   */
+  https?: {
+    /** PEM-encoded private key */
+    key: string;
+    /** PEM-encoded certificate */
+    cert: string;
+  } | {
+    /** Generate a self-signed certificate for localhost */
+    selfSigned: true;
+    /** Hostname for the certificate. Defaults to 'localhost' */
+    hostname?: string;
+  };
+  /**
+   * Custom configuration to inject into client bundles.
+   * Merged with existing GoatDBConfig during static asset serving.
+   */
+  customConfig?: Record<string, unknown>;
 }
 
 /**
@@ -339,7 +361,20 @@ export class Server<US extends Schema> {
       // Logs
       // this.registerEndpoint(new LogsEndpoint());
     }
-    this._httpServer = createHttpServer();
+    
+    // Process HTTPS configuration
+    let httpsConfig: { key: string; cert: string } | undefined;
+    if (options.https) {
+      if ('selfSigned' in options.https) {
+        // Generate self-signed certificate (async, but constructor must be sync)
+        // We'll handle this during server start
+        httpsConfig = undefined; // Will be generated in start()
+      } else {
+        httpsConfig = options.https;
+      }
+    }
+    
+    this._httpServer = createHttpServer({ https: httpsConfig });
   }
 
   /**
@@ -538,6 +573,15 @@ export class Server<US extends Schema> {
     // Return early if server is already running
     if (this._abortController) {
       return Promise.resolve();
+    }
+
+    // Handle self-signed certificate generation if needed
+    if (this._baseOptions.https && 'selfSigned' in this._baseOptions.https) {
+      const hostname = this._baseOptions.https.hostname || 'localhost';
+      const cert = await generateSelfSignedCertificate(hostname);
+      
+      // Recreate HTTP server with generated certificate
+      this._httpServer = createHttpServer({ https: cert });
     }
 
     // Start all services for each org

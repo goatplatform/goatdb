@@ -74,6 +74,7 @@ export class StaticAssetsEndpoint<US extends Schema> implements Endpoint<US> {
         services.domain.resolveOrg(services.orgId),
         services.orgId,
         getGoatConfig().debug,
+        services.customConfig, // Pass custom config for injection
       );
       return Promise.resolve(
         new Response(config + js, {
@@ -108,9 +109,11 @@ function generateConfigSnippet(
   serverURL: string,
   orgId: string,
   debug: boolean,
+  customConfig?: Record<string, unknown>,
 ): string {
   const config = {
     ...getGoatConfig(),
+    ...customConfig, // Merge custom config
     debug,
     version,
     orgId,
@@ -120,5 +123,5 @@ function generateConfigSnippet(
   if (serverURL) {
     config.serverURL = serverURL;
   }
-  return `;\n\GoatDBConfig = ${JSON.stringify(config)};\n;`;
+  return `;\nglobalThis.GoatDBConfig = ${JSON.stringify(config)};\n;`;
 }

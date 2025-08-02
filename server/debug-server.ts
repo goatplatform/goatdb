@@ -131,17 +131,18 @@ export type DebugServerOptions<US extends Schema> =
 export async function startDebugServer<US extends Schema>(
   options: DebugServerOptions<US>,
 ): Promise<never> {
-  Deno.addSignalListener('SIGTERM', () => {
-    ctx.close();
-  });
   getGoatConfig().debug = true; // Turn on debug mode globally
   const buildInfo = await generateBuildInfo(
     options.denoJson || path.join(Deno.cwd(), 'deno.json'),
   );
   buildInfo.debugBuild = true;
   if (typeof options.domain === 'undefined') {
+    const protocol = options.https ? 'https' : 'http';
+    const defaultPort = options.https ? 8443 : 8080;
+    const port = options.port || defaultPort;
+    
     options.domain = {
-      resolveOrg: () => 'http://localhost:8080',
+      resolveOrg: () => `${protocol}://localhost:${port}`,
       resolveDomain: () => 'localhost',
     };
   }
@@ -179,9 +180,23 @@ export async function startDebugServer<US extends Schema>(
       ((performance.now() - bundlingStart) / 1000).toFixed(2)
     }sec`,
   );
+  
+  // Declare cleanup variables
+  let watcher: Deno.FsWatcher | undefined;
+  let rebuildTimer: SimpleTimer | undefined;
+  
+  // Setup SIGTERM handler for graceful shutdown
+  Deno.addSignalListener('SIGTERM', async () => {
+    watcher?.close();
+    rebuildTimer?.unschedule();
+    await server.stop();
+    ctx.close();
+    Deno.exit(0);
+  });
+  
   if (options.watchDir) {
-    const watcher = Deno.watchFs(path.resolve(options.watchDir));
-    const rebuildTimer = new SimpleTimer(300, false, async () => {
+    watcher = Deno.watchFs(path.resolve(options.watchDir));
+    rebuildTimer = new SimpleTimer(300, false, async () => {
       console.log('Bundling client code...');
       bundlingStart = performance.now();
       try {

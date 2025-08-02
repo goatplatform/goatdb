@@ -1,4 +1,3 @@
-import { GoatDB } from '../db/db.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import {
   assertEquals,
@@ -7,6 +6,7 @@ import {
   expectToContain,
 } from './asserts.ts';
 import { TEST } from './mod.ts';
+import { isBrowser } from '../base/common.ts';
 
 // Define a test schema
 const TestSchema = {
@@ -22,38 +22,49 @@ const kDataRegistry = new DataRegistry();
 kDataRegistry.registerSchema(TestSchema);
 export default function setup(): void {
   TEST('Trusted', 'initialization', async (ctx) => {
-    const db = new GoatDB({
-      path: await ctx.tempDir('db-init'),
-      orgId: 'test-org',
-      trusted: true,
-      registry: kDataRegistry,
+    const db = await ctx.createDB('db-init', {
+      registry: kDataRegistry, // Override default registry
     });
 
     try {
-      assertEquals(db.orgId, 'test-org');
-      assertEquals(db.path, await ctx.tempDir('db-init'));
+      // Test environment-appropriate properties
+      if (isBrowser()) {
+        // Browser: Client mode properties
+        assertTrue(db.path.includes('/temp/test-Trusted/db-init')); // OPFS temp path
+        assertEquals(db.mode, 'client');
+      } else {
+        // Server: Standalone mode properties
+        assertEquals(db.orgId, 'test-org');
+        assertEquals(db.mode, 'server');
+        assertTrue(db.path.includes('test-Trusted')); // tempDir path
+      }
+
+      // Common properties for both environments
       assertEquals(db.registry, kDataRegistry);
 
       // Should start not ready
+      console.log(`[BROWSER DEBUG] Initial ready state: ${db.ready}`);
       assertEquals(db.ready, false);
-
-      // Wait for it to be ready
       await db.readyPromise();
       assertEquals(db.ready, true);
 
-      // Should start with root session
-      assertEquals(db.loggedIn, true);
-      assertEquals(db.currentUser?.key, 'root');
+      // Authentication state depends on environment
+      if (isBrowser()) {
+        // Browser: Client mode starts anonymous
+        assertEquals(db.loggedIn, false);
+        assertEquals(db.currentUser, undefined);
+      } else {
+        // Server: Standalone mode starts with root session
+        assertEquals(db.loggedIn, true);
+        assertEquals(db.currentUser?.key, 'root');
+      }
     } finally {
       await db.flushAll();
     }
   });
 
   TEST('Trusted', 'repository operations', async (ctx) => {
-    const db = new GoatDB({
-      path: await ctx.tempDir('db-repo'),
-      orgId: 'test-org',
-      trusted: true,
+    const db = await ctx.createDB('db-repo', {
       registry: kDataRegistry,
     });
 
@@ -86,10 +97,7 @@ export default function setup(): void {
   });
 
   TEST('Trusted', 'item management', async (ctx) => {
-    const db = new GoatDB({
-      path: await ctx.tempDir('db-items'),
-      orgId: 'test-org',
-      trusted: true,
+    const db = await ctx.createDB('db-items', {
       registry: kDataRegistry,
     });
 
@@ -107,8 +115,14 @@ export default function setup(): void {
       item.set('count', 42);
       assertEquals(item.get('count'), 42);
 
-      // Flush to ensure persistence
-      await db.flush('/test/items');
+      // Ensure persistence/sync based on environment
+      if (isBrowser()) {
+        // Browser: Sync with server
+        await db.sync('/test/items');
+      } else {
+        // Server: Local persistence
+        await db.flush('/test/items');
+      }
 
       // Access existing item
       const reloadedItem = db.item<typeof TestSchema>('/test/items', item.key);
@@ -129,10 +143,7 @@ export default function setup(): void {
   });
 
   TEST('Trusted', 'bulk load', async (ctx) => {
-    const db = new GoatDB({
-      path: await ctx.tempDir('db-bulk'),
-      orgId: 'test-org',
-      trusted: true,
+    const db = await ctx.createDB('db-bulk', {
       registry: kDataRegistry,
     });
 
@@ -157,6 +168,14 @@ export default function setup(): void {
         count: 200,
       });
 
+      // Ensure persistence/sync based on environment
+      if (isBrowser()) {
+        // Browser: Sync with server
+        await db.sync('/test/bulk');
+      } else {
+        // Server: Local persistence (load already persists)
+      }
+
       // Count should be 2
       assertEquals(db.count('/test/bulk'), 2);
     } finally {
@@ -165,10 +184,7 @@ export default function setup(): void {
   });
 
   TEST('Trusted', 'query functionality', async (ctx) => {
-    const db = new GoatDB({
-      path: await ctx.tempDir('db-query'),
-      orgId: 'test-org',
-      trusted: true,
+    const db = await ctx.createDB('db-query', {
       registry: kDataRegistry,
     });
 
@@ -208,10 +224,7 @@ export default function setup(): void {
   });
 
   TEST('Trusted', 'ManagedItem loading state management', async (ctx) => {
-    const db = new GoatDB({
-      path: await ctx.tempDir('db-loading'),
-      orgId: 'test-org',
-      trusted: true,
+    const db = await ctx.createDB('db-loading', {
       registry: kDataRegistry,
     });
 
@@ -261,10 +274,7 @@ export default function setup(): void {
   });
 
   TEST('Trusted', 'close commits uncommitted changes', async (ctx) => {
-    const db = new GoatDB({
-      path: await ctx.tempDir('db-close-commit'),
-      orgId: 'test-org',
-      trusted: true,
+    const db = await ctx.createDB('db-close-commit', {
       registry: kDataRegistry,
     });
 

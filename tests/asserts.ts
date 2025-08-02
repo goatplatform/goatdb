@@ -60,7 +60,7 @@ export function assertEquals(
  * @param message - Optional error message to display if assertion fails
  * @throws {Error} If the value is null or undefined
  */
-export function assertExists(value: unknown, message?: string) {
+export function assertExists(value: unknown, message?: string): asserts value is NonNullable<typeof value> {
   if (value === undefined || value === null) {
     throw new AssertionError(
       message || `assertExists failed: value is ${value}`,

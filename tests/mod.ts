@@ -18,6 +18,11 @@
  */
 import * as path from '@std/path';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
+import { isBrowser } from '../base/common.ts';
+import { GoatDB } from '../db/db.ts';
+import type { DBInstanceConfig } from '../db/db.ts';
+import type { Schema } from '../cfds/base/schema.ts';
+import { DataRegistry } from '../cfds/base/data-registry.ts';
 
 /**
  * A test function that takes a TestSuite context and returns either void or a
@@ -100,8 +105,7 @@ export class TestSuite {
         await test(this);
         const duration = performance.now() - start;
         console.log(
-          `✅ ${this.name}/${name} passed %c(${Math.round(duration)}ms)`,
-          'color: gray',
+          `✅ ${this.name}/${name} passed (${Math.round(duration)}ms)`
         );
         results.push({
           suiteName: this.name,
@@ -112,8 +116,7 @@ export class TestSuite {
       } catch (error) {
         const duration = performance.now() - start;
         console.log(
-          `❌ ${this.name}/${name} failed %c(${Math.round(duration)}ms)`,
-          'color: gray',
+          `❌ ${this.name}/${name} failed (${Math.round(duration)}ms)`
         );
         formatError(error);
         results.push({
@@ -141,12 +144,47 @@ export class TestSuite {
    */
   async tempDir(subPath?: string): Promise<string> {
     if (!this._tempDir) {
-      this._tempDir = path.join(
-        await (await FileImplGet()).getTempDir(),
-        'test-' + this.name,
-      );
+      const fileImpl = await FileImplGet();
+      const systemTempDir = await fileImpl.getTempDir();
+      this._tempDir = path.join(systemTempDir, 'test-' + this.name);
     }
-    return subPath ? path.join(this._tempDir, subPath) : this._tempDir;
+    return subPath ? path.join(this._tempDir, subPath) : this._tempDir;;
+  }
+
+  /**
+   * Creates a GoatDB instance configured for the current test environment.
+   * 
+   * - Server environments (Deno/Node): Standalone database with file system paths
+   * - Browser environment: Client database connected to debug server using OPFS paths
+   * 
+   * @param testId - Unique identifier for this test database within the suite
+   * @param config - Additional configuration to merge with environment defaults
+   * @returns Configured GoatDB instance ready for testing
+   */
+  async createDB<S extends Schema = Schema>(
+    testId: string,
+    config: Partial<DBInstanceConfig> = {}
+  ): Promise<GoatDB<S>> {
+    // Use same tempDir mechanism for both environments (file system + OPFS abstraction)
+    const tempPath = await this.tempDir(testId);
+    
+    if (isBrowser()) {
+      // Browser: Client mode with server connection using OPFS path for isolation
+      return new GoatDB<S>({
+        path: tempPath,                        // OPFS path from FileImpl abstraction
+        peers: 'https://localhost:8080',       // Connect to debug server
+        ...config,                             // User overrides
+      });
+    } else {
+      // Server: Standalone mode with file system path
+      return new GoatDB<S>({
+        path: tempPath,                        // File system path from FileImpl abstraction
+        orgId: 'test-org',                    // Consistent test org
+        trusted: true,                        // Default for tests
+        registry: DataRegistry.default,      // Default registry
+        ...config,                            // User overrides
+      });
+    }
   }
 }
 
@@ -201,10 +239,9 @@ export class TestsRunner {
             await test(suite);
             const duration = performance.now() - start;
             console.log(
-              `✅ ${suite.name}/${testName} passed %c(${
+              `✅ ${suite.name}/${testName} passed (${
                 Math.round(duration)
-              }ms)`,
-              'color: gray',
+              }ms)`
             );
             allResults.push({
               suiteName: suite.name,
@@ -215,10 +252,9 @@ export class TestsRunner {
           } catch (error) {
             const duration = performance.now() - start;
             console.log(
-              `❌ ${suite.name}/${testName} failed %c(${
+              `❌ ${suite.name}/${testName} failed (${
                 Math.round(duration)
-              }ms)`,
-              'color: gray',
+              }ms)`
             );
             formatError(error);
             allResults.push({

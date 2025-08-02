@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>GoatDB Browser Tests</title>
+    <style>
+        body { 
+            font-family: monospace; 
+            margin: 20px; 
+            background: #f8f8f8; 
+            line-height: 1.4;
+        }
+        .header {
+            background: #333;
+            color: white;
+            padding: 15px;
+            margin: -20px -20px 20px -20px;
+        }
+        .status { 
+            padding: 15px; 
+            margin: 15px 0; 
+            border-radius: 4px; 
+            font-weight: bold;
+        }
+        .running { 
+            background: #e3f2fd; 
+            border-left: 4px solid #2196f3; 
+            color: #1976d2;
+        }
+        .passed { 
+            background: #e8f5e8; 
+            border-left: 4px solid #4caf50; 
+            color: #2e7d32;
+        }
+        .failed { 
+            background: #ffebee; 
+            border-left: 4px solid #f44336; 
+            color: #c62828;
+        }
+        .log { 
+            background: #fff; 
+            padding: 15px; 
+            margin: 15px 0; 
+            font-family: 'Courier New', monospace; 
+            font-size: 12px; 
+            overflow-x: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .results {
+            background: #fff;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .config {
+            background: #f9f9f9;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 11px;
+            color: #666;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🐐 GoatDB Browser Tests</h1>
+        <p>Running existing tests in browser environment with HTTPS server connection</p>
+    </div>
+    
+    <div id="status" class="status running">Initializing tests...</div>
+    
+    <div class="config">
+        <strong>Test Configuration:</strong>
+        <div id="config-display">Loading configuration...</div>
+    </div>
+    
+    <div id="results" class="results" style="display: none;">
+        <!-- Test results will be populated here -->
+    </div>
+    
+    <div>
+        <strong>Console Output:</strong>
+        <pre id="console-log" class="log"></pre>
+    </div>
+    
+    <script>
+        // Display configuration when available
+        function updateConfig() {
+            const config = window.GoatDBConfig || {};
+            const configEl = document.getElementById('config-display');
+            configEl.innerHTML = `
+                Server URL: ${config.serverURL || 'Not configured'}<br>
+                Organization: ${config.orgId || 'Not configured'}<br>
+                Debug Mode: ${config.debug ? 'Enabled' : 'Disabled'}<br>
+                Version: ${config.version ? (Array.isArray(config.version) ? config.version.join('.') : config.version) : 'Unknown'}
+            `;
+        }
+        
+        // Capture console output for debugging
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        const logElement = document.getElementById('console-log');
+        
+        function appendLog(type, ...args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            logElement.textContent += `[${timestamp}] [${type}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        console.log = (...args) => { originalLog(...args); appendLog('LOG', ...args); };
+        console.error = (...args) => { originalError(...args); appendLog('ERROR', ...args); };
+        console.warn = (...args) => { originalWarn(...args); appendLog('WARN', ...args); };
+        
+        // Update status display
+        function updateStatus(message, className = 'running') {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${className}`;
+            statusEl.textContent = message;
+        }
+        
+        // Listen for test completion
+        window.addEventListener('testsComplete', (event) => {
+            const results = event.detail;
+            const statusEl = document.getElementById('status');
+            const resultsEl = document.getElementById('results');
+            
+            // Update status
+            const success = results.failed === 0;
+            statusEl.className = `status ${success ? 'passed' : 'failed'}`;
+            statusEl.textContent = success 
+                ? `✓ All tests passed (${results.passed} tests, ${results.duration}ms)`
+                : `✗ Tests failed (${results.passed} passed, ${results.failed} failed, ${results.duration}ms)`;
+            
+            // Show detailed results
+            resultsEl.style.display = 'block';
+            resultsEl.innerHTML = `
+                <h3>Test Summary</h3>
+                <p><strong>Passed:</strong> ${results.passed}</p>
+                <p><strong>Failed:</strong> ${results.failed}</p>
+                <p><strong>Duration:</strong> ${results.duration}ms</p>
+                <p><strong>Exit Code:</strong> ${results.exitCode || 0}</p>
+                ${results.exitCode === 0 
+                    ? '<p style="color: green;">✓ Browser tests completed successfully</p>'
+                    : '<p style="color: red;">✗ Browser tests failed</p>'
+                }
+            `;
+            
+            console.log('Browser tests completed:', results);
+        });
+        
+        // Handle test errors
+        window.addEventListener('error', (event) => {
+            if (event.error?.message === 'TEST_COMPLETION_SUCCESS') {
+                updateStatus('✓ Tests completed successfully', 'passed');
+            } else if (event.error?.message?.startsWith('TEST_COMPLETION_FAILURE')) {
+                updateStatus('✗ Tests failed: ' + event.error.message, 'failed');
+            } else {
+                updateStatus('✗ Test execution error: ' + event.error?.message, 'failed');
+                console.error('Unhandled test error:', event.error);
+            }
+        });
+        
+        // Update config display when available
+        setTimeout(updateConfig, 100);
+        
+        // Initial status
+        updateStatus('Loading test bundle...', 'running');
+    </script>
+    
+    <!-- Test bundle will be served at /app.js by debug server -->
+    <script src="/app.js"></script>
+</body>
+</html>

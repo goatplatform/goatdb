@@ -1,4 +1,25 @@
-import { isBrowser, isDeno, isNode } from '../base/common.ts';
+/**
+ * Main entry point for running all tests in the server environment
+ * (Deno or Node.js).
+ *
+ * This module is loaded as the entry point when executing tests in a
+ * server-side environment, such as via `deno run` or Node.js (after bundling).
+ * It is responsible for:
+ *
+ * - Registering all server-compatible test suites by calling their setup
+ *   functions.
+ * - Reading test configuration (such as suite and test selection) from
+ *   environment variables.
+ * - Running the specified tests using the default test runner.
+ * - Exiting the process with an appropriate exit code based on test results.
+ *
+ * To add new server-side tests, import and call their setup functions in this
+ * file.
+ *
+ * This entry point is not intended for browser-based test execution; for
+ * browser tests, see `tests-entry-browser.ts`.
+ */
+
 import { TestsRunner, type TestSummary } from './mod.ts';
 import setupUntrusted from './db-untrusted.test.ts';
 import setupTrusted from './db-trusted.test.ts';
@@ -14,28 +35,12 @@ import setupHealthCheckEndpointTest from './health-check-endpoint.test.ts';
 import setupMinimalSync from './minimal-client-server-sync.test.ts';
 import setupE2ELatency from './e2e-latency.test.ts';
 import setupClusterLatency from './cluster-latency.test.ts';
-
-// Minimal interface for globalThis with process.env
-interface GlobalWithProcessEnv {
-  process?: {
-    env?: Record<string, string | undefined>;
-  };
-}
-
-// Cross-platform env getter
-function getEnvVar(key: string): string | undefined {
-  if (isDeno()) {
-    // deno-lint-ignore no-explicit-any
-    return (Deno.env as any)?.get?.(key);
-  } else if (isNode()) {
-    const g = globalThis as unknown as GlobalWithProcessEnv;
-    return g.process?.env?.[key];
-  }
-  return undefined;
-}
+import { getEnvVar } from '../base/os.ts';
+import { isBrowser } from '../base/common.ts';
+import { assert } from '../base/error.ts';
 
 /**
- * Main entry point for running tests.
+ * Main entry point for running tests in the server environment.
  *
  * This function:
  * 1. Sets up all test suites by calling their setup functions
@@ -67,41 +72,45 @@ async function main(): Promise<void> {
   // then progressively run slower tests. This follows the test pyramid principle.
 
   // FAST UNIT TESTS (0-1ms each) - Pure logic, no I/O
-  setupOrderstamp();        // Utility functions for distributed timestamps
-  setupItemPath();          // Path validation and parsing logic  
+  setupOrderstamp(); // Utility functions for distributed timestamps
+  setupItemPath(); // Path validation and parsing logic
   setupHealthCheckEndpointTest(); // Simple HTTP endpoint check
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
-  setupCommit();            // Core commit/versioning logic
-  setupSession();           // Authentication and session management
-  setupGoatRequestTest();   // HTTP request processing
+  setupCommit(); // Core commit/versioning logic
+  setupSession(); // Authentication and session management
+  setupGoatRequestTest(); // HTTP request processing
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
-  setupTrusted();           // Database operations in trusted mode
-  setupUntrusted();         // Database operations in untrusted mode
+  setupTrusted(); // Database operations in trusted mode
+  setupUntrusted(); // Database operations in untrusted mode
   await setupServerArchitectureTest(); // Server initialization and configuration
   setupStaticAssetsEndpointTest(); // File serving and asset management
 
   // SYNC INTEGRATION TESTS (1-2s each) - Network operations, client-server
-  setupMinimalSync();       // Basic client-server synchronization
+  setupMinimalSync(); // Basic client-server synchronization
 
   // HEAVY END-TO-END TESTS (10-30s each) - Full system, network latency, multi-node
-  setupE2ELatency();        // Client-to-client sync latency measurement
-  setupClusterLatency();    // Multi-server cluster sync performance
+  setupE2ELatency(); // Client-to-client sync latency measurement
+  setupClusterLatency(); // Multi-server cluster sync performance
 
   // Get test configuration from environment
   const suiteName = getEnvVar('GOATDB_SUITE');
   const testName = getEnvVar('GOATDB_TEST');
 
   // Run the tests
-  const summary: TestSummary = await TestsRunner.default.run(suiteName, testName);
-
-  // Exit if not in browser environment
-  if (!isBrowser()) {
-    // Exit with code 1 if any tests failed, 0 if all passed
-    const exitCode = summary.failed > 0 ? 1 : 0;
-    await exit(exitCode);
-  }
+  const summary: TestSummary = await TestsRunner.default.run(
+    suiteName,
+    testName,
+  );
+  // Exit with code 1 if any tests failed, 0 if all passed
+  const exitCode = summary.failed > 0 ? 1 : 0;
+  await exit(exitCode);
 }
+
+assert(
+  !isBrowser(),
+  'Tests entry point should only be used in server environment',
+);
 
 main();

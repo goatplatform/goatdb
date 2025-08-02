@@ -488,6 +488,11 @@ export class DenoHttpServer implements MinimalHttpServer {
   private _abortController?: AbortController;
   private _server?: Deno.HttpServer;
   private _started: boolean = false;
+  private _options: HttpServerOptions;
+
+  constructor(options: HttpServerOptions = {}) {
+    this._options = options;
+  }
 
   start(
     handler: (
@@ -506,14 +511,23 @@ export class DenoHttpServer implements MinimalHttpServer {
     const started = new Promise<void>((res) => {
       resolve = res;
     });
-    this._server = Deno.serve(
-      {
-        port,
-        onListen() {
-          resolve();
-        },
-        signal: combinedSignal,
+    // Use HTTPS or HTTP based on configuration
+    const serveOptions: any = {
+      port,
+      onListen() {
+        resolve();
       },
+      signal: combinedSignal,
+    };
+    
+    // Add TLS options if HTTPS is configured
+    if (this._options.https) {
+      serveOptions.key = this._options.https.key;
+      serveOptions.cert = this._options.https.cert;
+    }
+    
+    this._server = Deno.serve(
+      serveOptions,
       (req: Request, info: Deno.ServeHandlerInfo) => {
         // Map Deno's info to the unified abstraction
         const remoteAddr: HttpRemoteAddr = {
@@ -563,8 +577,11 @@ export class DenoHttpServer implements MinimalHttpServer {
  * This class provides a Node.js-specific implementation of the HTTP server.
  */
 export class NodeHttpServer implements MinimalHttpServer {
-  /** The underlying Node.js HTTP server instance */
+  /** The underlying Node.js HTTP/HTTPS server instance */
   private _server?: import('node:http').Server<
+    typeof import('node:http').IncomingMessage,
+    typeof import('node:http').ServerResponse
+  > | import('node:https').Server<
     typeof import('node:http').IncomingMessage,
     typeof import('node:http').ServerResponse
   >;
@@ -572,6 +589,12 @@ export class NodeHttpServer implements MinimalHttpServer {
   private _started: boolean = false;
   /** Cached reference to the Node.js Buffer implementation */
   private _Buffer?: typeof import('node:buffer').Buffer;
+  /** HTTPS configuration options */
+  private _options: HttpServerOptions;
+
+  constructor(options: HttpServerOptions = {}) {
+    this._options = options;
+  }
 
   /**
    * Starts the HTTP server on the specified port.
@@ -594,13 +617,20 @@ export class NodeHttpServer implements MinimalHttpServer {
     }
 
     // Load required Node.js modules
-    const { createServer, IncomingMessage, ServerResponse } =
-      await getNodeHttp();
     const { Buffer } = await getNodeBufferModule();
     this._Buffer = Buffer;
 
-    // Create and configure the HTTP server
-    this._server = createServer(
+    // Create and configure the HTTP/HTTPS server
+    if (this._options.https) {
+      // Load HTTPS module for secure connections
+      const https = await import('node:https');
+      const { IncomingMessage, ServerResponse } = await getNodeHttp();
+      
+      this._server = https.createServer(
+        {
+          key: this._options.https.key,
+          cert: this._options.https.cert,
+        },
       async (
         req: InstanceType<typeof IncomingMessage>,
         res: InstanceType<typeof ServerResponse>,
@@ -655,6 +685,66 @@ export class NodeHttpServer implements MinimalHttpServer {
         }
       },
     );
+    } else {
+      // Create regular HTTP server
+      const { createServer, IncomingMessage, ServerResponse } = await getNodeHttp();
+      
+      this._server = createServer(
+        async (
+          req: InstanceType<typeof IncomingMessage>,
+          res: InstanceType<typeof ServerResponse>,
+        ) => {
+          try {
+            // Convert Node.js request to standardized GoatRequest
+            const goatReq = new GoatRequest(req as MinimalNodeIncomingMessage);
+
+            // Extract client hostname from request socket
+            const hostname = req.socket?.remoteAddress ?? '';
+
+            // Create server info object
+            const info: ServeHandlerInfo = {
+              remoteAddr: { hostname },
+              completed: Promise.resolve(),
+            };
+
+            // Process request and get response
+            const response = await handler(goatReq, info);
+
+            // Set response status and headers
+            res.statusCode = response.status;
+            response.headers.forEach((value, key) => res.setHeader(key, value));
+
+            // Handle response body streaming
+            if (response.body) {
+              const reader = response.body.getReader();
+              const write = async () => {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+
+                  if (value != null) {
+                    // Convert Uint8Array to Node.js Buffer if needed
+                    if (value instanceof Uint8Array && this._Buffer) {
+                      res.write(this._Buffer.from(value));
+                    } else {
+                      res.write(value);
+                    }
+                  }
+                }
+                res.end();
+              };
+              write();
+            } else {
+              res.end();
+            }
+          } catch (err) {
+            // Handle errors with 500 response
+            res.statusCode = 500;
+            res.end('Internal Server Error');
+          }
+        },
+      );
+    }
 
     // Start listening on specified port
     await new Promise<void>((resolve) => this._server!.listen(port, resolve));
@@ -687,17 +777,25 @@ export class NodeHttpServer implements MinimalHttpServer {
 }
 
 // Union type for all supported MinimalHttpServer implementations
+export interface HttpServerOptions {
+  /** HTTPS configuration */
+  https?: {
+    key: string;
+    cert: string;
+  };
+}
+
 export type HttpServerInstance = DenoHttpServer | NodeHttpServer;
 
 /**
  * Factory function to create the appropriate HTTP server implementation
  * depending on the runtime (Deno or Node.js).
  */
-export function createHttpServer(): HttpServerInstance {
+export function createHttpServer(options: HttpServerOptions = {}): HttpServerInstance {
   if (isDeno()) {
-    return new DenoHttpServer();
+    return new DenoHttpServer(options);
   } else if (isNode()) {
-    return new NodeHttpServer();
+    return new NodeHttpServer(options);
   } else {
     throw new Error('Unsupported runtime: cannot create HTTP server');
   }

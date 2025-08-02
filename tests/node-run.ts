@@ -57,7 +57,7 @@ export async function nodeRun(
     });
     const nodeProcess = nodeCmd.spawn();
     const writer = nodeProcess.stdin.getWriter();
-    await writer.write(result.outputFiles[0].contents);
+    await writer.write(result.outputFiles![0].contents);
     await writer.close();
     await nodeProcess.output();
     return (await nodeProcess.status).success;

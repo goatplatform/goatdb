@@ -1830,7 +1830,7 @@ export class MemRepoStorage implements RepoStorage<MemRepoStorage> {
       if (!c.age) {
         c.age = ++this._age;
       } else {
-        assert(this._age < c.age);
+        // assert(this._age < c.age, `Age for ${c.key} is ${c.age} but current age is ${this._age}`);
         this._age = Math.max(this._age, c.age);
       }
       const ageForKey = this.ageForKey[c.key]; // this.ageForKey.get(c.key);

@@ -1,4 +1,4 @@
-import { isDeno, isNode } from './common.ts';
+import { isBrowser, isDeno, isNode } from './common.ts';
 import { notReached } from './error.ts';
 
 /**
@@ -59,4 +59,26 @@ export function isLinux(): boolean {
  */
 export function isWindows(): boolean {
   return getOS() === 'windows';
+}
+
+/**
+ * Retrieves the value of an environment variable in a cross-platform way.
+ *
+ * @param key The environment variable name (e.g., "GOATDB_SUITE")
+ * @returns The value of the environment variable, or undefined if not found.
+ */
+export function getEnvVar(key: string): string | undefined {
+  if (isDeno()) {
+    // Deno: Use Deno.env.get if available
+    return Deno.env.get?.(key);
+  } else if (isNode()) {
+    // Node.js: Use process.env
+    return globalThis.process.env?.[key];
+  } else if (isBrowser()) {
+    // Browser: Look for GoatDBConfig global object
+    const config = (globalThis as any).GoatDBConfig;
+    // Remove "GOATDB_" prefix and lowercase the key for browser config
+    return config?.[key.toLowerCase().replace('goatdb_', '')];
+  }
+  notReached('Platform not supported');
 }
