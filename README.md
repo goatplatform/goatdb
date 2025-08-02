@@ -11,55 +11,21 @@
 # GoatDB: Embedded, Distributed, Document Database
 
 <p align="center">
-📚 <a href="https://goatdb.dev">Documentation</a> • ⚡ <a href="https://goatdb.dev/benchmarks/">Benchmarks</a> • 💬 <a href="https://github.com/goatplatform/goatdb/discussions">Discussions</a> • 👋 <a href="https://discord.gg/SAt3cbUqxr">Discord</a>
+📚 <a href="https://goatdb.dev">Documentation</a> • ⚡ <a href="https://goatdb.dev/benchmarks/">Benchmarks</a> • 💬 <a href="https://github.com/goatplatform/goatdb/discussions">Discussions</a> • 👋 <a href="https://discord.gg/SAt3cbUqxr">Discord</a> • 🔴 <a href="https://www.reddit.com/r/zbdb/s/jx1jAbEqtj">Reddit</a>
 </p>
 
-[GoatDB](https://goatdb.dev/) is an embedded,
-[distributed](https://goatdb.dev/architecture), document database that
-prioritizes [speed](https://goatdb.dev/benchmarks) and
-[developer experience](https://goatdb.dev/tutorial/). It excels at real-time
-collaboration and embedded caching applications.
+[GoatDB](https://goatdb.dev/) is an embedded, distributed document database that prioritizes speed and developer experience. Build real-time collaborative apps that work offline.
 
-Instead of following traditional database design patterns, GoatDB leverages
-[concepts](https://goatdb.dev/concepts) refined over decades by distributed
-version control systems. These are enhanced with novel algorithms for efficient
-[synchronization](https://goatdb.dev/sync) and automatic real-time conflict
-resolution.
-
-Currently optimized for TypeScript environments, GoatDB functions as a
-first-class citizen in both browsers and servers. It utilizes a
-[document model](https://goatdb.dev/concepts) with
-[schemas](https://goatdb.dev/schema), providing
-[causal eventual consistency](https://en.wikipedia.org/wiki/Causal_consistency)
-to simplify development while offering built-in optional
-[cryptographic signing](https://goatdb.dev/sessions) for the underlying
-[commit graph](https://goatdb.dev/commit-graph).
+Inspired by distributed version control systems, GoatDB brings Git-like features to databases: cryptographically signed commits, three-way merges, and automatic conflict resolution. TypeScript-first with React hooks included.
 
 **What makes GoatDB different?**
 
-- **<a href="https://goatdb.dev/repositories/">Repository-centric</a>:** Each
-  repository is a self-contained unit, enabling natural sharding, isolation, and
-  fine-grained <a href="https://goatdb.dev/authorization/">access control</a>.
-- **<a href="https://goatdb.dev/sync/">Stateless, probabilistic sync</a>:**
-  Synchronization uses iterative Bloom filter exchanges for efficient,
-  low-latency, and transport-agnostic convergence—no persistent sync state
-  required.
-- **<a href="https://goatdb.dev/query/">Deterministic, incremental
-  queries</a>:** Queries are first-class, track their own
-  <a href="https://goatdb.dev/commit-graph/">commit history</a>, and process
-  only new changes—enabling real-time, reactive data flows without full
-  recomputation.
-- **<a href="https://goatdb.dev/conflict-resolution/">Ephemeral CRDT-based
-  conflict resolution</a>:** Conflicts are resolved automatically and
-  efficiently using a three-way merge with short-lived CRDTs, tailored for
-  scalable, distributed collaboration.
-- **<a href="https://goatdb.dev/architecture/">Memory-first, append-only
-  storage</a>:** All active data is in memory for speed; the on-disk format is a
-  simple, append-only log for reliability and easy backup.
+- **Works offline:** Changes sync automatically when reconnected
+- **Instant UI updates:** Local changes are instant, no loading states
+- **Smart conflict resolution:** Git-style three-way merge for live data
+- **Self-healing:** Clients can restore crashed servers from the commit graph
 
-GoatDB is under active development. If you're interested in a new approach to
-distributed data, we invite you to explore further and contribute. And please,
-star ⭐️ our project. We really appreciate it! 🙏
+GoatDB is under active development. Star ⭐️ our project if you like the approach!
 
 > [!WARNING]
 > Please keep in mind that GoatDB is still under active development and
@@ -83,78 +49,18 @@ const item = db.create('/todos', { text: 'Hello, GoatDB!', done: false });
 item.set('done', true);
 ```
 
-## React Hooks
+## React Integration
 
-GoatDB provides a set of ergonomic React hooks for building real-time,
-offline-capable UIs with minimal boilerplate. These hooks offer a complete state
-management solution for React apps—handling database initialization, loading
-state, live queries, and item updates—all with automatic synchronization and
-efficient reactivity. Hooks like [`useDB`](https://goatdb.dev/react/#usedb),
-[`useDBReady`](https://goatdb.dev/react/#usedbready),
-[`useQuery`](https://goatdb.dev/react/#usequery), and
-[`useItem`](https://goatdb.dev/react/#useitem) make it easy to manage your
-application's data layer. See the [Concepts](https://goatdb.dev/concepts/) and
-[Reading and Writing Data](https://goatdb.dev/read-write-data/) docs for more
-background.
+GoatDB includes React hooks for real-time, offline-capable UIs. See the [React documentation](https://goatdb.dev/react/).
 
-**Example:**
-
-```jsx
-function TaskList() {
-  const tasks = useQuery({
-    schema: taskSchema, // see https://goatdb.dev/schema/
-    source: '/tasks',
-    predicate: (item) => !item.get('done'), // see https://goatdb.dev/query/
-  });
-  return (
-    <ul>
-      {tasks.results().map((task) => (
-        <li key={task.path}>
-          <TaskEditor path={task.path} />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function TaskEditor({ path }) {
-  const task = useItem(path, { keys: ['text', 'done'] }); // see https://goatdb.dev/read-write-data/
-  if (!task) return <span>Loading...</span>;
-  return (
-    <input
-      value={task.get('text')}
-      onChange={(e) => task.set('text', e.target.value)}
-    />
-  );
-}
-```
-
-For details and examples, see the
-[React documentation](https://goatdb.dev/react/).
-
-For full installation and usage details, see the
-<a href="https://goatdb.dev/install/">installation guide</a> and
-<a href="https://goatdb.dev/tutorial/">tutorial</a>.
+See the <a href="https://goatdb.dev/tutorial/">tutorial</a> for more examples.
 
 ## Contributing
 
-GoatDB is open source under the Apache 2.0 license. We welcome issues,
-discussions, and pull requests. To get started:
-
-1. Fork the repository
-2. Create a branch for your changes
-3. Submit a pull request
-
-For local development, you can link GoatDB into your project:
+We welcome contributions! Fork, make changes, and submit a PR. For local development:
 
 ```bash
 deno run -A jsr:@goatdb/goatdb/link link ./path/to/goatdb
-```
-
-To unlink GoatDB, run:
-
-```bash
-deno run -A jsr:@goatdb/goatdb/link unlink
 ```
 
 ## License
