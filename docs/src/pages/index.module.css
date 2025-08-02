@@ -140,6 +140,17 @@
 
 /* Responsive adjustments */
 @media screen and (max-width: 768px) {
+  .buttons {
+    flex-direction: column;
+    width: 100%;
+    padding: 0 1rem;
+  }
+  
+  .buttons .button {
+    width: 100%;
+    max-width: 280px;
+  }
+  
   .useCaseGrid {
     grid-template-columns: 1fr;
     gap: 1.5rem;

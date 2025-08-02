@@ -41,12 +41,12 @@ const FeatureList: FeatureItem[] = [
     ),
   },
   {
-    title: 'Handles Conflicts',
+    title: 'Smart Conflict Resolution',
     emoji: '🤝',
     description: (
       <>
-        Multiple users edit simultaneously. 
-        Conflicts resolve automatically. Users never see merge dialogs.
+        Like Git's three-way merge but for live data. 
+        Multiple users edit simultaneously without conflicts.
       </>
     ),
   },
@@ -96,8 +96,8 @@ export default function HomepageFeatures(): JSX.Element {
         </div>
         <div className={styles.architectureSection}>
           <h3>Never lose a change</h3>
-          <p className={styles.architectureDescription}>Each document has its own commit graph. Branches merge automatically. 
-          Conflicts resolve deterministically. No merge conflict dialogs, ever.</p>
+          <p className={styles.architectureDescription}>Each document has its own commit graph. Branches merge automatically using 
+          three-way merge with ephemeral CRDTs. No merge conflicts, ever.</p>
           <div className={styles.architectureFeatures}>
             <div className={styles.architectureFeature}>
               <span className={styles.architectureIcon}>🌳</span>
@@ -106,13 +106,13 @@ export default function HomepageFeatures(): JSX.Element {
             </div>
             <div className={styles.architectureFeature}>
               <span className={styles.architectureIcon}>🔀</span>
-              <h4>Three-Way Merges</h4>
-              <p>Automatic conflict resolution like Git</p>
+              <h4>Three-Way Merge</h4>
+              <p>Git-style merging for live data</p>
             </div>
             <div className={styles.architectureFeature}>
               <span className={styles.architectureIcon}>⚡</span>
-              <h4>Conflict-Free Types</h4>
-              <p>Sets and maps that merge seamlessly</p>
+              <h4>Ephemeral CRDTs</h4>
+              <p>Conflict-free types without the overhead</p>
             </div>
             <div className={styles.architectureFeature}>
               <span className={styles.architectureIcon}>🔍</span>

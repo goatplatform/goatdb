@@ -77,14 +77,14 @@ function TodoItem({ path }: { path: string }) {
             
             <TabItem value="sync" label="Multiplayer">
               <CodeBlock language="typescript">
-{`// Collaborative whiteboard with conflict-free data types
+{`// Collaborative whiteboard with automatic merging
 const WhiteboardSchema = {
   ns: 'whiteboard',
   version: 1,
   fields: {
     title: { type: 'string', required: true },
-    shapes: { type: 'set' },        // Conflict-free set
-    connectedUsers: { type: 'map' }, // User -> cursor position
+    shapes: { type: 'set' },        // Merge-friendly set
+    connectedUsers: { type: 'map' }, // Merge-friendly map
     tags: { type: 'set' }
   }
 } as const;
@@ -114,8 +114,8 @@ board.set('shapes', board.get('shapes').add({
 // ✅ Cursor positions update in real-time via the map
 // ✅ No conflict dialogs - additions always win
 
-// The magic: GoatDB's sets and maps handle conflicts automatically.
-// Unlike last-write-wins, collaborative additions are preserved.`}
+// The magic: Sets and maps merge like Git branches - intelligently combining changes.
+// Unlike last-write-wins, everyone's additions are preserved.`}
               </CodeBlock>
             </TabItem>
           </Tabs>
