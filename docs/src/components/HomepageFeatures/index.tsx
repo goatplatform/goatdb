@@ -1,18 +1,27 @@
 import clsx from 'clsx';
 import Heading from '@theme/Heading';
 import styles from './styles.module.css';
+import OfflineIcon from '../icons/OfflineIcon';
+import SelfHealingIcon from '../icons/SelfHealingIcon';
+import InstantUpdateIcon from '../icons/InstantUpdateIcon';
+import ConflictResolutionIcon from '../icons/ConflictResolutionIcon';
+import TypeScriptIcon from '../icons/TypeScriptIcon';
+import DeployIcon from '../icons/DeployIcon';
+import VersionHistoryIcon from '../icons/VersionHistoryIcon';
+import ThreeWayMergeIcon from '../icons/ThreeWayMergeIcon';
+import EphemeralCRDTIcon from '../icons/EphemeralCRDTIcon';
+import TimeTravelIcon from '../icons/TimeTravelIcon';
 
 type FeatureItem = {
   title: string;
-  Svg?: React.ComponentType<React.ComponentProps<'svg'>>;
-  emoji?: string;
+  Icon: React.ComponentType<{ className?: string }>;
   description: JSX.Element;
 };
 
 const FeatureList: FeatureItem[] = [
   {
     title: 'Works Offline',
-    emoji: '🔌',
+    Icon: OfflineIcon,
     description: (
       <>
         Your app works without internet. 
@@ -22,7 +31,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: 'Self-Healing Architecture',
-    emoji: '🔗',
+    Icon: SelfHealingIcon,
     description: (
       <>
         Cryptographically signed commits enable clients to restore 
@@ -32,7 +41,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: 'Instant UI Updates',
-    emoji: '🔄',
+    Icon: InstantUpdateIcon,
     description: (
       <>
         Local changes are instant. Remote changes stream in real-time. 
@@ -42,7 +51,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: 'Smart Conflict Resolution',
-    emoji: '🤝',
+    Icon: ConflictResolutionIcon,
     description: (
       <>
         Like Git's three-way merge but for live data. 
@@ -52,7 +61,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: 'Just TypeScript',
-    emoji: '📘',
+    Icon: TypeScriptIcon,
     description: (
       <>
         TypeScript schemas. JavaScript queries. 
@@ -62,7 +71,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: 'Single Binary Deploy',
-    emoji: '🚀',
+    Icon: DeployIcon,
     description: (
       <>
         Deno compiles everything into one binary. Deploy on cheap VMs. 
@@ -72,11 +81,13 @@ const FeatureList: FeatureItem[] = [
   },
 ];
 
-function Feature({title, emoji, description}: FeatureItem) {
+function Feature({title, Icon, description}: FeatureItem) {
   return (
     <div className={clsx('col col--4')}>
       <div className={styles.feature}>
-        <div className={styles.featureEmoji}>{emoji}</div>
+        <div className={styles.featureIcon}>
+          <Icon className={styles.icon} />
+        </div>
         <div className="padding-horiz--md">
           <Heading as="h3">{title}</Heading>
           <p>{description}</p>
@@ -100,22 +111,30 @@ export default function HomepageFeatures(): JSX.Element {
           three-way merge with ephemeral CRDTs. No merge conflicts, ever.</p>
           <div className={styles.architectureFeatures}>
             <div className={styles.architectureFeature}>
-              <span className={styles.architectureIcon}>🌳</span>
+              <div className={styles.architectureIconWrapper}>
+                <VersionHistoryIcon className={styles.architectureIcon} />
+              </div>
               <h4>Version History</h4>
               <p>Every item tracks its complete history</p>
             </div>
             <div className={styles.architectureFeature}>
-              <span className={styles.architectureIcon}>🔀</span>
+              <div className={styles.architectureIconWrapper}>
+                <ThreeWayMergeIcon className={styles.architectureIcon} />
+              </div>
               <h4>Three-Way Merge</h4>
               <p>Git-style merging for live data</p>
             </div>
             <div className={styles.architectureFeature}>
-              <span className={styles.architectureIcon}>⚡</span>
+              <div className={styles.architectureIconWrapper}>
+                <EphemeralCRDTIcon className={styles.architectureIcon} />
+              </div>
               <h4>Ephemeral CRDTs</h4>
               <p>Conflict-free types without the overhead</p>
             </div>
             <div className={styles.architectureFeature}>
-              <span className={styles.architectureIcon}>🔍</span>
+              <div className={styles.architectureIconWrapper}>
+                <TimeTravelIcon className={styles.architectureIcon} />
+              </div>
               <h4>Time Travel</h4>
               <p>Navigate through document history</p>
             </div>

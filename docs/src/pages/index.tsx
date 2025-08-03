@@ -7,6 +7,10 @@ import QuickStart from '@site/src/components/QuickStart';
 import Heading from '@theme/Heading';
 
 import styles from './index.module.css';
+import SingleTenantIcon from '@site/src/components/icons/SingleTenantIcon';
+import OfflineFirstIcon from '@site/src/components/icons/OfflineFirstIcon';
+import MultiplayerIcon from '@site/src/components/icons/MultiplayerIcon';
+import CollaborativeIcon from '@site/src/components/icons/CollaborativeIcon';
 
 function UseCases() {
   return (
@@ -15,22 +19,30 @@ function UseCases() {
         <h2>Built for modern apps</h2>
         <div className={styles.useCaseGrid}>
           <div className={styles.useCase}>
-            <span className={styles.useCaseEmoji}>💰</span>
+            <div className={styles.useCaseIconWrapper}>
+              <SingleTenantIcon className={styles.useCaseIcon} />
+            </div>
             <h3>Ultra-Cheap Single-Tenant</h3>
             <p>Deploy each customer on their own $5/month VM. The cryptographically signed commit graph means clients can restore crashed servers automatically. No complex HA setup needed.</p>
           </div>
           <div className={styles.useCase}>
-            <span className={styles.useCaseEmoji}>📱</span>
+            <div className={styles.useCaseIconWrapper}>
+              <OfflineFirstIcon className={styles.useCaseIcon} />
+            </div>
             <h3>Offline-First Apps</h3>
             <p>Create mobile and desktop apps that work seamlessly offline and sync when connected. Perfect for field work and unreliable networks.</p>
           </div>
           <div className={styles.useCase}>
-            <span className={styles.useCaseEmoji}>🎮</span>
+            <div className={styles.useCaseIconWrapper}>
+              <MultiplayerIcon className={styles.useCaseIcon} />
+            </div>
             <h3>Multiplayer Games</h3>
             <p>Build real-time multiplayer experiences with minimal server overhead. Each game room gets its own lightweight instance. Scale horizontally by adding cheap VMs.</p>
           </div>
           <div className={styles.useCase}>
-            <span className={styles.useCaseEmoji}>📝</span>
+            <div className={styles.useCaseIconWrapper}>
+              <CollaborativeIcon className={styles.useCaseIcon} />
+            </div>
             <h3>Collaborative Editing</h3>
             <p>Build Google Docs-like experiences where multiple users edit the same document in real-time, with automatic conflict resolution.</p>
           </div>
