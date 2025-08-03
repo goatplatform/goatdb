@@ -5,6 +5,8 @@ sidebar_position: 7
 slug: /repositories
 ---
 
+import RepositoryStructure from '@site/src/components/diagrams/RepositoryStructure';
+import CommitGraphs from '@site/src/components/diagrams/CommitGraphs';
 
 # Repositories in GoatDB
 
@@ -21,9 +23,7 @@ durable storage with efficient read and write operations.
 
 ### Storage Architecture
 
-<div style={{textAlign: 'center'}}>
-  <img src="/img/repository-structure.svg" alt="Repository Structure" />
-</div>
+<RepositoryStructure />
 
 Each repository is backed by a single `.jsonl` file that stores a log of
 commits. This design takes advantage of modern SSD characteristics:
@@ -43,9 +43,7 @@ The [JSON Lines](https://jsonlines.org/) format provides several benefits:
 
 ### Commit Graphs
 
-<div style={{textAlign: 'center'}}>
-  <img src="/img/commit-graphs.svg" alt="Distinct Commit Graphs" />
-</div>
+<CommitGraphs />
 
 Repositories are collections of distinct commit graphs - one per item. Each item
 (identified by its key) has its own independent commit history, allowing for

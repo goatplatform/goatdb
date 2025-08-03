@@ -1,0 +1,25 @@
+.diagramContainer {
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.diagramTitle {
+  font-size: 0.875rem;
+  color: var(--ifm-color-emphasis-800);
+  margin-bottom: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.diagramContent {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.diagramContent svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}

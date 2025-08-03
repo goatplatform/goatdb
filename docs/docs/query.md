@@ -5,6 +5,10 @@ sidebar_position: 4
 slug: /query
 ---
 
+import LocalCopy from '@site/src/components/diagrams/LocalCopy';
+import CommitStorage from '@site/src/components/diagrams/CommitStorage';
+import QueryCache from '@site/src/components/diagrams/QueryCache';
+import IncrementalUpdates from '@site/src/components/diagrams/IncrementalUpdates';
 
 # Querying Data in GoatDB
 
@@ -262,8 +266,7 @@ activeUsers.onResultsChanged(() => {
 
 ## Technical Details
 
-GoatDB's query system is designed for responsiveness and efficiency while being
-super easy to use without explicit indexing. The [architecture](/docs/architecture)
+GoatDB's query system is designed for responsiveness and efficiency while being easy to use without explicit indexing. The [architecture](/docs/architecture)
 prioritizes developer experience without sacrificing [performance](/docs/benchmarks):
 
 - **No Manual Indexing**: Unlike traditional databases, GoatDB doesn't require
@@ -272,34 +275,26 @@ prioritizes developer experience without sacrificing [performance](/docs/benchma
 - **Transparent Caching**: Results are cached transparently without developer
   intervention
 
-<div style={{textAlign: 'center'}}>
-  <img src="/img/local-copy.svg" alt="Local Copy & Offline Availability" />
-</div>
+<LocalCopy />
 
 Each peer maintains a complete local copy of the database, enabling offline
 operation and low-latency access. The local copy is [synchronized](/docs/sync) with
 the network when online, ensuring consistency across all peers.
 
-<div style={{textAlign: 'center'}}>
-  <img src="/img/commit-storage.svg" alt="Commit Storage & Age Assignment" />
-</div>
+<CommitStorage />
 
 As commits are stored in the database, each peer assigns its own monotonically
 increasing age number that reflect the order in which commits were received
 locally. These age numbers are local to each peer and are never synchronized
 across the network.
 
-<div style={{textAlign: 'center'}}>
-  <img src="/img/query-cache.svg" alt="Query Cache & Age Tracking" />
-</div>
+<QueryCache />
 
 When persisting query results, we store both the results and the age of the
-latest commit included in those results. This allows us to efficiently track
+latest commit processed by the query. This allows us to efficiently track
 which commits have already been processed.
 
-<div style={{textAlign: 'center'}}>
-  <img src="/img/incremental-updates.svg" alt="Incremental Query Updates" />
-</div>
+<IncrementalUpdates />
 
 When new commits arrive, queries can efficiently resume execution from their
 last known age, only processing the new commits. This incremental update process
