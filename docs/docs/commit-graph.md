@@ -5,6 +5,7 @@ sidebar_position: 11
 slug: /commit-graph
 ---
 
+import CommitGraphIllustration from '@site/src/components/diagrams/CommitGraphIllustration';
 
 # Commit Graph
 
@@ -38,9 +39,7 @@ the maximum supported offline period. For example, if configured to retain two
 weeks of history, clients can go offline for up to two weeks and still rejoin
 the network and merge their offline edits.
 
-<div style={{textAlign: 'center'}}>
-  <img src="/img/commit-graphs.svg" alt="An example of a real world commit graph being edited by two users in realtime" />
-</div>
+<CommitGraphIllustration />
 
 ## Creation Process
 
