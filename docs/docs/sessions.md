@@ -5,6 +5,9 @@ sidebar_position: 4
 slug: /sessions
 ---
 
+import KeyGeneration from '@site/src/components/diagrams/KeyGeneration';
+import SigningVerification from '@site/src/components/diagrams/SigningVerification';
+import DistributedSecurity from '@site/src/components/diagrams/DistributedSecurity';
 
 # Sessions and Users
 
@@ -21,9 +24,7 @@ key pairs**. The private key is generated and stored exclusively on the peer's
 machine, never leaving its local storage. Only the corresponding public key is
 shared with the GoatDB network.
 
-<div style={{textAlign: 'center'}}>
-  <img src="/img/key-gen.svg" alt="Key Generation Illustration" />
-</div>
+<KeyGeneration />
 
 Sessions come in two forms: identified sessions, which are tied to specific user
 IDs and peers, and anonymous sessions, which are only associated with specific
@@ -46,9 +47,7 @@ hasn't been tampered with) and proves the identity of the operation's creator.
 This dual verification system creates a robust foundation for both data
 integrity and accountability.
 
-<div style={{textAlign: 'center'}}>
-  <img src="/img/sign-verify.svg" alt="Signing and Verification Illustration" />
-</div>
+<SigningVerification />
 
 ## Distributed Security Architecture
 
@@ -59,9 +58,7 @@ in the network to verify its authenticity. This creates a tamper-proof
 authorized source, with invalid or unauthorized changes being automatically
 rejected by the network.
 
-<div style={{textAlign: 'center'}}>
-  <img src="/img/distributed-security.svg" alt="Distributed Security Illustration" />
-</div>
+<DistributedSecurity />
 
 A key feature of this architecture is the client-as-replica design. Clients
 maintain their own copy of the [commit graph](/docs/commit-graph) and verify all
