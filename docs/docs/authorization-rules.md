@@ -15,9 +15,9 @@ write to specific [repositories](/docs/repositories) or items within repositorie
 For details about how sessions and authentication work, see
 [Sessions and Users](/docs/sessions) and [Concepts](/docs/concepts).
 
-<div style={{textAlign: 'center'}}>
-  <img src="/img/auth-rules.svg" alt="Auth Rule Diagram" />
-</div>
+import AuthorizationFlow from '@site/src/components/diagrams/AuthorizationFlow';
+
+<AuthorizationFlow />
 
 ## Overview
 
