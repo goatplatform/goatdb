@@ -726,6 +726,23 @@ export class Query<
     const pathsIter = (
       typeof this.source === 'string' ? repo : this.source
     ).paths();
+
+    const cleanup = async () => {
+      if (this.isActive) {
+        this._scanTimeMs = performance.now() - startTime;
+        this._age = Math.max(this._age, maxAge);
+        if (!this._loadingFinished) {
+          this._loadingFinished = true;
+          this.repo.db.queryPersistence?.register(
+            this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
+          );
+          await this.repo.db.queryPersistence?.flush(this.id);
+          this._loading = false;
+          this.emit('LoadingFinished');
+        }
+      }
+    };
+
     if (isBrowser()) {
       let cancelCallback: undefined | (() => void);
       const cancelPromise = CoroutineScheduler.sharedScheduler().forEach(
@@ -737,6 +754,7 @@ export class Query<
           processPath(path, cancelCallback);
         },
       );
+      cancelPromise.then(cleanup);
     } else {
       let stopProcessing = false;
       const stopProcessingHandle = () => {
@@ -748,20 +766,9 @@ export class Query<
           break;
         }
       }
+      await cleanup();
     }
-    if (this.isActive) {
-      this._scanTimeMs = performance.now() - startTime;
-      this._age = Math.max(this._age, maxAge);
-      if (!this._loadingFinished) {
-        this._loadingFinished = true;
-        this.repo.db.queryPersistence?.register(
-          this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
-        );
-        await this.repo.db.queryPersistence?.flush(this.id);
-        this._loading = false;
-        this.emit('LoadingFinished');
-      }
-    }
+
     // console.log(
     //   `Age change = ${ageChange.toLocaleString()}, Skipped ${skipped.toLocaleString()}, Total ${total.toLocaleString()}`,
     // );
