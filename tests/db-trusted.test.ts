@@ -116,13 +116,8 @@ export default function setup(): void {
       assertEquals(item.get('count'), 42);
 
       // Ensure persistence/sync based on environment
-      if (isBrowser()) {
-        // Browser: Sync with server
-        await db.sync('/test/items');
-      } else {
-        // Server: Local persistence
-        await db.flush('/test/items');
-      }
+      await db.flush('/test/items');
+      await db.sync('/test/items');
 
       // Access existing item
       const reloadedItem = db.item<typeof TestSchema>('/test/items', item.key);
@@ -197,6 +192,7 @@ export default function setup(): void {
       db.create('/test/query', TestSchema, { name: 'Item 3', count: 30 });
 
       await db.flush('/test/query');
+      await db.sync('/test/query');
 
       // Create a query for items with count > 15
       const query = db.query({
