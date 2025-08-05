@@ -4,7 +4,6 @@ const sidebars: SidebarsConfig = {
   // By default, Docusaurus generates a sidebar from the docs folder structure
   docsSidebar: [
     // GETTING STARTED (Progressive onboarding)
-    'overview',
     'installation',
     'tutorial',
     

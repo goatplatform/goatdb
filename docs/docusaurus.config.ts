@@ -100,7 +100,7 @@ const config: Config = {
       items: [
         {
           type: 'doc',
-          docId: 'overview',
+          docId: 'installation',
           position: 'left',
           label: 'Docs',
         },
