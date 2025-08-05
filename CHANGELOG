@@ -8,6 +8,8 @@ and GoatDB adheres to
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-01-05
+
 ### Added
 
 - `getGlobalLoggerStreams()` returns the currently set global log streams
@@ -18,15 +20,25 @@ and GoatDB adheres to
 - Support for client mode outside of browser environments
 - CLI support for Node.js environments
 - End-to-end latency testing with load testing capabilities
+- HTTPS support with automatic self-signed certificate generation for secure
+  development
+- Browser testing infrastructure using Playwright for automated UI testing
+- Cluster latency testing for multi-node server synchronization
+- `itemPathIsValid()` utility function for path validation
+- Server port/address getters and graceful shutdown capabilities
 
 ### Fixed
 
 - Removed dependency on @std/expect which fixes tests on node
 - Cross-platform compatibility improvements
 - Database loading synchronization issues
-- Missing commit contents validation - now throws an error when commit contents are missing
+- Missing commit contents validation - now throws an error when commit contents
+  are missing
 - Cache file missing crash - no longer crashes if cache file doesn't exist
 - Node.js compatibility for tests and build process
+- Query scan completion timing in browser environments
+- Session expiration handling to properly block expired sessions
+- Test execution improvements with better error reporting and result tracking
 
 ### Changed
 
@@ -37,7 +49,10 @@ and GoatDB adheres to
 - Improved session handling and health check endpoints
 - Server code refactored to better support Node.js environments
 - Updated commit semantics for better reliability
-- Documentation migrated from Jekyll to Docusaurus for improved developer experience
+- Documentation migrated from Jekyll to Docusaurus for improved developer
+  experience
+- Optimized test execution order for faster developer feedback
+- Better cross-platform support for build processes
 
 ## [0.3.1]
 
@@ -191,7 +206,8 @@ and GoatDB adheres to
 
 - Initial release
 
-[Unreleased]: https://github.com/goatplatform/goatdb/releases/tag/v0.3.1...HEAD
+[Unreleased]: https://github.com/goatplatform/goatdb/releases/tag/v0.4.0...HEAD
+[0.4.0]: https://github.com/goatplatform/goatdb/releases/tag/v0.4.0
 [0.3.1]: https://github.com/goatplatform/goatdb/releases/tag/v0.3.1
 [0.3.0]: https://github.com/goatplatform/goatdb/releases/tag/v0.3.0
 [0.2.2]: https://github.com/goatplatform/goatdb/releases/tag/v0.2.2

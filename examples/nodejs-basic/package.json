@@ -9,7 +9,7 @@
     "dev": "node --watch index.js"
   },
   "dependencies": {
-    "@goatdb/goatdb": "npm:@jsr/goatdb__goatdb@^0.3.1"
+    "@goatdb/goatdb": "npm:@jsr/goatdb__goatdb@^0.4.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
