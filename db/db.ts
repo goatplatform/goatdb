@@ -87,8 +87,16 @@ export interface DBInstanceConfig {
    */
   orgId?: string;
   /**
-   * Absolute URLs of peers to sync with. Peers are must share the same
-   * public/private root keys of this instance.
+   * Absolute URLs of peer nodes to sync with. This option is only used for
+   * server cluster configurations, where multiple server nodes act as a single
+   * logical node in the network, sharing the same root session and
+   * cryptographic keys. In a server cluster, all peers listed here must share
+   * the same public/private root keys, and will coordinate as one logical
+   * entity.
+   *
+   * For client applications, this argument is not needed—React hooks and the
+   * client library automatically set up communication with the server as
+   * required.
    */
   peers?: string | Iterable<string>;
   /**
@@ -181,7 +189,11 @@ export class GoatDB<US extends Schema = Schema>
         : Array.from(new Set(config.peers));
       this._repoClients = new Map();
     }
-    this._trustPoolPromise = this._getTrustPoolImpl();
+    this._trustPoolPromise = this._getTrustPoolImpl().catch((err) => {
+      // Store the error but don't let it become an unhandled rejection
+      // It will be re-thrown when readyPromise() is called
+      return Promise.reject(err);
+    });
   }
 
   /**
@@ -272,6 +284,38 @@ export class GoatDB<US extends Schema = Schema>
   }
 
   /**
+   * Closes the database, releasing all resources including repositories,
+   * sync schedulers, queries, and file handles. This method should be called
+   * when you're done using the database instance.
+   */
+  async close(): Promise<void> {
+    // Stop all sync operations first (prevents new writes)
+    if (this._syncSchedulers) {
+      for (const scheduler of this._syncSchedulers) {
+        scheduler.close();
+      }
+      this._syncSchedulers = undefined;
+    }
+
+    // Close all open queries
+    for (const query of this._openQueries.values()) {
+      query.close();
+    }
+    this._openQueries.clear();
+
+    // Close all repositories
+    for (const repoPath of this._repositories.keys()) {
+      await this.closeRepo(repoPath);
+    }
+
+    // Clear query persistence (has flush timer)
+    if (this.queryPersistence) {
+      await this.queryPersistence.close();
+      this.queryPersistence = undefined;
+    }
+  }
+
+  /**
    * Logs out the current user, closing all open repositories and clearing
    * local data. On browsers, this method will also reload the page to ensure
    * a clean state.
@@ -279,9 +323,7 @@ export class GoatDB<US extends Schema = Schema>
    * @throws ServiceUnavailable if the operation fails.
    */
   async logout(): Promise<void> {
-    for (const repoPath of this._repositories.keys()) {
-      await this.close(repoPath);
-    }
+    await this.close();
     await remove(this._basePath);
     if (isBrowser()) {
       location.reload();
@@ -321,7 +363,7 @@ export class GoatDB<US extends Schema = Schema>
    *
    * @param path Path to the desired repository.
    */
-  async close(path: string): Promise<void> {
+  async closeRepo(path: string): Promise<void> {
     path = itemPathNormalize(path);
     const repoId = itemPathGetRepoId(path);
     if (this._openPromises.has(repoId)) {
@@ -341,7 +383,7 @@ export class GoatDB<US extends Schema = Schema>
     }
     await Promise.allSettled(commitPromises);
     for (const k of deletedKeys) {
-      this._items.get(k)!.detachAll();
+      this._items.get(k)!.deactivate();
       this._items.delete(k);
     }
     // Flush log file
@@ -353,13 +395,15 @@ export class GoatDB<US extends Schema = Schema>
       client.close();
     }
     this._repoClients?.delete(repoId);
+    // Detach event handlers first to prevent new file operations
+    repo.detachAll();
+
     // Close log file
     const fileEntry = this._files.get(repoId);
     if (fileEntry) {
       await JSONLogFileClose(fileEntry);
     }
     this._files.delete(repoId);
-    repo.detachAll();
     this._repositories.delete(repoId);
   }
 
@@ -872,14 +916,43 @@ function relativePathForRepo(repoId: string): string {
 
 let gSelectedInstanceNumber = -1;
 
+/**
+ * Picks a unique instance number for this browser tab (or worker), used to
+ * coordinate access to shared resources (such as files) in OPFS environments.
+ *
+ * ## Architectural Note
+ * Each browser tab (or worker) is treated as a separate *replica*, with its own
+ * independent copy of the data in memory. This means that if you open the
+ * application in multiple tabs, each tab will act as a separate database
+ * replica, and changes made in one tab will not automatically appear in
+ * another until explicit synchronization occurs.
+ *
+ * This mechanism assigns a unique instance number per tab/worker by acquiring
+ * a named lock via the `navigator.locks` API. All DB instances within the same
+ * tab will share the same instance number (cached in `gSelectedInstanceNumber`).
+ *
+ * ⚠️ **Warning:** This per-tab replica behavior is temporary and will be
+ * changed in the future. The architecture may evolve to support true
+ * multi-instance coordination or shared memory between DB instances in the
+ * same tab.
+ *
+ * @param startIndex - The starting index to try for instance number selection.
+ *                     Defaults to 0.
+ * @returns A Promise that resolves to the selected instance number, or
+ *          `undefined` if not applicable.
+ */
 async function pickInstanceNumber(
   startIndex: number = 0,
 ): Promise<number | undefined> {
   if ((await FileImplGet()) === FileImplOPFS) {
-    const { promise: indefinitePromise } = Promise.withResolvers();
-    const { promise, resolve } = Promise.withResolvers<number | undefined>();
+    const indefinitePromise = new Promise<void>(() => {
+    });
+    let resolve: (value: number | undefined) => void;
+    const promise = new Promise<number | undefined>((res) => {
+      resolve = res;
+    });
     if (gSelectedInstanceNumber >= 0) {
-      resolve(gSelectedInstanceNumber);
+      resolve!(gSelectedInstanceNumber);
     }
     navigator.locks.request(
       'GoatDB-' + startIndex,

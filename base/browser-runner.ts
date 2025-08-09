@@ -1,16 +1,29 @@
-import { kMinuteMs, kSecondMs } from '../../base/date.ts';
-import type { TestSummary } from '../mod.ts';
-import { sourceMapDecoder } from './sourcemap-decoder.ts';
+import { kMinuteMs, kSecondMs } from './date.ts';
+import { ProcessManager } from './process-manager.ts';
 
-export interface BrowserTestOptions {
+/**
+ * Options for running browser-based tests or benchmarks.
+ *
+ * @property suite - (Optional) Name of the test suite to run.
+ * @property test - (Optional) Name of a specific test to run.
+ * @property benchmark - (Optional) Name of a specific benchmark to run.
+ * @property debug - (Optional) If true, enables debug mode for verbose output.
+ * @property headless - (Optional) If true, runs browser in headless mode.
+ * @property port - (Optional) Port number for the debug server (default: 8080).
+ * @property mode - (Optional) Run mode: 'test' for tests, 'benchmark' for benchmarks.
+ */
+export interface BrowserRunOptions {
   suite?: string;
   test?: string;
+  benchmark?: string;
   debug?: boolean;
+  headless?: boolean;
   port?: number;
+  mode?: 'test' | 'benchmark';
 }
 
 /**
- * Runs browser tests using Playwright automation.
+ * Runs browser tests/benchmarks using Playwright automation.
  *
  * This function:
  * 1. Starts an HTTPS debug server with the browser test bundle
@@ -20,10 +33,15 @@ export interface BrowserTestOptions {
  * 5. Returns the test summary
  */
 export async function runBrowserTests(
-  options: BrowserTestOptions = {},
-): Promise<TestSummary> {
+  options: BrowserRunOptions = {},
+): Promise<any> {
   const port = options.port || 8080;
-  console.log('Starting HTTP debug server for browser tests...');
+  const isBenchmarkMode = options.mode === 'benchmark';
+  console.log(
+    `Starting HTTP debug server for browser ${
+      isBenchmarkMode ? 'benchmarks' : 'tests'
+    }...`,
+  );
 
   // Set environment variables for server configuration
   const env: Record<string, string> = {};
@@ -33,25 +51,28 @@ export async function runBrowserTests(
   if (options.test) {
     env['GOATDB_TEST'] = options.test;
   }
+  if (options.benchmark) {
+    env['GOATDB_BENCHMARK'] = options.benchmark;
+  }
 
-  // Start debug server with HTTPS using the browser test entry point
+  // Start debug server with HTTPS using the appropriate entry point
   const serverArgs = [
     'run',
     '-A',
-    './tests/browser/debug-server-entry.ts',
+    isBenchmarkMode
+      ? './benchmarks/browser/debug-server-entry.ts'
+      : './tests/browser/debug-server-entry.ts',
   ];
 
   console.log(`Running: deno ${serverArgs.join(' ')}`);
 
-  // Start server process directly for proper cleanup
-  const serverCmd = new Deno.Command('deno', {
-    args: serverArgs,
+  // Start server process with ProcessManager
+  const processManager = new ProcessManager();
+  const serverProcess = processManager.spawn('deno', serverArgs, {
     env,
     stdout: 'piped',
     stderr: 'piped',
   });
-
-  const serverProcess = serverCmd.spawn();
 
   // Give server time to start and generate certificate
   console.log('Waiting for server to start...');
@@ -90,7 +111,7 @@ export async function runBrowserTests(
     }
 
     const browser = await chromium.launch({
-      headless: !options.debug,
+      headless: options.headless ?? false, // Default to showing UI
       timeout: 0, // Disable browser launch timeout
       args: browserArgs,
     });
@@ -98,7 +119,7 @@ export async function runBrowserTests(
     const context = await browser.newContext({
       ignoreHTTPSErrors: true,
       acceptDownloads: false,
-      viewport: options.debug ? { width: 1200, height: 800 } : null,
+      viewport: (!options.headless || options.debug) ? { width: 1200, height: 800 } : null,
     });
 
     // Set context timeouts to avoid Playwright-level timeouts
@@ -107,11 +128,17 @@ export async function runBrowserTests(
 
     const page = await context.newPage();
 
+    // Enable source map support for better error reporting
+    const client = await page.context().newCDPSession(page);
+    await client.send('Runtime.enable');
+    await client.send('Debugger.enable');
+
     // Console logging removed for clean output
 
-    // Listen for page errors
+    // Listen for page errors (Playwright automatically provides source-mapped stacks)
     page.on('pageerror', (err) => {
       console.error('[Browser Error]', err.message);
+      console.error(err.stack); // Already source-mapped by Playwright
     });
 
     // Navigate to HTTPS test server (required for OPFS, Web Workers, Web Locks)
@@ -120,10 +147,12 @@ export async function runBrowserTests(
     await page.goto(testUrl, { waitUntil: 'domcontentloaded' });
 
     // Wait for test bundle to load and tests to start
+    console.log('[DEBUG] About to wait for GoatDBConfig...');
     try {
       await page.waitForFunction(() => {
         return typeof (window as any).GoatDBConfig !== 'undefined';
       }, { timeout: 10 * kSecondMs });
+      console.log('[DEBUG] GoatDBConfig found!');
     } catch (e) {
       console.error(
         '[DEBUG] Failed to find GoatDBConfig:',
@@ -132,52 +161,49 @@ export async function runBrowserTests(
       throw e;
     }
 
+    // Benchmarks take longer than tests
+    const timeoutMs = isBenchmarkMode ? 10 * kMinuteMs : 2 * kMinuteMs;
+
     await page.waitForFunction(
       () => (window as any).testResults?.completed === true,
-      { timeout: 2 * kMinuteMs },
+      { timeout: timeoutMs },
     );
 
-    // Get the test results
-    const summary = await page.evaluate(() =>
-      (window as any).testResults
-    ) as TestSummary;
+    // Get the test/benchmark results
+    const summary = await page.evaluate(() => (window as any).testResults);
+
+    // Handle both test and benchmark result formats
+    const passed = summary.passed ?? summary.summary?.passed ?? 0;
+    const failed = summary.failed ?? summary.summary?.failed ?? 0;
+
 
     try {
-      // Fetch source map while server is still running
-      if (summary.failed > 0) {
-        console.log('Fetching source map for error decoding...');
-        try {
-          const sourceMapResponse = await page.evaluate(async () => {
-            const response = await fetch('/app.js.map');
-            if (!response.ok) {
-              throw new Error(`Failed to fetch source map: ${response.status}`);
-            }
-            return await response.text();
-          });
-
-          const sourceMapData = JSON.parse(sourceMapResponse);
-
-          // Decode error stack traces for failed tests
-          for (const result of summary.results) {
-            if (!result.passed && result.error?.stack) {
-              const decoded = await sourceMapDecoder.decodeStackTrace(
-                result.error.stack,
-                testUrl,
-                sourceMapData,
-              );
-              // Add decoded stack as a property on the error
-              (result.error as any).decodedStack = decoded.decoded;
+      // Log failed test details (source maps handled automatically by Playwright)
+      if (failed > 0 && summary.results) {
+        console.error('\nFailed tests:');
+        const failures = summary.results.filter((r: any) => !r.passed);
+        
+        for (let i = 0; i < failures.length; i++) {
+          const result = failures[i];
+          console.error(
+            `${i + 1}. ${result.suiteName}/${result.testName} (${
+              Math.round(result.duration)
+            }ms)`,
+          );
+          if (result.error) {
+            console.error(`   ${result.error.name}: ${result.error.message}`);
+            // Playwright provides source-mapped stack traces automatically
+            if (result.error.stack) {
+              const stackLines = result.error.stack.split('\n');
+              for (const line of stackLines) {
+                if (line.trim()) console.error(`   ${line.trim()}`);
+              }
             }
           }
-          console.log('Source map decoding completed');
-        } catch (sourceMapError) {
-          console.warn(
-            'Failed to decode source maps:',
-            (sourceMapError as Error).message,
-          );
-          // Continue without source maps - tests still ran
         }
       }
+
+      const duration = summary.duration ?? summary.metadata?.duration ?? 0;
 
       // Take screenshot in debug mode
       if (options.debug) {
@@ -189,7 +215,6 @@ export async function runBrowserTests(
         console.log('Screenshot saved to browser-test-results.png');
       }
 
-      console.log('Closing browser...');
       // Force browser close with timeout since GoatDB timers may keep event loop busy
       await Promise.race([
         browser.close(),
@@ -219,64 +244,7 @@ export async function runBrowserTests(
     }
     throw error;
   } finally {
-    // Clean up server process
-    console.log('Cleaning up server process...');
-    try {
-      console.log('Sending SIGTERM to server process...');
-      serverProcess.kill('SIGTERM');
-
-      // Wait for graceful shutdown with timeout
-      const result = await Promise.race([
-        serverProcess.status.then(() => 'exited'),
-        new Promise((resolve) => setTimeout(() => resolve('timeout'), 5000)),
-      ]);
-
-      if (result === 'timeout') {
-        console.log(
-          'Server process did not terminate gracefully, forcing SIGKILL...',
-        );
-        try {
-          serverProcess.kill('SIGKILL');
-          await serverProcess.status; // Wait for forced termination
-        } catch (killError) {
-          console.warn('Error with SIGKILL:', (killError as Error).message);
-        }
-      } else {
-        console.log('Server process terminated gracefully');
-      }
-    } catch (error) {
-      console.warn(
-        'Error cleaning up server process:',
-        (error as Error).message,
-      );
-    }
+    // Clean up all processes with ProcessManager
+    await processManager.cleanup();
   }
-}
-
-/**
- * Main entry point for running browser tests from command line
- */
-export async function main(): Promise<void> {
-  try {
-    const summary = await runBrowserTests({
-      debug: Deno.args.includes('--debug'),
-      suite: Deno.args.find((arg) => arg.startsWith('--suite='))?.split('=')[1],
-      test: Deno.args.find((arg) => arg.startsWith('--test='))?.split('=')[1],
-    });
-
-    if (summary.failed > 0) {
-      console.error(`Browser tests failed: ${summary.failed} failures`);
-      Deno.exit(1);
-    }
-
-    console.log(`All browser tests passed: ${summary.passed} tests`);
-  } catch (error) {
-    console.error('Browser test execution failed:', (error as Error).message);
-    Deno.exit(1);
-  }
-}
-
-// Auto-run when used as entry point
-if (import.meta.main) {
-  main();
 }

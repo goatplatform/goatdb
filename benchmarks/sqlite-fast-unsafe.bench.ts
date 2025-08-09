@@ -1,21 +1,8 @@
-import { DatabaseSync } from 'node:sqlite';
+import { BENCHMARK } from './mod.ts';
 import { assert } from '../base/error.ts';
-import * as path from '@std/path';
 import { uniqueId } from '../base/common.ts';
-
-// Helper function to create a temp database file path for testing
-function createTempDbPath(): string {
-  return path.join(Deno.cwd(), `temp_bench_sqlite_${uniqueId()}.db`);
-}
-
-// Helper function to remove the temp database file
-async function cleanupTempDb(dbPath: string): Promise<void> {
-  try {
-    await Deno.remove(dbPath);
-  } catch (e) {
-    console.error('Failed to clean up temp database file:', e);
-  }
-}
+import { isBrowser } from '../base/common.ts';
+import * as path from '@std/path';
 
 // Helper to create test data
 function createTestData(count: number) {
@@ -31,8 +18,8 @@ function createTestData(count: number) {
 }
 
 // Helper to create test schema in SQLite
-function createTestTable(db: DatabaseSync): void {
-  db.exec('PRAGMA synchronous = OFF;');
+function createTestTable(db: any): void {
+  db.exec('PRAGMA synchronous = OFF;'); // Fast-unsafe setting
   db.exec(`
     CREATE TABLE IF NOT EXISTS test_items (
       id TEXT PRIMARY KEY,
@@ -43,45 +30,17 @@ function createTestTable(db: DatabaseSync): void {
   `);
 }
 
-// Benchmark suite for basic operations
-Deno.bench('SQLite-fast-unsafe: Create instance', {
-  warmup: 1,
-}, async (ctx) => {
-  const dbPath = createTempDbPath();
-  try {
-    ctx.start();
-    const db = new DatabaseSync(dbPath);
-    ctx.end();
-    db.close();
-  } finally {
-    await cleanupTempDb(dbPath);
-  }
-});
-
-Deno.bench('SQLite-fast-unsafe: Create table', {
-  warmup: 1,
-}, async (ctx) => {
-  const dbPath = createTempDbPath();
-  try {
-    const db = new DatabaseSync(dbPath);
-    ctx.start();
-    createTestTable(db);
-    ctx.end();
-    db.close();
-  } finally {
-    await cleanupTempDb(dbPath);
-  }
-});
-
-function populateDatabase(
+async function populateDatabase(
   dbPath: string,
   count: number,
-): void {
+): Promise<void> {
+  const { DatabaseSync } = await import('node:sqlite');
+  
   const db = new DatabaseSync(dbPath);
   createTestTable(db);
 
-  const currentCount =
-    db.prepare('SELECT COUNT(*) as count FROM test_items').get().count;
+  const countResult = db.prepare('SELECT COUNT(*) as count FROM test_items').get() as { count: number } | undefined;
+  const currentCount = countResult?.count ?? 0;
 
   if (currentCount < count) {
     const stmt = db.prepare(
@@ -98,72 +57,89 @@ function populateDatabase(
   db.close();
 }
 
-Deno.bench('SQLite-fast-unsafe: Open database (100k items)', {
-  n: 10,
-}, async (ctx) => {
-  const dbPath = path.join(Deno.cwd(), 'temp_bench_sqlite_100k.db');
-  try {
-    await populateDatabase(dbPath, 100000);
+export default function setup(): void {
+  // Skip SQLite benchmarks in browser - only run in Deno/Node
+  if (isBrowser()) {
+    return; // No SQLite benchmarks in browser
+  }
 
+  BENCHMARK('SQLite Fast-Unsafe', 'Create instance', async (ctx) => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const tempDir = await ctx.tempDir('sqlite-fast-create');
+    const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
+    
     ctx.start();
     const db = new DatabaseSync(dbPath);
-    // const res = db.prepare('SELECT * FROM test_items').all();
     ctx.end();
+    
+    return () => db.close();
+  });
 
-    // assert(res.length === 100000, 'Database should have 100000 items');
-    db.close();
-  } finally {
-    // Not deleting large test database to allow for repeated benchmarks
-    // await cleanupTempDb(dbPath);
-  }
-});
+  BENCHMARK('SQLite Fast-Unsafe', 'Create table', async (ctx) => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const tempDir = await ctx.tempDir('sqlite-fast-table');
+    const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
+    
+    const db = new DatabaseSync(dbPath);
+    createTestTable(db);
+    
+    return () => db.close();
+  });
 
-Deno.bench('SQLite-fast-unsafe: Read 100k items', {
-  n: 10,
-}, async (ctx) => {
-  const dbPath = path.join(Deno.cwd(), 'temp_bench_sqlite_100k.db');
-  try {
+  BENCHMARK('SQLite Fast-Unsafe', 'Open database (100k items)', {
+    warmup: 0,
+    iterations: 3,
+  }, async (ctx) => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const tempDir = await ctx.tempDir('sqlite-fast-100k');
+    const dbPath = path.join(tempDir, 'temp_bench_sqlite_100k.db');
+    
     await populateDatabase(dbPath, 100000);
 
-    ctx.start();
+    const db = new DatabaseSync(dbPath);
+    
+    return () => db.close();
+  });
+
+  BENCHMARK('SQLite Fast-Unsafe', 'Read 100k items', {
+    warmup: 0,
+    iterations: 3,
+  }, async (ctx) => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const tempDir = await ctx.tempDir('sqlite-fast-read-100k');
+    const dbPath = path.join(tempDir, 'temp_bench_sqlite_100k.db');
+    
+    await populateDatabase(dbPath, 100000);
+
     const db = new DatabaseSync(dbPath);
     const res = db.prepare('SELECT * FROM test_items').all();
-    ctx.end();
 
     assert(res.length === 100000, 'Database should have 100000 items');
-    db.close();
-  } finally {
-    // Not deleting large test database to allow for repeated benchmarks
-    // await cleanupTempDb(dbPath);
-  }
-});
+    
+    return () => db.close();
+  });
 
-Deno.bench('SQLite-fast-unsafe: Create single item', {
-  warmup: 1,
-}, async (ctx) => {
-  const dbPath = createTempDbPath();
-  try {
+  BENCHMARK('SQLite Fast-Unsafe', 'Create single item', async (ctx) => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const tempDir = await ctx.tempDir('sqlite-fast-create-single');
+    const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
+    
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
-    ctx.start();
     const stmt = db.prepare(
       'INSERT INTO test_items (id, title, count, tags) VALUES (?, ?, ?, ?)',
     );
     stmt.run('test1', 'Test item', 1, JSON.stringify(['test', 'benchmark']));
-    ctx.end();
 
-    db.close();
-  } finally {
-    await cleanupTempDb(dbPath);
-  }
-});
+    return () => db.close();
+  });
 
-Deno.bench('SQLite-fast-unsafe: Read item by ID', {
-  warmup: 1,
-}, async (ctx) => {
-  const dbPath = createTempDbPath();
-  try {
+  BENCHMARK('SQLite Fast-Unsafe', 'Read item by ID', async (ctx) => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const tempDir = await ctx.tempDir('sqlite-fast-read-item');
+    const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
+    
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
@@ -178,25 +154,21 @@ Deno.bench('SQLite-fast-unsafe: Read item by ID', {
       JSON.stringify(['read', 'test']),
     );
 
-    ctx.start();
     // Now read the item
     const readStmt = db.prepare('SELECT * FROM test_items WHERE id = ?');
-    const readItem = readStmt.get('foo');
-    ctx.end();
+    const readItem = readStmt.get('foo') as { title: string; count: number } | undefined;
 
-    assert(readItem.title === 'Test read item', 'Item title should match');
-    assert(readItem.count === 42, 'Item count should match');
-    db.close();
-  } finally {
-    await cleanupTempDb(dbPath);
-  }
-});
+    assert(readItem?.title === 'Test read item', 'Item title should match');
+    assert(readItem?.count === 42, 'Item count should match');
+    
+    return () => db.close();
+  });
 
-Deno.bench('SQLite-fast-unsafe: Update item', {
-  warmup: 1,
-}, async (ctx) => {
-  const dbPath = createTempDbPath();
-  try {
+  BENCHMARK('SQLite Fast-Unsafe', 'Update item', async (ctx) => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const tempDir = await ctx.tempDir('sqlite-fast-update');
+    const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
+    
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
     const itemId = uniqueId();
@@ -208,7 +180,6 @@ Deno.bench('SQLite-fast-unsafe: Update item', {
     insertStmt.run(itemId, 'Original title', 1, JSON.stringify(['original']));
 
     // Update the item
-    ctx.start();
     const updateStmt = db.prepare(
       'UPDATE test_items SET title = ?, count = ?, tags = ? WHERE id = ?',
     );
@@ -218,31 +189,26 @@ Deno.bench('SQLite-fast-unsafe: Update item', {
       JSON.stringify(['updated', 'modified']),
       itemId,
     );
-    ctx.end();
 
     // Verify updates
     const readStmt = db.prepare('SELECT * FROM test_items WHERE id = ?');
-    const item = readStmt.get(itemId);
-    assert(item.title === 'Updated title', 'Item title should be updated');
-    assert(item.count === 99, 'Item count should be updated');
+    const item = readStmt.get(itemId) as { title: string; count: number } | undefined;
+    assert(item?.title === 'Updated title', 'Item title should be updated');
+    assert(item?.count === 99, 'Item count should be updated');
 
-    db.close();
-  } finally {
-    await cleanupTempDb(dbPath);
-  }
-});
+    return () => db.close();
+  });
 
-Deno.bench('SQLite-fast-unsafe: Bulk create 100 items', {
-  warmup: 1,
-}, async (ctx) => {
-  const dbPath = createTempDbPath();
-  try {
+  BENCHMARK('SQLite Fast-Unsafe', 'Bulk create 100 items', async (ctx) => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const tempDir = await ctx.tempDir('sqlite-fast-bulk-create');
+    const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
+    
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
     const testData = createTestData(100);
 
-    ctx.start();
     const stmt = db.prepare(
       'INSERT INTO test_items (id, title, count, tags) VALUES (?, ?, ?, ?)',
     );
@@ -252,19 +218,15 @@ Deno.bench('SQLite-fast-unsafe: Bulk create 100 items', {
       stmt.run(`item${i}`, data.title, data.count, data.tags);
     }
     db.exec('COMMIT');
-    ctx.end();
 
-    db.close();
-  } finally {
-    await cleanupTempDb(dbPath);
-  }
-});
+    return () => db.close();
+  });
 
-Deno.bench('SQLite-fast-unsafe: Bulk read 100 items', {
-  warmup: 1,
-}, async (ctx) => {
-  const dbPath = createTempDbPath();
-  try {
+  BENCHMARK('SQLite Fast-Unsafe', 'Bulk read 100 items', async (ctx) => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const tempDir = await ctx.tempDir('sqlite-fast-bulk-read');
+    const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
+    
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
@@ -281,26 +243,20 @@ Deno.bench('SQLite-fast-unsafe: Bulk read 100 items', {
     db.exec('COMMIT');
 
     // Benchmark reading items
-    ctx.start();
     const readStmt = db.prepare('SELECT * FROM test_items WHERE id = ?');
     for (let i = 0; i < 100; i++) {
-      const item = readStmt.get(`item${i}`);
-      assert(item.title === `Item ${i}`, 'Item title should match');
+      const item = readStmt.get(`item${i}`) as { title: string } | undefined;
+      assert(item?.title === `Item ${i}`, 'Item title should match');
     }
-    ctx.end();
 
-    db.close();
-  } finally {
-    await cleanupTempDb(dbPath);
-  }
-});
+    return () => db.close();
+  });
 
-// Query benchmarks
-Deno.bench('SQLite-fast-unsafe: Simple query', {
-  warmup: 1,
-}, async (ctx) => {
-  const dbPath = createTempDbPath();
-  try {
+  BENCHMARK('SQLite Fast-Unsafe', 'Simple query', async (ctx) => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const tempDir = await ctx.tempDir('sqlite-fast-simple-query');
+    const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
+    
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
@@ -316,24 +272,20 @@ Deno.bench('SQLite-fast-unsafe: Simple query', {
     }
     db.exec('COMMIT');
 
-    ctx.start();
     // Run query for items with count > 50
     const query = db.prepare('SELECT * FROM test_items WHERE count > 50');
     const results = query.all();
-    ctx.end();
 
     assert(results.length === 49, 'Query should return 49 items');
-    db.close();
-  } finally {
-    await cleanupTempDb(dbPath);
-  }
-});
+    
+    return () => db.close();
+  });
 
-Deno.bench('SQLite-fast-unsafe: Complex query with sort', {
-  warmup: 1,
-}, async (ctx) => {
-  const dbPath = createTempDbPath();
-  try {
+  BENCHMARK('SQLite Fast-Unsafe', 'Complex query with sort', async (ctx) => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const tempDir = await ctx.tempDir('sqlite-fast-complex-query');
+    const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
+    
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
@@ -350,26 +302,21 @@ Deno.bench('SQLite-fast-unsafe: Complex query with sort', {
     db.exec('COMMIT');
 
     // Complex query with sorting
-    // Note: For the tags check, we're using a simple string search in the JSON
-    ctx.start();
     const query = db.prepare(`
       SELECT * FROM test_items 
       WHERE count > 30 AND count < 70 AND tags LIKE '%tag50%'
       ORDER BY count DESC
     `);
     const results = query.all();
-    ctx.end();
 
-    db.close();
-  } finally {
-    await cleanupTempDb(dbPath);
-  }
-});
+    return () => db.close();
+  });
 
-// Repository operations benchmark
-Deno.bench('SQLite-fast-unsafe: Count operation', async (ctx) => {
-  const dbPath = createTempDbPath();
-  try {
+  BENCHMARK('SQLite Fast-Unsafe', 'Count operation', async (ctx) => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const tempDir = await ctx.tempDir('sqlite-fast-count');
+    const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
+    
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
@@ -389,22 +336,20 @@ Deno.bench('SQLite-fast-unsafe: Count operation', async (ctx) => {
     db.exec('COMMIT');
 
     // Test count operation
-    ctx.start();
     const countResult = db.prepare('SELECT COUNT(*) as count FROM test_items')
-      .get();
-    const count = countResult.count;
-    ctx.end();
+      .get() as { count: number } | undefined;
+    const count = countResult?.count ?? 0;
 
     assert(count === 10, 'Table should contain 10 items');
-    db.close();
-  } finally {
-    await cleanupTempDb(dbPath);
-  }
-});
+    
+    return () => db.close();
+  });
 
-Deno.bench('SQLite-fast-unsafe: Keys operation', async (ctx) => {
-  const dbPath = createTempDbPath();
-  try {
+  BENCHMARK('SQLite Fast-Unsafe', 'Keys operation', async (ctx) => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const tempDir = await ctx.tempDir('sqlite-fast-keys');
+    const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
+    
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
@@ -424,14 +369,11 @@ Deno.bench('SQLite-fast-unsafe: Keys operation', async (ctx) => {
     db.exec('COMMIT');
 
     // Test keys operation
-    ctx.start();
     const keysResult = db.prepare('SELECT id FROM test_items').all();
-    const keys = keysResult.map((row) => row.id);
-    ctx.end();
+    const keys = keysResult.map((row: any) => row.id);
 
     assert(keys.length === 10, 'Table should have 10 keys');
-    db.close();
-  } finally {
-    await cleanupTempDb(dbPath);
-  }
-});
+    
+    return () => db.close();
+  });
+}

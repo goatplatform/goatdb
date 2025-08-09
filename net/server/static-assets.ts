@@ -59,6 +59,9 @@ export class StaticAssetsEndpoint<US extends Schema> implements Endpoint<US> {
 
     const headers: Record<string, string> = {
       'content-type': asset.contentType,
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
     };
     if (asset.contentType.startsWith('image/')) {
       headers[

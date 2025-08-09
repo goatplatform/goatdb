@@ -82,7 +82,7 @@ export async function retry<T>(
       err = e;
     }
     factor = (Date.now() - startTime) / timeoutMs;
-  } while (factor <= 1 || err instanceof TryAgain);
+  } while (factor <= 1 && err instanceof TryAgain);
 
   // If we got this far then we timed out on an error. Bubble it up.
   throw err instanceof RetryBaseErr ? err.origError : err;

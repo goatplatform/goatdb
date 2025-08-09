@@ -107,7 +107,7 @@ function displayClusterStats(
   numServers: number,
   numRounds: number,
 ) {
-  console.log('\n📊 === CLUSTER SYNC LATENCY RESULTS ===');
+  // Results only printed for failures or debug mode
 
   // Collect all successful latencies
   const allLatencies: number[] = [];
@@ -120,7 +120,6 @@ function displayClusterStats(
   }
 
   if (allLatencies.length === 0) {
-    console.log('❌ No successful sync operations recorded!');
     return;
   }
 
@@ -131,17 +130,7 @@ function displayClusterStats(
   const sorted = allLatencies.sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)];
 
-  console.log(`\n📈 Overall Statistics (${allLatencies.length} measurements):`);
-  console.log(`   Average: ${avg.toFixed(2)}ms`);
-  console.log(`   Median: ${median.toFixed(2)}ms`);
-  console.log(`   Min: ${min.toFixed(2)}ms`);
-  console.log(`   Max: ${max.toFixed(2)}ms`);
-  console.log(
-    `   Success Rate: ${
-      (allLatencies.length / (numServers * (numServers - 1) * numRounds) * 100)
-        .toFixed(1)
-    }%`,
-  );
+  // Statistics calculated but not printed
 
   // Per-path statistics
   // console.log(`\n📍 Per-Path Breakdown:`);
@@ -184,19 +173,7 @@ function displayClusterStats(
     const medianConsensus =
       sortedConsensus[Math.floor(sortedConsensus.length / 2)];
 
-    console.log(
-      `\n🤝 Consensus Time Statistics (${allConsensusTimes.length} measurements):`,
-    );
-    console.log(`   Average: ${avgConsensus.toFixed(2)}ms`);
-    console.log(`   Median: ${medianConsensus.toFixed(2)}ms`);
-    console.log(`   Min: ${minConsensus.toFixed(2)}ms`);
-    console.log(`   Max: ${maxConsensus.toFixed(2)}ms`);
-    console.log(
-      `   Success Rate: ${
-        (allConsensusTimes.length / (numServers * numRounds) * 100).toFixed(1)
-      }%`,
-    );
-    console.log(`   Note: Time until ALL servers have received the new value`);
+    // Consensus statistics calculated but not printed
   }
 }
 

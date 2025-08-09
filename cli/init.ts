@@ -1,5 +1,5 @@
 /**
- * This is a CLI used to initialize a new GoatDB project skaffold.
+ * This is a CLI used to initialize a new GoatDB project scaffold.
  * Check out https://goatdb.dev for additional docs.
  *
  * @module GoatDB/Init

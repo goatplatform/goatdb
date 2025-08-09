@@ -23,7 +23,7 @@
   "tasks": {
     "build": "deno run -A system-assets/build-sys-assets.ts",
     "test": "deno run -A tests/run.ts",
-    "bench": "deno bench -A --no-check",
+    "bench": "deno run -A benchmarks/run.ts",
     "docs:api": "deno run -A docs/docs-api-build.ts",
     "docs:clean": "rm -rf docs/node_modules docs/.docusaurus docs/build docs/package-lock.json",
     "docs:serve": "deno run -A docs/docs-build.ts serve",
@@ -43,6 +43,7 @@
     "playwright": "npm:playwright@^1.48.0",
     "react": "npm:react@^19.1.0",
     "source-map": "npm:source-map@^0.7.4",
+    "sql.js": "npm:sql.js@^1.11.0",
     "yargs": "npm:yargs@^17.7.2",
     "typedoc": "npm:typedoc@^0.28.8"
   },

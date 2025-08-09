@@ -288,7 +288,16 @@ async function handleRequest(
 
     case 'cursor': {
       const file = gOpenFiles.get(req.file);
-      assert(file !== undefined, 'File not found');
+      if (file === undefined) {
+        // File was closed, send error response instead of asserting
+        const resp: WorkerErrorResp = {
+          type: 'error',
+          id: req.id,
+          error: 'FileClosed',
+        };
+        gPostMessage!(JSON.stringify(resp));
+        break;
+      }
       const cursor = await JSONLogFileStartCursor(file);
       const cursorId = ++gOpenCursorNum;
       const nextPromise = JSONLogFileScan(cursor);

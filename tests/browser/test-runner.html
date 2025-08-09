@@ -4,91 +4,234 @@
     <meta charset="utf-8">
     <title>GoatDB Browser Tests</title>
     <style>
-        body { 
-            font-family: monospace; 
-            margin: 20px; 
-            background: #f8f8f8; 
-            line-height: 1.4;
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #1a1a1a;
+            --text-primary: #ffffff;
+            --text-secondary: #999999;
+            --accent: #4a9eff;
+            --success: #4caf50;
+            --error: #f44336;
+            --warning: #ff9800;
         }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 2rem;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
         .header {
-            background: #333;
-            color: white;
-            padding: 15px;
-            margin: -20px -20px 20px -20px;
+            margin-bottom: 1.5rem;
         }
-        .status { 
-            padding: 15px; 
-            margin: 15px 0; 
-            border-radius: 4px; 
-            font-weight: bold;
+        
+        h1 {
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: normal;
         }
-        .running { 
-            background: #e3f2fd; 
-            border-left: 4px solid #2196f3; 
-            color: #1976d2;
+        
+        .status {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #2a2a2a;
         }
-        .passed { 
-            background: #e8f5e8; 
-            border-left: 4px solid #4caf50; 
-            color: #2e7d32;
+        
+        .status-row {
+            display: flex;
+            justify-content: flex-start;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
         }
-        .failed { 
-            background: #ffebee; 
-            border-left: 4px solid #f44336; 
-            color: #c62828;
+        
+        .status-row:last-child {
+            margin-bottom: 0;
         }
-        .log { 
-            background: #fff; 
-            padding: 15px; 
-            margin: 15px 0; 
-            font-family: 'Courier New', monospace; 
-            font-size: 12px; 
-            overflow-x: auto;
-            border: 1px solid #ddd;
+        
+        .status-label {
+            color: var(--text-secondary);
+        }
+        
+        .status-value {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        
+        .results {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid #2a2a2a;
+            min-height: 400px;
+            overflow-y: auto;
+            max-height: 70vh;
+        }
+        
+        .result-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: var(--bg-primary);
             border-radius: 4px;
+            border-left: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+        
+        .result-item.passed {
+            border-left-color: var(--success);
+        }
+        
+        .result-item.failed {
+            border-left-color: var(--error);
+        }
+        
+        .result-item.running {
+            border-left-color: var(--warning);
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.25rem;
+        }
+        
+        .result-name {
+            font-weight: 600;
+            color: var(--accent);
+        }
+        
+        .result-duration {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        .error-message {
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid var(--error);
+            border-radius: 4px;
+            padding: 0.5rem;
+            margin-top: 0.5rem;
+            color: var(--error);
+            font-size: 0.85rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .loading {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 2rem;
+        }
+        
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+        
+        .log {
+            background: var(--bg-secondary);
+            padding: 1rem;
+            margin: 1.5rem 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            overflow-x: auto;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
             max-height: 400px;
             overflow-y: auto;
+            color: var(--text-secondary);
         }
-        .results {
-            background: #fff;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 4px;
-            border: 1px solid #ddd;
-        }
+        
         .config {
-            background: #f9f9f9;
-            padding: 10px;
-            margin: 10px 0;
-            font-size: 11px;
-            color: #666;
-            border-radius: 4px;
+            background: var(--bg-secondary);
+            padding: 1rem;
+            margin: 1rem 0;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            border-radius: 8px;
+            border: 1px solid #2a2a2a;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🐐 GoatDB Browser Tests</h1>
-        <p>Running existing tests in browser environment with HTTPS server connection</p>
-    </div>
-    
-    <div id="status" class="status running">Initializing tests...</div>
-    
-    <div class="config">
-        <strong>Test Configuration:</strong>
-        <div id="config-display">Loading configuration...</div>
-    </div>
-    
-    <div id="results" class="results" style="display: none;">
-        <!-- Test results will be populated here -->
-    </div>
-    
-    <div>
-        <strong>Console Output:</strong>
-        <pre id="console-log" class="log"></pre>
+    <div class="container">
+        <div class="header">
+            <h1>🐐 GoatDB Browser Tests</h1>
+            <p style="color: var(--text-secondary);">Running tests in browser environment with HTTPS server connection</p>
+        </div>
+        
+        <div class="status">
+            <div class="status-row">
+                <span class="status-label">Status:</span>
+                <span class="status-value" id="status">Initializing...</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Progress:</span>
+                <span class="status-value" id="progress">0 / 0</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Elapsed:</span>
+                <span class="status-value" id="elapsed">0.0s</span>
+            </div>
+        </div>
+        
+        <div class="config">
+            <strong>Test Configuration:</strong>
+            <div id="config-display">Loading configuration...</div>
+        </div>
+        
+        <div class="results" id="results">
+            <div class="loading">Loading test suite</div>
+        </div>
+        
+        <div>
+            <strong>Console Output:</strong>
+            <pre id="console-log" class="log"></pre>
+        </div>
     </div>
     
     <script>
+        // Global state
+        let startTime = Date.now();
+        let currentTest = null;
+        let testResults = [];
+        
+        // Update elapsed time
+        setInterval(() => {
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            document.getElementById('elapsed').textContent = `${elapsed}s`;
+        }, 100);
+        
         // Display configuration when available
         function updateConfig() {
             const config = window.GoatDBConfig || {};
@@ -120,51 +263,89 @@
         console.error = (...args) => { originalError(...args); appendLog('ERROR', ...args); };
         console.warn = (...args) => { originalWarn(...args); appendLog('WARN', ...args); };
         
-        // Update status display
-        function updateStatus(message, className = 'running') {
-            const statusEl = document.getElementById('status');
-            statusEl.className = `status ${className}`;
-            statusEl.textContent = message;
-        }
+        // Listen for test events
+        window.addEventListener('testStart', (event) => {
+            const { suite, name, current, total } = event.detail;
+            currentTest = { suite, name, startTime: Date.now() };
+            
+            // Add running test to results
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result-item running';
+            resultDiv.id = `test-${testResults.length}`;
+            resultDiv.innerHTML = `
+                <div class="result-header">
+                    <span class="result-name">${suite} / ${name}</span>
+                    <span class="result-duration">Running...</span>
+                </div>
+            `;
+            
+            const resultsContainer = document.getElementById('results');
+            if (resultsContainer.querySelector('.loading')) {
+                resultsContainer.innerHTML = '';
+            }
+            resultsContainer.insertBefore(resultDiv, resultsContainer.firstChild);
+            
+            // Update status and progress
+            document.getElementById('status').textContent = `Running: ${name}`;
+            document.getElementById('progress').textContent = `${current} / ${total}`;
+        });
+        
+        window.addEventListener('testComplete', (event) => {
+            const result = event.detail;
+            testResults.push(result);
+            
+            // Update the test item
+            const resultDiv = document.getElementById(`test-${testResults.length - 1}`);
+            if (resultDiv) {
+                resultDiv.className = `result-item ${result.passed ? 'passed' : 'failed'}`;
+                
+                let errorHtml = '';
+                if (result.error) {
+                    errorHtml = `<div class="error-message">${result.error.message}</div>`;
+                }
+                
+                resultDiv.innerHTML = `
+                    <div class="result-header">
+                        <span class="result-name">${result.suiteName} / ${result.testName}</span>
+                        <span class="result-duration">${Math.round(result.duration)}ms</span>
+                    </div>
+                    ${errorHtml}
+                `;
+            }
+        });
         
         // Listen for test completion
         window.addEventListener('testsComplete', (event) => {
             const results = event.detail;
-            const statusEl = document.getElementById('status');
-            const resultsEl = document.getElementById('results');
             
-            // Update status
+            // Update final status
             const success = results.failed === 0;
-            statusEl.className = `status ${success ? 'passed' : 'failed'}`;
-            statusEl.textContent = success 
-                ? `✓ All tests passed (${results.passed} tests, ${results.duration}ms)`
-                : `✗ Tests failed (${results.passed} passed, ${results.failed} failed, ${results.duration}ms)`;
+            document.getElementById('status').textContent = success 
+                ? `✓ All tests completed successfully`
+                : `✗ Tests completed with failures`;
             
-            // Show detailed results
-            resultsEl.style.display = 'block';
-            resultsEl.innerHTML = `
-                <h3>Test Summary</h3>
+            // Add summary to results
+            const summaryDiv = document.createElement('div');
+            summaryDiv.style.cssText = 'text-align: center; padding: 1rem; margin-top: 1rem; background: var(--bg-primary); border-radius: 8px; border: 1px solid #2a2a2a;';
+            summaryDiv.innerHTML = `
+                <h3 style="color: var(--accent); margin-bottom: 0.5rem;">Test Summary</h3>
                 <p><strong>Passed:</strong> ${results.passed}</p>
                 <p><strong>Failed:</strong> ${results.failed}</p>
-                <p><strong>Duration:</strong> ${results.duration}ms</p>
-                <p><strong>Exit Code:</strong> ${results.exitCode || 0}</p>
-                ${results.exitCode === 0 
-                    ? '<p style="color: green;">✓ Browser tests completed successfully</p>'
-                    : '<p style="color: red;">✗ Browser tests failed</p>'
-                }
+                <p><strong>Duration:</strong> ${(results.duration / 1000).toFixed(2)}s</p>
+                <p style="color: ${success ? 'var(--success)' : 'var(--error)'};">${success ? '✓ All tests passed' : '✗ Some tests failed'}</p>
             `;
             
-            console.log('Browser tests completed:', results);
+            document.getElementById('results').appendChild(summaryDiv);
         });
         
         // Handle test errors
         window.addEventListener('error', (event) => {
             if (event.error?.message === 'TEST_COMPLETION_SUCCESS') {
-                updateStatus('✓ Tests completed successfully', 'passed');
+                document.getElementById('status').textContent = '✓ Tests completed successfully';
             } else if (event.error?.message?.startsWith('TEST_COMPLETION_FAILURE')) {
-                updateStatus('✗ Tests failed: ' + event.error.message, 'failed');
+                document.getElementById('status').textContent = '✗ Tests failed: ' + event.error.message;
             } else {
-                updateStatus('✗ Test execution error: ' + event.error?.message, 'failed');
+                document.getElementById('status').textContent = '✗ Test execution error: ' + event.error?.message;
                 console.error('Unhandled test error:', event.error);
             }
         });
@@ -173,7 +354,7 @@
         setTimeout(updateConfig, 100);
         
         // Initial status
-        updateStatus('Loading test bundle...', 'running');
+        document.getElementById('status').textContent = 'Loading test bundle...';
     </script>
     
     <!-- Test bundle will be served at /app.js by debug server -->

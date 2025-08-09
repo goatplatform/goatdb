@@ -131,10 +131,13 @@ export class QueryPersistence {
   }
 
   /**
-   * Stops the periodic flush timer.
+   * Shuts down the QueryPersistence instance, ensuring all pending flush
+   * operations are completed and resources are released.
    */
-  close(): void {
+  async close(): Promise<void> {
     this._flushTimer.unschedule();
+    await Promise.allSettled(this._flushPromises.values());
+    this._flushPromises.clear();
   }
 
   /**

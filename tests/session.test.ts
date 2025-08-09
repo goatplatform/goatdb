@@ -153,9 +153,6 @@ export default function setup() {
     async () => {
       // Deno does not throw for invalid key material, so skip this test in Deno
       if (typeof Deno !== 'undefined') {
-        console.log(
-          'Skipping invalid key material test in Deno (does not throw)',
-        );
         return;
       }
       await assertThrows(async () => {

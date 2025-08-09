@@ -1,25 +1,23 @@
 import { runAcrossPlatforms } from '../base/multi-runner.ts';
-import { sourceMapDecoder } from './browser/sourcemap-decoder.ts';
 
 /**
- * Runs tests in Deno and/or Node.js environments based on command line arguments.
+ * Runs benchmarks in Deno and/or Node.js environments based on command line arguments.
  *
  * Command line options:
  * --deno-inspect-brk: Enable Deno debugger
  * --node-inspect-brk: Enable Node.js debugger
- * --suite=<name> or -suite <name>: Run specific test suite
- * --test=<name> or -test <name>: Run specific test
+ * --benchmark=<name> or -benchmark <name>: Run specific benchmark
  * --runtime=<deno|node|browser> or -runtime <deno|node|browser>: Run in specific runtime only
  *
- * @returns Promise that resolves when all tests complete
+ * @returns Promise that resolves when all benchmarks complete
  */
-async function runTests(): Promise<void> {
-  // Parse CLI arguments for inspect flags and suite/test selection
+async function runBenchmarks(): Promise<void> {
+  // Parse CLI arguments for inspect flags and benchmark selection
   const denoInspectBrk = Deno.args.includes('--deno-inspect-brk');
   const nodeInspectBrk = Deno.args.includes('--node-inspect-brk');
+  const headless = Deno.args.includes('--headless');
 
-  let suiteName: string | undefined = undefined;
-  let testName: string | undefined = undefined;
+  let benchmarkName: string | undefined = undefined;
   let runtime: string | undefined = undefined;
 
   // Parse command line arguments
@@ -27,27 +25,16 @@ async function runTests(): Promise<void> {
     const arg = Deno.args[i];
     if (
       arg === '--deno-inspect-brk' || arg === '--node-inspect-brk' ||
-      arg === '--debug'
+      arg === '--debug' || arg === '--headless'
     ) continue;
 
-    // Parse suite name argument
-    if (arg.startsWith('--suite=')) {
-      suiteName = arg.substring('--suite='.length);
+    // Parse benchmark name argument
+    if (arg.startsWith('--benchmark=')) {
+      benchmarkName = arg.substring('--benchmark='.length);
       continue;
     }
-    if (arg === '-suite' || arg === '--suite') {
-      suiteName = Deno.args[i + 1];
-      i++;
-      continue;
-    }
-
-    // Parse test name argument
-    if (arg.startsWith('--test=')) {
-      testName = arg.substring('--test='.length);
-      continue;
-    }
-    if (arg === '-test' || arg === '--test') {
-      testName = Deno.args[i + 1];
+    if (arg === '-benchmark' || arg === '--benchmark') {
+      benchmarkName = Deno.args[i + 1];
       i++;
       continue;
     }
@@ -67,7 +54,7 @@ async function runTests(): Promise<void> {
     console.error(
       'Unknown argument:',
       arg,
-      '\nUsage: deno task test [--deno-inspect-brk] [--node-inspect-brk] [-suite <suite>] [--suite=<suite>] [-test <test>] [--test=<test>] [-runtime <deno|node|browser>] [--debug]',
+      '\nUsage: deno task bench [--headless] [--deno-inspect-brk] [--node-inspect-brk] [-benchmark <benchmark>] [--benchmark=<benchmark>] [-runtime <deno|node|browser|all>] [--debug]',
     );
     Deno.exit(1);
   }
@@ -75,15 +62,19 @@ async function runTests(): Promise<void> {
   // Determine which runtimes to run based on arguments
   let runtimes: Array<'deno' | 'node' | 'browser'>;
   if (runtime) {
-    if (runtime !== 'deno' && runtime !== 'node' && runtime !== 'browser') {
+    if (runtime === 'all') {
+      // Special case: run all runtimes when explicitly requested
+      runtimes = ['deno', 'node', 'browser'];
+    } else if (runtime !== 'deno' && runtime !== 'node' && runtime !== 'browser') {
       console.error(
         'Invalid value for --runtime:',
         runtime,
-        '\nAllowed values: deno, node, browser',
+        '\nAllowed values: deno, node, browser, all',
       );
       Deno.exit(1);
+    } else {
+      runtimes = [runtime as 'deno' | 'node' | 'browser'];
     }
-    runtimes = [runtime as 'deno' | 'node' | 'browser'];
   } else {
     // Default to running all three runtimes (Deno, Node.js, Browser) unless specifically configured
     const runDeno = (denoInspectBrk && !nodeInspectBrk) ||
@@ -92,43 +83,32 @@ async function runTests(): Promise<void> {
     const runNode = (nodeInspectBrk && !denoInspectBrk) ||
       (!denoInspectBrk && !nodeInspectBrk) ||
       (denoInspectBrk && nodeInspectBrk);
-    const runBrowser = !denoInspectBrk && !nodeInspectBrk;
+    const runBrowser = !denoInspectBrk && !nodeInspectBrk; // Run browser benchmarks by default unless debugging
 
     runtimes = [];
-    if (runDeno) {
-      runtimes.push('deno');
-    }
-    if (runNode) {
-      runtimes.push('node');
-    }
-    if (runBrowser) {
-      runtimes.push('browser');
-    }
+    if (runDeno) runtimes.push('deno');
+    if (runNode) runtimes.push('node');
+    if (runBrowser) runtimes.push('browser');
   }
 
   try {
     await runAcrossPlatforms({
-      entryPointServer: './tests/tests-entry-server.ts',
-      entryPointBrowser: './tests/tests-entry-browser.ts',
-      suite: suiteName,
-      test: testName,
+      entryPointServer: './benchmarks/benchmarks-entry-server.ts',
+      entryPointBrowser: './benchmarks/benchmarks-entry-browser.ts',
+      benchmark: benchmarkName,
       runtimes,
       debug: Deno.args.includes('--debug'),
+      headless,
       denoInspectBrk,
       nodeInspectBrk,
-      mode: 'test',
+      mode: 'benchmark',
     });
-
-    // Cleanup sourcemap decoder
-    sourceMapDecoder.destroy();
   } catch (error) {
-    // Cleanup sourcemap decoder on error
-    sourceMapDecoder.destroy();
-    console.error('Test execution failed:', (error as Error).message);
+    console.error('Benchmark execution failed:', (error as Error).message);
     Deno.exit(1);
   }
 }
 
 if (import.meta.main) {
-  runTests();
+  runBenchmarks();
 }

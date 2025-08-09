@@ -77,7 +77,7 @@ export default function setup(): void {
       assertEquals(keys.length, 0);
 
       // Close the repository
-      await db.close('/test/repo1');
+      await db.closeRepo('/test/repo1');
       assertEquals(db.repository('/test/repo1'), undefined);
     } finally {
       await db.flushAll();
@@ -235,7 +235,7 @@ export default function setup(): void {
       await db.flush(freshRepoPath);
 
       // Close and clear this repository
-      await db.close(freshRepoPath);
+      await db.closeRepo(freshRepoPath);
 
       // Re-open with fresh item access - this should trigger loading
       const loadedItem = db.item(freshRepoPath, freshItem.key);
@@ -279,7 +279,7 @@ export default function setup(): void {
     item.set('count', newCount);
 
     // Immediately close the repo (should commit changes)
-    await db.close('/test/close-commit');
+    await db.closeRepo('/test/close-commit');
 
     // Ensure the repo is not present in memory
     assertEquals(db.repository('/test/close-commit'), undefined);

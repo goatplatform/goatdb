@@ -53,7 +53,10 @@ export async function nodeRun(
           args: ['--inspect-brk'],
         }
         : {}),
-      ...(env ? { env } : {}),
+      env: {
+        NODE_NO_WARNINGS: '1',
+        ...env,
+      },
     });
     const nodeProcess = nodeCmd.spawn();
     const writer = nodeProcess.stdin.getWriter();

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoatDB Browser Benchmarks</title>
+  <style>
+    :root {
+      --bg-primary: #0a0a0a;
+      --bg-secondary: #1a1a1a;
+      --text-primary: #ffffff;
+      --text-secondary: #999999;
+      --accent: #4a9eff;
+      --success: #4caf50;
+      --error: #f44336;
+      --warning: #ff9800;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      padding: 2rem;
+      line-height: 1.6;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      color: var(--accent);
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+      font-weight: normal;
+    }
+    
+    .status {
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid #2a2a2a;
+    }
+    
+    .status-row {
+      display: flex;
+      justify-content: flex-start;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .status-row:last-child {
+      margin-bottom: 0;
+    }
+    
+    .status-label {
+      color: var(--text-secondary);
+    }
+    
+    .status-value {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+    
+    .results {
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      padding: 1rem;
+      border: 1px solid #2a2a2a;
+      min-height: 400px;
+      overflow-y: auto;
+      max-height: 70vh;
+    }
+    
+    .result-item {
+      padding: 0.75rem;
+      margin-bottom: 0.5rem;
+      background: var(--bg-primary);
+      border-radius: 4px;
+      border-left: 3px solid transparent;
+      transition: all 0.2s ease;
+    }
+    
+    .result-item.passed {
+      border-left-color: var(--success);
+    }
+    
+    .result-item.failed {
+      border-left-color: var(--error);
+    }
+    
+    .result-item.running {
+      border-left-color: var(--warning);
+      animation: pulse 1s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    
+    .result-name {
+      font-weight: 600;
+      color: var(--accent);
+    }
+    
+    .result-duration {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    
+    .result-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid #2a2a2a;
+    }
+    
+    .stat-item {
+      display: flex;
+      justify-content: flex-start;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+    }
+    
+    .stat-label {
+      color: var(--text-secondary);
+    }
+    
+    .stat-value {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+    
+    .error-message {
+      background: rgba(244, 67, 54, 0.1);
+      border: 1px solid var(--error);
+      border-radius: 4px;
+      padding: 0.5rem;
+      margin-top: 0.5rem;
+      color: var(--error);
+      font-size: 0.85rem;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    
+    .loading {
+      text-align: center;
+      color: var(--text-secondary);
+      padding: 2rem;
+    }
+    
+    .loading::after {
+      content: '...';
+      animation: dots 1.5s steps(4, end) infinite;
+    }
+    
+    @keyframes dots {
+      0%, 20% { content: ''; }
+      40% { content: '.'; }
+      60% { content: '..'; }
+      80%, 100% { content: '...'; }
+    }
+    
+    .complete-message {
+      text-align: center;
+      padding: 1rem;
+      margin-top: 1rem;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      border: 1px solid #2a2a2a;
+    }
+    
+    .complete-message.success {
+      border-color: var(--success);
+      color: var(--success);
+    }
+    
+    .complete-message.failure {
+      border-color: var(--error);
+      color: var(--error);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🐐 GoatDB Browser Benchmarks</h1>
+    
+    <div class="status">
+      <div class="status-row">
+        <span class="status-label">Status:</span>
+        <span class="status-value" id="status">Initializing...</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Progress:</span>
+        <span class="status-value" id="progress">0 / 0</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Elapsed:</span>
+        <span class="status-value" id="elapsed">0.0s</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Filter:</span>
+        <span class="status-value" id="filter">All benchmarks</span>
+      </div>
+    </div>
+    
+    <div class="results" id="results">
+      <div class="loading">Loading benchmark suite</div>
+    </div>
+    
+    <div id="complete-message"></div>
+  </div>
+  
+  <script>
+    // Global configuration from server
+    window.GoatDBConfig = window.GoatDBConfig || {};
+    
+    let startTime = Date.now();
+    let currentBenchmark = null;
+    let benchmarkResults = [];
+    
+    // Update elapsed time
+    setInterval(() => {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      document.getElementById('elapsed').textContent = `${elapsed}s`;
+    }, 100);
+    
+    // Listen for benchmark events
+    window.addEventListener('benchmarkStart', (event) => {
+      const { suite, name, current, total } = event.detail;
+      currentBenchmark = { suite, name, startTime: Date.now() };
+      
+      // Add running benchmark to results
+      const resultDiv = document.createElement('div');
+      resultDiv.className = 'result-item running';
+      resultDiv.id = `benchmark-${benchmarkResults.length}`;
+      resultDiv.innerHTML = `
+        <div class="result-header">
+          <span class="result-name">${suite} / ${name}</span>
+          <span class="result-duration">Running...</span>
+        </div>
+      `;
+      
+      const resultsContainer = document.getElementById('results');
+      if (resultsContainer.querySelector('.loading')) {
+        resultsContainer.innerHTML = '';
+      }
+      resultsContainer.insertBefore(resultDiv, resultsContainer.firstChild);
+      
+      // Update status and progress
+      document.getElementById('status').textContent = `Running: ${name}`;
+      document.getElementById('progress').textContent = `${current} / ${total}`;
+    });
+    
+    window.addEventListener('benchmarkComplete', (event) => {
+      const result = event.detail;
+      benchmarkResults.push(result);
+      
+      // Update the benchmark item
+      const resultDiv = document.getElementById(`benchmark-${benchmarkResults.length - 1}`);
+      if (resultDiv) {
+        resultDiv.className = `result-item ${result.status}`;
+        
+        let statsHtml = '';
+        if (result.statistics) {
+          statsHtml = `
+            <div class="result-stats">
+              <div class="stat-item">
+                <span class="stat-label">Mean:</span>
+                <span class="stat-value">${result.statistics.mean.toFixed(2)}ms</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Min:</span>
+                <span class="stat-value">${result.statistics.min.toFixed(2)}ms</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Max:</span>
+                <span class="stat-value">${result.statistics.max.toFixed(2)}ms</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">P95:</span>
+                <span class="stat-value">${result.statistics.p95.toFixed(2)}ms</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">P99:</span>
+                <span class="stat-value">${result.statistics.p99.toFixed(2)}ms</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Throughput:</span>
+                <span class="stat-value">${result.statistics.throughput.toFixed(0)} ops/s</span>
+              </div>
+            </div>
+          `;
+        }
+        
+        let errorHtml = '';
+        if (result.error) {
+          errorHtml = `<div class="error-message">${result.error}</div>`;
+        }
+        
+        resultDiv.innerHTML = `
+          <div class="result-header">
+            <span class="result-name">${result.suite} / ${result.name}</span>
+            <span class="result-duration">${result.duration.toFixed(2)}ms</span>
+          </div>
+          ${statsHtml}
+          ${errorHtml}
+        `;
+      }
+      
+      // Update progress
+      const total = window.GoatDBConfig.totalBenchmarks || benchmarkResults.length;
+      document.getElementById('progress').textContent = `${benchmarkResults.length} / ${total}`;
+    });
+    
+    window.addEventListener('benchmarksComplete', (event) => {
+      const summary = event.detail;
+      
+      // Update status
+      document.getElementById('status').textContent = 'Complete';
+      
+      // Show complete message
+      const completeDiv = document.getElementById('complete-message');
+      const failed = summary.summary.failed || 0;
+      const passed = summary.summary.passed || 0;
+      
+      if (failed > 0) {
+        completeDiv.className = 'complete-message failure';
+        completeDiv.textContent = `✗ Benchmarks completed: ${passed} passed, ${failed} failed`;
+      } else {
+        completeDiv.className = 'complete-message success';
+        completeDiv.textContent = `✓ All ${passed} benchmarks passed successfully`;
+      }
+      
+      // Mark results as complete for Playwright
+      window.testResults = summary;
+      window.testResults.completed = true;
+    });
+    
+    // Display filter if configured
+    if (window.GoatDBConfig.benchmark) {
+      document.getElementById('filter').textContent = window.GoatDBConfig.benchmark;
+    }
+  </script>
+  
+  <!-- SQLite WASM not needed in main thread when using workers -->
+  
+  <!-- Benchmark bundle will be loaded here -->
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

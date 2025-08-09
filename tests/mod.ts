@@ -23,6 +23,8 @@ import { GoatDB } from '../db/db.ts';
 import type { DBInstanceConfig } from '../db/db.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
+import { ProgressBar } from '../shared/progress.ts';
+import { Emitter } from '../base/emitter.ts';
 
 /**
  * A test function that takes a TestSuite context and returns either void or a
@@ -98,41 +100,35 @@ export class TestSuite {
   async run(): Promise<TestResult[]> {
     console.log(`Running suite: ${this.name}`);
     const results: TestResult[] = [];
-    
+
     for (const [name, test] of this._tests.entries()) {
       const start = performance.now();
       try {
         await test(this);
-        const duration = performance.now() - start;
-        console.log(
-          `✅ ${this.name}/${name} passed (${Math.round(duration)}ms)`
-        );
         results.push({
           suiteName: this.name,
           testName: name,
           passed: true,
-          duration,
+          duration: performance.now() - start,
         });
       } catch (error) {
-        const duration = performance.now() - start;
-        console.log(
-          `❌ ${this.name}/${name} failed (${Math.round(duration)}ms)`
-        );
         formatError(error);
         results.push({
           suiteName: this.name,
           testName: name,
           passed: false,
-          duration,
-          error: error instanceof Error ? error : new Error(error ? String(error) : 'Unknown error'),
+          duration: performance.now() - start,
+          error: error instanceof Error
+            ? error
+            : new Error(error ? String(error) : 'Unknown error'),
         });
       }
     }
-    
+
     if (this._tempDir) {
       await (await FileImplGet()).remove(this._tempDir);
     }
-    
+
     return results;
   }
 
@@ -148,41 +144,49 @@ export class TestSuite {
       const systemTempDir = await fileImpl.getTempDir();
       this._tempDir = path.join(systemTempDir, 'test-' + this.name);
     }
-    return subPath ? path.join(this._tempDir, subPath) : this._tempDir;;
+    const finalPath = subPath
+      ? path.join(this._tempDir, subPath)
+      : this._tempDir;
+
+    // Ensure the directory exists
+    const fileImpl = await FileImplGet();
+    await fileImpl.mkdir(finalPath);
+
+    return finalPath;
   }
 
   /**
    * Creates a GoatDB instance configured for the current test environment.
-   * 
+   *
    * - Server environments (Deno/Node): Standalone database with file system paths
    * - Browser environment: Client database connected to debug server using OPFS paths
-   * 
+   *
    * @param testId - Unique identifier for this test database within the suite
    * @param config - Additional configuration to merge with environment defaults
    * @returns Configured GoatDB instance ready for testing
    */
   async createDB<S extends Schema = Schema>(
     testId: string,
-    config: Partial<DBInstanceConfig> = {}
+    config: Partial<DBInstanceConfig> = {},
   ): Promise<GoatDB<S>> {
     // Use same tempDir mechanism for both environments (file system + OPFS abstraction)
     const tempPath = await this.tempDir(testId);
-    
+
     if (isBrowser()) {
       // Browser: Client mode with server connection using OPFS path for isolation
       return new GoatDB<S>({
-        path: tempPath,                        // OPFS path from FileImpl abstraction
-        peers: 'https://localhost:8080',       // Connect to debug server
-        ...config,                             // User overrides
+        path: tempPath, // OPFS path from FileImpl abstraction
+        peers: 'https://localhost:8080', // Connect to debug server
+        ...config, // User overrides
       });
     } else {
       // Server: Standalone mode with file system path
       return new GoatDB<S>({
-        path: tempPath,                        // File system path from FileImpl abstraction
-        orgId: 'test-org',                    // Consistent test org
-        trusted: true,                        // Default for tests
-        registry: DataRegistry.default,      // Default registry
-        ...config,                            // User overrides
+        path: tempPath, // File system path from FileImpl abstraction
+        orgId: 'test-org', // Consistent test org
+        trusted: true, // Default for tests
+        registry: DataRegistry.default, // Default registry
+        ...config, // User overrides
       });
     }
   }
@@ -192,13 +196,14 @@ export class TestSuite {
  * Manages and runs test suites.
  * Provides a default instance and methods to create and run test suites.
  */
-export class TestsRunner {
+export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
   private readonly _suites: Map<string, TestSuite>;
 
   /** Default instance of TestsRunner */
   static default = new TestsRunner();
 
   constructor() {
+    super();
     this._suites = new Map();
   }
 
@@ -226,44 +231,58 @@ export class TestsRunner {
   async run(suiteName?: string, testName?: string): Promise<TestSummary> {
     const allResults: TestResult[] = [];
     const runStart = performance.now();
-    
+
+    // Calculate total tests for progress bar
+    let totalTests = 0;
     for (const [name, suite] of this._suites.entries()) {
       if (suiteName && name !== suiteName) continue;
-      
+      if (testName) {
+        totalTests += suite['_tests'].has(testName) ? 1 : 0;
+      } else {
+        totalTests += suite['_tests'].size;
+      }
+    }
+
+    const progress = new ProgressBar(totalTests);
+    let currentTest = 0;
+
+    for (const [name, suite] of this._suites.entries()) {
+      if (suiteName && name !== suiteName) continue;
+
       if (testName) {
         // Run only the specific test in the suite
         const test = suite['_tests'].get(testName);
         if (test) {
+          currentTest++;
+          progress.update(currentTest - 1, '', `${suite.name}/${testName}`);
+          this.emit('testStart', { suite: suite.name, name: testName, current: currentTest, total: totalTests });
+          
           const start = performance.now();
           try {
             await test(suite);
-            const duration = performance.now() - start;
-            console.log(
-              `✅ ${suite.name}/${testName} passed (${
-                Math.round(duration)
-              }ms)`
-            );
-            allResults.push({
+            progress.update(currentTest, '');
+            const result = {
               suiteName: suite.name,
               testName,
               passed: true,
-              duration,
-            });
+              duration: performance.now() - start,
+            };
+            allResults.push(result);
+            this.emit('testComplete', result);
           } catch (error) {
-            const duration = performance.now() - start;
-            console.log(
-              `❌ ${suite.name}/${testName} failed (${
-                Math.round(duration)
-              }ms)`
-            );
+            progress.update(currentTest, '');
             formatError(error);
-            allResults.push({
+            const result = {
               suiteName: suite.name,
               testName,
               passed: false,
-              duration,
-              error: error instanceof Error ? error : new Error(error ? String(error) : 'Unknown error'),
-            });
+              duration: performance.now() - start,
+              error: error instanceof Error
+                ? error
+                : new Error(error ? String(error) : 'Unknown error'),
+            };
+            allResults.push(result);
+            this.emit('testComplete', result);
           }
         } else {
           console.log(`Test '${testName}' not found in suite '${suite.name}'.`);
@@ -271,18 +290,85 @@ export class TestsRunner {
         if (suite['_tempDir']) {
           await (await FileImplGet()).remove(suite['_tempDir']);
         }
+        // Clear progress bar after single test completion
+        progress.clear();
       } else {
-        const results = await suite.run();
+        const results = await this.runSuiteWithProgress(suite, progress, currentTest, totalTests);
         allResults.push(...results);
+        currentTest += results.length;
       }
     }
+
+    progress.finish();
     
     const totalDuration = performance.now() - runStart;
     const summary = this.createSummary(allResults, totalDuration);
-    this.printSummary(summary);
-    
+
     return summary;
   }
+  
+  /**
+   * Runs a test suite with progress tracking.
+   * @param suite - The test suite to run
+   * @param progress - The progress bar to update
+   * @param startingTest - Current test number before running this suite
+   * @param totalTests - Total number of tests
+   * @returns Array of test results
+   */
+  private async runSuiteWithProgress(
+    suite: TestSuite, 
+    progress: ProgressBar, 
+    startingTest: number,
+    totalTests: number
+  ): Promise<TestResult[]> {
+    // Suite name will be shown in progress bar title
+    const results: TestResult[] = [];
+    let currentTest = startingTest;
+
+    for (const [name, test] of suite['_tests'].entries()) {
+      currentTest++;
+      progress.update(currentTest - 1, '', `${suite.name}/${name}`);
+      this.emit('testStart', { suite: suite.name, name, current: currentTest, total: totalTests });
+      
+      const start = performance.now();
+      try {
+        await test(suite);
+        progress.update(currentTest, '');
+        const result = {
+          suiteName: suite.name,
+          testName: name,
+          passed: true,
+          duration: performance.now() - start,
+        };
+        results.push(result);
+        this.emit('testComplete', result);
+      } catch (error) {
+        progress.update(currentTest, '');
+        formatError(error);
+        const result = {
+          suiteName: suite.name,
+          testName: name,
+          passed: false,
+          duration: performance.now() - start,
+          error: error instanceof Error
+            ? error
+            : new Error(error ? String(error) : 'Unknown error'),
+        };
+        results.push(result);
+        this.emit('testComplete', result);
+      }
+    }
+
+    if (suite['_tempDir']) {
+      await (await FileImplGet()).remove(suite['_tempDir']);
+    }
+
+    // Clear progress bar after suite completion
+    progress.clear();
+
+    return results;
+  }
+  
   /**
    * Creates a test summary from results.
    * @param results - All test results
@@ -290,9 +376,9 @@ export class TestsRunner {
    * @returns Test summary
    */
   private createSummary(results: TestResult[], duration: number): TestSummary {
-    const passed = results.filter(r => r.passed).length;
+    const passed = results.filter((r) => r.passed).length;
     const failed = results.length - passed;
-    
+
     return {
       totalTests: results.length,
       passed,
@@ -301,32 +387,37 @@ export class TestsRunner {
       results,
     };
   }
-  
+
   /**
    * Prints a summary of test results.
    * @param summary - The test summary to print
    */
-  private printSummary(summary: TestSummary) {
+  static printSummary(summary: TestSummary) {
     if (summary.totalTests === 0) return;
-    
+
+
     console.log();
     console.log('=== Test Summary ===');
     console.log(`Total: ${summary.totalTests} tests`);
-    console.log(`✅ Passed: ${summary.passed}`);
+    console.log(`Passed: ${summary.passed}`);
     if (summary.failed > 0) {
-      console.log(`❌ Failed: ${summary.failed}`);
+      console.log(`Failed: ${summary.failed}`);
       console.log();
       console.log('Failed tests:');
-      const failures = summary.results.filter(r => !r.passed);
+      const failures = summary.results.filter((r) => !r.passed);
       for (let i = 0; i < failures.length; i++) {
         const result = failures[i];
-        console.log(`${i + 1}. ${result.suiteName}/${result.testName} (${Math.round(result.duration)}ms)`);
+        console.log(
+          `${i + 1}. ${result.suiteName}/${result.testName} (${
+            Math.round(result.duration)
+          }ms)`,
+        );
         if (result.error) {
           console.log(`   ${result.error.name}: ${result.error.message}`);
         }
       }
     }
-    console.log(`⏱️ Duration: ${(summary.duration / 1000).toFixed(2)}s`);
+    console.log(`Duration: ${(summary.duration / 1000).toFixed(2)}s`);
     console.log();
   }
 }

@@ -50,20 +50,23 @@ export async function buildAssets(
   // System assets are always included and are placed at the root
   const result: StaticAssets = {};
   const textEncoder = new TextEncoder();
+  
+  // User provided assets are always processed, regardless of app build success
+  if (appConfig.assetsPath) {
+    // User provided assets are placed under /assets/
+    Object.assign(
+      result,
+      await compileAssetsDirectory(
+        path.resolve(appConfig.assetsPath),
+        appConfig.assetsFilter,
+        '/assets',
+      ),
+    );
+  }
+  
   // For app code, include html and css files
   if (Object.hasOwn(buildResults, APP_ENTRY_POINT)) {
     const { source, map } = buildResults[APP_ENTRY_POINT];
-    if (appConfig.assetsPath) {
-      // User provided assets are placed under /assets/
-      Object.assign(
-        result,
-        await compileAssetsDirectory(
-          path.resolve(appConfig.assetsPath),
-          appConfig.assetsFilter,
-          '/assets',
-        ),
-      );
-    }
     result['/app.js'] = {
       data: textEncoder.encode(source),
       contentType: 'text/javascript',

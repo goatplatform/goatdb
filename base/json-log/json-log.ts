@@ -137,6 +137,27 @@ const gPendingResolveFuncs = new Map<
 >();
 let gReqId = 0;
 
+// Track all pending operations per file
+const gPendingFileOperations = new Map<JSONLogFile, Set<Promise<any>>>();
+
+function trackFileOperation<T>(file: JSONLogFile, operation: Promise<T>): Promise<T> {
+  if (!gPendingFileOperations.has(file)) {
+    gPendingFileOperations.set(file, new Set());
+  }
+  
+  const pendingSet = gPendingFileOperations.get(file)!;
+  pendingSet.add(operation);
+  
+  operation.finally(() => {
+    pendingSet.delete(operation);
+    if (pendingSet.size === 0) {
+      gPendingFileOperations.delete(file);
+    }
+  });
+  
+  return operation;
+}
+
 async function sendRequest<T extends WorkerFileReq>(
   req: Omit<T, 'id'>,
 ): Promise<WorkerFileRespForReq<T>> {
@@ -198,6 +219,22 @@ export async function JSONLogFileOpen(
  * @param file The {@link JSONLogFile} handle to close
  */
 export async function JSONLogFileClose(file: JSONLogFile): Promise<void> {
+  // Wait for all pending operations on this file
+  const pendingOps = gPendingFileOperations.get(file);
+  if (pendingOps) {
+    await Promise.allSettled([...pendingOps]);
+  }
+
+  // Clear any pending scan operations for cursors belonging to this file
+  for (const [cursor, promise] of gPendingScanPromise.entries()) {
+    if (gCursorToFile.get(cursor) === file) {
+      // Let the pending operation complete but ignore any errors
+      promise.catch(() => {});
+      gPendingScanPromise.delete(cursor);
+      gCursorToFile.delete(cursor);
+    }
+  }
+
   await sendRequest<WorkerFileReqClose>({
     type: 'close',
     file,
@@ -223,12 +260,16 @@ export type JSONLogFileCursor = number;
 export async function JSONLogFileStartCursor(
   file: JSONLogFile,
 ): Promise<JSONLogFileCursor> {
-  return (
+  const cursor = (
     await sendRequest<WorkerFileReqCursor>({
       type: 'cursor',
       file,
     })
   ).cursor;
+
+  // Track which file this cursor belongs to
+  gCursorToFile.set(cursor, file);
+  return cursor;
 }
 
 /**
@@ -246,6 +287,9 @@ const gPendingScanPromise = new Map<
   Promise<WorkerFileRespScan>
 >();
 
+// Track which file each cursor belongs to for cleanup
+const gCursorToFile = new Map<JSONLogFileCursor, JSONLogFile>();
+
 /**
  * Scans the JSON log file starting from the given cursor.
  *
@@ -256,23 +300,25 @@ const gPendingScanPromise = new Map<
 export async function JSONLogFileScan(
   cursor: JSONLogFileCursor,
 ): Promise<[results: readonly ReadonlyJSONObject[], done: boolean]> {
+  const file = gCursorToFile.get(cursor);
+  if (!file) throw new Error('Cursor not found');
+
   let promise = gPendingScanPromise.get(cursor);
   if (!promise) {
     promise = sendRequest<WorkerFileReqScan>({
       type: 'scan',
       cursor,
     });
+    promise = trackFileOperation(file, promise);
   }
 
   const resp = await promise;
   if (!resp.done) {
-    gPendingScanPromise.set(
+    const nextPromise = sendRequest<WorkerFileReqScan>({
+      type: 'scan',
       cursor,
-      sendRequest<WorkerFileReqScan>({
-        type: 'scan',
-        cursor,
-      }),
-    );
+    });
+    gPendingScanPromise.set(cursor, trackFileOperation(file, nextPromise));
   }
   return [resp.values, resp.done];
 }
@@ -283,10 +329,11 @@ export async function JSONLogFileScan(
  * @param file The {@link JSONLogFile} handle to flush
  */
 export async function JSONLogFileFlush(file: JSONLogFile): Promise<void> {
-  await sendRequest<WorkerFileReqFlush>({
+  const promise = sendRequest<WorkerFileReqFlush>({
     type: 'flush',
     file,
   });
+  await trackFileOperation(file, promise);
 }
 
 /**
@@ -299,11 +346,12 @@ export async function JSONLogFileAppend(
   file: JSONLogFile,
   entries: readonly ReadonlyJSONObject[],
 ): Promise<void> {
-  await sendRequest<WorkerFileReqAppend>({
+  const promise = sendRequest<WorkerFileReqAppend>({
     type: 'append',
     file,
     values: entries,
   });
+  await trackFileOperation(file, promise);
 }
 
 /**

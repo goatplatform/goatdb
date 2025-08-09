@@ -1,5 +1,6 @@
 import * as path from '@std/path';
 import type { FileImpl } from './file-impl-interface.ts';
+import { retry, TryAgain } from '../time.ts';
 
 interface FileSystemSyncAccessHandle {
   close(): void;
@@ -40,9 +41,50 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
     const handle = await dir.getFileHandle(path.basename(filePath), {
       create: write,
     });
+    
+    // For benchmarks and tests that rapidly close and reopen files,
+    // we need to handle the race condition where the browser hasn't
+    // fully released the OPFS lock from the previous close() call.
+    let file: FileSystemSyncAccessHandle;
+    try {
+      // Try to create the sync access handle directly first
+      file = await (handle as unknown as SyncHandle).createSyncAccessHandle();
+    } catch (firstError) {
+      // If it fails with a locking error, retry with delays
+      if (firstError instanceof Error && 
+          (firstError.message.includes('Access Handles cannot be created') ||
+           firstError.message.includes('another open Access Handle') ||
+           firstError.message.includes('Writable stream'))) {
+        
+        console.warn(`[OPFS] Handle locked for ${filePath}, retrying...`);
+        
+        file = await retry(
+          async () => {
+            try {
+              return await (handle as unknown as SyncHandle).createSyncAccessHandle();
+            } catch (e) {
+              // Only retry if it's still a locking error
+              if (e instanceof Error && 
+                  (e.message.includes('Access Handles cannot be created') ||
+                   e.message.includes('another open Access Handle') ||
+                   e.message.includes('Writable stream'))) {
+                throw new TryAgain(e);
+              }
+              throw e;
+            }
+          },
+          100,   // 100ms total timeout - balance between speed and reliability
+          10,    // 10ms max delay between retries
+        );
+      } else {
+        // Not a locking error, propagate immediately
+        throw firstError;
+      }
+    }
+    
     return {
       handle,
-      file: await (handle as unknown as SyncHandle).createSyncAccessHandle(),
+      file,
       pos: 0,
     };
   },

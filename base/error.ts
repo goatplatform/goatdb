@@ -20,7 +20,6 @@ export function notReached(msg?: string): never {
 export function assert(condition: boolean, msg?: string): asserts condition {
   if (!condition) {
     msg = msg ? `Failed Assertion: "${msg}"` : 'Failed Assertion';
-    debugger;
     const error = new Error(msg);
     log({
       severity: 'ERROR',

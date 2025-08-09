@@ -80,11 +80,23 @@ async function main(): Promise<void> {
   const suiteName = getEnvVar('GOATDB_SUITE');
   const testName = getEnvVar('GOATDB_TEST');
 
+  // Forward test events to browser UI
+  TestsRunner.default.attach('testStart', (data) => {
+    globalThis.dispatchEvent(new CustomEvent('testStart', { detail: data }));
+  });
+  
+  TestsRunner.default.attach('testComplete', (data) => {
+    globalThis.dispatchEvent(new CustomEvent('testComplete', { detail: data }));
+  });
+
   // Run the tests
   const summary: TestSummary = await TestsRunner.default.run(
     suiteName,
     testName,
   );
+
+  // Print summary (will be captured by browser automation)
+  TestsRunner.printSummary(summary);
 
   if (isBrowser()) {
     // Mark summary as completed for browser automation

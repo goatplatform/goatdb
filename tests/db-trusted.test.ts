@@ -43,7 +43,6 @@ export default function setup(): void {
       assertEquals(db.registry, kDataRegistry);
 
       // Should start not ready
-      console.log(`[BROWSER DEBUG] Initial ready state: ${db.ready}`);
       assertEquals(db.ready, false);
       await db.readyPromise();
       assertEquals(db.ready, true);
@@ -60,6 +59,7 @@ export default function setup(): void {
       }
     } finally {
       await db.flushAll();
+      await db.close();
     }
   });
 
@@ -89,10 +89,11 @@ export default function setup(): void {
       assertEquals(keys.length, 0);
 
       // Close the repository
-      await db.close('/test/repo1');
+      await db.closeRepo('/test/repo1');
       assertEquals(db.repository('/test/repo1'), undefined);
     } finally {
       await db.flushAll();
+      await db.close();
     }
   });
 
@@ -134,6 +135,7 @@ export default function setup(): void {
       assertEquals(keys[0], item.key);
     } finally {
       await db.flushAll();
+      await db.close();
     }
   });
 
@@ -175,6 +177,7 @@ export default function setup(): void {
       assertEquals(db.count('/test/bulk'), 2);
     } finally {
       await db.flushAll();
+      await db.close();
     }
   });
 
@@ -216,6 +219,7 @@ export default function setup(): void {
       query.close();
     } finally {
       await db.flushAll();
+      await db.close();
     }
   });
 
@@ -248,7 +252,7 @@ export default function setup(): void {
       await db.flush(freshRepoPath);
 
       // Close and clear this repository
-      await db.close(freshRepoPath);
+      await db.closeRepo(freshRepoPath);
 
       // Re-open with fresh item access - this should trigger loading
       const loadedItem = db.item(freshRepoPath, freshItem.key);
@@ -266,6 +270,7 @@ export default function setup(): void {
       assertTrue(elapsed2 < 50); // Should be nearly instant when already ready
     } finally {
       await db.flushAll();
+      await db.close();
     }
   });
 
@@ -289,7 +294,7 @@ export default function setup(): void {
     item.set('count', newCount);
 
     // Immediately close the repo (should commit changes)
-    await db.close('/test/close-commit');
+    await db.closeRepo('/test/close-commit');
 
     // Ensure the repo is not present in memory
     assertEquals(db.repository('/test/close-commit'), undefined);

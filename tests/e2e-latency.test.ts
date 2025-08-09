@@ -301,18 +301,8 @@ export default function setupE2ELatency() {
       const latency = receivedTime - creationTime;
 
       // ============================================================================
-      // RESULTS REPORTING
+      // RESULTS REPORTING - Only for failures or debug mode
       // ============================================================================
-      console.log(`📊 === LATENCY MEASUREMENT RESULTS ===`);
-      console.log(`⚡ Application-perceived latency: ${latency.toFixed(2)}ms`);
-      console.log(`📐 Measurement resolution: ±10ms (due to polling)`);
-      console.log(`🏗️  Architecture overhead: ~200-500ms (sync delays)`);
-      console.log(
-        `🌐 Estimated network RTT: ~${
-          Math.max(50, latency - 500).toFixed(0)
-        }ms`,
-      );
-      console.log(`=======================================\n`);
 
       // Validate latency is within reasonable bounds for GoatDB's polling architecture
       // Expected range: 300-1000ms due to sync scheduler delays + network + processing
@@ -537,29 +527,8 @@ export default function setupE2ELatency() {
       }
 
       // ============================================================================
-      // RESULTS REPORTING
+      // RESULTS REPORTING - Only for failures or debug mode  
       // ============================================================================
-      console.log(`\n📊 === LOAD TEST RESULTS ===`);
-      console.log(`📤 Total items created: ${totalItems}`);
-      console.log(`✅ Items successfully synced: ${successfulItems}`);
-      console.log(`❌ Items that timed out: ${failedItems}`);
-      console.log(`📈 Success rate: ${successRate.toFixed(1)}%`);
-      console.log(`⚡ Average application latency: ${avgLatency.toFixed(2)}ms`);
-      console.log(`🚀 Best (min) latency: ${minLatency.toFixed(2)}ms`);
-      console.log(`🐌 Worst (max) latency: ${maxLatency.toFixed(2)}ms`);
-      console.log(
-        `🎯 Latency spread: ${(maxLatency - minLatency).toFixed(2)}ms`,
-      );
-      console.log(`📐 Measurement resolution: ±5ms (due to polling)`);
-      console.log(
-        `🔄 Load impact: ${
-          latencies.length > 1
-            ? ((avgLatency - Math.min(...latencies)) / Math.min(...latencies) *
-              100).toFixed(1) + '% increase from min'
-            : 'N/A'
-        }`,
-      );
-      console.log(`============================\n`);
 
       // ============================================================================
       // PERFORMANCE ASSERTIONS

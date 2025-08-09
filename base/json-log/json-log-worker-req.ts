@@ -244,7 +244,7 @@ export type WorkerRemoveResp = {
  * @param id Request ID used to match requests with responses
  * @param error The type of error that occurred
  */
-export type WorkerErrorType = 'UnknownCommand';
+export type WorkerErrorType = 'UnknownCommand' | 'FileClosed';
 
 export type WorkerErrorResp = {
   type: 'error';
