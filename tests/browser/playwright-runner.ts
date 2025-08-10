@@ -89,8 +89,13 @@ export async function runBrowserTests(
       );
     }
 
+    // Detect CI environment to enable headless mode automatically
+    const isCI = Deno.env.get('CI') === 'true' || 
+                 Deno.env.get('GITHUB_ACTIONS') === 'true' ||
+                 Deno.env.get('DOCKER') === 'true';
+
     const browser = await chromium.launch({
-      headless: !options.debug,
+      headless: !options.debug || isCI,
       timeout: 0, // Disable browser launch timeout
       args: browserArgs,
     });
