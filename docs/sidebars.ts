@@ -191,6 +191,7 @@ const sidebars: SidebarsConfig = {
     // REFERENCE & SUPPORT
     'benchmarks',
     'faq',
+    'contributing',
   ],
 };
 

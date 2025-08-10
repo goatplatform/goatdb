@@ -14,6 +14,10 @@
 📚 <a href="https://goatdb.dev">Documentation</a> • ⚡ <a href="https://goatdb.dev/docs/benchmarks/">Benchmarks</a> • 💬 <a href="https://github.com/goatplatform/goatdb/discussions">Discussions</a> • 👋 <a href="https://discord.gg/SAt3cbUqxr">Discord</a> • 🔴 <a href="https://www.reddit.com/r/zbdb/s/jx1jAbEqtj">Reddit</a>
 </p>
 
+<p align="center">
+<a href="https://cla-assistant.io/goatplatform/goatdb"><img src="https://cla-assistant.io/readme/badge/goatplatform/goatdb" alt="CLA assistant" /></a>
+</p>
+
 [GoatDB](https://goatdb.dev/) is an embedded, distributed document database that
 prioritizes speed and developer experience. Build real-time collaborative apps
 that work offline.
