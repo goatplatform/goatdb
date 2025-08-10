@@ -8,6 +8,7 @@ import {
   type RunSummary,
   Suite,
 } from '../shared/runner.ts';
+import { getSystemInfo } from '../base/system-info.ts';
 import { ProgressBar } from '../shared/progress.ts';
 import { writeTextFile } from '../base/json-log/file-impl.ts';
 import { Emitter } from '../base/emitter.ts';
@@ -279,7 +280,7 @@ export class BenchmarkRunner extends Emitter<BenchmarkEvent> {
     const summary = createSummary(results, runtime, totalDuration);
 
     // Output results in a clean table format
-    console.log('\n' + formatSummary(summary));
+    console.log('\n' + await formatSummary(summary));
 
     // Save JSON if requested
     if (outputJson) {
@@ -430,8 +431,15 @@ function formatResults(results: RunResult[]): string {
 /**
  * Format summary for console output
  */
-function formatSummary(summary: RunSummary): string {
+async function formatSummary(summary: RunSummary): Promise<string> {
   const lines: string[] = [];
+
+  // System information header
+  const systemInfo = await getSystemInfo();
+  lines.push(`System: ${systemInfo.hardware.cpu || 'unknown'}, ${systemInfo.hardware.memory || 'unknown'} RAM`);
+  lines.push(`Storage: ${systemInfo.hardware.storage}`);
+  lines.push(`Runtime: ${systemInfo.runtime.runtime} ${systemInfo.runtime.version} (${systemInfo.runtime.platform})`);
+  lines.push('');
 
   lines.push('Benchmark Results');
   lines.push('=================');

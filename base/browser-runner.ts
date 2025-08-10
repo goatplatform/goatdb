@@ -141,6 +141,13 @@ export async function runBrowserTests(
       console.error(err.stack); // Already source-mapped by Playwright
     });
 
+    // Forward browser console output to terminal
+    page.on('console', (msg) => {
+      const type = msg.type();
+      const text = msg.text();
+      console.log(text);
+    });
+
     // Navigate to HTTPS test server (required for OPFS, Web Workers, Web Locks)
     const testUrl = `https://localhost:${port}`;
     console.log(`Navigating to ${testUrl}...`);

@@ -5,10 +5,15 @@ type Stringable = { toString(): string };
 
 // Cache Node.js modules at the top level if in Node.js environment
 let nodeModules: { childProcess: any } | undefined = undefined;
-if (typeof require !== 'undefined') {
-  nodeModules = {
-    childProcess: require('node:child_process'),
-  };
+try {
+  if (typeof require !== 'undefined') {
+    nodeModules = {
+      childProcess: require('node:child_process'),
+    };
+  }
+} catch {
+  // Browser environment - silently fail
+  nodeModules = undefined;
 }
 
 export function getEntryFilePath(): string {
@@ -84,7 +89,7 @@ export interface CliResult {
  * ```
  */
 export async function cli(cmd: string, ...args: string[]): Promise<CliResult> {
-  console.log(`Running: ${cmd} ${args.join(' ')}`);
+  // console.log(`Running: ${cmd} ${args.join(' ')}`);
   if (typeof Deno !== 'undefined') {
     const process = new Deno.Command(cmd, {
       args,

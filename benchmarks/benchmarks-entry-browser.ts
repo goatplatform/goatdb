@@ -9,6 +9,7 @@ import { BenchmarkRunner } from './mod.ts';
 import { getEnvVar } from '../base/os.ts';
 import { exit } from '../base/process.ts';
 import { notReached } from '../base/error.ts';
+import { getSystemInfo } from '../base/system-info.ts';
 import {
   type LogEntry,
   type LogStream,

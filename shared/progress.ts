@@ -66,11 +66,7 @@ export class ProgressBar {
    */
   private render() {
     if (!this.enabled) {
-      // In browser or when disabled, just log the message once at start or end
-      if (this.current === 1 || this.current === this.total) {
-        const titlePart = this.title ? `${this.title}: ` : '';
-        console.log(`${titlePart}${this.current}/${this.total} ${this.message}`);
-      }
+      // In browser or when disabled, don't log anything
       return;
     }
 
