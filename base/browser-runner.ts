@@ -111,7 +111,7 @@ export async function runBrowserTests(
     }
 
     const browser = await chromium.launch({
-      headless: options.headless ?? false, // Default to showing UI
+      headless: options.headless ?? isCI ?? false, // Auto-enable in CI, default to showing UI locally
       timeout: 0, // Disable browser launch timeout
       args: browserArgs,
     });
