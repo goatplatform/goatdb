@@ -1,0 +1,41 @@
+/* Benchmark table styling for performance comparisons */
+
+/* Winner/Best performance highlighting */
+.benchmark-table .winner {
+  background-color: #e8f5e8;
+  color: #2e7d2e;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 3px 6px;
+  border: 1px solid #4caf50;
+}
+
+/* Dark theme adjustments */
+[data-theme='dark'] .benchmark-table .winner {
+  background-color: rgba(76, 175, 80, 0.15);
+  color: #81c784;
+  border: 1px solid #4caf50;
+}
+
+/* Table styling improvements */
+.benchmark-table {
+  font-size: 0.9em;
+}
+
+.benchmark-table th {
+  background-color: var(--ifm-color-emphasis-100);
+  font-weight: 600;
+}
+
+.benchmark-table td {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+/* Operation column stays readable font */
+.benchmark-table td:first-child {
+  font-family: var(--ifm-font-family-base);
+  font-size: 0.9em;
+  white-space: normal;
+}

@@ -5,264 +5,369 @@ sidebar_position: 8
 slug: /benchmarks
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import '../src/css/benchmark-tables.css';
 
 # GoatDB Benchmarks
 
-GoatDB's benchmarks provide a performance comparison between GoatDB's different
-operational modes and SQLite. These benchmarks help understand the performance
-characteristics and tradeoffs of each approach.
+GoatDB's benchmarks provide performance comparisons across different platforms and operational modes against SQLite. These help you understand what performance to expect and the tradeoffs involved.
 
-We're comparing GoatDB to SQLite because SQLite is widely considered the gold
-standard for embedded databases, offering an excellent balance of features,
-performance, and reliability.
+## Quick Summary
 
-SQLite is built using classic RDBMS techniques and especially shines when
-complex queries on larger-than-memory datasets are needed. However, when
-implementing synchronization mechanisms and security controls for offline
-writes, GoatDB is able to offer competitive performance.
+GoatDB is a **memory-first database** that loads entire datasets into memory before operations begin. This design trades initial load time for very fast operations once loaded. It's designed for **offline-first applications** with built-in synchronization and cryptographic security.
 
-The most basic trade-off between the two systems is that GoatDB first loads the
-entire dataset into memory before any operations can be performed. This comes
-with its own unique set of trade-offs. It's important to note that GoatDB isn't
-trying to replace SQLite, but rather carve its own niche for specific use cases
-where in-memory operations, offline capabilities, and cryptographic security are
-prioritized over handling larger-than-memory datasets.
+**Key tradeoffs vs SQLite:**
+- **Much faster reads** once data is loaded (1-2μs vs 10-500μs)  
+- **Slower initial loading** (hundreds of ms for large datasets)
+- **Built-in security** and synchronization (cryptographically signed commits)
+- **Real-time collaboration** with automatic conflict resolution
 
-Replicating these benchmarks on your machine is easy. Just clone the
-[GoatDB repository](https://github.com/goatplatform/goatdb) and run:
+## Performance by Platform
 
-```bash
-deno task bench
-```
+<Tabs groupId="platform">
+<TabItem value="node" label="Node.js" default>
 
-All benchmarks were performed on the following configuration:
+**System:** Apple M4 Pro, 24GB RAM, NVMe SSD  
+**Runtime:** node v24.4.1 (darwin arm64)
 
-- CPU: Intel(R) Core(TM) i7-8850H CPU @ 2.60GHz
-- Runtime: Deno 2.2.3 (x86_64-apple-darwin)
+<div className="benchmark-table">
 
-## Summary
+| Operation | GoatDB | GoatDB-Trusted | SQLite |
+|-----------|--------|----------------|--------|
+| Create instance | 1.0ms | 1.2ms | <span className="winner">112.2μs</span> |
+| Open database (empty) | 422.4μs | 379.0μs | <span className="winner">280.3μs</span> |
+| Open database (100k items) | 1.1ms | 840.9μs | <span className="winner">77.7μs</span> |
+| Create item | 383.8μs | 363.2μs | <span className="winner">229.9μs</span> |
+| Read item by ID | 0.9μs | <span className="winner">0.8μs</span> | 12.4μs |
+| Update item | 122.2μs | <span className="winner">90.4μs</span> | 1.2ms |
+| Bulk create 100 items | 6.8ms | 1.8ms | <span className="winner">674.6μs</span> |
+| Bulk read 100 items | 193.9μs | <span className="winner">147.2μs</span> | 416.4μs |
+| Read 100k items | 110.3ms | 417.3ms | <span className="winner">36.2ms</span> |
+| Simple query | 377.6μs | <span className="winner">193.3μs</span> | 752.1μs |
+| Complex query with sort | <span className="winner">114.5μs</span> | 137.1μs | 742.4μs |
+| Count operation | 3.1μs | <span className="winner">1.4μs</span> | 676.4μs |
+| Keys operation | 3.3μs | <span className="winner">2.7μs</span> | 647.9μs |
 
-First, let's compare different operational modes that guarantee durability. Note
-that GoatDB's default mode cryptographically signs each commit (write) for
-security, while trusted mode skips these security controls for better
-performance:
+</div>
 
-| Benchmark                    | GoatDB (Default) | GoatDB (Trusted) | SQLite       |
-| ---------------------------- | ---------------- | ---------------- | ------------ |
-| Create instance              | 5.1 ms           | 4.6 ms           | **203.2 µs** |
-| Open repository (empty)      | 1.4 ms           | 1.5 ms           | **1.1 ms**   |
-| Open repository (100k items) | 738.4 ms         | 721.5 ms         | **186.3 µs** |
-| Create single item           | 3.0 ms           | 2.0 ms           | **815.6 µs** |
-| Read item by path            | **2.0 µs**       | **2.5 µs**       | 67.0 µs      |
-| Update item                  | 1.8 ms           | **327.5 µs**     | 780.6 µs     |
-| Bulk create 100 items        | 98.1 ms          | 67.1 ms          | **1.5 ms**   |
-| Bulk read 100 items          | **421.8 µs**     | **468.5 µs**     | 1.7 ms       |
-| Simple query                 | 264.1 µs         | 324.2 µs         | **149.0 µs** |
-| Complex query with sort      | 144.1 µs         | 207.2 µs         | **97.1 µs**  |
-| Repository operations: count | **4.7 µs**       | **4.6 µs**       | 64.7 µs      |
-| Repository operations: keys  | **7.9 µs**       | **7.9 µs**       | 81.6 µs      |
+</TabItem>
+<TabItem value="browser" label="Browser">
 
-When relaxed durability is acceptable, both GoatDB and SQLite can skip the
-`fsync` call to achieve much faster performance. Note that with SQLite, you risk
-database corruption if the system crashes during a write, while GoatDB will
-simply discard any incomplete writes.
+**System:** Apple M4 Pro (12 cores), 24GB RAM  
+**Storage:** OPFS  
+**Browser:** Chrome 139.0
 
-| Benchmark                    | GoatDB (Fast) | SQLite (synchronous = OFF) |
-| ---------------------------- | ------------- | -------------------------- |
-| Create instance              | 5.5 ms        | **160.3 µs**               |
-| Open repository (empty)      | 1.4 ms        | **507.4 µs**               |
-| Open repository (100k items) | 717.1 ms      | **196.3 µs**               |
-| Create single item           | **91.3 µs**   | 701.4 µs                   |
-| Read item by path            | **2.6 µs**    | 63.9 µs                    |
-| Update item                  | **24.9 µs**   | 521.8 µs                   |
-| Bulk create 100 items        | 11.5 ms       | **900.0 µs**               |
-| Bulk read 100 items          | **43.9 µs**   | 1.8 ms                     |
-| Simple query                 | 293.7 µs      | **116.1 µs**               |
-| Complex query with sort      | 159.1 µs      | **92.1 µs**                |
-| Repository operations: count | **3.9 µs**    | 58.5 µs                    |
-| Repository operations: keys  | **7.1 µs**    | 67.4 µs                    |
+<div className="benchmark-table">
 
-GoatDB is a memory-first database built on an append-only distributed commit
-graph stored as a log of commits on disk. This design currently requires the
-entire commit graph to be loaded into memory before any operations can be
-performed.
+| Operation | GoatDB | SQLite |
+|-----------|--------|--------|
+| Create instance | 16.9ms | <span className="winner">3.6ms</span> |
+| Open database (empty) | 911.7μs | <span className="winner">2.5μs</span> |
+| Open database (100k items) | 289.3ms | <span className="winner">1.7ms</span> |
+| Create item | <span className="winner">1.0ms</span> | 4.1ms |
+| Read item by ID | <span className="winner">0.5μs</span> | 566.5μs |
+| Update item | <span className="winner">101.5μs</span> | 3.1ms |
+| Bulk create 100 items | 21.4ms | <span className="winner">6.8ms</span> |
+| Bulk read 100 items | <span className="winner">140.0μs</span> | 44.0ms |
+| Read 100k items | <span className="winner">84.5ms</span> | 358.2ms |
+| Simple query | 826.0μs | <span className="winner">668.0μs</span> |
+| Complex query with sort | 697.0μs | <span className="winner">538.5μs</span> |
+| Count operation | <span className="winner">2.0μs</span> | 522.5μs |
+| Keys operation | <span className="winner">3.0μs</span> | 512.5μs |
 
-Opening a repository takes time proportional to the number of commits it
-contains. While the benchmark shows GoatDB is significantly slower than SQLite
-when opening a repository with 100k items (721ms vs 186µs), it's important to
-note that if we actually read the entire table's contents into memory, GoatDB is
-only about 5x slower than SQLite's `SELECT *` operation (721ms vs 136ms).
+</div>
 
-The performance breakdown of repository opening reveals that bringing the raw
-log data into memory is the least time-consuming part (approximately 10% of the
-total time). The majority is spent on deserializing and constructing the
-in-memory representation of the commit graph—a particularly challenging workload
-for modern JavaScript garbage collectors.
+</TabItem>
+<TabItem value="deno" label="Deno">
 
-To address this performance bottleneck, we are developing a zero-copy format
-([see GitHub issue #36](https://github.com/goatplatform/goatdb/issues/36)) that
-will significantly reduce this overhead and bring opening times much closer to
-SQLite's performance.
+**System:** Apple M4 Pro, 24GB RAM, NVMe SSD  
+**Runtime:** deno 2.4.3 (darwin aarch64)
 
-GoatDB uses a different scaling approach than traditional databases. Rather than
-growing a single large database, it employs application-level sharding with
-multiple medium-sized repositories that sync independently. Each user or data
-group has its own repository, enabling horizontal scaling and efficient
-client-server synchronization. This architecture provides natural scalability
-for multi-user applications without complex manual sharding.
+<div className="benchmark-table">
 
-SQLite shines in query performance with its decades of battle-tested
-optimizations, though GoatDB's incremental queries perform competitively in
-real-world scenarios despite their simpler implementation. While GoatDB is
-written in TypeScript and SQLite in C, the benchmark differences primarily stem
-from fundamentally different architectures rather than language choice, as
-modern JavaScript runtimes are quite competitive on raw performance. GoatDB
-prioritizes distributed operation and offline-first capabilities, while SQLite's
-B-tree implementation has been refined since 2000 for traditional database
-performance, reflecting their different design goals.
+| Operation | GoatDB | GoatDB-Trusted | SQLite |
+|-----------|--------|----------------|--------|
+| Create instance | 1.3ms | 1.2ms | <span className="winner">88.6μs</span> |
+| Open database (empty) | 522.6μs | 381.2μs | <span className="winner">277.3μs</span> |
+| Open database (100k items) | 377.6ms | 361.3ms | <span className="winner">79.7μs</span> |
+| Create item | 484.2μs | 383.4μs | <span className="winner">376.5μs</span> |
+| Read item by ID | 1.6μs | <span className="winner">1.2μs</span> | 14.0μs |
+| Update item | 137.7μs | <span className="winner">82.2μs</span> | 1.0ms |
+| Bulk create 100 items | 13.7ms | 2.2ms | <span className="winner">1.0ms</span> |
+| Bulk read 100 items | 228.3μs | <span className="winner">208.8μs</span> | 430.8μs |
+| Read 100k items | 119.7ms | 368.5ms | <span className="winner">53.4ms</span> |
+| Simple query | 321.3μs | <span className="winner">145.6μs</span> | 1.2ms |
+| Complex query with sort | <span className="winner">96.9μs</span> | 96.9μs | 1.3ms |
+| Count operation | 1.8μs | <span className="winner">1.5μs</span> | 1.5ms |
+| Keys operation | 3.2μs | <span className="winner">2.0μs</span> | 1.6ms |
 
-## Synchronization Latency
+</div>
 
-The benchmarks above focus on local database operations. For distributed synchronization between peers, GoatDB exhibits different performance characteristics:
+</TabItem>
+</Tabs>
+
+## Understanding the Numbers
+
+:::info GoatDB's Memory-First Design
+GoatDB loads the entire dataset into memory before any operations can begin. The "Open database (100k items)" benchmark shows this upfront cost - but this comparison is misleading. SQLite only opens the database file without reading the data, while GoatDB actually loads all 100k items into memory for immediate access.
+:::
+
+The numbers above show GoatDB in "durable mode" where every operation explicitly flushes to disk for fair comparison with SQLite's default fsync behavior. This creates an artificially pessimistic view of GoatDB's real-world performance.
+
+:::tip When GoatDB Excels
+- **Individual reads**: 1-2μs vs SQLite's 10-500μs  
+- **Bulk reads**: Processing many items at once
+- **Repository operations**: count, keys operations are nearly instant
+- **Real-time queries**: Incremental updates as data changes
+:::
+
+In practice, GoatDB doesn't fsync by default. It uses dual-write to both local disk and network peers for redundancy, with explicit flushing available when needed.
+
+:::warning Trade-offs to Consider
+- **Initial load time**: Hundreds of milliseconds for large datasets  
+- **Memory usage**: Entire dataset must fit in memory
+- **Batched writes**: Operations are grouped with a slight delay, achieving write amplification = 1
+:::
+
+## Operational Modes
+
+**Default Mode**: Cryptographically signs every commit with ECDSA P-384 for tamper-proof audit trails and secure multi-peer synchronization. In real-world usage, writes to both local disk and network peers without waiting for fsync, providing eventual durability with crash consistency. The benchmarks above artificially add explicit flushing for fair comparison.
+
+**Trusted Mode**: Bypasses cryptographic signing for better performance in controlled environments like backend services. Same durability behavior as default mode - the performance gain comes from skipping cryptography, not durability changes.
+
+## Architecture Notes
+
+GoatDB is built on an **append-only distributed commit graph** stored as a JSON log on disk. This design fundamentally differs from SQLite's B-tree approach:
+
+**Why GoatDB doesn't need fsync like SQLite:**
+- **SQLite's B-tree**: In-place updates that can corrupt the database if interrupted during writes
+- **GoatDB's append-only log**: New commits are simply appended; incomplete writes are discarded on restart
+- **Corruption immunity**: The log truncates to the last valid commit on crash recovery
+
+The benchmarks above show an artificial "durable mode" where GoatDB explicitly flushes after every operation to match SQLite's default fsync behavior. In real-world usage, GoatDB provides:
+
+- **Better write performance** without explicit flushing (up to 10x faster)
+- **Dual redundancy** through concurrent local/network persistence
+- **Application-controlled durability** via explicit flush when needed
+
+**Application-level sharding**: Rather than growing single large databases, GoatDB uses multiple medium-sized repositories that sync independently. Each user or data group typically gets its own repository, enabling natural horizontal scaling.
+
+## Synchronization Performance
+
+The benchmarks above focus on local database operations. For distributed synchronization between peers, GoatDB exhibits different characteristics:
 
 | Metric | Typical Range | Notes |
 |--------|---------------|-------|
-| Single item sync | 700-1000ms | Application-perceived latency |
-| Concurrent sync (10 items) | 1000-1400ms average | Includes queuing overhead |
+| Single item sync | 700-1000ms | End-to-end application latency |
+| Concurrent sync (10 items) | 1000-1400ms avg | With queuing overhead |
 | Success rate under load | >95% | 10 concurrent operations |
 
-These measurements represent end-to-end latency from item creation on one peer to API availability on another peer, including GoatDB's polling-based sync architecture, Bloom filter exchanges, and processing overhead. Pure network transmission comprises approximately 50-200ms of the total latency.
+These measurements represent end-to-end latency from item creation on one peer to availability on another, including GoatDB's polling-based sync, Bloom filter exchanges, and processing overhead. Network transmission is ~50-200ms of the total.
 
-Synchronization performance prioritizes consistency and offline-first design over minimal latency, making GoatDB well-suited for collaborative applications but less optimal for high-frequency real-time use cases.
+:::note
+**Measurement methodology**: Unlike the automated benchmarks above, synchronization performance is measured manually in real-world scenarios. Synchronization currently prioritizes consistency and offline-first design over minimal latency, making GoatDB well-suited for collaborative applications but less optimal for high-frequency real-time scenarios. However, this is expected to improve significantly with the [planned sync protocol optimization](https://github.com/goatplatform/goatdb/issues/37), which will reduce end-to-end sync latency and make GoatDB more suitable for low-latency and high-frequency use cases in the future.
+:::
 
-## Default Mode
+## Fast Mode Comparison
 
-The benchmarks below show performance in Default mode, which includes all
-security and cryptographic controls. While these controls add some performance
-overhead, they enable critical features such as:
+For maximum performance, GoatDB can drop both cryptographic signing and fsync while retaining crash-proof storage and network sync:
 
-- Cryptographically verified data integrity
-- Secure multi-user collaboration
-- Clients act as active replicas automatically and securely restoring a crashed
-  server
-- Protection against unauthorized offline data modifications
-- Replicated tamper-proof audit trail of all changes
+<Tabs groupId="platform">
+<TabItem value="node-fast" label="Node.js" default>
 
-| Benchmark                    | Average  | p75      | p99      | p995     |
-| ---------------------------- | -------- | -------- | -------- | -------- |
-| Create instance              | 5.1 ms   | 5.4 ms   | 9.1 ms   | 9.1 ms   |
-| Open repository (empty)      | 1.4 ms   | 1.5 ms   | 1.8 ms   | 1.8 ms   |
-| Open repository (100k items) | 738.4 ms | 773.3 ms | 809.0 ms | 809.0 ms |
-| Create single item           | 3.0 ms   | 3.2 ms   | 3.2 ms   | 3.2 ms   |
-| Read item by path            | 2.0 µs   | 2.0 µs   | 2.5 µs   | 2.5 µs   |
-| Update item                  | 1.8 ms   | 1.9 ms   | 2.2 ms   | 2.2 ms   |
-| Bulk create 100 items        | 98.1 ms  | 77.5 ms  | 402.4 ms | 402.4 ms |
-| Bulk read 100 items          | 421.8 µs | 443.9 µs | 487.5 µs | 487.5 µs |
-| Simple query                 | 264.1 µs | 264.1 µs | 1.3 ms   | 1.3 ms   |
-| Complex query with sort      | 144.1 µs | 157.3 µs | 215.2 µs | 215.2 µs |
-| Repository operations: count | 4.7 µs   | 4.8 µs   | 7.6 µs   | 7.6 µs   |
-| Repository operations: keys  | 7.9 µs   | 8.2 µs   | 9.2 µs   | 9.2 µs   |
+**GoatDB Fast Mode (no signing, no fsync) vs SQLite with `synchronous = OFF`**
 
-## Trusted Mode
+<div className="benchmark-table">
 
-Trusted mode bypasses cryptographic verification and security controls for
-improved performance. This mode is suitable for applications where security is
-handled at a different layer or in trusted environments, such as microservices
-running in the cloud without direct client interaction.
+| Operation | GoatDB-Fast | SQLite-Fast-Unsafe |
+|-----------|-------------|-------------------|
+| Create instance | 1.1ms | <span className="winner">65.6μs</span> |
+| Open database (empty) | 376.1μs | <span className="winner">314.2μs</span> |
+| Create item | <span className="winner">18.5μs</span> | 448.8μs |
+| Read item by ID | <span className="winner">1.1μs</span> | 482.2μs |
+| Update item | <span className="winner">7.1μs</span> | 633.7μs |
+| Bulk create 100 items | 2.3ms | <span className="winner">518.7μs</span> |
+| Bulk read 100 items | <span className="winner">18.1μs</span> | 935.0μs |
+| Read 100k items | 398.5ms | <span className="winner">133.3ms</span> |
+| Simple query | <span className="winner">137.7μs</span> | 678.2μs |
+| Complex query with sort | <span className="winner">112.8μs</span> | 591.8μs |
+| Count operation | <span className="winner">1.7μs</span> | 474.2μs |
+| Keys operation | <span className="winner">3.2μs</span> | 544.0μs |
 
-| Benchmark                             | Average  | p75      | p99      | p995     |
-| ------------------------------------- | -------- | -------- | -------- | -------- |
-| Trusted: Create instance              | 4.6 ms   | 4.9 ms   | 7.7 ms   | 7.7 ms   |
-| Trusted: Open repository (empty)      | 1.5 ms   | 1.5 ms   | 4.2 ms   | 4.2 ms   |
-| Trusted: Open repository (100k items) | 721.5 ms | 712.1 ms | 837.5 ms | 837.5 ms |
-| Trusted: Create single item           | 2.0 ms   | 2.1 ms   | 2.5 ms   | 2.5 ms   |
-| Trusted: Read item by path            | 2.5 µs   | 2.7 µs   | 3.3 µs   | 3.3 µs   |
-| Trusted: Update item                  | 327.5 µs | 373.5 µs | 441.0 µs | 441.0 µs |
-| Trusted: Bulk create 100 items        | 67.1 ms  | 78.8 ms  | 80.6 ms  | 80.6 ms  |
-| Trusted: Bulk read 100 items          | 468.5 µs | 462.9 µs | 952.9 µs | 952.9 µs |
-| Trusted: Simple query                 | 324.2 µs | 333.3 µs | 382.0 µs | 382.0 µs |
-| Trusted: Complex query with sort      | 207.2 µs | 222.7 µs | 242.8 µs | 242.8 µs |
-| Trusted: Repository operations: count | 4.6 µs   | 4.5 µs   | 7.1 µs   | 7.1 µs   |
-| Trusted: Repository operations: keys  | 7.9 µs   | 8.6 µs   | 9.1 µs   | 9.1 µs   |
+</div>
 
-## Fast Mode
+</TabItem>
+<TabItem value="deno-fast" label="Deno">
 
-Fast mode is similar to trusted mode, but with one key difference: the code
-doesn't wait for updates to be persisted to local disk before acknowledging
-completion. Instead, GoatDB persists updates in the background, writing to both
-the local disk and remote server concurrently. This mode is particularly useful
-for caching applications in backend environments or for trusted systems where
-performance is the highest priority while still maintaining eventual durability.
-Fast mode is ideal when you need maximum throughput for high-volume operations
-while accepting a small risk of data loss in case of sudden system failure.
+**GoatDB Fast Mode (no signing, no fsync) vs SQLite with `synchronous = OFF`**
 
-Even in Fast mode, GoatDB maintains data integrity through its append-only
-commit graph architecture. This design provides inherent resistance to
-corruption - in the event of a system crash during write operations, the
-database simply trims the log to the last valid commit point. Unlike traditional
-databases where crashes can lead to complex recovery scenarios or data
-corruption, GoatDB's approach ensures that the database always remains in a
-consistent state. This structural safeguard works alongside the performance
-optimizations of Fast mode, providing both speed and reliability without
-compromising data integrity, at the expense of decreased durability.
+<div className="benchmark-table">
 
-| Benchmark                          | Average  | p75      | p99      | p995     |
-| ---------------------------------- | -------- | -------- | -------- | -------- |
-| Fast: Create instance              | 5.5 ms   | 5.5 ms   | 14.7 ms  | 14.7 ms  |
-| Fast: Open repository (empty)      | 1.4 ms   | 1.5 ms   | 1.6 ms   | 1.6 ms   |
-| Fast: Open repository (100k items) | 717.1 ms | 716.1 ms | 816.3 ms | 816.3 ms |
-| Fast: Create single item           | 91.3 µs  | 95.7 µs  | 132.3 µs | 132.3 µs |
-| Fast: Read item by path            | 2.6 µs   | 2.8 µs   | 3.2 µs   | 3.2 µs   |
-| Fast: Update item                  | 24.9 µs  | 24.7 µs  | 57.9 µs  | 57.9 µs  |
-| Fast: Bulk create 100 items        | 11.5 ms  | 7.3 ms   | 86.4 ms  | 86.4 ms  |
-| Fast: Bulk read 100 items          | 43.9 µs  | 44.3 µs  | 78.2 µs  | 78.2 µs  |
-| Fast: Simple query                 | 293.7 µs | 314.5 µs | 414.0 µs | 414.0 µs |
-| Fast: Complex query with sort      | 159.1 µs | 176.0 µs | 263.1 µs | 263.1 µs |
-| Fast: Repository operations: count | 3.9 µs   | 4.1 µs   | 4.7 µs   | 4.7 µs   |
-| Fast: Repository operations: keys  | 7.1 µs   | 7.3 µs   | 8.1 µs   | 8.1 µs   |
+| Operation | GoatDB-Fast | SQLite-Fast-Unsafe |
+|-----------|-------------|-------------------|
+| Create instance | 2.2ms | <span className="winner">103.1μs</span> |
+| Open database (empty) | 3.2ms | <span className="winner">745.2μs</span> |
+| Create item | <span className="winner">23.3μs</span> | 533.5μs |
+| Read item by ID | <span className="winner">1.3μs</span> | 585.1μs |
+| Update item | <span className="winner">9.6μs</span> | 681.3μs |
+| Bulk create 100 items | 2.6ms | <span className="winner">635.5μs</span> |
+| Bulk read 100 items | <span className="winner">20.8μs</span> | 1.2ms |
+| Read 100k items | 401.5ms | <span className="winner">185.0ms</span> |
+| Simple query | <span className="winner">166.9μs</span> | 848.5μs |
+| Complex query with sort | <span className="winner">88.8μs</span> | 717.1μs |
+| Count operation | <span className="winner">1.6μs</span> | 526.2μs |
+| Keys operation | <span className="winner">2.9μs</span> | 570.9μs |
 
-## SQLite Comparison
+</div>
 
-SQLite is currently the leading choice in embedded databases, known for its
-reliability and performance. While SQLite doesn't provide any security controls
-nor synchronizes across devices, its benchmark is provided here for reference
-purposes.
+</TabItem>
+</Tabs>
 
-| Benchmark                          | Average  | p75      | p99      | p995     |
-| ---------------------------------- | -------- | -------- | -------- | -------- |
-| SQLite: Create instance            | 203.2 µs | 195.5 µs | 396.0 µs | 506.9 µs |
-| SQLite: Create table               | 1.1 ms   | 1.1 ms   | 2.0 ms   | 2.2 ms   |
-| SQLite: Open database (100k items) | 186.3 µs | 199.9 µs | 332.2 µs | 342.4 µs |
-| SQLite: Read 100k items            | 138.7 ms | 139.7 ms | 153.3 ms | 153.3 ms |
-| SQLite: Create single item         | 815.6 µs | 889.9 µs | 1.2 ms   | 1.2 ms   |
-| SQLite: Read item by ID            | 67.0 µs  | 71.6 µs  | 121.7 µs | 126.0 µs |
-| SQLite: Update item                | 780.6 µs | 891.5 µs | 1.2 ms   | 1.3 ms   |
-| SQLite: Bulk create 100 items      | 1.5 ms   | 1.5 ms   | 2.3 ms   | 3.0 ms   |
-| SQLite: Bulk read 100 items        | 1.7 ms   | 1.7 ms   | 2.3 ms   | 2.4 ms   |
-| SQLite: Simple query               | 149.0 µs | 155.8 µs | 291.5 µs | 491.8 µs |
-| SQLite: Complex query with sort    | 97.1 µs  | 101.8 µs | 169.7 µs | 233.7 µs |
-| SQLite: Count operation            | 64.7 µs  | 65.1 µs  | 131.7 µs | 366.9 µs |
-| SQLite: Keys operation             | 81.6 µs  | 84.9 µs  | 197.0 µs | 211.6 µs |
+:::info GoatDB Fast Mode
+**Fast Mode** drops both cryptographic signing and fsync but retains dual writes to disk and network. This creates a **multi-master embedded cache** that is:
+- **Memory-first fast**: All operations work from memory
+- **Crash-proof**: Append-only log design prevents corruption
+- **Network-synced**: Automatic replication to peers
+- **Perfect for backend caching**: Maximum speed with reliability
 
-### synchronous = OFF
+GoatDB exposes [`sync()`](/docs/api/classes/goatdb#sync) and [`flush()`](/docs/api/classes/goatdb#flush) methods so applications can control synchronization and durability in the rare cases where explicit control is needed.
 
-A somewhat similar comparison to GoatDB's Fast mode would be with SQLite's
-`synchronous = OFF` setting. This setting disables the durability guarantees of
-SQLite, allowing the database to operate in a more performant mode, while
-risking a corruption of the database in case of sudden system failure.
+**SQLite `synchronous = OFF`** risks database corruption on crash, while GoatDB Fast Mode remains crash-proof due to its append-only design.
+:::
 
-| Benchmark                                 | Average  | p75      | p99      | p995     |
-| ----------------------------------------- | -------- | -------- | -------- | -------- |
-| SQLite-fast-unsafe: Create instance       | 160.3 µs | 171.9 µs | 277.5 µs | 313.4 µs |
-| SQLite-fast-unsafe: Create table          | 507.4 µs | 526.2 µs | 871.4 µs | 982.0 µs |
-| SQLite-fast-unsafe: Open database (100k)  | 196.3 µs | 214.5 µs | 355.5 µs | 390.1 µs |
-| SQLite-fast-unsafe: Read 100k items       | 136.5 ms | 141.0 ms | 149.7 ms | 149.7 ms |
-| SQLite-fast-unsafe: Create single item    | 701.4 µs | 877.2 µs | 1.4 ms   | 1.4 ms   |
-| SQLite-fast-unsafe: Read item by ID       | 63.9 µs  | 67.2 µs  | 142.1 µs | 179.0 µs |
-| SQLite-fast-unsafe: Update item           | 521.8 µs | 534.5 µs | 1.3 ms   | 1.3 ms   |
-| SQLite-fast-unsafe: Bulk create 100 items | 900.0 µs | 919.0 µs | 1.4 ms   | 1.5 ms   |
-| SQLite-fast-unsafe: Bulk read 100 items   | 1.8 ms   | 1.8 ms   | 2.4 ms   | 2.6 ms   |
-| SQLite-fast-unsafe: Simple query          | 116.1 µs | 124.1 µs | 176.4 µs | 184.3 µs |
-| SQLite-fast-unsafe: Complex query w/sort  | 92.1 µs  | 96.1 µs  | 160.0 µs | 201.3 µs |
-| SQLite-fast-unsafe: Count operation       | 58.5 µs  | 63.8 µs  | 117.6 µs | 122.7 µs |
-| SQLite-fast-unsafe: Keys operation        | 67.4 µs  | 71.5 µs  | 127.3 µs | 138.7 µs |
+## Detailed Statistics
+
+<details>
+<summary>Expand for detailed percentile breakdowns</summary>
+
+<Tabs groupId="platform">
+<TabItem value="stats-node" label="Node.js" default>
+
+### GoatDB Default Mode
+
+| Operation | Average | p95 | p99 | Samples |
+|-----------|---------|-----|-----|---------|
+| Create instance | 1.0ms | 1.1ms | 1.1ms | 10 |
+| Open repository (empty) | 422.4μs | 630.5μs | 630.5μs | 3 |
+| Open repository (100k items) | 1.1ms | 1.3ms | 1.3ms | 3 |
+| Read 100k items | 110.3ms | 124.6ms | 124.6ms | 3 |
+| Create single item | 383.8μs | 445.7μs | 445.7μs | 10 |
+| Read item by path | 0.9μs | 1.3μs | 1.3μs | 10 |
+| Update item | 122.2μs | 157.3μs | 157.3μs | 10 |
+| Bulk create 100 items | 6.8ms | 10.7ms | 10.7ms | 10 |
+| Bulk read 100 items | 193.9μs | 254.5μs | 254.5μs | 10 |
+| Simple query | 377.6μs | 2.0ms | 2.0ms | 10 |
+| Complex query with sort | 114.5μs | 370.6μs | 370.6μs | 10 |
+| Repository operations: count | 3.1μs | 15.2μs | 15.2μs | 10 |
+| Repository operations: keys | 3.3μs | 6.8μs | 6.8μs | 10 |
+
+### GoatDB Trusted Mode
+
+| Operation | Average | p95 | p99 | Samples |
+|-----------|---------|-----|-----|---------|
+| Create instance | 1.2ms | 1.4ms | 1.4ms | 10 |
+| Open repository (empty) | 379.0μs | 507.4μs | 507.4μs | 3 |
+| Open repository (100k items) | 840.9μs | 923.9μs | 923.9μs | 3 |
+| Create single item | 363.2μs | 419.8μs | 419.8μs | 10 |
+| Read item by path | 0.8μs | 1.3μs | 1.3μs | 10 |
+| Update item | 90.4μs | 176.0μs | 176.0μs | 10 |
+| Bulk create 100 items | 1.8ms | 1.9ms | 1.9ms | 10 |
+| Bulk read 100 items | 147.2μs | 159.2μs | 159.2μs | 10 |
+| Read 100k items | 417.3ms | 426.7ms | 426.7ms | 3 |
+| Simple query | 193.3μs | 531.1μs | 531.1μs | 10 |
+| Complex query with sort | 137.1μs | 459.9μs | 459.9μs | 10 |
+| Repository operations: count | 1.4μs | 1.8μs | 1.8μs | 10 |
+| Repository operations: keys | 2.7μs | 5.1μs | 5.1μs | 10 |
+
+### SQLite
+
+| Operation | Average | p95 | p99 | Samples |
+|-----------|---------|-----|-----|---------|
+| Create instance | 112.2μs | 188.5μs | 188.5μs | 10 |
+| Create table | 280.3μs | 403.3μs | 403.3μs | 10 |
+| Open database (100k items) | 77.7μs | 93.7μs | 93.7μs | 3 |
+| Read 100k items | 36.2ms | 39.1ms | 39.1ms | 3 |
+| Create single item | 229.9μs | 298.3μs | 298.3μs | 10 |
+| Read item by ID | 12.4μs | 15.0μs | 15.0μs | 10 |
+| Update item | 1.2ms | 2.5ms | 2.5ms | 10 |
+| Bulk create 100 items | 674.6μs | 707.0μs | 707.0μs | 10 |
+| Bulk read 100 items | 416.4μs | 431.5μs | 431.5μs | 10 |
+| Simple query | 752.1μs | 796.2μs | 796.2μs | 10 |
+| Complex query with sort | 742.4μs | 859.4μs | 859.4μs | 10 |
+| Count operation | 676.4μs | 1.4ms | 1.4ms | 10 |
+| Keys operation | 647.9μs | 749.7μs | 749.7μs | 10 |
+
+</TabItem>
+<TabItem value="stats-deno" label="Deno">
+
+### GoatDB Default Mode
+
+| Operation | Average | p95 | p99 | Samples |
+|-----------|---------|-----|-----|---------|
+| Create instance | 1.3ms | 2.0ms | 2.0ms | 10 |
+| Open repository (empty) | 522.6μs | 720.7μs | 720.7μs | 3 |
+| Open repository (100k items) | 377.6ms | 519.5ms | 519.5ms | 3 |
+| Read 100k items | 119.7ms | 133.0ms | 133.0ms | 3 |
+| Create single item | 484.2μs | 925.6μs | 925.6μs | 10 |
+| Read item by path | 1.6μs | 2.4μs | 2.4μs | 10 |
+| Update item | 137.7μs | 180.6μs | 180.6μs | 10 |
+| Bulk create 100 items | 13.7ms | 21.6ms | 21.6ms | 10 |
+| Bulk read 100 items | 228.3μs | 318.1μs | 318.1μs | 10 |
+| Simple query | 321.3μs | 1.5ms | 1.5ms | 10 |
+| Complex query with sort | 96.9μs | 342.9μs | 342.9μs | 10 |
+| Repository operations: count | 1.8μs | 2.4μs | 2.4μs | 10 |
+| Repository operations: keys | 3.2μs | 5.7μs | 5.7μs | 10 |
+
+### GoatDB Trusted Mode
+
+| Operation | Average | p95 | p99 | Samples |
+|-----------|---------|-----|-----|---------|
+| Create instance | 1.2ms | 1.7ms | 1.7ms | 10 |
+| Open repository (empty) | 381.2μs | 428.5μs | 428.5μs | 3 |
+| Open repository (100k items) | 361.3ms | 463.9ms | 463.9ms | 3 |
+| Create single item | 383.4μs | 745.0μs | 745.0μs | 10 |
+| Read item by path | 1.2μs | 2.0μs | 2.0μs | 10 |
+| Update item | 82.2μs | 105.9μs | 105.9μs | 10 |
+| Bulk create 100 items | 2.2ms | 2.5ms | 2.5ms | 10 |
+| Bulk read 100 items | 208.8μs | 568.9μs | 568.9μs | 10 |
+| Read 100k items | 368.5ms | 413.0ms | 413.0ms | 3 |
+| Simple query | 145.6μs | 297.1μs | 297.1μs | 10 |
+| Complex query with sort | 96.9μs | 316.6μs | 316.6μs | 10 |
+| Repository operations: count | 1.5μs | 2.3μs | 2.3μs | 10 |
+| Repository operations: keys | 2.0μs | 2.9μs | 2.9μs | 10 |
+
+### SQLite
+
+| Operation | Average | p95 | p99 | Samples |
+|-----------|---------|-----|-----|---------|
+| Create instance | 88.6μs | 106.9μs | 106.9μs | 10 |
+| Create table | 277.3μs | 333.5μs | 333.5μs | 10 |
+| Open database (100k items) | 79.7μs | 81.7μs | 81.7μs | 3 |
+| Read 100k items | 53.4ms | 56.4ms | 56.4ms | 3 |
+| Create single item | 376.5μs | 629.4μs | 629.4μs | 10 |
+| Read item by ID | 14.0μs | 20.4μs | 20.4μs | 10 |
+| Update item | 1.0ms | 1.4ms | 1.4ms | 10 |
+| Bulk create 100 items | 1.0ms | 2.5ms | 2.5ms | 10 |
+| Bulk read 100 items | 430.8μs | 464.6μs | 464.6μs | 10 |
+| Simple query | 1.2ms | 2.7ms | 2.7ms | 10 |
+| Complex query with sort | 1.3ms | 3.6ms | 3.6ms | 10 |
+| Count operation | 1.5ms | 2.7ms | 2.7ms | 10 |
+| Keys operation | 1.6ms | 3.6ms | 3.6ms | 10 |
+
+</TabItem>
+</Tabs>
+
+</details>
+
+## Running Your Own Benchmarks
+
+To replicate these results on your machine:
+
+```bash
+git clone https://github.com/goatplatform/goatdb
+cd goatdb
+deno task bench
+```
+
+The benchmark suite runs on Deno, Node.js, and Browser environments automatically, providing comprehensive performance data across all supported platforms.
