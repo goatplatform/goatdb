@@ -84,7 +84,7 @@ export default function RepositoryModel() {
         </defs>
         
         {/* PROBLEM: Crowded large containers with tight spacing */}
-        <g transform="translate(135, 50)">
+        <g transform="translate(135, 35)">
           {/* Large container 1 with heavy load - tight spacing */}
           <rect x="0" y="0" width="90" height="70" rx="4" className="crowded-container"/>
           <rect x="4" y="4" width="82" height="62" rx="2" className="heavy-load"/>
@@ -95,9 +95,9 @@ export default function RepositoryModel() {
         </g>
         
         {/* TRANSFORMATION: Right-sized arrow with clear label */}
-        <path d="M 330 85 L 390 85" className="transform-arrow" markerEnd="url(#arrow)"/>
-        <text x="358" y="74" className="scale-label">Scale Out</text>
-        <text x="360" y="104" className="scale-label">Don't Scale Up</text>
+        <path d="M 330 80 L 390 80" className="transform-arrow" markerEnd="url(#arrow)"/>
+        <text x="358" y="68" className="scale-label">Scale Out</text>
+        <text x="360" y="102" className="scale-label">Don't Scale Up</text>
         
         {/* SOLUTION: Organized small containers with generous spacing */}
         <g transform="translate(405, 40)">
