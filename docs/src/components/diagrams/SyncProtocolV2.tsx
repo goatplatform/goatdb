@@ -212,7 +212,7 @@ export default function SyncProtocolV2() {
         
         {/* Bottom explanation */}
         <g transform="translate(80, 600)">
-          <text x="720" y="75" className="sync-text-sub" textAnchor="middle">
+          <text x="680" y="75" className="sync-text-sub" textAnchor="middle">
             <tspan fontWeight="600" fill="var(--ifm-color-primary-darker)">No centralized coordination:</tspan>
             <tspan dx="5">Every device syncs directly with any other device</tspan>
           </text>
