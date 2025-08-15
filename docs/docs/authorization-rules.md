@@ -235,7 +235,7 @@ While authorization rules provide fine-grained control over data access, there
 are scenarios where bypassing these rules is necessary for performance or
 architectural reasons. GoatDB's [trusted mode](/docs/sessions#trusted-mode) allows
 you to disable authorization rule evaluation entirely. For performance
-implications, see [Benchmarks](/docs/benchmarks#trusted-mode).
+implications, see [Benchmarks](/docs/benchmarks#operational-modes).
 
 :::note
 

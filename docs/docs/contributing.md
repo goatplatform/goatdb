@@ -20,7 +20,7 @@ Check out our [Good First Issues](https://github.com/goatplatform/goatdb/labels/
 
 **Cutting-Edge Distributed Systems**: Work on [Bloom filter synchronization](/docs/sync), ephemeral [CRDTs](/docs/conflict-resolution), and [cryptographically signed commit graphs](/docs/commit-graph)—techniques pushing the boundaries of database design.
 
-**Cross-Runtime Innovation**: Build features that work identically across [Deno, Node.js, and browsers](/docs/architecture#storage-model) with a single TypeScript codebase.
+**Cross-Runtime Innovation**: Build features that work identically across [Deno, Node.js, and browsers](/docs/architecture#repository-system) with a single TypeScript codebase.
 
 ## Getting Started
 

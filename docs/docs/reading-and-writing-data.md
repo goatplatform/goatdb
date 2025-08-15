@@ -173,7 +173,7 @@ todoItem.isDeleted = false;
 Deletion in GoatDB is soft-delete by default. [Items](/docs/concepts#item) marked as
 deleted are not immediately removed but are instead hidden from
 [queries](/docs/query) and prepared for future
-[garbage collection](/docs/architecture/#garbage-collection). This design allows for
+[garbage collection](/docs/repositories#durability). This design allows for
 easy [recovery](/docs/repositories/#durability) of accidentally deleted items and
 maintains data history.
 

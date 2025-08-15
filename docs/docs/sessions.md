@@ -78,7 +78,7 @@ For applications where security is handled at a different layer or in trusted
 environments (such as microservices running in the cloud without direct client
 interaction), [GoatDB](/) offers a trusted mode that bypasses cryptographic
 verification and security controls. This mode can significantly
-[improve performance](/docs/benchmarks/#trusted-mode) by skipping commit signing and
+[improve performance](/docs/benchmarks#operational-modes) by skipping commit signing and
 verification.
 
 :::note
