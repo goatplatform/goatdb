@@ -1,0 +1,610 @@
+/* Base component styles using Docusaurus CSS variables */
+
+/* Box component */
+.box {
+  border: 2px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-global-radius);
+  padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal);
+  background: var(--ifm-background-surface-color);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.box[role="button"] {
+  cursor: pointer;
+}
+
+.box[role="button"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.box--primary { border-color: var(--ifm-color-primary); }
+.box--secondary { border-color: var(--ifm-color-secondary); }
+.box--success { border-color: var(--ifm-color-success); }
+.box--danger { border-color: var(--ifm-color-danger); }
+.box--info { border-color: var(--ifm-color-info); }
+
+.box--small { padding: calc(var(--ifm-spacing-vertical) * 0.5) calc(var(--ifm-spacing-horizontal) * 0.5); }
+.box--medium { padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal); }
+.box--large { padding: calc(var(--ifm-spacing-vertical) * 1.5) calc(var(--ifm-spacing-horizontal) * 1.5); }
+
+.boxLabel {
+  font-weight: var(--ifm-font-weight-semibold);
+  text-align: center;
+}
+
+.boxContent {
+  margin-top: var(--ifm-spacing-vertical);
+}
+
+/* Arrow component */
+.arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--ifm-spacing-horizontal);
+  color: var(--ifm-color-emphasis-600);
+}
+
+.arrowSvg {
+  width: 60px;
+  height: 40px;
+}
+
+.arrow--vertical .arrowSvg {
+  transform: rotate(90deg);
+}
+
+.arrow--animated .arrowSvg {
+  animation: pulse 2s infinite;
+}
+
+.arrowLabel {
+  position: absolute;
+  font-size: var(--ifm-font-size-small);
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* Node component */
+.node {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--ifm-color-emphasis-400);
+  background: var(--ifm-background-surface-color);
+  transition: all 0.2s ease;
+}
+
+.node[role="button"] {
+  cursor: pointer;
+}
+
+.node--circle {
+  border-radius: 50%;
+  aspect-ratio: 1;
+}
+
+.node--square {
+  border-radius: var(--ifm-global-radius);
+  aspect-ratio: 1;
+}
+
+.node--diamond {
+  border-radius: var(--ifm-global-radius);
+  transform: rotate(45deg);
+  aspect-ratio: 1;
+}
+
+.node--diamond .nodeLabel {
+  transform: rotate(-45deg);
+}
+
+.node--small { width: 60px; height: 60px; }
+.node--medium { width: 80px; height: 80px; }
+.node--large { width: 100px; height: 100px; }
+
+.node--active { 
+  border-color: var(--ifm-color-success);
+  background: var(--ifm-color-success-lightest);
+}
+
+.node--inactive { 
+  border-color: var(--ifm-color-danger);
+  background: var(--ifm-color-danger-lightest);
+  opacity: 0.6;
+}
+
+.node--processing { 
+  border-color: var(--ifm-color-warning);
+  background: var(--ifm-color-warning-lightest);
+  animation: pulse 1s infinite;
+}
+
+.nodeLabel {
+  font-size: var(--ifm-font-size-small);
+  text-align: center;
+}
+
+/* Stack Collapse component */
+.stackCollapse {
+  margin: var(--ifm-leading) 0;
+}
+
+.stackContainer {
+  min-height: 300px;
+  position: relative;
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+
+.traditionalStack,
+.goatdbStack {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  width: 100%;
+}
+
+.visible {
+  opacity: 1;
+  transform: scale(1);
+  display: block;
+}
+
+.hidden {
+  opacity: 0;
+  transform: scale(0.95);
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.stackTitle {
+  text-align: center;
+  margin-bottom: var(--ifm-spacing-vertical);
+  color: var(--ifm-font-color-base);
+}
+
+.stackItems {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ifm-spacing-horizontal);
+  flex-wrap: wrap;
+}
+
+.stackComplexity,
+.stackSimplicity {
+  display: flex;
+  justify-content: space-around;
+  margin-top: var(--ifm-spacing-vertical);
+  font-size: var(--ifm-font-size-small);
+  color: var(--ifm-color-emphasis-600);
+}
+
+.complexityItem,
+.simplicityItem {
+  padding: calc(var(--ifm-spacing-vertical) * 0.5) var(--ifm-spacing-horizontal);
+  background: var(--ifm-background-color);
+  border-radius: var(--ifm-global-radius);
+}
+
+.unifiedBox {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.miniComponents {
+  display: flex;
+  gap: calc(var(--ifm-spacing-horizontal) * 0.5);
+  margin-top: var(--ifm-spacing-vertical);
+}
+
+.miniBox {
+  padding: calc(var(--ifm-spacing-vertical) * 0.25) calc(var(--ifm-spacing-horizontal) * 0.5);
+  background: var(--ifm-color-success-lighter);
+  border-radius: var(--ifm-global-radius);
+  font-size: var(--ifm-font-size-small);
+}
+
+.toggleButton {
+  display: block;
+  margin: 0 auto;
+  padding: var(--ifm-button-padding-vertical) var(--ifm-button-padding-horizontal);
+  background: var(--ifm-button-background-color);
+  color: var(--ifm-button-color);
+  border: 1px solid var(--ifm-button-border-color);
+  border-radius: var(--ifm-button-border-radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggleButton:hover {
+  background: var(--ifm-button-background-color-hover);
+}
+
+/* Layered Architecture component */
+.layeredArchitecture {
+  position: relative;
+  margin: var(--ifm-leading) 0;
+}
+
+.layersContainer {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ifm-spacing-vertical) * 0.5);
+}
+
+.architectureLayer {
+  padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal);
+  background: var(--ifm-background-surface-color);
+  border: 2px solid var(--ifm-color-emphasis-200);
+  border-radius: var(--ifm-global-radius);
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.architectureLayer::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(
+    to bottom,
+    hsl(calc(var(--layer-index) * 60), 70%, 50%),
+    hsl(calc(var(--layer-index) * 60 + 30), 70%, 60%)
+  );
+}
+
+.layerSelected {
+  background: var(--ifm-color-emphasis-100);
+  border-color: var(--ifm-color-primary);
+}
+
+.layerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.layerName {
+  margin: 0;
+  font-size: var(--ifm-h5-font-size);
+}
+
+.layerDescription {
+  margin: 0;
+  color: var(--ifm-color-emphasis-700);
+  font-size: var(--ifm-font-size-small);
+}
+
+.layerDetails {
+  margin-top: var(--ifm-spacing-vertical);
+  padding-top: var(--ifm-spacing-vertical);
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+  color: var(--ifm-color-emphasis-800);
+  animation: slideDown 0.2s ease;
+}
+
+.dataFlowIndicator {
+  position: absolute;
+  right: -40px;
+  top: 0;
+  height: 100%;
+  width: 40px;
+}
+
+.flowArrow {
+  width: 100%;
+  height: 100%;
+  color: var(--ifm-color-emphasis-400);
+}
+
+/* Data Flow component */
+.dataFlow {
+  margin: var(--ifm-leading) 0;
+}
+
+.flowSelector {
+  display: flex;
+  gap: var(--ifm-spacing-horizontal);
+  justify-content: center;
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+
+.flowButton {
+  padding: calc(var(--ifm-spacing-vertical) * 0.5) var(--ifm-spacing-horizontal);
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-global-radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.flowButton:hover {
+  background: var(--ifm-color-emphasis-100);
+}
+
+.flowButton.active {
+  background: var(--ifm-color-primary);
+  color: var(--ifm-color-primary-contrast-background);
+  border-color: var(--ifm-color-primary);
+}
+
+.flowContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ifm-spacing-horizontal);
+  min-height: 120px;
+  padding: var(--ifm-spacing-vertical) 0;
+}
+
+.flowContainer.animating .flowStep {
+  animation: fadeInUp 0.3s ease forwards;
+  opacity: 0;
+}
+
+.flowStep {
+  opacity: 1;
+}
+
+.flowConnector {
+  font-size: var(--ifm-h3-font-size);
+  color: var(--ifm-color-emphasis-500);
+  animation: fadeIn 0.3s ease;
+}
+
+.flowDescription {
+  text-align: center;
+  margin-top: var(--ifm-spacing-vertical);
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* Comparison Split component */
+.comparisonSplit {
+  margin: var(--ifm-leading) 0;
+}
+
+.comparisonTitle {
+  text-align: center;
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+
+.splitContainer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ifm-spacing-horizontal);
+}
+
+@media (max-width: 768px) {
+  .splitContainer {
+    grid-template-columns: 1fr;
+  }
+}
+
+.splitPanel {
+  padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal);
+  border: 2px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-global-radius);
+  background: var(--ifm-background-surface-color);
+}
+
+.traditionalPanel {
+  border-color: var(--ifm-color-danger-lighter);
+}
+
+.goatdbPanel {
+  border-color: var(--ifm-color-success-lighter);
+}
+
+.panelTitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--ifm-spacing-vertical);
+  padding-bottom: var(--ifm-spacing-vertical);
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.panelLabel {
+  font-size: var(--ifm-h5-font-size);
+}
+
+.complexityIndicator {
+  font-size: var(--ifm-font-size-small);
+  padding: calc(var(--ifm-spacing-vertical) * 0.25) calc(var(--ifm-spacing-horizontal) * 0.5);
+  border-radius: var(--ifm-global-radius);
+}
+
+.complexityLow {
+  background: var(--ifm-color-success-lightest);
+  color: var(--ifm-color-success-darkest);
+}
+
+.complexityMedium {
+  background: var(--ifm-color-warning-lightest);
+  color: var(--ifm-color-warning-darkest);
+}
+
+.complexityHigh {
+  background: var(--ifm-color-danger-lightest);
+  color: var(--ifm-color-danger-darkest);
+}
+
+.panelItems {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.panelItem {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: calc(var(--ifm-spacing-vertical) * 0.5);
+}
+
+.itemBullet {
+  margin-right: calc(var(--ifm-spacing-horizontal) * 0.5);
+  font-weight: bold;
+}
+
+.traditionalPanel .itemBullet {
+  color: var(--ifm-color-danger);
+}
+
+.goatdbPanel .itemBullet {
+  color: var(--ifm-color-success);
+}
+
+/* Repository Network component */
+.repositoryNetwork {
+  margin: var(--ifm-leading) 0;
+}
+
+.networkContainer {
+  position: relative;
+  height: 400px;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: var(--ifm-global-radius);
+  overflow: hidden;
+}
+
+.networkSvg {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.networkConnection {
+  stroke: var(--ifm-color-emphasis-400);
+  stroke-width: 2;
+  transition: all 0.3s ease;
+}
+
+.networkConnection.recovering {
+  stroke: var(--ifm-color-success);
+  animation: pulse 1s infinite;
+}
+
+.networkNodes {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.networkNode {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.dataPush {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--ifm-color-success);
+  font-size: var(--ifm-h4-font-size);
+  animation: pushData 1s infinite;
+}
+
+.networkControls {
+  display: flex;
+  gap: var(--ifm-spacing-horizontal);
+  justify-content: center;
+  margin-top: var(--ifm-spacing-vertical);
+}
+
+.controlButton {
+  padding: var(--ifm-button-padding-vertical) var(--ifm-button-padding-horizontal);
+  background: var(--ifm-button-background-color);
+  color: var(--ifm-button-color);
+  border: 1px solid var(--ifm-button-border-color);
+  border-radius: var(--ifm-button-border-radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.controlButton:hover:not(:disabled) {
+  background: var(--ifm-button-background-color-hover);
+}
+
+.controlButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.networkStatus {
+  text-align: center;
+  margin-top: var(--ifm-spacing-vertical);
+  min-height: 2em;
+}
+
+.statusMessage {
+  color: var(--ifm-color-emphasis-700);
+  font-style: italic;
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    max-height: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: 200px;
+    opacity: 1;
+  }
+}
+
+@keyframes pushData {
+  0%, 100% { transform: translate(-50%, 0); }
+  50% { transform: translate(-50%, -5px); }
+}
+
+/* Accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -5,159 +5,238 @@ sidebar_position: 2
 slug: /architecture
 ---
 
+import StackArchitectureV2 from '@site/src/components/diagrams/StackArchitectureV2';
+import CoreArchitectureV2 from '@site/src/components/diagrams/CoreArchitectureV2';
+import ComparisonSplitSimple from '@site/src/components/diagrams/ComparisonSplitSimple';
 import RepositoryModel from '@site/src/components/diagrams/RepositoryModel';
-import MemoryManagement from '@site/src/components/diagrams/MemoryManagement';
-import QueryProcessing from '@site/src/components/diagrams/QueryProcessing';
-import SyncProtocol from '@site/src/components/diagrams/SyncProtocol';
-import GarbageCollection from '@site/src/components/diagrams/GarbageCollection';
+import SyncProtocolV2 from '@site/src/components/diagrams/SyncProtocolV2';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 # GoatDB Architecture
 
-[GoatDB](/) is a distributed, [schema-based](/docs/schema) database that implements
-novel approaches to data [synchronization](/docs/sync) and
-[conflict resolution](/docs/conflict-resolution), drawing inspiration from
-distributed version control systems (DVCS). This document explores the technical
-foundations and design decisions that shape GoatDB's architecture.
+GoatDB collapses the traditional database-server-client stack into a single executable. This eliminates operational complexity while providing stronger consistency guarantees than traditional distributed systems.
 
-## Repository-Centric Design
+## The Stack Collapse
+
+Traditional web applications create unnecessary complexity by requiring three separate systems: frontend, backend, and database. Each needs deployment, monitoring, and coordination between layers.
+
+<StackArchitectureV2 />
+
+GoatDB transforms this architecture by running everything together. Your data lives locally, operations are synchronous, and network sync happens automatically in the background. This means one deployment instead of three, with no configuration and no coordination overhead.
+
+This fundamental shift creates tangible real-world benefits. Operationally, you deploy one executable while servers auto-heal from clients with zero configuration. For development, synchronous local operations eliminate loading states and async complexity. In distributed environments, applications work offline with automatic conflict resolution and collaborative features without coordination.
+
+The cumulative result is fewer moving parts, faster development cycles, and more reliable applications that handle network failures gracefully.
+
+## Core Architecture
+
+Building on this collapsed stack approach, GoatDB's architecture consists of six interconnected layers that work together to replace traditional database-server-client complexity with a single coherent system.
+
+<CoreArchitectureV2 />
+
+At the top, React Integration provides optional hooks that make data reactive in your UI. When data changes anywhere in the distributed system, React components automatically re-render without manual state management or loading states.
+
+The Database Core serves as the main developer API for creating, reading, and updating data. Sessions handle authentication and permissions, while items provide direct object manipulation. All operations remain synchronous because data lives in memory rather than requiring network calls.
+
+Below this, the Repository System organizes data using Git-like repositories where every change creates a versioned commit. Queries process changes incrementally, maintaining performance as data grows. This layer provides the version control foundation that enables time-travel and collaborative editing capabilities.
+
+The Conflict Resolution layer automatically merges concurrent changes without coordination or manual intervention. When multiple users edit the same data simultaneously, proven algorithms ensure everyone converges to the same result without requiring locks or retry logic.
+
+Supporting these capabilities, the Networking Layer keeps all peers synchronized through efficient peer-to-peer communication. Compact signatures minimize bandwidth usage while handling network failures gracefully, allowing any peer to crash and recover without data loss.
+
+At the foundation, the Runtime Abstraction makes everything work identically across browsers, servers, and mobile apps. This layer handles platform differences in storage and networking so your application code works everywhere without changes.
+
+## Architectural Benefits in Practice
+
+These architectural decisions create practical advantages that address common development pain points. Rather than theoretical benefits, GoatDB's design eliminates specific complexities that developers face daily.
+
+### Eliminates Frontend Complexity
+
+<ComparisonSplitSimple
+  title="Frontend State Management"
+  traditional={{
+    label: "Traditional Approach",
+    items: [
+      "Loading states throughout the app for every data operation",
+      "Async complexity spread across every component",
+      "Manual coordination of network requests and UI state",
+      "Optimistic updates and cache invalidation everywhere"
+    ],
+    complexity: "high"
+  }}
+  goatdb={{
+    label: "GoatDB Approach",
+    items: [
+      "Single loading state during app initialization",
+      "All user interactions are synchronous",
+      "Data always instantly available after startup",
+      "Automatic background sync without UI blocking"
+    ],
+    complexity: "low"
+  }}
+/>
+
+The fundamental difference stems from where data lives. Most databases reside on servers, forcing every UI interaction to become an async network operation. GoatDB runs in your application, making data access synchronous while sync happens transparently in the background.
+
+### Eliminates Database Migration Pain
+
+<ComparisonSplitSimple
+  title="Schema Evolution"
+  traditional={{
+    label: "SQL Migrations",
+    items: [
+      "Database locks block all operations during migrations",
+      "Failed migrations require emergency rollbacks with data loss risk",
+      "Breaking schema changes force coordinated releases across teams",
+      "Production hotfixes blocked by pending migration dependencies"
+    ],
+    complexity: "high"
+  }}
+  goatdb={{
+    label: "GoatDB Evolution",
+    items: [
+      "Automatic field-level upgrades during data access",
+      "Mixed-version deployments merge changes seamlessly",
+      "Schema changes deploy independently without coordination",
+      "Safe rollbacks through branch-based version control"
+    ],
+    complexity: "low"
+  }}
+/>
+
+GoatDB's schema evolution leverages its Git-like architecture to eliminate traditional migration pain. Sequential upgrade functions transform data automatically when accessed, while the branch-based model enables safe mixed-version deployments. New application versions can merge changes from older versions during gradual rollouts, eliminating coordination overhead. When rollbacks are needed, you switch branches rather than attempting risky downgrade migrations.
+
+### Eliminates Server State Management
+
+<ComparisonSplitSimple
+  title="Server Operations"
+  traditional={{
+    label: "Traditional Servers",
+    items: [
+      "Connection pools require constant tuning and monitoring",
+      "Server crashes mean complex backup/restore procedures",
+      "Cache invalidation cascades break application logic",
+      "Database clustering requires coordination and split-brain prevention"
+    ],
+    complexity: "high"
+  }}
+  goatdb={{
+    label: "GoatDB Servers",
+    items: [
+      "Stateless servers crash without data loss",
+      "Clients automatically heal crashed servers",
+      "No cache invalidation - clients manage their own state",
+      "Add servers without coordination or configuration"
+    ],
+    complexity: "low"
+  }}
+/>
+
+GoatDB inverts traditional server architecture by treating servers as stateless synchronization nodes rather than authoritative data stores. Clients hold the authoritative data and use cryptographic sessions that work across any server. When servers crash, the peer-to-peer network automatically restores missing data from connected clients, eliminating backup/restore complexity. This removes the need for connection pools, cache invalidation, and server clustering coordination.
+
+## Repository System
+
+These architectural benefits are made possible by GoatDB's unique approach to data organization, which mirrors how desktop applications handle files.
 
 <RepositoryModel />
 
-The [repository model](/docs/repositories) in [GoatDB](/) takes inspiration from DVCS
-systems but adapts it for database operations. Each [repository](/docs/repositories)
-functions as an independent unit of data [synchronization](/docs/sync) and
-[access control](/docs/authorization), providing natural boundaries for data
-isolation. This design enables independent [synchronization](/docs/sync) operations
-and gives applications fine-grained control over which data sets are loaded into
-memory.
+When data lives locally, a repository becomes just a file on disk. Opening a repository works like Word opening a document—the entire file gets paged into memory for fast access. This fundamentally differs from traditional databases where every operation requires a network round-trip to a remote server.
 
-At the core of this model is the concept of item-level
-[commit graphs](/docs/commit-graph). Each [item](/docs/concepts#item), identified by its
-key, maintains its own independent [commit graph](/docs/commit-graph). This approach
-enables parallel evolution of items and efficient concurrent operations.
-[Access control](/docs/authorization) is implemented at the [item](/docs/concepts#item)
-level through repository-level
-[authorization rules](/docs/authorization/#creating-authorization-rules), striking a
-balance between granularity and [performance](/docs/benchmarks).
+Just as you wouldn't put every document in a single massive file, GoatDB naturally shards data across multiple repositories. Each repository stays small enough to load quickly and sync efficiently. You only open the repositories your application actually needs, just like you only open the files you're working on.
 
-The [repository model](/docs/repositories) presents several technical challenges that
-require careful consideration. Managing repository
-[commit histories](/docs/commit-graph) efficiently is crucial, as is coordinating
-cross-repository [queries](/docs/query). The
-[repository lifecycle](/docs/repositories/#opening-a-repository) must be carefully
-managed, and [authorization rules](/docs/authorization/#creating-authorization-rules)
-need to be designed with performance in mind.
+This approach enables natural scaling that mirrors desktop application behavior. When you need more data capacity, you create more repositories rather than making existing ones larger. Different users can work with different sets of repositories based on their needs. The system maintains speed because data access remains local, while sync happens in the background to keep everything consistent across the network.
 
-## Memory Management
+## System Properties
 
-<MemoryManagement />
+The repository system creates several fundamental properties that distinguish GoatDB from traditional database architectures. These properties work together to deliver the practical benefits outlined above.
 
-GoatDB's memory management approach prioritizes explicit control over automatic
-optimization. This design decision reflects several technical tradeoffs. While
-only active [repositories](/docs/repositories) consume memory, loading a
-[repository](/docs/repositories) requires its full [commit history](/docs/commit-graph).
-This explicit repository management enables
-[predictable performance](/docs/benchmarks) characteristics and allows applications
-to implement custom caching and loading strategies.
+### Works Like Desktop Files, Not Remote Servers
 
-Looking ahead, several technical improvements are under consideration. Lazy
-loading of [commit history](/docs/commit-graph) could reduce initial memory
-requirements, while zero-copy operations
-([see GitHub issue #36](https://github.com/goatplatform/goatdb/issues/36)) could
-minimize memory overhead. Automatic
-[repository lifecycle](/docs/repositories/#opening-a-repository) management
-([see GitHub issue #34](https://github.com/goatplatform/goatdb/issues/34)) with
-configurable policies might provide a balance between control and convenience.
+Opening a repository resembles opening a document—everything loads into memory for instant access. Traditional databases require network round-trips for every query, creating loading states and async complexity throughout applications. GoatDB eliminates this by making data operations synchronous after initial load.
 
-## Local Query Processing
+In practical terms, your React components never need loading states for data that's already loaded. When a user clicks to complete a task, `task.set('done', true)` executes immediately, just like editing text in a document. This synchronous behavior transforms user experience by eliminating the delays and uncertainty that come from remote data access.
 
-<QueryProcessing />
+### Automatic Conflict Resolution Without Coordination
 
-The [query system](/docs/query) in GoatDB implements a deterministic, real-time query
-engine that processes data locally while maintaining consistency across
-distributed peers. At its core, the system treats queries as first-class
-citizens with their own lifecycle and state management.
+Multiple people can edit simultaneously without complex coordination protocols. When users edit the same todo item across different devices, conflict resolution algorithms automatically merge changes at the data level—everyone ends up with the same result without manual intervention.
 
-Each query maintains its own commit history tracking, allowing it to efficiently
-process incremental updates without full recomputation. When new commits arrive,
-queries resume execution from their last known state, only processing the new
-changes. This approach enables real-time updates while maintaining predictable
-performance characteristics.
+Traditional databases require lock coordination, retry logic, or manual conflict resolution. GoatDB combines 3-way merges with proven conflict-free algorithms that guarantee convergence without any coordination overhead. This means collaborative features work naturally without the complexity typically associated with real-time editing.
 
-Queries use plain JavaScript functions for filtering and sorting, making them
-easy to write and understand. To prevent blocking during large dataset scans,
-these functions run in a coroutine that yields control back to the event loop.
-On the client, this ensures smooth UI responsiveness. On the server, it allows
-other requests to be processed while long-running queries execute.
+### Self-Healing Distribution
 
-Queries can be composed by chaining them together, where one query's results
-become the input for another. This composition model enables complex data
-transformations while maintaining efficiency - each query in the chain only
-processes the results of the previous query, and updates only affect the
-necessary parts of the chain.
+Servers crash without consequence because they function as stateless synchronization nodes rather than authoritative data stores. Clients automatically restore missing data to crashed servers, eliminating the backup/restore complexity that burdens traditional systems.
 
-## Storage Model
+This architectural inversion means expensive servers no longer hold all state while fragile clients coordinate access. Instead, abundant client hardware performs the computational work while simple servers relay changes. The stateless nature of the synchronization protocol ensures reliability without operational intervention.
 
-GoatDB's storage model emphasizes simplicity and reliability. Each repository is
-stored as a single file, with the entire database residing in a single
-directory. This design choice enables atomic operations through file-based
-storage, simplifies backup and restore procedures, and provides a
-platform-independent storage format. The direct file access also facilitates
-debugging and troubleshooting.
+### Zero Configuration Operations
+
+Deployment involves running one binary—everything works without load balancers, database setup, or infrastructure coordination. The same code runs identically across browsers, servers, and mobile environments.
+
+Because databases are just files on disk, traditional operational complexity disappears entirely. GoatDB eliminates many DevOps overheads by treating databases as simple files that can be backed up live with a simple zip command and deployed anywhere without configuration.
 
 ## Synchronization Protocol
 
-<SyncProtocol />
+These system properties depend on a stateless synchronization protocol that handles distributed coordination automatically.
 
-The [synchronization protocol](/docs/sync) implements a stateless, delta-compressed
-approach to data exchange. This design enables efficient transmission of changes
-without requiring persistent sync state. The protocol is transport-independent,
-working over any communication channel, and includes automatic handling of
-concurrent modifications.
+### Stateless Peer-to-Peer Coordination
 
-The protocol's design naturally enables peer-to-peer data recovery through its
-distributed nature. Each peer maintains a complete copy of the data, and the
-synchronization mechanism automatically handles data verification and recovery
-when peers reconnect. This approach provides built-in redundancy without
-requiring a separate recovery system. Cryptographic verification ensures data
-integrity during both synchronization and recovery operations.
+Every device in the network can sync with any other device without requiring centralized coordination. When you edit data on your laptop, those changes propagate to your phone, your server, and your colleagues' devices through peer communication.
 
-## Garbage Collection
+Servers play a dual role in this architecture. By default, they act as relays for clients to enable quality of service and reliable connectivity. However, clients may optionally choose to sync directly with each other, moving data truly end-to-end so the server never sees it. Servers also enforce permissions by owning cryptographic root keys that validate user authentication and control access to system data.
 
-<GarbageCollection />
+<SyncProtocolV2 />
 
-GoatDB's garbage collection system (currently in design phase) uses a time-based
-approach to managing commit history. It takes advantage of the system's
-time-based nature. Commits older than the maximum session expiration time can be
-safely discarded without compromising offline capabilities, creating a natural
-boundary for garbage collection.
+### Efficient Data Discovery
 
-The system faces an interesting technical challenge: how to safely remove full
-snapshot commits while maintaining the integrity of
-[delta-compressed](/docs/commit-graph/#delta-compression) commits that depend on
-them. This requires careful coordination between garbage collection and delta
-compression to ensure atomic removal of full snapshots and their dependent
-commits. The solution lies in treating the commit graph as a unit of garbage
-collection, where entire branches of expired commits can be removed together.
+Rather than comparing full inventories, devices exchange compact summaries to identify missing data. This mathematical approach minimizes bandwidth usage while guaranteeing that all devices eventually converge to the same state.
 
-## Technical Tradeoffs and Future Directions
+The sync process happens through four automatic steps: peers discover what each other has, identify gaps in their data, transfer only missing commits, and integrate changes into local queries. Your application code never needs to coordinate this process—it happens transparently in the background.
 
-GoatDB's architecture makes several deliberate technical tradeoffs. The system
-prioritizes core functionality over complex features, favoring explicit control
-over automatic optimization. It ensures consistency at the cost of some
-performance overhead, reflecting a design philosophy that values reliability and
-predictability.
+### Automatic Failure Recovery  
 
-Future technical exploration will focus on:
+Crashed servers restart without data loss because clients automatically restore missing commits during the next sync cycle. Network partitions heal seamlessly when connectivity returns. The stateless nature of the protocol means each sync cycle can recover from any previous failures without manual intervention.
 
-- Large scale backend deployment and benchmarks to validate performance
-  characteristics and scalability in production environments
-- Application-provided merge strategy to enable custom conflict resolution logic
-  tailored to specific use cases
-- Server-side sharding to support horizontal scaling of large datasets across
-  multiple nodes
-- Database integrations leveraging GoatDB's version control capabilities to
-  efficiently synchronize and maintain consistency with external databases
+This approach eliminates traditional operational overhead. There are no backup procedures, no manual intervention during outages, and no environment-specific configuration. Mathematical guarantees replace operational complexity, making the system self-managing in most failure scenarios.
 
-These areas represent opportunities to enhance the system's capabilities while
-maintaining its core design principles.
+### Background Integration
+
+User interactions remain synchronous while sync happens invisibly in the background. When new commits arrive from other devices, queries recompute incrementally and React components update automatically without loading states or cache invalidation logic.
+
+Traditional real-time systems require WebSockets, message queues, and complex state management to coordinate changes across clients. GoatDB's sync layer works transparently—your application code doesn't need to handle network coordination or real-time updates explicitly.
+
+## When This Architecture Fits
+
+Understanding when GoatDB's architecture provides the most value helps determine if it matches your application's needs and constraints.
+
+### Collaborative and Real-Time Applications
+
+Building applications where users work together or need instant updates traditionally requires WebSocket infrastructure, complex state synchronization, and manual conflict resolution. GoatDB provides automatic real-time collaboration with offline capability built directly into the architecture.
+
+This approach works particularly well for document editors, project management tools, design platforms, and team dashboards where multiple users edit simultaneously and expect immediate responsiveness without the complexity of traditional real-time systems.
+
+### Distributed Systems Without Operational Overhead
+
+Applications requiring multi-region deployments or backend services typically struggle with replication logic, disaster recovery planning, and environment-specific configuration. GoatDB's single-binary deployment works identically everywhere with mathematical sync guarantees.
+
+This architecture excels for SaaS platforms serving global users, microservices sharing data across regions, and applications requiring ultra-cheap single-tenant deployments for enterprise customers or compliance requirements.
+
+### Mobile and Offline-First Applications
+
+Creating applications that work seamlessly offline and online traditionally involves complex synchronization logic, loading states, and poor offline experiences. GoatDB provides desktop-class responsiveness with background sync that requires no additional application logic.
+
+This approach works exceptionally well for productivity apps, note-taking tools, field service applications, and IoT device fleets where connectivity is intermittent and local-first operation is essential for user experience.
+
+### Rapid Development and Testing
+
+Teams wanting to focus on application logic without database infrastructure overhead can benefit from GoatDB's eliminated setup complexity. Traditional full-stack development requires database setup, migration management, and deployment coordination that slows iteration cycles.
+
+This architecture works best with human-scale datasets per instance, applications where eventual consistency is acceptable, and teams that value development velocity and operational simplicity over infinite horizontal scale.
+
+## Design Philosophy
+
+This architecture emerges from recognizing that modern hardware has fundamentally inverted traditional database assumptions. Client devices now contain the majority of available computing power, while servers have become the expensive, constrained resource.
+
+By moving data to where compute is abundant and treating servers as simple coordination nodes, GoatDB achieves both superior performance and dramatically reduced complexity. This architectural shift enables a new class of applications: truly offline-first collaborative tools, mobile apps with desktop-class responsiveness, and distributed systems that deploy as easily as desktop applications.
+
+The result represents a fundamental shift from complex coordinated systems to simple mathematical guarantees, from operational overhead to single-binary deployment, and from eventual consistency as a compromise to eventual consistency as an architectural strength.
