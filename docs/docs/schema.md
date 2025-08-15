@@ -11,6 +11,8 @@ Schemas in GoatDB solve three critical problems for distributed applications: **
 
 ## Quick Start
 
+Import the [DataRegistry](/docs/api/classes/dataregistry) and define your schema:
+
 ```typescript
 import { DataRegistry } from '@goatdb/goatdb';
 
@@ -52,7 +54,7 @@ task.set('completed', 'yes'); // ❌ TypeScript error
 
 ### Schemas Are Conflict Resolution Strategies
 
-When two users edit the same document simultaneously, GoatDB automatically resolves conflicts based on your schema's field types:
+When two users edit the same [document](/docs/concepts#item) simultaneously, GoatDB automatically resolves conflicts based on your schema's [field types](/docs/api/types/fielddef):
 
 ```typescript
 // User A adds a tag while User B adds a different tag
@@ -126,6 +128,8 @@ Registration serves three purposes:
 
 ### Basic Structure
 
+Each [schema](/docs/api/types/schema) requires a namespace, version, and [field definitions](/docs/api/types/schemafieldsdef):
+
 ```typescript
 export const kSchemaMessage = {
   ns: 'message',      // Namespace - groups related items
@@ -152,7 +156,7 @@ type MessageType = typeof kSchemaMessage;
 
 ### Field Configuration
 
-Each field accepts these options:
+Each [field definition](/docs/api/types/fielddef) accepts these options:
 
 ```typescript
 {
@@ -200,7 +204,7 @@ const kSchemaProject = {
 
 ## Conflict Resolution Deep Dive
 
-Understanding how different field types resolve conflicts is crucial for designing robust schemas.
+Understanding how different [field types](/docs/api/types/schemadatatype) resolve conflicts is crucial for designing robust schemas.
 
 ### Primitive Types (string, number, boolean, date)
 
@@ -217,7 +221,7 @@ userB.set('title', 'Title B');  // timestamp: 150ms
 // Result: 'Title B' (latest timestamp wins)
 ```
 
-**Use when**: Fields that represent single values where conflicts are rare or latest value is preferred.
+**Use when**: Fields that represent single values where [conflicts](/docs/conflict-resolution) are rare or latest value is preferred.
 
 ### Sets
 
@@ -634,7 +638,7 @@ const document = {
 - **References**: `ref` nodes for internal links and external references
 - **Media**: `img` nodes with `src`, `object` nodes for embedded content
 
-**Working with RichText**: Uses standard GoatDB item API:
+**Working with RichText**: Uses standard GoatDB [item API](/docs/api/classes/manageditem):
 
 ```typescript
 import { initRichText, plaintextToTree } from '@goatdb/goatdb/cfds/richtext/tree';
@@ -665,4 +669,4 @@ doc.set('content', richTextFromPlain);
 
 **Conflict Resolution**: Tree-based intelligent merging  
 **Use Cases**: Documents, comments, collaborative content  
-**API**: Uses standard `item.set()` and `item.get()` - no special RichText methods
+**API**: Uses standard [item.set()](/docs/api/classes/manageditem#set) and [item.get()](/docs/api/classes/manageditem#get) - no special RichText methods
