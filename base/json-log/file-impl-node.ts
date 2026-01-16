@@ -1,7 +1,7 @@
-import * as path from '@std/path';
+import * as path from '../path.ts';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
-import type { FileImpl } from './file-impl-interface.ts';
+import type { DirEntry, FileImpl } from './file-impl-interface.ts';
 
 interface NodeFsFile {
   file: fs.FileHandle;
@@ -97,7 +97,7 @@ export const FileImplNode: FileImpl<NodeFsFile> = {
   },
 
   getCWD() {
-    return '/';
+    return process.cwd();
   },
 
   getTempDir() {
@@ -107,5 +107,27 @@ export const FileImplNode: FileImpl<NodeFsFile> = {
   async mkdir(path: string) {
     await fs.mkdir(path, { recursive: true });
     return true;
+  },
+
+  async exists(path: string): Promise<boolean> {
+    try {
+      await fs.lstat(path);
+      return true;
+    } catch (_: unknown) {
+      return false;
+    }
+  },
+
+  async copyFile(srcPath: string, destPath: string): Promise<void> {
+    await fs.copyFile(srcPath, destPath);
+  },
+
+  async readDir(dirPath: string): Promise<DirEntry[]> {
+    const dirents = await fs.readdir(dirPath, { withFileTypes: true });
+    return dirents.map((d) => ({
+      name: d.name,
+      isFile: d.isFile(),
+      isDirectory: d.isDirectory(),
+    }));
   },
 };

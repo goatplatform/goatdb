@@ -1,5 +1,5 @@
-import * as path from '@std/path';
-import type { FileImpl } from './file-impl-interface.ts';
+import * as path from '../path.ts';
+import type { DirEntry, FileImpl } from './file-impl-interface.ts';
 import { retry, TryAgain } from '../time.ts';
 
 interface FileSystemSyncAccessHandle {
@@ -27,6 +27,26 @@ async function getDir(dirPath: string): Promise<FileSystemDirectoryHandle> {
       continue;
     }
     parent = await parent.getDirectoryHandle(c, { create: true });
+  }
+  return parent;
+}
+
+async function getDirReadOnly(
+  dirPath: string,
+): Promise<FileSystemDirectoryHandle | null> {
+  const root = await navigator.storage.getDirectory();
+  dirPath = path.normalize(dirPath);
+  const comps = dirPath.split('/');
+  let parent = root;
+  for (const c of comps) {
+    if (c.length === 0) {
+      continue;
+    }
+    try {
+      parent = await parent.getDirectoryHandle(c);
+    } catch {
+      return null;
+    }
   }
   return parent;
 }
@@ -164,5 +184,65 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
   async mkdir(path: string) {
     await getDir(path);
     return true;
+  },
+
+  async exists(filePath: string): Promise<boolean> {
+    try {
+      const dir = await getDirReadOnly(path.dirname(filePath));
+      if (!dir) {
+        return false;
+      }
+      const filename = path.basename(filePath);
+      // Try file first, then directory
+      try {
+        await dir.getFileHandle(filename);
+      } catch {
+        await dir.getDirectoryHandle(filename);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async copyFile(srcPath: string, destPath: string): Promise<void> {
+    const MAX_COPY_SIZE = 50 * 1024 * 1024; // 50MB
+    const srcHandle = await FileImplOPFS.open(srcPath, false);
+    try {
+      const size = srcHandle.file.getSize();
+      if (size > MAX_COPY_SIZE) {
+        throw new Error(
+          `File too large for browser copy: ${size} bytes (max ${MAX_COPY_SIZE})`
+        );
+      }
+      const buffer = new Uint8Array(size);
+      await FileImplOPFS.read(srcHandle, buffer);
+
+      const destHandle = await FileImplOPFS.open(destPath, true);
+      try {
+        await FileImplOPFS.write(destHandle, buffer);
+        await FileImplOPFS.truncate(destHandle, size);
+      } finally {
+        await FileImplOPFS.close(destHandle);
+      }
+    } finally {
+      await FileImplOPFS.close(srcHandle);
+    }
+  },
+
+  async readDir(dirPath: string): Promise<DirEntry[]> {
+    const dir = await getDirReadOnly(dirPath);
+    if (!dir) {
+      throw new Error(`ENOENT: no such file or directory, scandir '${dirPath}'`);
+    }
+    const entries: DirEntry[] = [];
+    for await (const [name, handle] of dir.entries()) {
+      entries.push({
+        name,
+        isFile: handle.kind === 'file',
+        isDirectory: handle.kind === 'directory',
+      });
+    }
+    return entries;
   },
 };

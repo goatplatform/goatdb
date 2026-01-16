@@ -17,11 +17,11 @@
  * platforms while isolating platform-specific filesystem code into separate
  * modules.
  */
-import { isBrowser, isDeno } from '../common.ts';
-// import { FileImplDeno } from './file-impl-deno.ts';
-import type { FileImpl } from './file-impl-interface.ts';
-// import { FileImplNode } from './file-impl-node.ts';
-// import { FileImplOPFS } from './file-impl-opfs.ts';
+import { getRuntime } from '../runtime/index.ts';
+import * as path from '../path.ts';
+import type { DirEntry, FileImpl } from './file-impl-interface.ts';
+
+export type { DirEntry } from './file-impl-interface.ts';
 
 let gFileImpl: FileImpl<unknown> | undefined;
 
@@ -29,22 +29,17 @@ let gFileImpl: FileImpl<unknown> | undefined;
  * Returns the appropriate FileImpl implementation for the current runtime
  * environment.
  *
- * In Deno, returns FileImplDeno which uses Deno.FsFile.
- * In web browsers, returns FileImplOPFS which uses the Origin Private File
- * System API.
+ * Uses the RuntimeAdapter registry to select the correct implementation:
+ * - Deno: FileImplDeno using Deno.FsFile
+ * - Node.js: FileImplNode using fs.promises.FileHandle
+ * - Browser: FileImplOPFS using Origin Private File System API
  *
  * @returns FileImpl<unknown> The filesystem implementation for the current
  *                            runtime
  */
 export async function FileImplGet(): Promise<FileImpl<unknown>> {
   if (gFileImpl === undefined) {
-    if (isBrowser()) {
-      gFileImpl = (await import('./file-impl-opfs.ts')).FileImplOPFS;
-    } else if (isDeno()) {
-      gFileImpl = (await import('./file-impl-deno.ts')).FileImplDeno;
-    } else {
-      gFileImpl = (await import('./file-impl-node.ts')).FileImplNode;
-    }
+    gFileImpl = await getRuntime().createFileImpl();
   }
   return gFileImpl;
 }
@@ -126,5 +121,122 @@ export async function writeTextFile(
     return true;
   } catch (_: unknown) {
     return false;
+  }
+}
+
+/**
+ * Checks if a file or directory exists at the specified path.
+ *
+ * @param path The path to check
+ * @returns Promise<boolean> True if the path exists, false otherwise
+ */
+export async function pathExists(path: string): Promise<boolean> {
+  const impl = await FileImplGet();
+  return impl.exists(path);
+}
+
+/**
+ * Copies a file from source to destination path.
+ *
+ * @param srcPath The source file path
+ * @param destPath The destination file path
+ * @returns Promise<void> Resolves when the copy is complete
+ * @throws Will throw an error if the source file doesn't exist or copy fails
+ */
+export async function copyFile(srcPath: string, destPath: string): Promise<void> {
+  const impl = await FileImplGet();
+  await impl.copyFile(srcPath, destPath);
+}
+
+/**
+ * Creates a directory at the specified path.
+ * This operation is always recursive.
+ *
+ * @param path The path where to create the directory
+ * @returns Promise<boolean> True if the directory was created, false otherwise
+ */
+export async function mkdir(path: string): Promise<boolean> {
+  const impl = await FileImplGet();
+  return impl.mkdir(path);
+}
+
+/**
+ * Gets the current working directory.
+ *
+ * @returns The current working directory path
+ */
+export async function getCWD(): Promise<string> {
+  const impl = await FileImplGet();
+  return impl.getCWD();
+}
+
+/**
+ * Reads the contents of a directory.
+ *
+ * @param dirPath The path to the directory
+ * @returns Promise<DirEntry[]> Array of directory entries
+ */
+export async function readDir(dirPath: string): Promise<DirEntry[]> {
+  const impl = await FileImplGet();
+  return impl.readDir(dirPath);
+}
+
+/**
+ * Options for walkDir.
+ */
+export interface WalkOptions {
+  /** Include directories in the output (default: false) */
+  includeDirs?: boolean;
+  /** Maximum depth to recurse (undefined = unlimited) */
+  maxDepth?: number;
+}
+
+/**
+ * Recursively walks a directory tree and yields file paths.
+ *
+ * @param dir The directory to walk
+ * @param options Walk options
+ * @yields Absolute file paths
+ */
+export async function* walkDir(
+  dir: string,
+  options?: WalkOptions,
+): AsyncGenerator<string> {
+  const impl = await FileImplGet();
+  yield* walkDirImpl(
+    impl,
+    dir,
+    options?.includeDirs ?? false,
+    options?.maxDepth,
+    0,
+  );
+}
+
+async function* walkDirImpl(
+  impl: FileImpl<unknown>,
+  dir: string,
+  includeDirs: boolean,
+  maxDepth: number | undefined,
+  currentDepth: number,
+): AsyncGenerator<string> {
+  const entries = await impl.readDir(dir);
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory) {
+      if (includeDirs) {
+        yield fullPath;
+      }
+      if (maxDepth === undefined || currentDepth < maxDepth) {
+        yield* walkDirImpl(
+          impl,
+          fullPath,
+          includeDirs,
+          maxDepth,
+          currentDepth + 1,
+        );
+      }
+    } else if (entry.isFile) {
+      yield fullPath;
+    }
   }
 }

@@ -7,6 +7,18 @@
 export type SeekFrom = 'current' | 'start' | 'end';
 
 /**
+ * Represents a directory entry returned by readDir.
+ */
+export interface DirEntry {
+  /** The name of the file or directory (not the full path) */
+  name: string;
+  /** True if this entry is a file */
+  isFile: boolean;
+  /** True if this entry is a directory */
+  isDirectory: boolean;
+}
+
+/**
  * FileImpl is an abstract interface that maps to the underlying environment's
  * file system API. It provides a unified way to interact with files across
  * different JavaScript runtimes (Deno, browsers, Node.js, etc.) by abstracting
@@ -102,4 +114,33 @@ export interface FileImpl<T> {
    *          false otherwise
    */
   mkdir(path: string): Promise<boolean>;
+
+  /**
+   * Checks if a file or directory exists at the specified path.
+   *
+   * @param path The path to check
+   * @returns A promise that resolves to true if the path exists, false otherwise
+   */
+  exists(path: string): Promise<boolean>;
+
+  /**
+   * Copies a file from source to destination path.
+   *
+   * @param srcPath The source file path
+   * @param destPath The destination file path
+   * @returns A promise that resolves when the copy is complete
+   * @throws Will throw an error if the source file doesn't exist or copy fails
+   * @throws In browser environments, files larger than 50MB cannot be copied
+   *         due to memory constraints.
+   */
+  copyFile(srcPath: string, destPath: string): Promise<void>;
+
+  /**
+   * Reads the contents of a directory.
+   *
+   * @param path The path to the directory
+   * @returns A promise that resolves to an array of directory entries
+   * @throws Will throw an error if the directory doesn't exist or cannot be read
+   */
+  readDir(path: string): Promise<DirEntry[]>;
 }

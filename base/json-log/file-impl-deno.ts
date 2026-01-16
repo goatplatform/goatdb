@@ -1,5 +1,5 @@
-import * as path from '@std/path';
-import type { FileImpl } from './file-impl-interface.ts';
+import * as path from '../path.ts';
+import type { DirEntry, FileImpl } from './file-impl-interface.ts';
 
 export const FileImplDeno: FileImpl<Deno.FsFile> = {
   async open(filePath, write) {
@@ -80,5 +80,30 @@ export const FileImplDeno: FileImpl<Deno.FsFile> = {
     } catch (_: unknown) {
       return false;
     }
+  },
+
+  async exists(path: string): Promise<boolean> {
+    try {
+      await Deno.lstat(path);
+      return true;
+    } catch (_: unknown) {
+      return false;
+    }
+  },
+
+  async copyFile(srcPath: string, destPath: string): Promise<void> {
+    await Deno.copyFile(srcPath, destPath);
+  },
+
+  async readDir(dirPath: string): Promise<DirEntry[]> {
+    const entries: DirEntry[] = [];
+    for await (const entry of Deno.readDir(dirPath)) {
+      entries.push({
+        name: entry.name,
+        isFile: entry.isFile,
+        isDirectory: entry.isDirectory,
+      });
+    }
+    return entries;
   },
 };
