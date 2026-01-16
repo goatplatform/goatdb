@@ -4,13 +4,12 @@
  */
 
 import { GoatDB } from '../db/db.ts';
-import { isBrowser, isDeno, isNode } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
 import { sleep } from '../base/time.ts';
 import type { DBInstanceConfig } from '../db/db.ts';
-import * as path from '@std/path';
+import * as path from '../base/path.ts';
 import type { Schema } from '../cfds/base/schema.ts';
-import { notReached } from '../base/error.ts';
 
 /**
  * Result structure for both tests and benchmarks
@@ -206,7 +205,8 @@ export class Suite {
   }
 
   /**
-   * Cleans up any resources used by the suite
+   * Cleans up any resources used by the suite.
+   * Uses RuntimeTestConfig.cleanupDelayMs for platform-specific delays.
    */
   async cleanup() {
     // Close all open DBs first
@@ -215,9 +215,10 @@ export class Suite {
     }
     this._dbs.clear();
 
-    // In browser environment, add small delay to ensure OPFS handles are released
-    if (isBrowser()) {
-      await sleep(10);
+    // Use RuntimeTestConfig for cleanup delay (OPFS needs ~10ms for handle release)
+    const cleanupDelayMs = getRuntime().testConfig.cleanupDelayMs;
+    if (cleanupDelayMs > 0) {
+      await sleep(cleanupDelayMs);
     }
 
     if (this._tempDir) {
@@ -251,6 +252,7 @@ export class Suite {
 
   /**
    * Creates a GoatDB instance configured for the current test environment.
+   * Uses RuntimeTestConfig.dbDefaults for platform-specific defaults.
    *
    * @param testId - Unique identifier for this test database within the suite
    * @param config - Additional configuration to merge with environment defaults
@@ -260,36 +262,29 @@ export class Suite {
     testId: string,
     config: Partial<DBInstanceConfig> = {},
   ): Promise<GoatDB<S>> {
+    const runtime = getRuntime();
+
     // If there's already a DB with this testId, close it first
     const existingDb = this._dbs.get(testId);
     if (existingDb) {
       await existingDb.close();
       this._dbs.delete(testId);
-      // Small delay in browser to ensure OPFS handles are released
-      if (isBrowser()) {
-        await sleep(10);
+      // Use RuntimeTestConfig for cleanup delay
+      const cleanupDelayMs = runtime.testConfig.cleanupDelayMs;
+      if (cleanupDelayMs > 0) {
+        await sleep(cleanupDelayMs);
       }
     }
 
     // Use same tempDir mechanism for both environments
     const tempPath = await this.tempDir(testId);
 
-    let db: GoatDB<S>;
-    if (isBrowser()) {
-      // Browser: Standalone trusted mode for benchmarking
-      db = new GoatDB<S>({
-        path: tempPath,
-        trusted: true,
-        ...config,
-      });
-    } else {
-      // Server: Standalone mode with file system path
-      db = new GoatDB<S>({
-        path: tempPath,
-        trusted: true,
-        ...config,
-      });
-    }
+    // Create DB with RuntimeTestConfig defaults
+    const db = new GoatDB<S>({
+      path: tempPath,
+      ...runtime.testConfig.dbDefaults,
+      ...config,
+    });
 
     // Ensure DB is ready before returning
     try {
@@ -414,19 +409,10 @@ export function getDefaultBenchmarkConfig(name: string): BenchmarkConfig {
 
 /**
  * Detects the current JavaScript runtime environment.
+ * Uses the RuntimeAdapter registry for detection.
  *
  * @returns {'deno' | 'node' | 'browser'} - The detected runtime.
- * @throws If the runtime cannot be determined
  */
-export function getRuntime(): 'deno' | 'node' | 'browser' {
-  if (isBrowser()) {
-    return 'browser';
-  }
-  if (isDeno()) {
-    return 'deno';
-  }
-  if (isNode()) {
-    return 'node';
-  }
-  notReached('Unknown runtime');
+export function getRuntimeId(): 'deno' | 'node' | 'browser' {
+  return getRuntime().id as 'deno' | 'node' | 'browser';
 }

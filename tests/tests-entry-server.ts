@@ -21,20 +21,8 @@
  */
 
 import { TestsRunner, type TestSummary } from './mod.ts';
-import setupUntrusted from './db-untrusted.test.ts';
-import setupTrusted from './db-trusted.test.ts';
-import setupItemPath from './item-path.ts';
-import setupOrderstamp from './orderstamp-expose.test.ts';
-import setupGoatRequestTest from './goat-request.test.ts';
-import setupSession from './session.test.ts';
-import setupCommit from './commit.test.ts';
-import setupServerArchitectureTest from './server-architecture.test.ts';
+import { registerAllTests } from './test-registry.ts';
 import { exit } from '../base/process.ts';
-import setupStaticAssetsEndpointTest from './static-assets-endpoint.test.ts';
-import setupHealthCheckEndpointTest from './health-check-endpoint.test.ts';
-import setupMinimalSync from './minimal-client-server-sync.test.ts';
-import setupE2ELatency from './e2e-latency.test.ts';
-import setupClusterLatency from './cluster-latency.test.ts';
 import { getEnvVar } from '../base/os.ts';
 import { isBrowser } from '../base/common.ts';
 import { assert } from '../base/error.ts';
@@ -67,32 +55,8 @@ import { assert } from '../base/error.ts';
  * ```
  */
 async function main(): Promise<void> {
-  // Test execution order optimized for developer feedback speed:
-  // Run fast tests first so developers get immediate pass/fail results,
-  // then progressively run slower tests. This follows the test pyramid principle.
-
-  // FAST UNIT TESTS (0-1ms each) - Pure logic, no I/O
-  setupOrderstamp(); // Utility functions for distributed timestamps
-  setupItemPath(); // Path validation and parsing logic
-  setupHealthCheckEndpointTest(); // Simple HTTP endpoint check
-
-  // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
-  setupCommit(); // Core commit/versioning logic
-  setupSession(); // Authentication and session management
-  setupGoatRequestTest(); // HTTP request processing
-
-  // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
-  setupTrusted(); // Database operations in trusted mode
-  setupUntrusted(); // Database operations in untrusted mode
-  await setupServerArchitectureTest(); // Server initialization and configuration
-  setupStaticAssetsEndpointTest(); // File serving and asset management
-
-  // SYNC INTEGRATION TESTS (1-2s each) - Network operations, client-server
-  setupMinimalSync(); // Basic client-server synchronization
-
-  // HEAVY END-TO-END TESTS (10-30s each) - Full system, network latency, multi-node
-  setupE2ELatency(); // Client-to-client sync latency measurement
-  setupClusterLatency(); // Multi-server cluster sync performance
+  // Register all tests (order optimized for fast feedback in test-registry.ts)
+  await registerAllTests();
 
   // Get test configuration from environment
   const suiteName = getEnvVar('GOATDB_SUITE');

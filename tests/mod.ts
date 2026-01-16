@@ -16,14 +16,14 @@
  * in the same process, making it easier to debug and ensuring consistent
  * state between tests while maintaining high performance.
  */
-import * as path from '@std/path';
+import * as path from '../base/path.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
 import { isBrowser } from '../base/common.ts';
 import { GoatDB } from '../db/db.ts';
 import type { DBInstanceConfig } from '../db/db.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
-import { ProgressBar } from '../shared/progress.ts';
+import { ProgressManager, type TaskId } from '../shared/progress.ts';
 import { Emitter } from '../base/emitter.ts';
 
 /**
@@ -92,6 +92,14 @@ export class TestSuite {
   }
 
   /**
+   * Returns all registered tests in this suite.
+   * @returns A read-only map of test names to test functions
+   */
+  getTests(): ReadonlyMap<string, TestFunc> {
+    return this._tests;
+  }
+
+  /**
    * Runs all test cases in the suite sequentially.
    * Logs the results and timing for each test.
    * Cleans up temporary directory after all tests complete.
@@ -112,7 +120,6 @@ export class TestSuite {
           duration: performance.now() - start,
         });
       } catch (error) {
-        formatError(error);
         results.push({
           suiteName: this.name,
           testName: name,
@@ -125,11 +132,21 @@ export class TestSuite {
       }
     }
 
-    if (this._tempDir) {
-      await (await FileImplGet()).remove(this._tempDir);
-    }
+    await this.cleanup();
 
     return results;
+  }
+
+  /**
+   * Cleans up temporary resources for this suite.
+   * Called automatically by TestSuite.run(), but must be called manually
+   * when tests are executed directly (e.g., worker runner).
+   */
+  async cleanup(): Promise<void> {
+    if (this._tempDir) {
+      await (await FileImplGet()).remove(this._tempDir);
+      this._tempDir = undefined;
+    }
   }
 
   /**
@@ -222,8 +239,45 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
   }
 
   /**
+   * Returns all registered test suites.
+   * @returns A read-only map of suite names to suite instances
+   */
+  getSuites(): ReadonlyMap<string, TestSuite> {
+    return this._suites;
+  }
+
+  /**
+   * Counts tests matching optional filters.
+   * @param suiteName - Optional suite name to filter by
+   * @param testName - Optional test name to filter by
+   * @returns Object with suiteCount and testCount
+   */
+  getTestCount(
+    suiteName?: string,
+    testName?: string,
+  ): { suiteCount: number; testCount: number } {
+    let suiteCount = 0;
+    let testCount = 0;
+    for (const [name, suite] of this._suites.entries()) {
+      if (suiteName && name !== suiteName) continue;
+      const tests = suite.getTests();
+      if (testName) {
+        if (tests.has(testName)) {
+          suiteCount++;
+          testCount++;
+        }
+      } else {
+        suiteCount++;
+        testCount += tests.size;
+      }
+    }
+    return { suiteCount, testCount };
+  }
+
+  /**
    * Runs test suites and their tests.
    * Can run all suites, a specific suite, or a specific test within a suite.
+   * Uses hierarchical progress tracking with ProgressManager.
    * @param suiteName - Optional name of suite to run
    * @param testName - Optional name of specific test to run
    * @returns Test execution summary
@@ -232,19 +286,29 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
     const allResults: TestResult[] = [];
     const runStart = performance.now();
 
-    // Calculate total tests for progress bar
+    // Calculate total tests and suite count for progress
     let totalTests = 0;
+    let suiteCount = 0;
     for (const [name, suite] of this._suites.entries()) {
       if (suiteName && name !== suiteName) continue;
       if (testName) {
-        totalTests += suite['_tests'].has(testName) ? 1 : 0;
+        if (suite['_tests'].has(testName)) {
+          totalTests += 1;
+          suiteCount++;
+        }
       } else {
         totalTests += suite['_tests'].size;
+        suiteCount++;
       }
     }
 
-    const progress = new ProgressBar(totalTests);
+    const pm = new ProgressManager();
     let currentTest = 0;
+    let completedSuites = 0;
+
+    // Create root task for overall progress
+    const rootId = pm.create('Running Tests', suiteCount);
+    pm.update(rootId, 0);
 
     for (const [name, suite] of this._suites.entries()) {
       if (suiteName && name !== suiteName) continue;
@@ -254,13 +318,16 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
         const test = suite['_tests'].get(testName);
         if (test) {
           currentTest++;
-          progress.update(currentTest - 1, '', `${suite.name}/${testName}`);
+          // Create suite task as child of root
+          const suiteId = pm.create(suite.name, 1, rootId);
+          const testId = pm.create(testName, 1, suiteId);
+          pm.update(testId, 0, 'starting');
           this.emit('testStart', { suite: suite.name, name: testName, current: currentTest, total: totalTests });
-          
+
           const start = performance.now();
           try {
             await test(suite);
-            progress.update(currentTest, '');
+            pm.complete(testId, 'done');
             const result = {
               suiteName: suite.name,
               testName,
@@ -270,8 +337,7 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
             allResults.push(result);
             this.emit('testComplete', result);
           } catch (error) {
-            progress.update(currentTest, '');
-            formatError(error);
+            pm.complete(testId, 'failed');
             const result = {
               suiteName: suite.name,
               testName,
@@ -284,56 +350,64 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
             allResults.push(result);
             this.emit('testComplete', result);
           }
-        } else {
-          console.log(`Test '${testName}' not found in suite '${suite.name}'.`);
+          pm.complete(suiteId);
+          completedSuites++;
+          pm.update(rootId, completedSuites);
         }
-        if (suite['_tempDir']) {
-          await (await FileImplGet()).remove(suite['_tempDir']);
-        }
-        // Clear progress bar after single test completion
-        progress.clear();
+        await suite.cleanup();
       } else {
-        const results = await this.runSuiteWithProgress(suite, progress, currentTest, totalTests);
+        const results = await this.runSuiteWithProgress(suite, pm, currentTest, totalTests, rootId);
         allResults.push(...results);
         currentTest += results.length;
+        completedSuites++;
+        pm.update(rootId, completedSuites);
       }
     }
 
-    progress.finish();
-    
+    pm.complete(rootId);
+    pm.finish();
+
     const totalDuration = performance.now() - runStart;
     const summary = this.createSummary(allResults, totalDuration);
 
     return summary;
   }
-  
+
   /**
-   * Runs a test suite with progress tracking.
+   * Runs a test suite with hierarchical progress tracking.
    * @param suite - The test suite to run
-   * @param progress - The progress bar to update
+   * @param pm - The progress manager to update
    * @param startingTest - Current test number before running this suite
    * @param totalTests - Total number of tests
+   * @param parentId - Optional parent task ID for hierarchy
    * @returns Array of test results
    */
   private async runSuiteWithProgress(
-    suite: TestSuite, 
-    progress: ProgressBar, 
+    suite: TestSuite,
+    pm: ProgressManager,
     startingTest: number,
-    totalTests: number
+    totalTests: number,
+    parentId?: TaskId
   ): Promise<TestResult[]> {
-    // Suite name will be shown in progress bar title
     const results: TestResult[] = [];
     let currentTest = startingTest;
 
+    // Create suite-level task as child of parent (or root)
+    const testCount = suite['_tests'].size;
+    const suiteId = pm.create(suite.name, testCount, parentId);
+
     for (const [name, test] of suite['_tests'].entries()) {
       currentTest++;
-      progress.update(currentTest - 1, '', `${suite.name}/${name}`);
+
+      // Create test task as child of suite
+      const testId = pm.create(name, 1, suiteId);
+      pm.update(testId, 0, 'starting');
       this.emit('testStart', { suite: suite.name, name, current: currentTest, total: totalTests });
-      
+
       const start = performance.now();
       try {
         await test(suite);
-        progress.update(currentTest, '');
+        pm.complete(testId, 'done');
         const result = {
           suiteName: suite.name,
           testName: name,
@@ -343,8 +417,7 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
         results.push(result);
         this.emit('testComplete', result);
       } catch (error) {
-        progress.update(currentTest, '');
-        formatError(error);
+        pm.complete(testId, 'failed');
         const result = {
           suiteName: suite.name,
           testName: name,
@@ -359,12 +432,10 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
       }
     }
 
-    if (suite['_tempDir']) {
-      await (await FileImplGet()).remove(suite['_tempDir']);
-    }
+    // Complete the suite
+    pm.complete(suiteId);
 
-    // Clear progress bar after suite completion
-    progress.clear();
+    await suite.cleanup();
 
     return results;
   }
@@ -414,30 +485,19 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
         );
         if (result.error) {
           console.log(`   ${result.error.name}: ${result.error.message}`);
+          if (result.error.stack) {
+            const stackLines = result.error.stack.split('\n').slice(1);
+            for (const line of stackLines) {
+              console.log(`   ${line}`);
+            }
+          }
+          console.log();
         }
       }
     }
     console.log(`Duration: ${(summary.duration / 1000).toFixed(2)}s`);
     console.log();
   }
-}
-
-/**
- * Formats and displays an error with full stack trace.
- * @param error - The error to format
- */
-function formatError(error: unknown) {
-  if (error instanceof Error) {
-    console.log(`   ${error.name}: ${error.message}`);
-    if (error.stack) {
-      console.log(error.stack);
-    }
-  } else if (error) {
-    console.log(`   Error: ${String(error)}`);
-  } else {
-    console.log(`   Error: Unknown error`);
-  }
-  console.log(); // Empty line for readability
 }
 
 /**

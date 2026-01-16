@@ -23,6 +23,76 @@ export interface BrowserRunOptions {
 }
 
 /**
+ * Waits for a specific message in process stdout.
+ * Forwards all output to console while waiting, then continues forwarding in background.
+ */
+async function waitForProcessOutput(
+  stdout: ReadableStream<Uint8Array>,
+  readyMessage: string,
+  timeoutMs: number,
+): Promise<void> {
+  const decoder = new TextDecoder();
+  const reader = stdout.getReader();
+  let buffer = '';
+
+  const timeout = setTimeout(() => {
+    reader.cancel();
+  }, timeoutMs);
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        clearTimeout(timeout);
+        throw new Error('Server process exited before becoming ready');
+      }
+      const text = decoder.decode(value, { stream: true });
+      buffer += text;
+      // Forward server output to console
+      await Deno.stdout.write(value);
+      if (buffer.includes(readyMessage)) {
+        clearTimeout(timeout);
+        // Continue forwarding remaining stdout in background (same reader)
+        forwardRemainingStream(reader);
+        return;
+      }
+    }
+  } catch (err) {
+    clearTimeout(timeout);
+    if ((err as Error).message?.includes('cancel')) {
+      throw new Error(`Server did not become ready within ${timeoutMs}ms`);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Continues forwarding a stream reader to console in the background.
+ */
+function forwardRemainingStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): void {
+  (async () => {
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        await Deno.stdout.write(value);
+      }
+    } catch {
+      // Stream closed, ignore
+    }
+  })();
+}
+
+/**
+ * Forwards a stream to console in the background.
+ */
+function forwardStream(stream: ReadableStream<Uint8Array>): void {
+  forwardRemainingStream(stream.getReader());
+}
+
+/**
  * Runs browser tests/benchmarks using Playwright automation.
  *
  * This function:
@@ -74,9 +144,13 @@ export async function runBrowserTests(
     stderr: 'piped',
   });
 
-  // Give server time to start and generate certificate
+  // Forward stderr to console for visibility
+  forwardStream(serverProcess.stderr!);
+
+  // Wait for server to emit ready message
   console.log('Waiting for server to start...');
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  const READY_MESSAGE = 'Browser test server running at';
+  await waitForProcessOutput(serverProcess.stdout!, READY_MESSAGE, 60_000);
 
   try {
     // Dynamic import Playwright (optional dependency)

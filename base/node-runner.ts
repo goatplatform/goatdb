@@ -22,8 +22,15 @@ export async function compileForNodeWithEsbuild(
     plugins: [...denoPlugins()],
     outfile: outName,
     bundle: true,
+    platform: 'node',
+    format: 'esm',
+    target: 'node18',
     write: false,
     sourcemap: 'inline',
+    external: ['nodemailer', 'esbuild', '@luca/esbuild-deno-loader', 'chokidar'],
+    banner: {
+      js: "import { createRequire } from 'node:module';const require = createRequire(import.meta.url);globalThis.require = require;",
+    },
     logOverride: {
       'empty-import-meta': 'silent',
     },

@@ -98,13 +98,13 @@ directories that should be automatically cleaned up after the suite runs.
 ```ts
 import { TEST } from './mod.ts';
 import { assertTrue } from './asserts.ts';
-import { exists, writeTextFile } from 'jsr:@std/fs';
+import { pathExists, writeTextFile } from '../base/json-log/file-impl.ts';
 
 export default function setup() {
   TEST('TempDirSuite', 'can write to temp dir', async (ctx) => {
     const tempPath = await ctx.tempDir('myfile.txt');
     await writeTextFile(tempPath, 'hello!');
-    assertTrue(await exists(tempPath));
+    assertTrue(await pathExists(tempPath));
   });
 }
 ```

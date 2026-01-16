@@ -1,5 +1,213 @@
 import { compileForNodeWithEsbuild, nodeRun } from './node-runner.ts';
 import { runBrowserTests } from './browser-runner.ts';
+import { ProgressManager, type TaskId } from '../shared/progress.ts';
+import type { TestResult, TestSummary } from '../tests/mod.ts';
+
+/**
+ * Worker message types for Deno test execution.
+ */
+interface WorkerReadyMessage {
+  type: 'ready';
+  payload: { suiteCount: number; testCount: number };
+}
+
+interface WorkerTestStartMessage {
+  type: 'testStart';
+  payload: { suiteName: string; testName: string; current: number; total: number };
+}
+
+interface WorkerTestCompleteMessage {
+  type: 'testComplete';
+  payload: {
+    suiteName: string;
+    testName: string;
+    passed: boolean;
+    duration: number;
+    error?: { name: string; message: string; stack?: string };
+  };
+}
+
+interface WorkerDoneMessage {
+  type: 'done';
+  payload: { exitCode: number; summary: TestSummary };
+}
+
+type WorkerOutgoingMessage =
+  | WorkerReadyMessage
+  | WorkerTestStartMessage
+  | WorkerTestCompleteMessage
+  | WorkerDoneMessage;
+
+/** Worker execution timeout (5 minutes) */
+const WORKER_TIMEOUT_MS = 5 * 60 * 1000;
+
+/**
+ * Runs Deno tests using a Web Worker for responsive TUI.
+ * The main thread handles TUI rendering while the Worker executes tests.
+ */
+async function runDenoWithWorker(
+  suite?: string,
+  test?: string,
+): Promise<{ elapsed: number; failed: number; passed: number }> {
+  return new Promise((resolve, reject) => {
+    const start = performance.now();
+    let timeoutId: number | undefined;
+
+    // Create Worker
+    const worker = new Worker(
+      new URL('../tests/worker-runner.ts', import.meta.url).href,
+      { type: 'module' },
+    );
+
+    // Progress manager for TUI
+    const pm = new ProgressManager();
+    let rootId: TaskId | undefined;
+    const suiteTaskIds = new Map<string, TaskId>();
+    const testTaskIds = new Map<string, TaskId>();
+    let animationInterval: number | undefined;
+    let totalTests = 0;
+    let completedTests = 0;
+    let failedCount = 0;
+    let passedCount = 0;
+    let testSummary: TestSummary | undefined;
+
+    // Start animation interval for spinner updates (100ms)
+    animationInterval = setInterval(() => {
+      // Trigger re-render to animate spinners without updating progress
+      if (rootId) {
+        pm.triggerRender();
+      }
+    }, 100);
+
+    // Set up worker timeout to prevent indefinite hangs
+    timeoutId = setTimeout(() => {
+      if (animationInterval) {
+        clearInterval(animationInterval);
+      }
+      pm.finish();
+      worker.terminate();
+      reject(new Error(`Worker timeout after ${WORKER_TIMEOUT_MS / 1000 / 60} minutes`));
+    }, WORKER_TIMEOUT_MS) as unknown as number;
+
+    // Handle Worker messages
+    worker.onmessage = (event: MessageEvent<WorkerOutgoingMessage>) => {
+      const { type, payload } = event.data;
+
+      switch (type) {
+        case 'ready': {
+          // Worker is ready with test counts
+          totalTests = payload.testCount;
+          // Use null for indeterminate if no tests match filter, otherwise use suite count
+          // (ProgressManager requires total > 0 or null)
+          const rootTotal = payload.suiteCount > 0 ? payload.suiteCount : null;
+          rootId = pm.create('Running Tests', rootTotal);
+          pm.update(rootId, 0);
+          break;
+        }
+
+        case 'testStart': {
+          // Test starting - create progress tasks if needed
+          const { suiteName, testName, current, total } = payload;
+
+          // Create suite task if not exists
+          if (!suiteTaskIds.has(suiteName)) {
+            const suiteId = pm.create(suiteName, 1, rootId);
+            suiteTaskIds.set(suiteName, suiteId);
+          }
+
+          // Create test task
+          const testKey = `${suiteName}::${testName}`;
+          const suiteId = suiteTaskIds.get(suiteName)!;
+          const testId = pm.create(testName, 1, suiteId);
+          testTaskIds.set(testKey, testId);
+          pm.update(testId, 0, 'running');
+          break;
+        }
+
+        case 'testComplete': {
+          // Test completed
+          const { suiteName, testName, passed, duration, error } = payload;
+          const testKey = `${suiteName}::${testName}`;
+          const testId = testTaskIds.get(testKey);
+
+          if (testId) {
+            pm.complete(testId, passed ? 'done' : 'failed');
+          }
+
+          completedTests++;
+          if (passed) {
+            passedCount++;
+          } else {
+            failedCount++;
+          }
+
+          // Update root progress
+          if (rootId) {
+            const suitesDone = new Set(
+              [...testTaskIds.keys()]
+                .filter((k) => {
+                  const id = testTaskIds.get(k);
+                  return id !== undefined;
+                })
+                .map((k) => k.split('::')[0]),
+            );
+            pm.update(rootId, suitesDone.size);
+          }
+          break;
+        }
+
+        case 'done': {
+          // All tests completed
+          testSummary = payload.summary;
+
+          // Cleanup
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          if (animationInterval) {
+            clearInterval(animationInterval);
+          }
+
+          // Complete all tasks
+          for (const suiteId of suiteTaskIds.values()) {
+            pm.complete(suiteId);
+          }
+          if (rootId) {
+            pm.complete(rootId);
+          }
+          pm.finish();
+
+          // Terminate worker
+          worker.terminate();
+
+          const elapsed = (performance.now() - start) / 1000;
+          resolve({
+            elapsed,
+            failed: payload.summary.failed,
+            passed: payload.summary.passed,
+          });
+          break;
+        }
+      }
+    };
+
+    // Handle Worker errors
+    // Cleanup order: interval first (prevents animation during cleanup), then timeout, then finish
+    worker.onerror = (error) => {
+      if (animationInterval) clearInterval(animationInterval);
+      if (timeoutId) clearTimeout(timeoutId);
+      pm.finish();
+      worker.terminate();
+      reject(new Error(`Worker error: ${error.message}`));
+    };
+
+    // Start test execution
+    worker.postMessage({
+      type: 'run',
+      payload: { suiteName: suite, testName: test },
+    });
+  });
+}
 
 /**
  * Configuration options for running code across multiple JavaScript runtimes.
@@ -76,38 +284,61 @@ export async function runAcrossPlatforms(
   // Run in Deno if configured
   if (runDeno) {
     console.log('=== 🦖 Running in Deno... ===');
-    const denoStart = performance.now();
 
-    // Configure Deno command
-    const denoArgs = ['run', '-A'];
-    if (config.denoInspectBrk) {
-      denoArgs.push('--inspect-brk');
-    }
-    denoArgs.push(config.entryPointServer);
+    // Use Worker for responsive TUI, unless debugging (debugger needs main process)
+    if (!config.denoInspectBrk && config.mode === 'test') {
+      // Worker-based execution for tests
+      try {
+        const result = await runDenoWithWorker(config.suite, config.test);
+        denoElapsed = result.elapsed;
 
-    // Set up environment variables
-    const denoEnv: Record<string, string> = { ...Deno.env.toObject() };
-    if (config.suite) {
-      denoEnv['GOATDB_SUITE'] = config.suite;
-    }
-    if (config.test) {
-      denoEnv['GOATDB_TEST'] = config.test;
-    }
-    if (config.benchmark) {
-      denoEnv['GOATDB_BENCHMARK'] = config.benchmark;
-    }
+        if (result.failed > 0) {
+          console.log(
+            `=== 🦖 Deno: ${result.passed} passed, ${result.failed} failed ===`,
+          );
+        } else {
+          console.log(`=== 🦖 Deno: ${result.passed} passed ===`);
+        }
+      } catch (error) {
+        console.error('=== 🦖 Deno Worker execution failed ===');
+        console.error('Error:', (error as Error).message);
+        throw error;
+      }
+    } else {
+      // Subprocess execution for debugging or benchmarks
+      const denoStart = performance.now();
 
-    // Execute Deno
-    const denoCmd = new Deno.Command('deno', {
-      args: denoArgs,
-      stdout: 'inherit',
-      stderr: 'inherit',
-      env: denoEnv,
-    });
-    await denoCmd.output();
+      // Configure Deno command
+      const denoArgs = ['run', '-A'];
+      if (config.denoInspectBrk) {
+        denoArgs.push('--inspect-brk');
+      }
+      denoArgs.push(config.entryPointServer);
 
-    const denoEnd = performance.now();
-    denoElapsed = (denoEnd - denoStart) / 1000;
+      // Set up environment variables
+      const denoEnv: Record<string, string> = { ...Deno.env.toObject() };
+      if (config.suite) {
+        denoEnv['GOATDB_SUITE'] = config.suite;
+      }
+      if (config.test) {
+        denoEnv['GOATDB_TEST'] = config.test;
+      }
+      if (config.benchmark) {
+        denoEnv['GOATDB_BENCHMARK'] = config.benchmark;
+      }
+
+      // Execute Deno
+      const denoCmd = new Deno.Command('deno', {
+        args: denoArgs,
+        stdout: 'inherit',
+        stderr: 'inherit',
+        env: denoEnv,
+      });
+      await denoCmd.output();
+
+      const denoEnd = performance.now();
+      denoElapsed = (denoEnd - denoStart) / 1000;
+    }
   }
 
   // Run in Node.js if configured
