@@ -1,0 +1,30 @@
+{
+  "name": "goatdb-app",
+  "version": "1.0.0",
+  "description": "A GoatDB application",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch server/debug-server.ts",
+    "build": "tsx server/build.ts",
+    "start": "node dist/server.js",
+    "clean": "rm -rf server-data dist"
+  },
+  "dependencies": {
+    "@goatdb/goatdb": "npm:@jsr/goatdb__goatdb@latest",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.0.0",
+    "@types/yargs": "^17.0.0",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

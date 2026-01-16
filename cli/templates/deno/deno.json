@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "dom.asynciterable", "deno.ns"]
+  },
+  "tasks": {
+    "dev": "deno run -A server/debug-server.ts",
+    "build": "deno run -A server/build.ts",
+    "clean": "rm -r server-data"
+  },
+  "version": "0.0.1"
+}
