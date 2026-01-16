@@ -1,6 +1,6 @@
-import { isBrowser } from '../base/common.ts';
-import { assert } from '../base/error.ts';
-import { VCurrent, type VersionNumber } from '../base/version-number.ts';
+import { isBrowser } from './common.ts';
+import { assert } from './error.ts';
+import { VCurrent, type VersionNumber } from './version-number.ts';
 
 export interface GoatConfig {
   version: VersionNumber;

@@ -1,8 +1,4 @@
-import { exists, walk } from '@std/fs';
-import { extname } from '@std/path';
-import * as esbuild from 'esbuild';
-import * as path from '@std/path';
-import { denoPlugins } from '@luca/esbuild-deno-loader';
+import * as path from '../base/path.ts';
 import {
   bundleResultFromBuildResult,
   isReBuildContext,
@@ -15,22 +11,49 @@ import type {
   ContentType,
   StaticAssets,
 } from '../system-assets/system-assets.ts';
+import { pathExists, readFile, walkDir } from '../base/json-log/file-impl.ts';
+
+// Lazy-loaded modules to avoid bundling build-time dependencies into runtime code.
+// These packages (esbuild, @luca/esbuild-deno-loader) are Deno/JSR-specific and
+// cannot be resolved by Node.js at runtime.
+let esbuildModule: typeof import('esbuild') | undefined;
+let denoPluginsModule: typeof import('@luca/esbuild-deno-loader') | undefined;
+
+async function getEsbuild() {
+  if (!esbuildModule) {
+    esbuildModule = await import('esbuild');
+  }
+  return esbuildModule;
+}
+
+async function getDenoPlugins() {
+  if (!denoPluginsModule) {
+    denoPluginsModule = await import('@luca/esbuild-deno-loader');
+  }
+  return denoPluginsModule.denoPlugins;
+}
 
 export type EntryPoint = { in: string; out: string };
 
 export async function buildAssets(
-  ctx: ReBuildContext | typeof esbuild | undefined,
+  ctx: ReBuildContext | undefined,
   entryPoints: EntryPoint[],
   appConfig: AppConfig,
 ): Promise<StaticAssets> {
-  if (!ctx) {
-    ctx = esbuild;
-  }
-  const buildResults =
-    await (isReBuildContext(ctx) ? ctx.rebuild() : bundleResultFromBuildResult(
-      await ctx.build({
+  let buildResults: Record<string, { source: string; map: string }>;
+  let shouldStopEsbuild = false;
+
+  if (ctx && isReBuildContext(ctx)) {
+    buildResults = await ctx.rebuild();
+  } else {
+    // No context provided, use esbuild directly
+    const esbuild = await getEsbuild();
+    const denoPlugins = await getDenoPlugins();
+    buildResults = bundleResultFromBuildResult(
+      await esbuild.build({
         entryPoints,
-        plugins: [...denoPlugins()],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        plugins: [...denoPlugins()] as any,
         bundle: true,
         write: false,
         sourcemap: 'linked',
@@ -41,16 +64,19 @@ export async function buildAssets(
         minify: appConfig.minify,
         jsx: 'automatic',
       }),
-    ));
+    );
+    shouldStopEsbuild = true;
+  }
 
-  if (ctx === esbuild) {
-    await ctx.stop();
+  if (shouldStopEsbuild) {
+    const esbuild = await getEsbuild();
+    await esbuild.stop();
   }
 
   // System assets are always included and are placed at the root
   const result: StaticAssets = {};
   const textEncoder = new TextEncoder();
-  
+
   // User provided assets are always processed, regardless of app build success
   if (appConfig.assetsPath) {
     // User provided assets are placed under /assets/
@@ -63,7 +89,7 @@ export async function buildAssets(
       ),
     );
   }
-  
+
   // For app code, include html and css files
   if (Object.hasOwn(buildResults, APP_ENTRY_POINT)) {
     const { source, map } = buildResults[APP_ENTRY_POINT];
@@ -78,7 +104,7 @@ export async function buildAssets(
     if (appConfig.htmlPath) {
       try {
         result['/index.html'] = {
-          data: await Deno.readFile(appConfig.htmlPath),
+          data: await readFile(appConfig.htmlPath),
           contentType: 'text/html',
         };
       } catch (_: unknown) {
@@ -88,7 +114,7 @@ export async function buildAssets(
     if (appConfig.cssPath) {
       try {
         result['/index.css'] = {
-          data: await Deno.readFile(appConfig.cssPath),
+          data: await readFile(appConfig.cssPath),
           contentType: 'text/css',
         };
       } catch (_: unknown) {
@@ -96,7 +122,7 @@ export async function buildAssets(
       }
     }
   }
-  // All other entries include as
+  // All other entries included as JavaScript files
   for (const ep of Object.keys(buildResults)) {
     if (ep === APP_ENTRY_POINT) {
       continue;
@@ -133,32 +159,26 @@ export async function compileAssetsDirectory(
   prefix?: string,
 ): Promise<Record<string, Asset>> {
   const result: Record<string, Asset> = {};
-  if (!(await exists(dir))) {
+  if (!(await pathExists(dir))) {
     return result;
   }
-  for await (
-    const { path } of walk(dir, {
-      includeDirs: false,
-      includeSymlinks: false,
-      followSymlinks: false,
-    })
-  ) {
-    if (filter && !filter(path)) {
+  for await (const filePath of walkDir(dir, { includeDirs: false })) {
+    if (filter && !filter(filePath)) {
       continue;
     }
-    const origExt = extname(path);
+    const origExt = path.extname(filePath);
     let ext = origExt.substring(1);
     if (ext === 'ts') {
       ext = 'js';
     }
-    let key = path.substring(dir.length).toLowerCase();
+    let key = filePath.substring(dir.length).toLowerCase();
     // Rewrite extension to match
     key = key.substring(0, key.length - origExt.length) + '.' + ext;
     if (prefix) {
       key = `${prefix}${key}`;
     }
     result[key] = {
-      data: await Deno.readFile(path),
+      data: await readFile(filePath),
       contentType: ContentTypeMapping[ext] || 'application/octet-stream',
     };
   }
