@@ -1,6 +1,7 @@
 import { notReached } from '../base/error.ts';
 import type { EmailMessage } from '../net/server/email.ts';
 import type { ServerOptions } from '../net/server/server.ts';
+import type { Schema } from '../cfds/base/schema.ts';
 
 /**
  * Configuration type for login emails containing magic links.
@@ -34,9 +35,9 @@ export type EmailInfo = EmailLoginWithMagicLink;
  * @param config - Server configuration options
  * @returns An EmailMessage object with subject, text and HTML content
  */
-export type EmailBuilder = (
+export type EmailBuilder<US extends Schema = Schema> = (
   info: EmailInfo,
-  config: ServerOptions,
+  config: ServerOptions<US>,
 ) => EmailMessage;
 
 /**
@@ -53,9 +54,9 @@ export type EmailBuilder = (
  *          HTML formats
  * @throws Error if an unknown email type is provided
  */
-export function DefaultEmailBuilder(
+export function DefaultEmailBuilder<US extends Schema = Schema>(
   info: EmailInfo,
-  config: ServerOptions,
+  config: ServerOptions<US>,
 ): EmailMessage {
   switch (info.type) {
     case 'Login':

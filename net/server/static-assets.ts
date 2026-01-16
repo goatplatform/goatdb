@@ -1,7 +1,7 @@
 import type { Endpoint, ServerServices } from './server.ts';
 import { getRequestPath } from './utils.ts';
 import { kStaticAssetsSystem } from '../../system-assets/system-assets.ts';
-import { getGoatConfig } from '../../server/config.ts';
+import { getGoatConfig } from '../../base/config.ts';
 import type { VersionNumber } from '../../base/version-number.ts';
 import type { GoatRequest } from './http-compat.ts';
 import type { Schema } from '../../cfds/base/schema.ts';
@@ -87,7 +87,7 @@ export class StaticAssetsEndpoint<US extends Schema> implements Endpoint<US> {
     }
 
     return Promise.resolve(
-      new Response(asset.data, {
+      new Response(asset.data as BufferSource, {
         headers,
       }),
     );

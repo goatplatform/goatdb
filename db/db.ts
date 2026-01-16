@@ -1,4 +1,4 @@
-import * as path from '@std/path';
+import * as path from '../base/path.ts';
 import { sessionFromItem, TrustPool } from './session.ts';
 import { Repository, type RepositoryConfig } from '../repo/repo.ts';
 import type { DBSettings, DBSettingsProvider } from './settings/settings.ts';
@@ -48,7 +48,7 @@ import { FileImplOPFS } from '../base/json-log/file-impl-opfs.ts';
 import { assert } from '../base/error.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { Emitter } from '../base/emitter.ts';
-import { getGoatConfig } from '../server/config.ts';
+import { getGoatConfig } from '../base/config.ts';
 // import { remove } from '../base/json-log/json-log.ts';
 
 /**

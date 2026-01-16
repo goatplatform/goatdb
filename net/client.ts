@@ -15,7 +15,7 @@ import { Emitter } from '../base/emitter.ts';
 import type { Commit } from '../repo/commit.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { assert } from '../base/error.ts';
-import { getGoatConfig } from '../server/config.ts';
+import { getGoatConfig } from '../base/config.ts';
 
 const COMMIT_SUBMIT_RETRY = 10;
 

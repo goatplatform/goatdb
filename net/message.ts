@@ -15,7 +15,7 @@ import type { ReadonlyJSONObject } from '../base/interfaces.ts';
 import type { VersionNumber } from '../base/version-number.ts';
 import type { DataRegistry } from '../cfds/base/data-registry.ts';
 import { Commit } from '../repo/commit.ts';
-import { getGoatConfig } from '../server/config.ts';
+import { getGoatConfig } from '../base/config.ts';
 
 export const K_DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 

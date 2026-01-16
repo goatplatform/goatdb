@@ -17,7 +17,7 @@ import { coreValueEquals } from '../base/core-types/equals.ts';
 import { assert, notReached } from '../base/error.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import type { VersionNumber } from '../base/version-number.ts';
-import { getGoatConfig } from '../server/config.ts';
+import { getGoatConfig } from '../base/config.ts';
 import { type Comparable, coreValueCompare } from '../base/core-types/index.ts';
 import type { ReadonlyJSONObject } from '../base/interfaces.ts';
 import {

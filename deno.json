@@ -16,7 +16,7 @@
   "exports": {
     ".": "./mod.ts",
     "./react": "./react/hooks.ts",
-    "./server": "./server/mod.ts",
+    "./server": "./server.ts",
     "./init": "./cli/init.ts",
     "./link": "./cli/link.ts"
   },

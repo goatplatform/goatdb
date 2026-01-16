@@ -8688,6 +8688,9 @@
     }
   },
   "workspace": {
+    "dependencies": [
+      "npm:typedoc@~0.28.8"
+    ],
     "packageJson": {
       "dependencies": [
         "npm:@docusaurus/core@3.8.1",

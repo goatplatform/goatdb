@@ -1,4 +1,4 @@
-import * as path from '@std/path';
+import * as path from '../base/path.ts';
 import {
   type Endpoint,
   type Middleware,
@@ -14,7 +14,7 @@ import {
 import { TEST } from './mod.ts';
 import { assertEquals, assertTrue } from './asserts.ts';
 import type { Schema } from '../cfds/base/schema.ts';
-import { generateBuildInfo } from '../server/build-info.ts';
+import { generateBuildInfo } from '../base/build-info.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
 import { isDeno, isNode } from '../base/common.ts';
 

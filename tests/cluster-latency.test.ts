@@ -6,9 +6,9 @@ import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { sleep } from '../base/time.ts';
 import { encodeSession, generateSession } from '../db/session.ts';
 import { prettyJSON } from '../base/common.ts';
-import * as path from '@std/path';
+import * as path from '../base/path.ts';
 import { FileImplGet, writeTextFile } from '../base/json-log/file-impl.ts';
-import { generateBuildInfo } from '../server/build-info.ts';
+import { generateBuildInfo } from '../base/build-info.ts';
 import { Schema } from '../cfds/base/schema.ts';
 
 // Schema definition for cluster latency test items

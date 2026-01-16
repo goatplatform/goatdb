@@ -1,6 +1,6 @@
 import { assertTrue } from './asserts.ts';
 import { TEST } from './mod.ts';
-import { Orderstamp } from '../mod.ts';
+import * as Orderstamp from '@goatdb/orderstamp';
 
 export default function setup(): void {
   TEST('Orderstamp', 'Orderstamp API is exposed', () => {

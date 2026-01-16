@@ -1,4 +1,4 @@
-import * as path from '@std/path';
+import * as path from '../../base/path.ts';
 import type { Dictionary } from '../../base/collections/dict.ts';
 import {
   log,
@@ -15,11 +15,11 @@ import { MetricsMiddleware } from './metrics.ts';
 import { BaseService } from './service.ts';
 import { CORSEndpoint, CORSMiddleware } from './cors.ts';
 import { ServerError } from '../../cfds/base/errors.ts';
-import { getGoatConfig } from '../../server/config.ts';
 import { GoatDB } from '../../db/db.ts';
+import { getGoatConfig } from '../../base/config.ts';
 import { SyncEndpoint } from './sync.ts';
 import type { DBInstanceConfig } from '../../db/db.ts';
-import type { BuildInfo } from '../../server/build-info.ts';
+import type { BuildInfo } from '../../base/build-info.ts';
 import { type EmailConfig, EmailService } from './email.ts';
 import type { StaticAssets } from '../../system-assets/system-assets.ts';
 import type { Schema } from '../../cfds/base/schema.ts';

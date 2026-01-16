@@ -1,4 +1,4 @@
-import { isDeno, isNode } from '../../base/common.ts';
+import { getRuntime } from '../../base/runtime/index.ts';
 import { assert, notReached } from '../../base/error.ts';
 
 /**
@@ -74,7 +74,7 @@ async function getNodeBufferModule() {
  * @throws {Error} If called outside of Node.js
  */
 async function getBuffer(): Promise<MinimalBuffer> {
-  assert(isNode(), 'Buffer is only available in Node.js');
+  assert(getRuntime().id === 'node', 'Buffer is only available in Node.js');
   // Use cached dynamic import
   const mod = await getNodeBufferModule();
   return mod.Buffer;
@@ -186,7 +186,7 @@ export function createGoatHeaders(init?: HeadersInit): GoatHeaders {
   if (typeof Headers !== 'undefined') {
     // Web standard Headers is available (Deno or modern Node.js)
     return new Headers(init);
-  } else if (isNode()) {
+  } else if (getRuntime().id === 'node') {
     // Node.js environment without Headers
     const headers = new NodeHeadersPolyfill();
 
@@ -358,7 +358,7 @@ export class GoatRequest {
       this.method = req.method;
       this.headers = req.headers;
       this.body = req.body;
-    } else if (isNode()) {
+    } else if (getRuntime().id === 'node') {
       this._native = req;
       let scheme: string, authority: string, path: string;
       if (isNodeHttp2Request(req)) {
@@ -413,7 +413,7 @@ export class GoatRequest {
    */
   // deno-lint-ignore no-explicit-any
   async json(): Promise<any> {
-    if (!isNode()) {
+    if (getRuntime().id !== 'node') {
       return (this._native as Request).json();
     } else {
       const chunks: Uint8Array[] = [];
@@ -431,7 +431,7 @@ export class GoatRequest {
    * @returns The body content as a string
    */
   async text(): Promise<string> {
-    if (!isNode()) {
+    if (getRuntime().id !== 'node') {
       return (this._native as Request).text();
     } else {
       const chunks: Uint8Array[] = [];
@@ -578,13 +578,7 @@ export class DenoHttpServer implements MinimalHttpServer {
  */
 export class NodeHttpServer implements MinimalHttpServer {
   /** The underlying Node.js HTTP/HTTPS server instance */
-  private _server?: import('node:http').Server<
-    typeof import('node:http').IncomingMessage,
-    typeof import('node:http').ServerResponse
-  > | import('node:https').Server<
-    typeof import('node:http').IncomingMessage,
-    typeof import('node:http').ServerResponse
-  >;
+  private _server?: import('node:http').Server | import('node:https').Server;
   /** Whether the server has been started */
   private _started: boolean = false;
   /** Cached reference to the Node.js Buffer implementation */
@@ -790,13 +784,17 @@ export type HttpServerInstance = DenoHttpServer | NodeHttpServer;
 /**
  * Factory function to create the appropriate HTTP server implementation
  * depending on the runtime (Deno or Node.js).
+ *
+ * Uses the RuntimeAdapter registry to determine the current runtime.
+ * Browser environments do not support HTTP server creation and will throw.
  */
 export function createHttpServer(options: HttpServerOptions = {}): HttpServerInstance {
-  if (isDeno()) {
+  const runtime = getRuntime();
+  if (runtime.id === 'deno') {
     return new DenoHttpServer(options);
-  } else if (isNode()) {
+  } else if (runtime.id === 'node') {
     return new NodeHttpServer(options);
   } else {
-    throw new Error('Unsupported runtime: cannot create HTTP server');
+    throw new Error(`Unsupported runtime for HTTP server: ${runtime.id}`);
   }
 }

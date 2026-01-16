@@ -112,7 +112,7 @@ export class MapTypeOperations extends CoreTypeOperations<
     return changes;
   }
 
-  deserialize(value: DecodedValue, options?: ValueTypeOptions) {
+  override deserialize(value: DecodedValue, options?: ValueTypeOptions) {
     const prim = value as PrimitiveMap;
 
     const dict = dictFromPrimitive(prim);
@@ -132,13 +132,13 @@ export class MapTypeOperations extends CoreTypeOperations<
     return new Map();
   }
 
-  gc(
+  override gc(
     value: Dictionary<CoreKey, ConcreteCoreValue>
   ): Dictionary<CoreKey, ConcreteCoreValue> | undefined {
     return undefined;
   }
 
-  fillRefs(
+  override fillRefs(
     refs: Set<string>,
     dict: Dictionary<ConcreteCoreValue, ConcreteCoreValue>
   ): void {
@@ -154,7 +154,7 @@ export class MapTypeOperations extends CoreTypeOperations<
     }
   }
 
-  rewriteRefs(
+  override rewriteRefs(
     keyMapping: Map<string, string>,
     dict: Dictionary<string, ConcreteCoreValue>,
     deleteRefs?: Set<string>

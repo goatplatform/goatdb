@@ -10,7 +10,7 @@ import { kSecondMs } from '../base/date.ts';
 import type { JSONValue, ReadonlyJSONObject } from '../base/interfaces.ts';
 import { sleep } from '../base/time.ts';
 import { timeout } from '../cfds/base/errors.ts';
-import { getGoatConfig } from '../server/config.ts';
+import { getGoatConfig } from '../base/config.ts';
 import { getCrypto } from '../base/common.ts';
 
 export async function createNewSession(

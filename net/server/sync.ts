@@ -10,7 +10,7 @@ import type {
 } from '../../base/interfaces.ts';
 import type { Session } from '../../db/session.ts';
 import type { Commit } from '../../repo/commit.ts';
-import { getGoatConfig } from '../../server/config.ts';
+import { getGoatConfig } from '../../base/config.ts';
 import type { RepoClient } from '../client.ts';
 import { SyncMessage } from '../message.ts';
 import { kSyncConfigServer, syncConfigGetCycles } from '../sync-scheduler.ts';

@@ -79,7 +79,7 @@
  */
 import { GoatDB } from './db/db.ts';
 import { Query } from './repo/query.ts';
-import type { AppConfig } from './server/app-config.ts';
+import type { AppConfig } from './cli/app-config.ts';
 import {
   type AuthConfig,
   type AuthOp,
@@ -99,13 +99,13 @@ import { Repository } from './repo/repo.ts';
 import { ManagedItem } from './db/managed-item.ts';
 import { Item } from './cfds/base/item.ts';
 import { prettyJSON, uniqueId } from './base/common.ts';
-import type { BuildInfo } from './server/build-info.ts';
 import { ConsoleLogStream } from './logging/console-stream.ts';
 import type { LogStream } from './logging/log.ts';
 import { JSONLogStream } from './logging/json-log-stream.ts';
 import { normalizeEmail } from './base/string.ts';
 import { Emitter } from './base/emitter.ts';
 import { TrustPool } from './db/session.ts';
+import type { BuildInfo } from './base/build-info.ts';
 
 export * from './cfds/base/schema.ts';
 export * from './base/core-types/base.ts';

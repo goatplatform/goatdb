@@ -1,22 +1,19 @@
 #!/usr/bin/env -S deno run -A
-import { 
-  Application, 
-  type DeclarationReflection, 
-} from 'typedoc';
-import * as path from 'jsr:@std/path';
-import { ensureDir } from 'jsr:@std/fs';
+import { Application, type DeclarationReflection } from 'typedoc';
+import * as path from '../base/path.ts';
+import { mkdir } from '../base/json-log/file-impl.ts';
 
 // Import functions from our new modules
 import {
   buildCrossReferenceMap,
-  collectTypeReferences,
   classifyType,
+  collectTypeReferences,
 } from './type-formatter.ts';
 import {
   buildReverseInheritanceMap,
   createClassMDX,
-  createInterfaceMDX,
   createFunctionsMDX,
+  createInterfaceMDX,
   createTypeMDX,
   extractDocumentation,
 } from './mdx-generator.ts';
@@ -38,19 +35,13 @@ interface ModuleConfig {
   dependencies?: string[];
 }
 
-
 // List of GoatDB modules to document
+// Note: Server exports are now part of core module (mod.ts)
 const GOATDB_MODULES: ModuleConfig[] = [
   {
     name: 'core',
     entryPoint: 'mod.ts',
     stability: 'stable',
-  },
-  {
-    name: 'server',
-    entryPoint: 'server/mod.ts',
-    stability: 'stable',
-    dependencies: ['core'],
   },
   {
     name: 'react',
@@ -92,10 +83,10 @@ async function cleanOutputDirectory(): Promise<void> {
   } catch {
     // Directory might not exist, that's fine
   }
-  await ensureDir(API_DOCS_DIR);
-  await ensureDir(path.join(API_DOCS_DIR, 'classes'));
-  await ensureDir(path.join(API_DOCS_DIR, 'interfaces'));
-  await ensureDir(path.join(API_DOCS_DIR, 'types'));
+  await mkdir(API_DOCS_DIR);
+  await mkdir(path.join(API_DOCS_DIR, 'classes'));
+  await mkdir(path.join(API_DOCS_DIR, 'interfaces'));
+  await mkdir(path.join(API_DOCS_DIR, 'types'));
 }
 
 /**
@@ -107,7 +98,9 @@ async function cleanOutputDirectory(): Promise<void> {
  * @returns An ApiElements object containing discovered API elements and module
  *          metadata.
  */
-async function extractApiElements(moduleConfig: ModuleConfig): Promise<ApiElements> {
+async function extractApiElements(
+  moduleConfig: ModuleConfig,
+): Promise<ApiElements> {
   const filePath = moduleConfig.entryPoint;
   console.log(`🔍 Extracting API elements from ${filePath}...`);
 
@@ -185,13 +178,11 @@ async function extractApiElements(moduleConfig: ModuleConfig): Promise<ApiElemen
  * Returns a human-friendly module name for a given file path.
  *
  * - "mod.ts"           → "Core"
- * - "server/mod.ts"    → "Server"
  * - "react/hooks.ts"   → "React"
  * - Otherwise, returns the file name (without ".ts" extension)
  */
 function getModuleName(filePath: string): string {
   if (filePath === 'mod.ts') return 'Core';
-  if (filePath === 'server/mod.ts') return 'Server';
   if (filePath === 'react/hooks.ts') return 'React';
   return path.basename(filePath, '.ts');
 }
@@ -209,7 +200,10 @@ async function writeApiFiles(allElements: ApiElements[]): Promise<void> {
   const crossRefMap = buildCrossReferenceMap(allElements);
 
   // Build reverse inheritance map for parent->child relationships
-  const reverseInheritanceMap = buildReverseInheritanceMap(allElements, crossRefMap);
+  const reverseInheritanceMap = buildReverseInheritanceMap(
+    allElements,
+    crossRefMap,
+  );
 
   // Build declarations map for property resolution
   const allDeclarations = new Map<string, DeclarationReflection>();
@@ -355,19 +349,21 @@ Complete API documentation for GoatDB.\n\n`;
  */
 async function validateModuleConfigs(): Promise<ModuleConfig[]> {
   console.log('🔍 Validating module configurations...');
-  
+
   const validModules: ModuleConfig[] = [];
-  
+
   for (const moduleConfig of GOATDB_MODULES) {
     try {
       await Deno.stat(moduleConfig.entryPoint);
       validModules.push(moduleConfig);
       console.log(`   ✅ ${moduleConfig.name}: ${moduleConfig.entryPoint}`);
     } catch {
-      console.warn(`   ⚠️  Module ${moduleConfig.name} entry point not found: ${moduleConfig.entryPoint}`);
+      console.warn(
+        `   ⚠️  Module ${moduleConfig.name} entry point not found: ${moduleConfig.entryPoint}`,
+      );
     }
   }
-  
+
   console.log(`   Found ${validModules.length} valid modules`);
   return validModules;
 }
@@ -378,31 +374,31 @@ async function validateModuleConfigs(): Promise<ModuleConfig[]> {
  */
 function validateModularCrossReferences(allElements: ApiElements[]): void {
   console.log('🔍 Validating cross-references with module awareness...');
-  
+
   // Create a map of module name to documented types
   const moduleTypes = new Map<string, Set<string>>();
-  
+
   // Collect documented types by module
   for (const elements of allElements) {
     const types = new Set<string>();
-    elements.classes.forEach(cls => types.add(cls.name));
-    elements.interfaces.forEach(iface => types.add(iface.name));
-    elements.types.forEach(type => types.add(type.name));
+    elements.classes.forEach((cls) => types.add(cls.name));
+    elements.interfaces.forEach((iface) => types.add(iface.name));
+    elements.types.forEach((type) => types.add(type.name));
     moduleTypes.set(elements.moduleName, types);
   }
-  
+
   let totalIssues = 0;
-  
+
   // Validate each module's references
   for (const elements of allElements) {
     const moduleName = elements.moduleName;
     const moduleConfig = elements.moduleConfig;
-    
+
     console.log(`   📦 Validating ${moduleName} module...`);
-    
+
     // Collect allowed types (from this module and its dependencies)
     const allowedTypes = new Set<string>();
-    
+
     // Add types from this module
     const thisModuleTypes = moduleTypes.get(moduleName);
     if (thisModuleTypes) {
@@ -410,7 +406,7 @@ function validateModularCrossReferences(allElements: ApiElements[]): void {
         allowedTypes.add(type);
       }
     }
-    
+
     // Add types from dependency modules
     if (moduleConfig.dependencies) {
       for (const depModule of moduleConfig.dependencies) {
@@ -422,10 +418,10 @@ function validateModularCrossReferences(allElements: ApiElements[]): void {
         }
       }
     }
-    
+
     // Collect referenced types from this module
     const referencedTypes = new Set<string>();
-    
+
     // Scan all elements in this module
     for (const cls of elements.classes) {
       scanElementForTypeReferences(cls, referencedTypes);
@@ -439,93 +435,117 @@ function validateModularCrossReferences(allElements: ApiElements[]): void {
     for (const fn of elements.functions) {
       scanElementForTypeReferences(fn, referencedTypes);
     }
-    
+
     // Find problematic references
     const problematicTypes: string[] = [];
     const internalTypes: string[] = [];
-    
+
     for (const refType of referencedTypes) {
       const classification = classifyType(refType, moduleName);
-      
+
       if (classification.classification === 'builtin') {
         // Built-in types are always OK
         continue;
       }
-      
+
       if (classification.classification === 'internal') {
         // Internal types should not be referenced in public APIs
         internalTypes.push(refType);
         continue;
       }
-      
+
       // Check if the type is allowed in this module's scope
       if (!allowedTypes.has(refType)) {
         // Check if it's a legitimate cross-module reference
         if (classification.module && classification.module !== moduleName) {
-          const allowedModules = [moduleName, ...(moduleConfig.dependencies || [])];
+          const allowedModules = [
+            moduleName,
+            ...(moduleConfig.dependencies || []),
+          ];
           if (!allowedModules.includes(classification.module)) {
-            problematicTypes.push(`${refType} (from ${classification.module} module)`);
+            problematicTypes.push(
+              `${refType} (from ${classification.module} module)`,
+            );
           }
         } else {
           problematicTypes.push(refType);
         }
       }
     }
-    
+
     // Report issues for this module
     if (internalTypes.length > 0) {
-      console.warn(`   ⚠️  ${moduleName}: ${internalTypes.length} internal types referenced in public API:`);
+      console.warn(
+        `   ⚠️  ${moduleName}: ${internalTypes.length} internal types referenced in public API:`,
+      );
       for (const type of internalTypes.sort()) {
         console.warn(`      - ${type} (internal implementation detail)`);
       }
       totalIssues += internalTypes.length;
     }
-    
+
     if (problematicTypes.length > 0) {
-      console.warn(`   ⚠️  ${moduleName}: ${problematicTypes.length} cross-module references without proper dependencies:`);
+      console.warn(
+        `   ⚠️  ${moduleName}: ${problematicTypes.length} cross-module references without proper dependencies:`,
+      );
       for (const type of problematicTypes.sort()) {
         console.warn(`      - ${type}`);
       }
       totalIssues += problematicTypes.length;
     }
-    
+
     if (internalTypes.length === 0 && problematicTypes.length === 0) {
-      console.log(`      ✅ ${allowedTypes.size} types available, ${referencedTypes.size} types referenced, all valid`);
+      console.log(
+        `      ✅ ${allowedTypes.size} types available, ${referencedTypes.size} types referenced, all valid`,
+      );
     }
   }
-  
+
   if (totalIssues > 0) {
-    console.warn(`\n⚠️  Found ${totalIssues} cross-reference issues. These indicate API design issues:`);
-    console.warn('   - Internal types: Mark with @internal or refactor to avoid exposing in public API');
-    console.warn('   - Cross-module types: Add module dependencies or re-export types properly');
-    console.warn('   This is a warning only - documentation will still be generated.');
+    console.warn(
+      `\n⚠️  Found ${totalIssues} cross-reference issues. These indicate API design issues:`,
+    );
+    console.warn(
+      '   - Internal types: Mark with @internal or refactor to avoid exposing in public API',
+    );
+    console.warn(
+      '   - Cross-module types: Add module dependencies or re-export types properly',
+    );
+    console.warn(
+      '   This is a warning only - documentation will still be generated.',
+    );
   } else {
-    console.log(`\n✅ Cross-reference validation passed. All module boundaries respected.`);
+    console.log(
+      `\n✅ Cross-reference validation passed. All module boundaries respected.`,
+    );
   }
 }
 
 /**
  * Scans a TypeDoc element for type references and adds them to the set.
  */
-function scanElementForTypeReferences(element: DeclarationReflection, referencedTypes: Set<string>): void {
+function scanElementForTypeReferences(
+  element: DeclarationReflection,
+  referencedTypes: Set<string>,
+): void {
   // Scan element type
   if (element.type) {
     collectTypeReferences(element.type, referencedTypes);
   }
-  
+
   // Scan inheritance
   if (element.extendedTypes) {
     for (const extType of element.extendedTypes) {
       collectTypeReferences(extType, referencedTypes);
     }
   }
-  
+
   if (element.implementedTypes) {
     for (const implType of element.implementedTypes) {
       collectTypeReferences(implType, referencedTypes);
     }
   }
-  
+
   // Scan signatures (functions, methods)
   if (element.signatures) {
     for (const sig of element.signatures) {
@@ -541,7 +561,7 @@ function scanElementForTypeReferences(element: DeclarationReflection, referenced
       }
     }
   }
-  
+
   // Scan children (properties, methods)
   if (element.children) {
     for (const child of element.children) {
@@ -570,7 +590,11 @@ async function main(): Promise<void> {
         const elements = await extractApiElements(moduleConfig);
         allElements.push(elements);
       } catch (error) {
-        console.warn(`⚠️  Failed to process ${moduleConfig.name}: ${(error as Error).message}`);
+        console.warn(
+          `⚠️  Failed to process ${moduleConfig.name}: ${
+            (error as Error).message
+          }`,
+        );
       }
     }
 

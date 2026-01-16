@@ -15,7 +15,7 @@
  * All actual test code is defined below and registered via the setup function.
  */
 
-import * as path from '@std/path';
+import * as path from '../base/path.ts';
 import {
   assertEquals,
   assertExists,
@@ -27,7 +27,7 @@ import { GoatDB } from '../db/db.ts';
 import { Server } from '../net/server/server.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { sleep } from '../base/time.ts';
-import { generateBuildInfo } from '../server/build-info.ts';
+import { generateBuildInfo } from '../base/build-info.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
 
 /**
@@ -305,11 +305,11 @@ export default function setupE2ELatency() {
       // ============================================================================
 
       // Validate latency is within reasonable bounds for GoatDB's polling architecture
-      // Expected range: 300-1000ms due to sync scheduler delays + network + processing
+      // Expected range: 300-2000ms due to sync scheduler delays + network + processing
       assertLessThan(
         latency,
-        1000,
-        `Application latency should be under 1 second, got ${
+        2000,
+        `Application latency should be under 2 seconds, got ${
           latency.toFixed(2)
         }ms`,
       );

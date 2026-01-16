@@ -10,9 +10,9 @@ export function decodeChange<EC extends EncodedChange = EncodedChange>(
   const type = decoder.get('changeType') as ChangeType;
   switch (type) {
     case 'fd':
-      return new FieldChange({ decoder });
+      return new FieldChange({ decoder }) as Change<EC>;
     case 'rt':
-      return new RichTextChange({ decoder });
+      return new RichTextChange({ decoder }) as Change<EC>;
     default:
       notReached('Unsupported format: ' + type);
   }

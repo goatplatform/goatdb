@@ -11,7 +11,6 @@
  * operations and the Origin Private File System (OPFS) API, allowing the same
  * code to work seamlessly in both environments.
  */
-import { encodeBase64 } from '@std/encoding/base64';
 import { kStaticAssetsSystem } from '../../system-assets/system-assets.ts';
 import { assert } from '../error.ts';
 import type { ReadonlyJSONObject } from '../interfaces.ts';
@@ -30,7 +29,7 @@ import type {
   WorkerRemoveReq,
   WorkerWriteTextFileReq,
 } from './json-log-worker-req.ts';
-import { isDeno, isNode } from '../common.ts';
+import { getRuntime } from '../runtime/index.ts';
 
 let gWorker: Worker | NodeWorker | undefined;
 
@@ -71,43 +70,9 @@ export async function startJSONLogWorkerIfNeeded(): Promise<
     const workerJs = new TextDecoder().decode(
       kStaticAssetsSystem['/system-assets/json-log-worker.js'].data,
     );
-    if (isDeno()) {
-      const dataUrl = `data:text/javascript;base64,${encodeBase64(workerJs)}`;
-      gWorker = new Worker(import.meta.resolve(dataUrl), {
-        type: 'module',
-      });
-    } else {
-      if (isNode()) {
-        const NodeWorker = (await import('node:worker_threads')).Worker;
-        // deno-lint-ignore no-process-global
-        const inspect = process.execArgv.includes('--inspect-brk') ||
-          // deno-lint-ignore no-process-global
-          process.execArgv.includes('--inspect');
-        gWorker = new NodeWorker!(
-          'data:' + workerJs,
-          {
-            eval: true,
-            name: 'json-log-worker',
-            execArgv: inspect ? ['--inspect'] : [],
-          },
-        );
-      } else {
-        gWorker = new Worker(
-          URL.createObjectURL(
-            new Blob(
-              [workerJs],
-              {
-                type: 'application/javascript',
-              },
-            ),
-          ),
-          {
-            type: 'module',
-          },
-        );
-      }
-    }
-    if (isNode()) {
+    gWorker = getRuntime().createWorker(workerJs) as Worker | NodeWorker;
+
+    if (getRuntime().id === 'node') {
       (gWorker as NodeWorker).on('message', handleResponse);
       (gWorker as NodeWorker).on('error', (error: unknown) => {
         console.error(error);

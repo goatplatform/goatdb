@@ -75,7 +75,7 @@ export class RichTextChange extends Change<EncodedRTChange> {
     return 'rt';
   }
 
-  serialize(
+  override serialize(
     encoder: Encoder<keyof EncodedRTChange, CoreValue>,
     opts?: CoreOptions
   ): void {

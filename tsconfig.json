@@ -17,7 +17,6 @@
   },
   "include": [
     "mod.ts",
-    "server/mod.ts", 
     "react/hooks.ts"
   ],
   "exclude": [

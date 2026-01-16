@@ -53,7 +53,7 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
     return newValue;
   }
 
-  normalize(val: RichText) {
+  override normalize(val: RichText) {
     return normalizeRichText(val);
   }
 
@@ -61,11 +61,11 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
     return undefined;
   }
 
-  validate(value: any): boolean {
+  override validate(value: any): boolean {
     return isRichText(value);
   }
 
-  serialize(
+  override serialize(
     key: string,
     value: RichText,
     encoder: Encoder,
@@ -90,11 +90,11 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
     }
   }
 
-  deserialize(value: DecodedValue, options?: ValueTypeOptions) {
+  override deserialize(value: DecodedValue, options?: ValueTypeOptions) {
     return value as RichText;
   }
 
-  valueAddedDiff(value2: RichText, options?: ValueTypeOptions) {
+  override valueAddedDiff(value2: RichText, options?: ValueTypeOptions) {
     const local = options?.local === true; //Default is false
 
     const empty = initRichText();
@@ -102,7 +102,7 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
     return diff(empty, value2, local);
   }
 
-  valueRemovedDiff(
+  override valueRemovedDiff(
     value1: RichText,
     options?: ValueTypeOptions,
   ): Change<EncodedChange> | Change<EncodedChange>[] | undefined {
@@ -130,7 +130,7 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
     return false;
   }
 
-  equals(val1: RichText, val2: RichText, options?: ValueTypeOptions): boolean {
+  override equals(val1: RichText, val2: RichText, options?: ValueTypeOptions): boolean {
     const local = options?.local === true; //Default is false
 
     const func = local ? undefined : onlyNoneLocal;
@@ -139,11 +139,11 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
     });
   }
 
-  clone(value: RichText) {
+  override clone(value: RichText) {
     return coreValueClone(value);
   }
 
-  needGC(value: RichText): boolean {
+  override needGC(value: RichText): boolean {
     if (value.pointers) {
       for (const pointer of value.pointers) {
         if (isExpiredPointer(pointer, expiredPointersBuffer)) {
@@ -154,11 +154,11 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
     return false;
   }
 
-  gc(value: RichText): RichText | undefined {
+  override gc(value: RichText): RichText | undefined {
     return purgeExpiredPointers(value, expiredPointersBuffer);
   }
 
-  fillRefs(refs: Set<string>, value: RichText): void {
+  override fillRefs(refs: Set<string>, value: RichText): void {
     for (const [node] of dfs(value.root)) {
       if (isRefMarker(node)) {
         refs.add(node.ref);
@@ -166,7 +166,7 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
     }
   }
 
-  rewriteRefs(
+  override rewriteRefs(
     keyMapping: Map<string, string>,
     value: RichText,
     deleteRefs?: Set<string>,

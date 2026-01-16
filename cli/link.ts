@@ -32,7 +32,7 @@
  * ```
  */
 
-import * as path from '@std/path';
+import * as path from '../base/path.ts';
 import { prettyJSON } from '../base/common.ts';
 import {
   FileImplGet,
@@ -97,7 +97,6 @@ type DenoJson = {
 const goatEntryPoints = {
   '': 'mod.ts',
   '/react': 'react/hooks.ts',
-  '/server': 'server/mod.ts',
   '/init': 'cli/init.ts',
   '/link': 'cli/link.ts',
 } as const;

@@ -216,6 +216,9 @@ try {
 /**
  * Determines if the code is running in a browser environment.
  *
+ * @deprecated Use `getRuntime().id === 'browser'` from `base/runtime/index.ts` instead.
+ * This function is kept for backwards compatibility.
+ *
  * @returns {boolean} True if running in a browser, false otherwise.
  */
 export function isBrowser(): boolean {
@@ -225,6 +228,9 @@ export function isBrowser(): boolean {
 /**
  * Determines if the code is running in a Deno environment.
  *
+ * @deprecated Use `getRuntime().id === 'deno'` from `base/runtime/index.ts` instead.
+ * This function is kept for backwards compatibility.
+ *
  * @returns {boolean} True if running in Deno, false otherwise.
  */
 export function isDeno(): boolean {
@@ -233,6 +239,9 @@ export function isDeno(): boolean {
 
 /**
  * Determines if the code is running in a Node.js environment.
+ *
+ * @deprecated Use `getRuntime().id === 'node'` from `base/runtime/index.ts` instead.
+ * This function is kept for backwards compatibility.
  *
  * @returns {boolean} True if running in Node.js, false otherwise.
  */

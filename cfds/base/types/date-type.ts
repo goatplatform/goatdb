@@ -10,7 +10,7 @@ export class DateTypeOperations extends PrimitiveTypeOperations<Date> {
     super(CoreType.Date, 'date');
   }
 
-  deserialize(value: DecodedValue, options?: ValueTypeOptions) {
+  override deserialize(value: DecodedValue, options?: ValueTypeOptions) {
     const date = super.deserialize(value, options);
     if (typeof date === 'number') {
       return deserializeDate(date);
@@ -18,7 +18,7 @@ export class DateTypeOperations extends PrimitiveTypeOperations<Date> {
     return date;
   }
 
-  serialize(
+  override serialize(
     key: string,
     value: Date,
     encoder: Encoder,

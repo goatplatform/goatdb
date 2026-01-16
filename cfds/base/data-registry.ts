@@ -2,12 +2,9 @@ import type { CoreObject } from '../../base/core-types/base.ts';
 import { coreValueClone } from '../../base/core-types/clone.ts';
 import { assert } from '../../base/error.ts';
 import type { Session } from '../../db/session.ts';
-import {
-  type GoatDB,
-  itemPathGetPart,
-  itemPathGetRepoId,
-  Repository,
-} from '../../mod.ts';
+import type { GoatDB } from '../../db/db.ts';
+import { itemPathGetPart, itemPathGetRepoId } from '../../db/path.ts';
+import { Repository } from '../../repo/repo.ts';
 import {
   kNullSchema,
   kSchemaSession,

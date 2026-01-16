@@ -60,7 +60,7 @@ export class FieldChange<
 
       this.valueType = decoder.get('vType')! as ValueType;
       const typeOP = getTypeOperations(this.valueType);
-      this.value = typeOP.deserialize(decoder.get('value'));
+      this.value = typeOP.deserialize(decoder.get('value')) as TValue;
     } else {
       this.operation = config.operation;
       this.valueType = coreValueClone(config.valueType);
@@ -99,7 +99,7 @@ export class FieldChange<
     return valueTypeEquals(this.valueType, this.value, other.value);
   }
 
-  serialize(
+  override serialize(
     encoder: Encoder<keyof EncodedFieldChange, CoreValue>,
     _options?: unknown
   ): void {

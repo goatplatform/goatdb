@@ -1,4 +1,4 @@
-import { Tuple4, tuple4Make } from './tuple.ts';
+import { type Tuple4, tuple4Make } from './tuple.ts';
 
 export type VersionNumber = Tuple4;
 

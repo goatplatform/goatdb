@@ -219,7 +219,7 @@ export async function verifyData<T extends JSONValue>(
       hash: { name: 'SHA-384' },
     },
     expectedSigner.publicKey,
-    decodeBase32URL(sig.signature),
+    decodeBase32URL(sig.signature) as BufferSource,
     buffer,
   );
   gCachedDataVerifications.set(cacheKey, result);

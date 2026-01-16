@@ -1,5 +1,7 @@
 // deno-types="@types/nodemailer"
 import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
+import type SESTransport from 'nodemailer/lib/ses-transport/index.js';
 import type { ServerServices } from './server.ts';
 import { BaseService } from './service.ts';
 import type { EmailType } from '../../logging/metrics.ts';
@@ -15,18 +17,18 @@ import { Schema } from '../../cfds/base/schema.ts';
  * Can be either SMTP or Amazon SES configuration.
  */
 export type NodeMailerConfig =
-  | nodemailer.SmtpOptions
-  | nodemailer.SesOptions;
+  | SMTPTransport.Options
+  | SESTransport.Options;
 
 /**
- * Configuration interface for SMTP email service.
- * Extends NodeMailerConfig with additional debug options.
+ * Configuration type for SMTP email service.
+ * Combines NodeMailerConfig with additional debug options.
  *
  * @property debugEmails - When true, enables sending of emails on development
  *                        machines. When false or undefined, email sending is
  *                        disabled. Defaults to false.
  */
-export interface EmailConfig extends NodeMailerConfig {
+export type EmailConfig = NodeMailerConfig & {
   /**
    * The e-mail address of the sender. All e-mail addresses can be plain
    * 'sender@server.com' or formatted 'Sender Name <sender@server.com>', see
@@ -69,7 +71,7 @@ export interface EmailConfig extends NodeMailerConfig {
    * the Reply-To: field
    */
   replyTo?: string | string[] | undefined;
-}
+};
 
 /**
  * Interface for email message configuration.
@@ -115,13 +117,15 @@ export class EmailService<US extends Schema>
       return false;
     }
     try {
+      const builder = (this._config.builder ||
+        DefaultEmailBuilder) as unknown as EmailBuilder<US>;
       const msg = {
         from: this._config.from,
         sender: this._config.sender,
         cc: this._config.cc,
         bcc: this._config.bcc,
         replyTo: this._config.replyTo,
-        ...(this._config.builder || DefaultEmailBuilder)(info, this.services),
+        ...builder(info, this.services),
       };
       const success = await this._transporter.sendMail(msg);
       if (success) {

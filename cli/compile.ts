@@ -1,8 +1,8 @@
-import * as path from '@std/path';
-import type { AppConfig } from '../mod.ts';
+import * as path from '../base/path.ts';
+import type { AppConfig } from './app-config.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
-import { buildAssets } from '../server/generate-static-assets.ts';
-import { generateBuildInfo } from '../server/build-info.ts';
+import { buildAssets } from './build-assets.ts';
+import { generateBuildInfo } from '../base/build-info.ts';
 import { notReached } from '../base/error.ts';
 import { staticAssetsToJS } from '../system-assets/system-assets.ts';
 

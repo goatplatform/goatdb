@@ -1630,9 +1630,6 @@ export class Repository<
             break;
           }
           if (this.hasItemForCommit(c)) {
-            console.log(
-              `Reverting ${key} to ${new Date(c.timestamp).toLocaleString()}`,
-            );
             this.setValueForKey(key, this.itemForCommit(c), undefined);
             break;
           }
@@ -1698,9 +1695,6 @@ export class Repository<
           (c) => !connectionIds.includes(c.connectionId),
         );
         if (parent && this.hasItemForCommit(parent)) {
-          console.log(
-            `Reverting ${key} to ${parent.timestamp.toLocaleString()}`,
-          );
           this.setValueForKey(key, this.itemForCommit(parent), undefined);
         }
       }
