@@ -6,7 +6,12 @@
  */
 import * as path from '../base/path.ts';
 import { isDeno, isNode } from '../base/common.ts';
-import { pathExists, copyFile, mkdir, getCWD } from '../base/json-log/file-impl.ts';
+import {
+  copyFile,
+  getCWD,
+  mkdir,
+  pathExists,
+} from '../base/json-log/file-impl.ts';
 import { cli } from '../base/development.ts';
 
 /**
@@ -17,7 +22,7 @@ async function getTemplateDir(): Promise<string> {
   // Primary: relative to module (works for direct Deno/Node ESM execution)
   const primaryPath = path.join(
     path.dirname(path.fromFileUrl(import.meta.url)),
-    'templates'
+    'templates',
   );
 
   if (await pathExists(primaryPath)) {
@@ -38,7 +43,7 @@ async function copyTemplateFile(
   templateDir: string,
   templatePath: string,
   destPath: string,
-  targetDir: string
+  targetDir: string,
 ): Promise<void> {
   const fullDestPath = path.join(targetDir, destPath);
   if (await pathExists(fullDestPath)) {
@@ -50,8 +55,10 @@ async function copyTemplateFile(
   await copyFile(srcPath, fullDestPath);
 }
 
-
-async function installDenoDependency(spec: string, targetDir: string): Promise<void> {
+async function installDenoDependency(
+  spec: string,
+  targetDir: string,
+): Promise<void> {
   const result = await cli('deno', 'add', spec, { cwd: targetDir });
   if (result.exitCode !== 0) {
     throw new Error(`Failed to install dependency ${spec}`);
@@ -68,7 +75,9 @@ export interface BootstrapOptions {
   skipDependencies?: boolean;
 }
 
-export async function bootstrapProject(options?: BootstrapOptions | string): Promise<void> {
+export async function bootstrapProject(
+  options?: BootstrapOptions | string,
+): Promise<void> {
   // Support legacy string argument for backwards compatibility
   const opts: BootstrapOptions = typeof options === 'string'
     ? { targetDir: options }
@@ -84,26 +93,86 @@ export async function bootstrapProject(options?: BootstrapOptions | string): Pro
   if (!(await pathExists(templateDir))) {
     throw new Error(
       `Template directory not found at ${templateDir}. ` +
-      `Ensure GoatDB is properly installed.`
+        `Ensure GoatDB is properly installed.`,
     );
   }
 
   // Copy shared template files (identical for both platforms)
-  await copyTemplateFile(templateDir, 'shared/client/index.html', 'client/index.html', projectDir);
-  await copyTemplateFile(templateDir, 'shared/client/index.css', 'client/index.css', projectDir);
-  await copyTemplateFile(templateDir, 'shared/.gitignore', '.gitignore', projectDir);
+  await copyTemplateFile(
+    templateDir,
+    'shared/client/index.html',
+    'client/index.html',
+    projectDir,
+  );
+  await copyTemplateFile(
+    templateDir,
+    'shared/client/index.css',
+    'client/index.css',
+    projectDir,
+  );
+  await copyTemplateFile(
+    templateDir,
+    'shared/.gitignore',
+    '.gitignore',
+    projectDir,
+  );
 
   // Copy runtime-specific template files
-  await copyTemplateFile(templateDir, `${runtime}/client/index.tsx`, 'client/index.tsx', projectDir);
-  await copyTemplateFile(templateDir, `${runtime}/client/app.tsx`, 'client/app.tsx', projectDir);
-  await copyTemplateFile(templateDir, `${runtime}/common/schema.ts`, 'common/schema.ts', projectDir);
-  await copyTemplateFile(templateDir, `${runtime}/server/debug-server.ts`, 'server/debug-server.ts', projectDir);
-  await copyTemplateFile(templateDir, `${runtime}/server/server.ts`, 'server/server.ts', projectDir);
-  await copyTemplateFile(templateDir, `${runtime}/server/build.ts`, 'server/build.ts', projectDir);
+  await copyTemplateFile(
+    templateDir,
+    `${runtime}/client/index.tsx`,
+    'client/index.tsx',
+    projectDir,
+  );
+  await copyTemplateFile(
+    templateDir,
+    `${runtime}/client/app.tsx`,
+    'client/app.tsx',
+    projectDir,
+  );
+  await copyTemplateFile(
+    templateDir,
+    `${runtime}/common/schema.ts`,
+    'common/schema.ts',
+    projectDir,
+  );
+  await copyTemplateFile(
+    templateDir,
+    `${runtime}/server/debug-server.ts`,
+    'server/debug-server.ts',
+    projectDir,
+  );
+  await copyTemplateFile(
+    templateDir,
+    `${runtime}/server/server.ts`,
+    'server/server.ts',
+    projectDir,
+  );
+  await copyTemplateFile(
+    templateDir,
+    `${runtime}/server/build.ts`,
+    'server/build.ts',
+    projectDir,
+  );
+
+  // Copy Node.js SEA-specific server entry (for compiled executables)
+  if (runtime === 'node') {
+    await copyTemplateFile(
+      templateDir,
+      'node/server/server-sea.ts',
+      'server/server-sea.ts',
+      projectDir,
+    );
+  }
 
   // Copy configuration files based on runtime
   if (isDeno()) {
-    await copyTemplateFile(templateDir, 'deno/deno.json', 'deno.json', projectDir);
+    await copyTemplateFile(
+      templateDir,
+      'deno/deno.json',
+      'deno.json',
+      projectDir,
+    );
     if (!opts.skipDependencies) {
       await installDenoDependency('jsr:@goatdb/goatdb', projectDir);
       await installDenoDependency('jsr:@std/path', projectDir);
@@ -113,8 +182,18 @@ export async function bootstrapProject(options?: BootstrapOptions | string): Pro
       await installDenoDependency('npm:@types/react@19.0.8', projectDir);
     }
   } else if (isNode()) {
-    await copyTemplateFile(templateDir, 'node/package.json', 'package.json', projectDir);
-    await copyTemplateFile(templateDir, 'node/tsconfig.json', 'tsconfig.json', projectDir);
+    await copyTemplateFile(
+      templateDir,
+      'node/package.json',
+      'package.json',
+      projectDir,
+    );
+    await copyTemplateFile(
+      templateDir,
+      'node/tsconfig.json',
+      'tsconfig.json',
+      projectDir,
+    );
     await copyTemplateFile(templateDir, 'node/.npmrc', '.npmrc', projectDir);
 
     if (!opts.skipDependencies) {
@@ -124,23 +203,23 @@ export async function bootstrapProject(options?: BootstrapOptions | string): Pro
       }
     }
   }
-
 }
 
 // Handle main execution for both Deno and Node.js (ESM-compatible)
-function checkIsMainModule(): boolean {
+async function checkIsMainModule(): Promise<boolean> {
   if (typeof (import.meta as { main?: boolean }).main === 'boolean') {
     return (import.meta as { main: boolean }).main;
   }
-  // Node.js: compare import.meta.url with process.argv[1]
+  // Node.js ESM: compare resolved filesystem paths (cross-platform)
   if (isNode() && process.argv[1]) {
-    const scriptUrl = `file://${process.argv[1]}`;
-    return import.meta.url === scriptUrl;
+    const { fileURLToPath } = await import('node:url');
+    const { resolve } = await import('node:path');
+    return fileURLToPath(import.meta.url) === resolve(process.argv[1]);
   }
   return false;
 }
 
-if (checkIsMainModule()) {
+if (await checkIsMainModule()) {
   (async () => {
     try {
       // Get optional target directory from CLI arguments

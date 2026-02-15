@@ -20,11 +20,11 @@
     "@types/node": "^20.0.0",
     "@types/react": "^19.0.0",
     "@types/yargs": "^17.0.0",
-    "esbuild": "^0.24.0",
+    "esbuild": "^0.25.4",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.10.0"
   }
 }

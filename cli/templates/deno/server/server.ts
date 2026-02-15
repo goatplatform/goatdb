@@ -1,16 +1,21 @@
-import yargs from "yargs";
-import * as path from "node:path";
-import { prettyJSON } from "@goatdb/goatdb";
-import { Server, staticAssetsFromJS, type BuildInfo } from "@goatdb/goatdb/server";
-import { registerSchemas } from "../common/schema.ts";
+import yargs from 'yargs';
+import * as path from '@std/path';
+import { prettyJSON } from '@goatdb/goatdb';
+import {
+  type BuildInfo,
+  Server,
+  staticAssetsFromJS,
+} from '@goatdb/goatdb/server';
+import { registerSchemas } from '../common/schema.ts';
 // These imported files will be automatically generated during compilation
-import encodedStaticAsses from "../build/staticAssets.json" with {
-  type: "json",
+import encodedStaticAssets from '../build/staticAssets.json' with {
+  type: 'json',
 };
-import kBuildInfo from "../build/buildInfo.json" with { type: "json" };
+import kBuildInfo from '../build/buildInfo.json' with { type: 'json' };
 
 interface Arguments {
   path?: string;
+  port?: number;
   version?: boolean;
   info?: boolean;
 }
@@ -29,29 +34,56 @@ async function main(): Promise<void> {
   const buildInfo: BuildInfo = kBuildInfo as BuildInfo;
   const args: Arguments = yargs(Deno.args)
     .command(
-      "<path>",
-      "Start the server at the specified path",
+      '<path>',
+      'Start the server at the specified path',
     )
     .version(buildInfo.appVersion)
-    .option("info", {
-      alias: "i",
-      desc: "Print technical information",
-      type: "boolean",
+    .option('port', {
+      type: 'number',
+      default: 8080,
+      description: 'Port to run the server on',
+    })
+    .option('info', {
+      alias: 'i',
+      desc: 'Print technical information',
+      type: 'boolean',
     })
     .help()
     .parse();
   registerSchemas();
   if (args.info) {
-    console.log(buildInfo.appName + " v" + buildInfo.appVersion);
+    console.log(
+      (buildInfo.appName || 'app') + ' v' + (buildInfo.appVersion || 'unknown'),
+    );
     console.log(prettyJSON(buildInfo));
     Deno.exit();
   }
   const server = new Server({
-    staticAssets: staticAssetsFromJS(encodedStaticAsses),
-    path: args.path || path.join(Deno.cwd(), "server-data"),
+    staticAssets: staticAssetsFromJS(encodedStaticAssets),
+    path: args.path || path.join(Deno.cwd(), 'server-data'),
     buildInfo,
+    port: args.port,
   });
   await server.start();
+  console.log(`GoatDB server running at http://localhost:${server.port}`);
+
+  let stopping = false;
+  const shutdown = () => {
+    if (stopping) return;
+    stopping = true;
+    setTimeout(() => Deno.exit(1), 5000);
+    server.stop().then(() => Deno.exit(0)).catch((e) => {
+      console.error(e);
+      Deno.exit(1);
+    });
+  };
+  Deno.addSignalListener('SIGTERM', shutdown);
+  Deno.addSignalListener('SIGINT', shutdown);
 }
 
-if (import.meta.main) main();
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error(err);
+    Deno.exit(1);
+  });
+}
