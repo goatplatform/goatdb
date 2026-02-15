@@ -1706,7 +1706,7 @@ function compareCommitsDesc(c1: Commit, c2: Commit): number {
   if (c2.timestamp > c1.timestamp) {
     return 1;
   }
-  if (c2.timestamp < c2.timestamp) {
+  if (c2.timestamp < c1.timestamp) {
     return -1;
   }
   return compareStrings(c2.id, c1.id);
