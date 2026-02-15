@@ -206,6 +206,14 @@ try {
   // kIsDeno = false;
 }
 
+let kIsNode: boolean = false;
+try {
+  kIsNode = typeof process !== 'undefined' && !!process?.versions?.node &&
+    !process?.versions?.deno;
+} catch (_: unknown) {
+  // kIsNode = false;
+}
+
 let kHasSelf: boolean = false;
 try {
   kHasSelf = self !== undefined;
@@ -222,7 +230,7 @@ try {
  * @returns {boolean} True if running in a browser, false otherwise.
  */
 export function isBrowser(): boolean {
-  return kHasSelf && !kIsDeno;
+  return kHasSelf && !kIsDeno && !kIsNode;
 }
 
 /**
@@ -246,7 +254,7 @@ export function isDeno(): boolean {
  * @returns {boolean} True if running in Node.js, false otherwise.
  */
 export function isNode(): boolean {
-  return !kIsDeno && !kHasSelf;
+  return kIsNode;
 }
 
 /**

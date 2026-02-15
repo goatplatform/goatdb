@@ -1,10 +1,12 @@
 import { TEST } from './mod.ts';
-import { assertTrue, assertEquals } from './asserts.ts';
+import { assertEquals, assertTrue } from './asserts.ts';
 import {
-  getRuntime,
-  getRegisteredAdapters,
   clearRuntimeCache,
+  getRegisteredAdapters,
+  getRuntime,
 } from '../base/runtime/index.ts';
+
+declare const __BUNDLE_TARGET__: string | undefined;
 
 export default function setupRuntimeTests(): void {
   // I-001: Runtime Detection Caching
@@ -52,10 +54,28 @@ export default function setupRuntimeTests(): void {
   // C-001: Registration Order
   TEST('Runtime', 'adapters registered in correct order (C-001)', () => {
     const adapters = getRegisteredAdapters();
-    assertTrue(adapters.length >= 3, 'Should have at least 3 adapters');
-    assertEquals(adapters[0].id, 'deno', 'First adapter should be Deno');
-    assertEquals(adapters[1].id, 'browser', 'Second adapter should be Browser');
-    assertEquals(adapters[2].id, 'node', 'Third adapter should be Node');
+    // When bundled, __BUNDLE_TARGET__ is defined and only one adapter registers.
+    // When unbundled (Deno, Node dev), all three register.
+    if (typeof __BUNDLE_TARGET__ === 'undefined') {
+      assertTrue(adapters.length >= 3, 'Should have at least 3 adapters');
+      assertEquals(adapters[0].id, 'deno', 'First adapter should be Deno');
+      assertEquals(
+        adapters[1].id,
+        'browser',
+        'Second adapter should be Browser',
+      );
+      assertEquals(adapters[2].id, 'node', 'Third adapter should be Node');
+    } else {
+      assertTrue(
+        adapters.length >= 1,
+        'Should have at least 1 adapter when bundled',
+      );
+      assertEquals(
+        adapters[0].id,
+        __BUNDLE_TARGET__,
+        `Bundled adapter should match target "${__BUNDLE_TARGET__}"`,
+      );
+    }
   });
 
   // I-003: testConfig is frozen

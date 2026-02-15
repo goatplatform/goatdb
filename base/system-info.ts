@@ -1,5 +1,6 @@
 import { cli } from './development.ts';
 import { isBrowser, isDeno, isNode } from './common.ts';
+import { normalizeNodePlatform } from './os.ts';
 
 export type SystemInfo = {
   hardware: {
@@ -40,7 +41,7 @@ async function getServerSystemInfo(): Promise<SystemInfo> {
   } else if (isNode()) {
     const os = require('node:os');
     const process = require('node:process');
-    platform = `${os.platform()} ${os.arch()}`;
+    platform = `${normalizeNodePlatform(os.platform())} ${os.arch()}`;
     runtime = 'node';
     version = process.version;
   }
@@ -66,16 +67,16 @@ function getBrowserSystemInfo(): SystemInfo {
   let cpuInfo = navigator.hardwareConcurrency
     ? `${navigator.hardwareConcurrency} cores`
     : null;
-  
+
   // Try to get more CPU details from user agent
   const ua = navigator.userAgent;
   if (ua.includes('Intel')) {
-    cpuInfo = navigator.hardwareConcurrency 
-      ? `Intel CPU (${navigator.hardwareConcurrency} cores)` 
+    cpuInfo = navigator.hardwareConcurrency
+      ? `Intel CPU (${navigator.hardwareConcurrency} cores)`
       : 'Intel CPU';
   } else if (ua.includes('Apple') && ua.includes('Mac')) {
-    cpuInfo = navigator.hardwareConcurrency 
-      ? `Apple Silicon (${navigator.hardwareConcurrency} cores)` 
+    cpuInfo = navigator.hardwareConcurrency
+      ? `Apple Silicon (${navigator.hardwareConcurrency} cores)`
       : 'Apple Silicon';
   }
 
@@ -84,9 +85,13 @@ function getBrowserSystemInfo(): SystemInfo {
   if ('deviceMemory' in navigator) {
     // @ts-ignore - deviceMemory is not in standard types but may exist
     memoryInfo = `${navigator.deviceMemory}GB`;
-  } else if ('memory' in performance && 'totalJSHeapSize' in (performance as any).memory) {
+  } else if (
+    'memory' in performance && 'totalJSHeapSize' in (performance as any).memory
+  ) {
     // Estimate from JS heap limit (very rough approximation)
-    const heapMB = Math.round((performance as any).memory.totalJSHeapSize / (1024 * 1024));
+    const heapMB = Math.round(
+      (performance as any).memory.totalJSHeapSize / (1024 * 1024),
+    );
     if (heapMB > 100) {
       memoryInfo = `~${Math.round(heapMB / 500)}GB (estimated)`;
     }

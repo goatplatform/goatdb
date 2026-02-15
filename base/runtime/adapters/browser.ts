@@ -10,7 +10,9 @@ import type {
   RuntimeTestConfig,
   SystemInfo,
 } from '../index.ts';
+import type { OperatingSystem } from '../../os.ts';
 import type { FileImpl } from '../../json-log/file-impl-interface.ts';
+import { notReached } from '../../error.ts';
 
 /**
  * Browser-specific RuntimeAdapter implementation.
@@ -19,13 +21,15 @@ export const BrowserAdapter: RuntimeAdapter = {
   id: 'browser',
 
   detect(): boolean {
-    // Browser detection: has 'self' global but not Deno
+    // Browser detection: has 'self' global but not Deno or Node.js.
+    // Node.js workers also define 'self' (alias for globalThis since v13),
+    // so we must explicitly exclude them.
     try {
       // deno-lint-ignore no-explicit-any
-      const hasSelf = typeof (globalThis as any).self !== 'undefined';
-      // deno-lint-ignore no-explicit-any
-      const hasDeno = typeof (globalThis as any).Deno !== 'undefined';
-      return hasSelf && !hasDeno;
+      const g = globalThis as any;
+      return typeof g.self !== 'undefined' &&
+        typeof g.Deno === 'undefined' &&
+        !(typeof g.process !== 'undefined' && g.process.versions?.node);
     } catch {
       return false;
     }
@@ -44,7 +48,9 @@ export const BrowserAdapter: RuntimeAdapter = {
   createWorker(code: string): Worker {
     const blob = new Blob([code], { type: 'application/javascript' });
     const url = URL.createObjectURL(blob);
-    return new Worker(url, { type: 'module' });
+    const worker = new Worker(url, { type: 'module' });
+    URL.revokeObjectURL(url);
+    return worker;
   },
 
   getSystemInfo(): SystemInfo {
@@ -86,20 +92,51 @@ export const BrowserAdapter: RuntimeAdapter = {
     return '/temp';
   },
 
-  getOS(): string {
-    // Try to detect from navigator.platform
+  getExecPath(): string {
+    return notReached('getExecPath() is not available in browser');
+  },
+
+  getOS(): OperatingSystem {
     try {
+      // Tier 1: User-Agent Client Hints (Chrome 93+, Edge 93+)
+      // deno-lint-ignore no-explicit-any
+      const uaPlatform = typeof navigator !== 'undefined'
+        ? (navigator as any).userAgentData?.platform
+        : undefined;
+      if (uaPlatform) {
+        const p = uaPlatform.toLowerCase();
+        if (p.includes('win')) return 'windows';
+        if (p === 'macos' || p.includes('mac')) return 'darwin';
+        if (p.includes('android')) return 'android';
+        if (p.includes('linux')) return 'linux';
+      }
+
+      // Tier 2: navigator.platform (deprecated but universally supported)
       if (typeof navigator !== 'undefined' && navigator.platform) {
         const platform = navigator.platform.toLowerCase();
         if (platform.includes('win')) return 'windows';
         if (platform.includes('mac')) return 'darwin';
-        if (platform.includes('linux')) return 'linux';
-        return platform;
+        if (platform.includes('linux')) {
+          // Android reports platform as 'Linux armv...' — disambiguate via UA
+          if (navigator.userAgent?.toLowerCase().includes('android')) {
+            return 'android';
+          }
+          return 'linux';
+        }
+      }
+
+      // Tier 3: User-Agent string (last resort)
+      if (typeof navigator !== 'undefined' && navigator.userAgent) {
+        const ua = navigator.userAgent.toLowerCase();
+        if (ua.includes('windows')) return 'windows';
+        if (ua.includes('mac os') || ua.includes('macintosh')) return 'darwin';
+        if (ua.includes('android')) return 'android';
+        if (ua.includes('linux')) return 'linux';
       }
     } catch {
-      // Ignore errors
+      // Ignore errors in restricted contexts
     }
-    return 'browser';
+    return 'unknown';
   },
 
   terminalSize(): { cols: number; rows: number } {

@@ -17,13 +17,20 @@
 
 import { notReached } from '../error.ts';
 import type { FileImpl } from '../json-log/file-impl-interface.ts';
+import type { OperatingSystem } from '../os.ts';
 
 /**
  * Identifies a JavaScript runtime environment.
  * Standard runtimes are 'deno', 'node', 'browser'.
  * Extensible to support 'bun', 'electron', or custom runtimes.
  */
-export type RuntimeId = 'deno' | 'node' | 'browser' | 'bun' | 'electron' | string;
+export type RuntimeId =
+  | 'deno'
+  | 'node'
+  | 'browser'
+  | 'bun'
+  | 'electron'
+  | string;
 
 /**
  * Platform-specific test configuration.
@@ -107,9 +114,15 @@ export interface RuntimeAdapter {
   getTempDir(): Promise<string>;
 
   /**
+   * Gets the path to the current runtime executable.
+   * Throws in browsers (not applicable).
+   */
+  getExecPath(): string;
+
+  /**
    * Gets the operating system identifier.
    */
-  getOS(): string;
+  getOS(): OperatingSystem;
 
   /**
    * Gets terminal dimensions (columns and rows).
@@ -209,8 +222,28 @@ import { DenoAdapter } from './adapters/deno.ts';
 import { BrowserAdapter } from './adapters/browser.ts';
 import { NodeAdapter } from './adapters/node.ts';
 
-// Registration order: Deno first (most specific), Browser second, Node last (fallback)
-// This order is critical: Deno has both 'Deno' global and 'self', so must check first
-registerRuntime(DenoAdapter);
-registerRuntime(BrowserAdapter);
-registerRuntime(NodeAdapter);
+// Build-time target: replaced by esbuild's `define` option with a string
+// literal (e.g. "browser" or "node"). When running unbundled, the typeof
+// check prevents a ReferenceError and all adapters register.
+declare const __BUNDLE_TARGET__: string | undefined;
+
+// Registration order: Deno first (most specific), Browser second, Node last
+// (fallback). This order is critical: Deno has both 'Deno' global and 'self',
+// so must check first.
+// Note: Deno runs unbundled (__BUNDLE_TARGET__ undefined); the 'deno' check
+// is kept for potential future Deno bundling support.
+if (
+  typeof __BUNDLE_TARGET__ === 'undefined' || __BUNDLE_TARGET__ === 'deno'
+) {
+  registerRuntime(DenoAdapter);
+}
+if (
+  typeof __BUNDLE_TARGET__ === 'undefined' || __BUNDLE_TARGET__ === 'browser'
+) {
+  registerRuntime(BrowserAdapter);
+}
+if (
+  typeof __BUNDLE_TARGET__ === 'undefined' || __BUNDLE_TARGET__ === 'node'
+) {
+  registerRuntime(NodeAdapter);
+}

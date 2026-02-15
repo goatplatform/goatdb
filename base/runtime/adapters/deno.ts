@@ -10,6 +10,7 @@ import type {
   RuntimeTestConfig,
   SystemInfo,
 } from '../index.ts';
+import type { OperatingSystem } from '../../os.ts';
 import type { FileImpl } from '../../json-log/file-impl-interface.ts';
 
 /**
@@ -97,7 +98,11 @@ export const DenoAdapter: RuntimeAdapter = {
     return tempDir;
   },
 
-  getOS(): string {
+  getExecPath(): string {
+    return Deno.execPath();
+  },
+
+  getOS(): OperatingSystem {
     return Deno.build.os;
   },
 

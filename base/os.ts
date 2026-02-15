@@ -1,5 +1,6 @@
 import { isBrowser, isDeno, isNode } from './common.ts';
 import { notReached } from './error.ts';
+import { getRuntime } from './runtime/index.ts';
 
 /**
  * Represents the possible operating systems that can be detected.
@@ -12,26 +13,35 @@ export type OperatingSystem =
   | 'windows'
   | 'freebsd'
   | 'netbsd'
+  | 'openbsd'
   | 'aix'
   | 'solaris'
-  | 'illumos';
+  | 'illumos'
+  | 'unknown';
 
 /**
- * Returns the current operating system.
- *
- * Detects the OS in both Deno and Node.js environments.
- *
- * @returns The detected operating system
- * @throws If called in an unsupported runtime
+ * Normalizes a Node.js `os.platform()` string to a GoatDB OperatingSystem.
  */
+export function normalizeNodePlatform(platform: string): OperatingSystem {
+  if (platform === 'win32') return 'windows';
+  if (platform === 'sunos') return 'solaris';
+  const known: OperatingSystem[] = [
+    'darwin',
+    'linux',
+    'android',
+    'freebsd',
+    'netbsd',
+    'openbsd',
+    'aix',
+    'illumos',
+  ];
+  return known.includes(platform as OperatingSystem)
+    ? (platform as OperatingSystem)
+    : 'unknown';
+}
+
 export function getOS(): OperatingSystem {
-  if (isDeno()) {
-    return Deno.build.os;
-  } else if (isNode()) {
-    const os = require('node:os');
-    return os.platform();
-  }
-  notReached('Platform not supported');
+  return getRuntime().getOS();
 }
 
 /**

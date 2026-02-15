@@ -10,7 +10,10 @@ import type {
   RuntimeTestConfig,
   SystemInfo,
 } from '../index.ts';
+import type { OperatingSystem } from '../../os.ts';
+import { normalizeNodePlatform } from '../../os.ts';
 import type { FileImpl } from '../../json-log/file-impl-interface.ts';
+import { notReached } from '../../error.ts';
 
 /**
  * Node.js-specific RuntimeAdapter implementation.
@@ -83,10 +86,11 @@ export const NodeAdapter: RuntimeAdapter = {
     const proc = (globalThis as any).process;
     // deno-lint-ignore no-explicit-any
     const os = (globalThis as any).require?.('node:os');
+    const platform = os?.platform?.() || proc?.platform;
 
     return {
       runtime: 'node',
-      os: os?.platform?.() || proc?.platform,
+      os: normalizeNodePlatform(platform || 'unknown'),
       arch: os?.arch?.() || proc?.arch,
       version: proc?.versions?.node,
     };
@@ -108,14 +112,22 @@ export const NodeAdapter: RuntimeAdapter = {
     return proc?.env?.TMPDIR || proc?.env?.TMP || proc?.env?.TEMP || '/tmp';
   },
 
-  getOS(): string {
+  getExecPath(): string {
+    // deno-lint-ignore no-explicit-any
+    const execPath = (globalThis as any).process?.execPath;
+    if (!execPath) {
+      return notReached('getExecPath() is not available in this environment');
+    }
+    return execPath;
+  },
+
+  getOS(): OperatingSystem {
     // deno-lint-ignore no-explicit-any
     const os = (globalThis as any).require?.('node:os');
-    if (os?.platform) {
-      return os.platform();
-    }
     // deno-lint-ignore no-explicit-any
-    return (globalThis as any).process?.platform || 'unknown';
+    const platform: string = os?.platform?.() ||
+      (globalThis as any).process?.platform || 'unknown';
+    return normalizeNodePlatform(platform);
   },
 
   terminalSize(): { cols: number; rows: number } {
