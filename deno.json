@@ -8,15 +8,21 @@
     "useTabs": false,
     "lineWidth": 80,
     "indentWidth": 2,
-    "singleQuote": true
+    "singleQuote": true,
+    "exclude": [
+      "benchmarks/browser/assets/",
+      "system-assets/bloom_filter.js",
+      "external/"
+    ]
   },
   "name": "@goatdb/goatdb",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "license": "AGPL/ELV2",
   "exports": {
     ".": "./mod.ts",
     "./react": "./react/hooks.ts",
     "./server": "./server.ts",
+    "./server/build": "./server-build.ts",
     "./init": "./cli/init.ts",
     "./link": "./cli/link.ts"
   },
@@ -34,7 +40,6 @@
     "@luca/esbuild-deno-loader": "jsr:@luca/esbuild-deno-loader@^0.11.1",
     "@std/data-structures": "jsr:@std/data-structures@^1.0.8",
     "@std/expect": "jsr:@std/expect@^1.0.16",
-    "@std/fs": "jsr:@std/fs@^1.0.17",
     "@std/path": "jsr:@std/path@^1.0.9",
     "@std/encoding": "jsr:@std/encoding@^1.0.10",
     "@types/nodemailer": "npm:@types/nodemailer@^6.4.17",

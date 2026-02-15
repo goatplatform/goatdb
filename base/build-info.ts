@@ -1,7 +1,7 @@
 import { isDeno, isNode } from './common.ts';
 import { cli } from './development.ts';
 import { readTextFile } from './json-log/file-impl.ts';
-import { isWindows } from './os.ts';
+import { isWindows, normalizeNodePlatform } from './os.ts';
 import type { JSONObject } from './interfaces.ts';
 
 /**
@@ -37,7 +37,7 @@ export interface BuildInfo extends JSONObject {
   builder: BuilderInfo;
   /**
    * Application version, if available. Taken from the "version" field of the
-   * project's deno.json.
+   * project's configuration file (deno.json or package.json).
    */
   appVersion?: string;
   /**
@@ -60,7 +60,7 @@ async function getCurrentUsername(): Promise<string> {
       const username = Deno.env.get('USER') || Deno.env.get('LOGNAME');
       if (username) return username;
     }
-    const { result, exitCode } = await cli('whoami');
+    const { result, exitCode } = await cli('whoami', { timeout: 10_000 });
     return exitCode === 0 ? result.trim() : 'unknown';
   } else if (isNode()) {
     try {
@@ -78,7 +78,7 @@ async function getCurrentUsername(): Promise<string> {
       const username = process.env.USER || process.env.LOGNAME;
       if (username) return username;
     }
-    const { result, exitCode } = await cli('whoami');
+    const { result, exitCode } = await cli('whoami', { timeout: 10_000 });
     return exitCode === 0 ? result.trim() : 'unknown';
   }
   return 'unknown';
@@ -87,11 +87,11 @@ async function getCurrentUsername(): Promise<string> {
 /**
  * Generates build information for the current application.
  *
- * @param denoJsonPath Path to the deno.json configuration file
+ * @param configPath Path to the project configuration file (deno.json or package.json)
  * @returns A BuildInfo object containing details about the build
  */
 export async function generateBuildInfo(
-  denoJsonPath: string,
+  configPath: string,
 ): Promise<BuildInfo> {
   const info: Partial<BuildInfo> = {};
   // Creation date
@@ -111,9 +111,9 @@ export async function generateBuildInfo(
   } else if (isNode()) {
     info.builder = {
       runtime: 'node',
-      target: `${process.platform}-${process.arch}`,
+      target: `${normalizeNodePlatform(process.platform)}-${process.arch}`,
       arch: process.arch,
-      os: process.platform,
+      os: normalizeNodePlatform(process.platform),
       vendor: 'node',
       env: null,
     };
@@ -129,9 +129,17 @@ export async function generateBuildInfo(
     };
   }
   // App version
-  const denoJson = JSON.parse((await readTextFile(denoJsonPath)) || '{}');
-  if (typeof denoJson.version === 'string') {
-    info.appVersion = denoJson.version;
+  let config: Record<string, unknown> = {};
+  try {
+    config = JSON.parse((await readTextFile(configPath)) || '{}');
+  } catch {
+    // Malformed config file — proceed without version/name
+  }
+  if (typeof config.version === 'string') {
+    info.appVersion = config.version;
+  }
+  if (typeof config.name === 'string') {
+    info.appName = config.name;
   }
   return info as BuildInfo;
 }

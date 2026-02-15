@@ -32,6 +32,7 @@ db/managed-item.ts → ManagedItem (document interface)
 db/session.ts      → ECDSA P-384 authentication
 repo/              → Commit graphs, version history
 net/server/        → HTTP server, sync protocol
+server-build.ts    → Build-time exports (compile, startDebugServer, AppConfig)
 tests/mod.ts       → Test framework (TEST function)
 ```
 
@@ -42,9 +43,9 @@ tests/mod.ts       → Test framework (TEST function)
 Strictly enforced via runtime assertions. No exceptions.
 
 ```typescript
-db.item('/data/todos/task-123');   // Correct
-db.item('/todos/task-123');        // FAILS - missing type
-db.item('data/todos/task-123');    // FAILS - not absolute
+db.item('/data/todos/task-123'); // Correct
+db.item('/todos/task-123'); // FAILS - missing type
+db.item('data/todos/task-123'); // FAILS - not absolute
 ```
 
 ### Async Readiness
@@ -53,7 +54,7 @@ Database operations MUST await readiness:
 
 ```typescript
 const db = new GoatDB({ path: './data' });
-await db.readyPromise();  // MANDATORY - always
+await db.readyPromise(); // MANDATORY - always
 // ... operations ...
 await db.flushAll();
 await db.close();
@@ -91,12 +92,12 @@ db.create('/data/repo/item', kMySchema, data);
 
 ## Naming Conventions
 
-| Type | Pattern | Example |
-|------|---------|---------|
-| Variables/Functions | `camelCase` | `changeCount` |
-| Classes | `PascalCase` | `ManagedItem` |
-| Private fields | `_prefix` | `_ready` |
-| Grouped utilities | Common prefix | `itemPath*()` |
+| Type                | Pattern       | Example       |
+| ------------------- | ------------- | ------------- |
+| Variables/Functions | `camelCase`   | `changeCount` |
+| Classes             | `PascalCase`  | `ManagedItem` |
+| Private fields      | `_prefix`     | `_ready`      |
+| Grouped utilities   | Common prefix | `itemPath*()` |
 
 ## Security Invariants
 
@@ -107,15 +108,15 @@ db.create('/data/repo/item', kMySchema, data);
 
 ## Common Failures
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| Test never runs | `TEST()` outside setup | Move inside `setup()` |
-| Operations fail silently | Missing `readyPromise()` | Always await before ops |
-| Validation error | Schema not registered | Register before use |
-| Test hangs | DB not closed | Use try/finally with `close()` |
-| Path assertion | Wrong format | Use `/type/repo/item` |
+| Symptom                  | Cause                    | Fix                            |
+| ------------------------ | ------------------------ | ------------------------------ |
+| Test never runs          | `TEST()` outside setup   | Move inside `setup()`          |
+| Operations fail silently | Missing `readyPromise()` | Always await before ops        |
+| Validation error         | Schema not registered    | Register before use            |
+| Test hangs               | DB not closed            | Use try/finally with `close()` |
+| Path assertion           | Wrong format             | Use `/type/repo/item`          |
 
 ## CI
 
-GitHub Actions runs `deno task test` on push/PR to main.
-Requires Playwright: `deno run -A npm:playwright@^1.48.0 install --with-deps chromium`
+GitHub Actions runs `deno task test` on push/PR to main. Requires Playwright:
+`deno run -A npm:playwright@^1.48.0 install --with-deps chromium`

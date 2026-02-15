@@ -43,6 +43,18 @@ production. Progress is tracked under this
 
 :::
 
+:::tip[Building Standalone Executables]
+
+To compile Node.js applications to standalone executables using SEA (Single Executable Applications), ensure **postject** is available:
+
+```bash
+npm install -g postject
+```
+
+GoatDB uses postject automatically via `npx` during compilation. See [Node.js SEA docs](https://nodejs.org/api/single-executable-applications.html).
+
+:::
+
 **npm:**
 
 ```bash

@@ -24,6 +24,7 @@ import setupMinimalSync from './minimal-client-server-sync.test.ts';
 import setupE2ELatency from './e2e-latency.test.ts';
 import setupClusterLatency from './cluster-latency.test.ts';
 import setupCliInitTests from './cli-init.test.ts';
+import setupCliCompileTests from './cli-compile.test.ts';
 import setupPathTests from './path.test.ts';
 import setupRuntimeTests from './runtime.test.ts';
 import setupProgressTests from './progress.test.ts';
@@ -63,6 +64,7 @@ export async function registerAllTests(): Promise<void> {
   setupMinimalSync(); // Basic client-server synchronization
 
   // HEAVY END-TO-END TESTS (10-30s each) - Full system, network latency, multi-node
+  setupCliCompileTests(); // CLI compilation (includes E2E compile test)
   setupE2ELatency(); // Client-to-client sync latency measurement
   setupClusterLatency(); // Multi-server cluster sync performance
 }
