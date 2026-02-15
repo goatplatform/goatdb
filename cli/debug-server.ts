@@ -86,7 +86,16 @@ export type DebugServerOptions<US extends Schema> =
   & Omit<ServerOptions<US>, 'staticAssets' | 'buildInfo' | 'domain'>
   & Partial<Pick<ServerOptions<US>, 'domain'>>
   & LiveReloadOptions
-  & AppConfig;
+  & AppConfig
+  & {
+    /**
+     * Called after the server and database are initialized but before
+     * HTTP listening begins. Use this to access the GoatDB instance
+     * for server-side application logic (event handlers, background
+     * processes, custom endpoints).
+     */
+    setup?: (server: Server<US>) => void | Promise<void>;
+  };
 
 async function openBrowser(url: string): Promise<void> {
   if (isDeno()) {
@@ -172,6 +181,10 @@ export async function startDebugServer<US extends Schema>(
   ];
 
   await server.servicesForOrganization(options.orgId || 'localhost');
+
+  if (options.setup) {
+    await options.setup(server);
+  }
 
   if (options.beforeBuild) {
     await options.beforeBuild();
