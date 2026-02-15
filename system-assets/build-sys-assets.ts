@@ -1,7 +1,7 @@
 import * as path from '@std/path';
 import * as esbuild from 'esbuild';
 import { denoPlugins } from '@luca/esbuild-deno-loader';
-import { getRepositoryPath } from '../base/development.ts';
+import { getRepositoryPath } from '../base/git-root.ts';
 import { type StaticAssets, staticAssetsToJS } from './system-assets.ts';
 
 export async function buildSysAssets(): Promise<void> {

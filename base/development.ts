@@ -1,6 +1,4 @@
-import * as path from './path.ts';
 import { isDeno, isNode } from './common.ts';
-import { pathExists } from './json-log/file-impl.ts';
 
 // Minimal type for objects with a toString method (used in Node.js streams)
 type Stringable = { toString(): string };
@@ -8,23 +6,8 @@ type Stringable = { toString(): string };
 // Cache Node.js child_process module (loaded lazily)
 let childProcessModule: any = undefined;
 
-export function getEntryFilePath(): string {
-  return path.fromFileUrl(import.meta.url);
-}
-
-export async function getRepositoryPath(): Promise<string> {
-  let candidate = path.dirname(getEntryFilePath());
-  while (!(await pathExists(path.join(candidate, '.git')))) {
-    candidate = path.dirname(candidate);
-  }
-  return candidate;
-}
-
-export async function getImportMapPath(): Promise<string> {
-  return path.join(await getRepositoryPath(), 'import-map.json');
-}
-
 export async function copyToClipboard(value: string): Promise<boolean> {
+  if (!isDeno()) return false;
   try {
     if (Deno.build.os === 'darwin') {
       const process = new Deno.Command('pbcopy', {
@@ -65,6 +48,8 @@ export interface CliResult {
 export interface CliOptions {
   /** Working directory for the command */
   cwd?: string;
+  /** Timeout in milliseconds. Process is killed if it exceeds this. */
+  timeout?: number;
 }
 
 function isCliOptions(arg: unknown): arg is CliOptions {
@@ -84,7 +69,10 @@ function isCliOptions(arg: unknown): arg is CliOptions {
  * const { result, exitCode } = await cli('npm', 'install', { cwd: '/path/to/project' });
  * ```
  */
-export async function cli(cmd: string, ...args: (string | CliOptions)[]): Promise<CliResult> {
+export async function cli(
+  cmd: string,
+  ...args: (string | CliOptions)[]
+): Promise<CliResult> {
   // Extract options if the last argument is an options object
   let options: CliOptions = {};
   let cmdArgs: string[];
@@ -97,18 +85,38 @@ export async function cli(cmd: string, ...args: (string | CliOptions)[]): Promis
     cmdArgs = args as string[];
   }
 
-  // console.log(`Running: ${cmd} ${cmdArgs.join(' ')}`);
   if (isDeno()) {
+    const ac = options.timeout ? new AbortController() : undefined;
+    let timer: number | undefined;
+    if (ac && options.timeout) {
+      timer = setTimeout(
+        () => ac.abort(),
+        options.timeout,
+      ) as unknown as number;
+    }
     const process = new Deno.Command(cmd, {
       args: cmdArgs,
       stdout: 'piped',
       stderr: 'piped',
       cwd: options.cwd,
+      signal: ac?.signal,
     });
-    const { stdout, stderr, code } = await process.output();
-    const decoder = new TextDecoder();
-    const output = decoder.decode(stdout) + decoder.decode(stderr);
-    return { result: output, exitCode: code };
+    try {
+      const { stdout, stderr, code } = await process.output();
+      const decoder = new TextDecoder();
+      const output = decoder.decode(stdout) + decoder.decode(stderr);
+      return { result: output, exitCode: code };
+    } catch (e: unknown) {
+      if (ac?.signal.aborted) {
+        return {
+          result: `Process timed out after ${options.timeout}ms`,
+          exitCode: 124,
+        };
+      }
+      throw e;
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
   } else if (isNode()) {
     // Node.js environment - lazy load child_process module
     if (!childProcessModule) {
@@ -117,23 +125,62 @@ export async function cli(cmd: string, ...args: (string | CliOptions)[]): Promis
     const { spawn } = childProcessModule;
     return new Promise((resolve) => {
       let result = '';
-      const spawnOptions = options.cwd ? { cwd: options.cwd } : {};
-      const process = spawn(cmd, cmdArgs, spawnOptions);
+      const spawnOptions: Record<string, unknown> = {};
+      if (options.cwd) spawnOptions.cwd = options.cwd;
 
-      process.stdout.on('data', (data: Stringable) => {
+      const proc = spawn(cmd, cmdArgs, spawnOptions);
+      let settled = false;
+      let timedOut = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let killTimer: ReturnType<typeof setTimeout> | undefined;
+
+      function settle(value: CliResult): void {
+        if (settled) return;
+        settled = true;
+        if (timer !== undefined) clearTimeout(timer);
+        if (killTimer !== undefined) clearTimeout(killTimer);
+        resolve(value);
+      }
+
+      if (options.timeout) {
+        timer = setTimeout(() => {
+          timedOut = true;
+          try {
+            proc.kill('SIGTERM');
+          } catch (_) {
+            // Process already exited
+          }
+          killTimer = setTimeout(() => {
+            try {
+              proc.kill('SIGKILL');
+            } catch (_) {
+              // Process already exited
+            }
+          }, 2_000);
+        }, options.timeout);
+      }
+
+      proc.stdout.on('data', (data: Stringable) => {
         result += data.toString();
       });
 
-      process.stderr.on('data', (data: Stringable) => {
+      proc.stderr.on('data', (data: Stringable) => {
         result += data.toString();
       });
 
-      process.on('close', (code: number | null) => {
-        resolve({ result, exitCode: code ?? 0 });
+      proc.on('close', (code: number | null) => {
+        if (timedOut) {
+          settle({
+            result: `Process timed out after ${options.timeout}ms`,
+            exitCode: 124,
+          });
+        } else {
+          settle({ result, exitCode: code ?? 0 });
+        }
       });
 
-      process.on('error', (err: Error) => {
-        resolve({ result: err.message, exitCode: 1 });
+      proc.on('error', (err: Error) => {
+        settle({ result: err.message, exitCode: 1 });
       });
     });
   } else {
