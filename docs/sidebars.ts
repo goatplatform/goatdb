@@ -1,4 +1,4 @@
-import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
+import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
 const sidebars: SidebarsConfig = {
   // By default, Docusaurus generates a sidebar from the docs folder structure
@@ -6,12 +6,12 @@ const sidebars: SidebarsConfig = {
     // GETTING STARTED (Progressive onboarding)
     'installation',
     'tutorial',
-    
+
     // CORE CONCEPTS (Foundation knowledge)
     'concepts',
     'architecture',
     'schema',
-    
+
     // PRACTICAL GUIDES (How-to documentation)
     'reading-and-writing-data',
     'query',
@@ -20,12 +20,12 @@ const sidebars: SidebarsConfig = {
     'sessions',
     'authorization-rules',
     'sync',
-    
+
     // ADVANCED TOPICS (Deep dives)
     'conflict-resolution',
     'commit-graph',
     'order-stamps',
-    
+
     // API REFERENCE
     {
       type: 'category',
@@ -34,7 +34,7 @@ const sidebars: SidebarsConfig = {
       items: [
         // Start with overview
         'api/index',
-        
+
         // ESSENTIALS - Most commonly used APIs
         {
           type: 'category',
@@ -42,12 +42,12 @@ const sidebars: SidebarsConfig = {
           collapsed: false,
           items: [
             'api/classes/goatdb',
-            'api/classes/manageditem', 
+            'api/classes/manageditem',
             'api/classes/query',
             'api/classes/dataregistry',
           ],
         },
-        
+
         // CORE CLASSES
         {
           type: 'category',
@@ -61,7 +61,7 @@ const sidebars: SidebarsConfig = {
             'api/classes/jsonlogstream',
           ],
         },
-        
+
         // SERVER & DEPLOYMENT
         {
           type: 'category',
@@ -84,7 +84,7 @@ const sidebars: SidebarsConfig = {
             'api/types/emailinfo',
           ],
         },
-        
+
         // REACT INTEGRATION
         {
           type: 'category',
@@ -97,7 +97,7 @@ const sidebars: SidebarsConfig = {
             'api/types/propswithpath',
           ],
         },
-        
+
         // CORE INTERFACES & TYPES
         {
           type: 'category',
@@ -114,14 +114,14 @@ const sidebars: SidebarsConfig = {
             'api/interfaces/readonlyjsonobject',
             'api/interfaces/logstream',
             'api/interfaces/buildinfo',
-            
+
             // Behavioral interfaces
             'api/interfaces/comparable',
             'api/interfaces/equatable',
             'api/interfaces/clonable',
             'api/interfaces/encodable',
             'api/interfaces/encoder',
-            
+
             // Core value types
             'api/types/corevalue',
             'api/types/concretecorevalue',
@@ -132,12 +132,12 @@ const sidebars: SidebarsConfig = {
             'api/types/corekey',
             'api/types/readonlycoreobject',
             'api/types/readonlycorearray',
-            
+
             // Database types
             'api/types/dbreadystate',
           ],
         },
-        
+
         // SCHEMA & VALIDATION
         {
           type: 'category',
@@ -158,7 +158,7 @@ const sidebars: SidebarsConfig = {
             'api/types/schemavaluewithoptional',
           ],
         },
-        
+
         // AUTHENTICATION & AUTHORIZATION
         {
           type: 'category',
@@ -172,7 +172,7 @@ const sidebars: SidebarsConfig = {
             'api/types/authruleinfo',
           ],
         },
-        
+
         // UTILITIES & HELPERS
         {
           type: 'category',
@@ -187,7 +187,7 @@ const sidebars: SidebarsConfig = {
         },
       ],
     },
-    
+
     // REFERENCE & SUPPORT
     'benchmarks',
     'faq',

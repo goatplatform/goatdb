@@ -143,7 +143,10 @@ export async function pathExists(path: string): Promise<boolean> {
  * @returns Promise<void> Resolves when the copy is complete
  * @throws Will throw an error if the source file doesn't exist or copy fails
  */
-export async function copyFile(srcPath: string, destPath: string): Promise<void> {
+export async function copyFile(
+  srcPath: string,
+  destPath: string,
+): Promise<void> {
   const impl = await FileImplGet();
   await impl.copyFile(srcPath, destPath);
 }

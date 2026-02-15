@@ -65,7 +65,9 @@ async function runBenchmarks(): Promise<void> {
     if (runtime === 'all') {
       // Special case: run all runtimes when explicitly requested
       runtimes = ['deno', 'node', 'browser'];
-    } else if (runtime !== 'deno' && runtime !== 'node' && runtime !== 'browser') {
+    } else if (
+      runtime !== 'deno' && runtime !== 'node' && runtime !== 'browser'
+    ) {
       console.error(
         'Invalid value for --runtime:',
         runtime,

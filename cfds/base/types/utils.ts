@@ -10,7 +10,7 @@ export function diff(
   value1: CoreValue,
   value2: CoreValue,
   typeOP?: IValueTypeOperations,
-  options: ValueTypeOptions = {}
+  options: ValueTypeOptions = {},
 ): undefined | Change<EncodedChange> | Change<EncodedChange>[] {
   if (value1 === undefined && value2 === undefined) return;
 
@@ -32,7 +32,7 @@ export function patch(
   value: CoreValue,
   changes: Change<EncodedChange>[],
   typeOP?: IValueTypeOperations,
-  options: ValueTypeOptions = {}
+  options: ValueTypeOptions = {},
 ): CoreValue {
   const lTypeOP = typeOP || getTypeOperationsByValue(value);
   const newValue = lTypeOP.patch(value, changes, options);
@@ -42,7 +42,7 @@ export function patch(
 
 export function concatChanges(
   changes1: undefined | Change<EncodedChange> | Change<EncodedChange>[],
-  changes2: undefined | Change<EncodedChange> | Change<EncodedChange>[]
+  changes2: undefined | Change<EncodedChange> | Change<EncodedChange>[],
 ): Change<EncodedChange>[] {
   const result: Change<EncodedChange>[] = [];
   if (changes1) {

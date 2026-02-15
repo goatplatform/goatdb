@@ -199,7 +199,7 @@ export function isEmptyObject(obj: any): boolean {
 }
 
 export function isGenerator<T = unknown, TReturn = any, TNext = unknown>(
-  obj: any
+  obj: any,
 ): obj is Generator<T, TReturn, TNext> {
   return (
     !isNoValue(obj) &&

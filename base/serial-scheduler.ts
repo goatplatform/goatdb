@@ -7,7 +7,7 @@ export class SerialScheduler {
 
   constructor() {
     this._timer = new NextEventLoopCycleTimer(() =>
-      this.processPendingFunctions(),
+      this.processPendingFunctions()
     );
     this._pendingFunctions = [];
   }

@@ -46,8 +46,7 @@ export abstract class BaseCyclicalEncoder<
   R extends JSONValue,
   T,
   OT extends CoreOptions = CoreOptions,
-> implements Encoder<string, CoreValue, T, OT>
-{
+> implements Encoder<string, CoreValue, T, OT> {
   set(key: string, value: CoreValue, options?: OT): void {
     // TODO(ofri): Properly handle Encodable instances as values
     if (isObject(value)) {

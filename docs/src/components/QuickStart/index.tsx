@@ -7,16 +7,18 @@ import styles from './styles.module.css';
 export default function QuickStart(): JSX.Element {
   return (
     <section className={styles.quickstart}>
-      <div className="container">
+      <div className='container'>
         <div className={styles.quickstartHeader}>
           <h2>Start building in seconds</h2>
-          <p>Everything you need to build collaborative, offline-capable apps.</p>
+          <p>
+            Everything you need to build collaborative, offline-capable apps.
+          </p>
         </div>
-        
-        <Tabs defaultValue="basic" className={styles.codeTabs}>
-            <TabItem value="basic" label="Define & Store" default>
-              <CodeBlock language="typescript">
-{`// Define your data structure
+
+        <Tabs defaultValue='basic' className={styles.codeTabs}>
+          <TabItem value='basic' label='Define & Store' default>
+            <CodeBlock language='typescript'>
+              {`// Define your data structure
 const TodoSchema = {
   ns: 'todo',
   version: 1,
@@ -37,12 +39,12 @@ todo.set('done', true);
 
 // Delete it - no await needed
 todo.isDeleted = true;`}
-              </CodeBlock>
-            </TabItem>
-            
-            <TabItem value="react" label="React Integration">
-              <CodeBlock language="tsx">
-{`// Your UI stays in sync automatically
+            </CodeBlock>
+          </TabItem>
+
+          <TabItem value='react' label='React Integration'>
+            <CodeBlock language='tsx'>
+              {`// Your UI stays in sync automatically
 function TodoList() {
   // This query updates when ANY peer makes changes
   const todos = useQuery({
@@ -72,12 +74,12 @@ function TodoItem({ path }: { path: string }) {
     </label>
   );
 }`}
-              </CodeBlock>
-            </TabItem>
-            
-            <TabItem value="sync" label="Multiplayer">
-              <CodeBlock language="typescript">
-{`// Collaborative whiteboard with automatic merging
+            </CodeBlock>
+          </TabItem>
+
+          <TabItem value='sync' label='Multiplayer'>
+            <CodeBlock language='typescript'>
+              {`// Collaborative whiteboard with automatic merging
 const WhiteboardSchema = {
   ns: 'whiteboard',
   version: 1,
@@ -116,9 +118,9 @@ board.set('shapes', board.get('shapes').add({
 
 // The magic: Sets and maps merge like Git branches - intelligently combining changes.
 // Unlike last-write-wins, everyone's additions are preserved.`}
-              </CodeBlock>
-            </TabItem>
-          </Tabs>
+            </CodeBlock>
+          </TabItem>
+        </Tabs>
       </div>
     </section>
   );

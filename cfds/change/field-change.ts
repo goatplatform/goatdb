@@ -40,7 +40,7 @@ export interface FieldChangeConfig<TValue extends CoreValue>
 }
 
 export class FieldChange<
-  TValue extends CoreValue
+  TValue extends CoreValue,
 > extends Change<EncodedFieldChange> {
   readonly operation: FieldOperation;
   readonly value: TValue;
@@ -49,7 +49,7 @@ export class FieldChange<
   constructor(
     config:
       | FieldChangeConfig<TValue>
-      | ConstructorDecoderConfig<EncodedFieldChange>
+      | ConstructorDecoderConfig<EncodedFieldChange>,
   ) {
     super(config);
 
@@ -68,7 +68,7 @@ export class FieldChange<
       const typeOP = getTypeOperations(this.valueType);
       assert(
         typeOP.validate(config.value),
-        `Invalid Field value for type: ${this.valueType}`
+        `Invalid Field value for type: ${this.valueType}`,
       );
       this.value = config.value;
     }
@@ -101,7 +101,7 @@ export class FieldChange<
 
   override serialize(
     encoder: Encoder<keyof EncodedFieldChange, CoreValue>,
-    _options?: unknown
+    _options?: unknown,
   ): void {
     super.serialize(encoder, _options);
 

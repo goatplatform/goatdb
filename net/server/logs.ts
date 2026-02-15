@@ -7,7 +7,7 @@ export class LogsEndpoint implements Endpoint {
   filter(
     services: ServerServices,
     req: Request,
-    info: Deno.ServeHandlerInfo
+    info: Deno.ServeHandlerInfo,
   ): boolean {
     if (req.method !== 'POST') {
       return false;
@@ -19,13 +19,13 @@ export class LogsEndpoint implements Endpoint {
   async processRequest(
     services: ServerServices,
     req: Request,
-    info: Deno.ServeHandlerInfo
+    info: Deno.ServeHandlerInfo,
   ): Promise<Response> {
     if (!req.body) {
       return Promise.resolve(
         new Response(null, {
           status: 400,
-        })
+        }),
       );
     }
 
@@ -33,7 +33,7 @@ export class LogsEndpoint implements Endpoint {
     const [userId, userRecord, userSession] = await requireSignedUser(
       services,
       req,
-      'operator'
+      'operator',
     );
     const db = services.sqliteLogStream.db;
     const query = reqJson.query;

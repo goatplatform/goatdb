@@ -36,11 +36,11 @@ export function benchmarkResultsJoin(
     benchmarkId: uniqueId(),
     testSize: r1.testSize + r2.testSize,
     totalInsertTime: r1.totalInsertTime + r2.totalInsertTime,
-    avgInsertTime:
-      (r1.totalInsertTime + r2.totalInsertTime) / (r1.testSize + r2.testSize),
+    avgInsertTime: (r1.totalInsertTime + r2.totalInsertTime) /
+      (r1.testSize + r2.testSize),
     totalGetTime: r1.totalGetTime + r2.totalGetTime,
-    avgGetTime:
-      (r1.totalGetTime + r2.totalGetTime) / (r1.testSize + r2.testSize),
+    avgGetTime: (r1.totalGetTime + r2.totalGetTime) /
+      (r1.testSize + r2.testSize),
   };
 }
 

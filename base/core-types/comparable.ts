@@ -3,7 +3,7 @@ import { compareStrings } from '../string.ts';
 import { CoreOptions, CoreType, CoreValue } from './base.ts';
 import { encodableValueHash } from './encoding/hash.ts';
 import { Comparable } from './index.ts';
-import { getCoreType, isEquatable, isComparable } from './utils.ts';
+import { getCoreType, isComparable, isEquatable } from './utils.ts';
 
 export const MinComparableValue = {};
 export const MaxComparableValue = {};

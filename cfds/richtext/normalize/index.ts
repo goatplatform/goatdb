@@ -24,7 +24,7 @@ export function normalizeRichText(richText: RichText): RichText {
   stripTrivialTextNodes(richText);
   richText = reconstructRichText(
     // stripTrivialTextNodes(
-    flattenRichText(richText, true, false)
+    flattenRichText(richText, true, false),
     // richText.pointers
     // )
   );
@@ -42,7 +42,7 @@ export function normalizeRichText(richText: RichText): RichText {
 
 function hasPointers(
   node: TextNode,
-  ptrSet: Set<Pointer> | undefined
+  ptrSet: Set<Pointer> | undefined,
 ): boolean {
   if (!ptrSet) {
     return false;
@@ -184,7 +184,7 @@ enum ActionResult {
 function runNodeRules(
   parent: ElementNode,
   grandParent?: ElementNode,
-  gpIndex?: number
+  gpIndex?: number,
 ): number {
   let i = parent.children.length - 1;
   let counter = 0;
@@ -337,8 +337,9 @@ function runNodeRules(
             child.text === '' &&
             child.isLocal === undefined
           ) {
-            const brother =
-              i === 0 ? parent.children[1] : parent.children[i - 1];
+            const brother = i === 0
+              ? parent.children[1]
+              : parent.children[i - 1];
 
             if (i + 1 === parent.children.length) {
               const firstChild = parent.children[0];
@@ -376,7 +377,7 @@ function runNodeRules(
         }
         default: {
           throw new Error(
-            `Rule action: ${(action as any).name} is not defined!`
+            `Rule action: ${(action as any).name} is not defined!`,
           );
         }
       }

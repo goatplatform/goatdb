@@ -61,7 +61,7 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
     const handle = await dir.getFileHandle(path.basename(filePath), {
       create: write,
     });
-    
+
     // For benchmarks and tests that rapidly close and reopen files,
     // we need to handle the race condition where the browser hasn't
     // fully released the OPFS lock from the previous close() call.
@@ -71,37 +71,41 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
       file = await (handle as unknown as SyncHandle).createSyncAccessHandle();
     } catch (firstError) {
       // If it fails with a locking error, retry with delays
-      if (firstError instanceof Error && 
-          (firstError.message.includes('Access Handles cannot be created') ||
-           firstError.message.includes('another open Access Handle') ||
-           firstError.message.includes('Writable stream'))) {
-        
+      if (
+        firstError instanceof Error &&
+        (firstError.message.includes('Access Handles cannot be created') ||
+          firstError.message.includes('another open Access Handle') ||
+          firstError.message.includes('Writable stream'))
+      ) {
         console.warn(`[OPFS] Handle locked for ${filePath}, retrying...`);
-        
+
         file = await retry(
           async () => {
             try {
-              return await (handle as unknown as SyncHandle).createSyncAccessHandle();
+              return await (handle as unknown as SyncHandle)
+                .createSyncAccessHandle();
             } catch (e) {
               // Only retry if it's still a locking error
-              if (e instanceof Error && 
-                  (e.message.includes('Access Handles cannot be created') ||
-                   e.message.includes('another open Access Handle') ||
-                   e.message.includes('Writable stream'))) {
+              if (
+                e instanceof Error &&
+                (e.message.includes('Access Handles cannot be created') ||
+                  e.message.includes('another open Access Handle') ||
+                  e.message.includes('Writable stream'))
+              ) {
                 throw new TryAgain(e);
               }
               throw e;
             }
           },
-          100,   // 100ms total timeout - balance between speed and reliability
-          10,    // 10ms max delay between retries
+          100, // 100ms total timeout - balance between speed and reliability
+          10, // 10ms max delay between retries
         );
       } else {
         // Not a locking error, propagate immediately
         throw firstError;
       }
     }
-    
+
     return {
       handle,
       file,
@@ -212,7 +216,7 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
       const size = srcHandle.file.getSize();
       if (size > MAX_COPY_SIZE) {
         throw new Error(
-          `File too large for browser copy: ${size} bytes (max ${MAX_COPY_SIZE})`
+          `File too large for browser copy: ${size} bytes (max ${MAX_COPY_SIZE})`,
         );
       }
       const buffer = new Uint8Array(size);
@@ -233,7 +237,9 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
   async readDir(dirPath: string): Promise<DirEntry[]> {
     const dir = await getDirReadOnly(dirPath);
     if (!dir) {
-      throw new Error(`ENOENT: no such file or directory, scandir '${dirPath}'`);
+      throw new Error(
+        `ENOENT: no such file or directory, scandir '${dirPath}'`,
+      );
     }
     const entries: DirEntry[] = [];
     for await (const [name, handle] of dir.entries()) {

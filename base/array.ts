@@ -3,7 +3,7 @@ import { randomInt } from './math.ts';
 export function equal<T>(
   arr1: T[],
   arr2: T[],
-  comparator?: (a: T, b: T) => boolean
+  comparator?: (a: T, b: T) => boolean,
 ) {
   if (!!arr1 != !!arr2) {
     return false;
@@ -75,7 +75,7 @@ export function shuffle<T>(arr: T[]): T[] {
 
 export function* slices<T>(
   values: T[] | Iterable<T>,
-  size: number
+  size: number,
 ): Generator<T[], void, void> {
   if (values instanceof Array) {
     for (let i = 0; i < values.length; i += size) {
@@ -99,7 +99,7 @@ export function* slices<T>(
 export function anyArrayIntersection<T1, T2>(
   arr1: T1[],
   arr2: T2[],
-  eq: (i1: T1, i2: T2) => boolean = (i1, i2) => (i1 as any) === (i2 as any)
+  eq: (i1: T1, i2: T2) => boolean = (i1, i2) => (i1 as any) === (i2 as any),
 ) {
   for (const i1 of arr1) {
     for (const i2 of arr2) {

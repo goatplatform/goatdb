@@ -18,7 +18,7 @@ export type PromiseResult<T> = SuccessResult<T> | ErrorResult;
  */
 export async function awaitPromises<T>(
   promises: Promise<T>[],
-  returnResults: boolean = true
+  returnResults: boolean = true,
 ): Promise<PromiseResult<T>[]> {
   if (!promises.length) {
     return Promise.resolve([]);
@@ -36,7 +36,7 @@ export async function awaitPromises<T>(
           return { status: 'error', error: err };
         }
       }
-    })
+    }),
   );
 
   if (returnResults) {

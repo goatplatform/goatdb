@@ -35,7 +35,7 @@ export class ParallelExecutor {
     if (this._queue.length === 0) {
       return Promise.resolve();
     }
-    return new Promise(res => {
+    return new Promise((res) => {
       this._awaiter = res;
     });
   }

@@ -17,7 +17,7 @@ export class BaseService<T> {
   get services(): T {
     assert(
       this._services !== undefined,
-      'Did you forget to setup this service?'
+      'Did you forget to setup this service?',
     );
     return this._services;
   }

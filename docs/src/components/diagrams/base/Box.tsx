@@ -10,17 +10,19 @@ interface BoxProps {
   onClick?: () => void;
 }
 
-export default function Box({ 
-  label, 
-  color = 'primary', 
+export default function Box({
+  label,
+  color = 'primary',
   size = 'medium',
   children,
   className = '',
-  onClick
+  onClick,
 }: BoxProps) {
   return (
-    <div 
-      className={`${styles.box} ${styles[`box--${color}`]} ${styles[`box--${size}`]} ${className}`}
+    <div
+      className={`${styles.box} ${styles[`box--${color}`]} ${
+        styles[`box--${size}`]
+      } ${className}`}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}

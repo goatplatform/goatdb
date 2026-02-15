@@ -28,7 +28,8 @@
 }
 
 .benchmark-table td {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
+  font-family:
+    'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
   font-size: 0.85em;
   white-space: nowrap;
 }

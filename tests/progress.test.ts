@@ -7,7 +7,7 @@
 
 import { TEST } from './mod.ts';
 import { assertEquals, assertThrows, assertTrue } from './asserts.ts';
-import { Task, ProgressManager } from '../shared/progress.ts';
+import { ProgressManager, Task } from '../shared/progress.ts';
 
 export default function setupProgressTests(): void {
   // ==========================================================================
@@ -20,13 +20,17 @@ export default function setupProgressTests(): void {
     assertEquals(task.current, 0);
   });
 
-  TEST('Progress', 'Task transitions pending to running on first update', () => {
-    const task = new Task('t1', 'Test Task', 10);
-    assertEquals(task.status, 'pending');
-    task.update(5);
-    assertEquals(task.status, 'running');
-    assertEquals(task.current, 5);
-  });
+  TEST(
+    'Progress',
+    'Task transitions pending to running on first update',
+    () => {
+      const task = new Task('t1', 'Test Task', 10);
+      assertEquals(task.status, 'pending');
+      task.update(5);
+      assertEquals(task.status, 'running');
+      assertEquals(task.current, 5);
+    },
+  );
 
   TEST('Progress', 'Task stays running on subsequent updates', () => {
     const task = new Task('t1', 'Test Task', 10);
@@ -112,24 +116,32 @@ export default function setupProgressTests(): void {
   // Task Aggregation Tests
   // ==========================================================================
 
-  TEST('Progress', 'aggregatedProgress returns own progress without children', () => {
-    const tasks = new Map<string, Task>();
-    const task = new Task('t1', 'Test Task', 10);
-    task.update(5);
-    tasks.set('t1', task);
+  TEST(
+    'Progress',
+    'aggregatedProgress returns own progress without children',
+    () => {
+      const tasks = new Map<string, Task>();
+      const task = new Task('t1', 'Test Task', 10);
+      task.update(5);
+      tasks.set('t1', task);
 
-    const progress = task.aggregatedProgress(tasks);
-    assertEquals(progress, 0.5);
-  });
+      const progress = task.aggregatedProgress(tasks);
+      assertEquals(progress, 0.5);
+    },
+  );
 
-  TEST('Progress', 'aggregatedProgress returns null for indeterminate task', () => {
-    const tasks = new Map<string, Task>();
-    const task = new Task('t1', 'Indeterminate', null);
-    tasks.set('t1', task);
+  TEST(
+    'Progress',
+    'aggregatedProgress returns null for indeterminate task',
+    () => {
+      const tasks = new Map<string, Task>();
+      const task = new Task('t1', 'Indeterminate', null);
+      tasks.set('t1', task);
 
-    const progress = task.aggregatedProgress(tasks);
-    assertEquals(progress, null);
-  });
+      const progress = task.aggregatedProgress(tasks);
+      assertEquals(progress, null);
+    },
+  );
 
   TEST('Progress', 'aggregatedProgress returns 1 for zero total', () => {
     const tasks = new Map<string, Task>();
@@ -160,26 +172,30 @@ export default function setupProgressTests(): void {
     assertEquals(progress, 0.75);
   });
 
-  TEST('Progress', 'aggregatedProgress returns completion ratio when some children indeterminate', () => {
-    const tasks = new Map<string, Task>();
-    const parent = new Task('p1', 'Parent', 4, null, 0);
-    const child1 = new Task('c1', 'Child1', 2, 'p1', 1);
-    const child2 = new Task('c2', 'Child2', null, 'p1', 1); // indeterminate
+  TEST(
+    'Progress',
+    'aggregatedProgress returns completion ratio when some children indeterminate',
+    () => {
+      const tasks = new Map<string, Task>();
+      const parent = new Task('p1', 'Parent', 4, null, 0);
+      const child1 = new Task('c1', 'Child1', 2, 'p1', 1);
+      const child2 = new Task('c2', 'Child2', null, 'p1', 1); // indeterminate
 
-    parent.addChild('c1');
-    parent.addChild('c2');
-    child1.update(2);
-    child1.complete('done'); // Mark as done
+      parent.addChild('c1');
+      parent.addChild('c2');
+      child1.update(2);
+      child1.complete('done'); // Mark as done
 
-    tasks.set('p1', parent);
-    tasks.set('c1', child1);
-    tasks.set('c2', child2);
+      tasks.set('p1', parent);
+      tasks.set('c1', child1);
+      tasks.set('c2', child2);
 
-    // With indeterminate children, returns ratio of completed children
-    // child1 is done, child2 is pending -> 1/2 = 0.5
-    const progress = parent.aggregatedProgress(tasks);
-    assertEquals(progress, 0.5);
-  });
+      // With indeterminate children, returns ratio of completed children
+      // child1 is done, child2 is pending -> 1/2 = 0.5
+      const progress = parent.aggregatedProgress(tasks);
+      assertEquals(progress, 0.5);
+    },
+  );
 
   // ==========================================================================
   // Task Hierarchy Tests (I-002, I-003)
@@ -220,27 +236,35 @@ export default function setupProgressTests(): void {
     assertTrue(id2.startsWith('task-'));
   });
 
-  TEST('Progress', 'ProgressManager create with parent establishes hierarchy', () => {
-    const pm = new ProgressManager(false);
-    const parentId = pm.create('Parent', 10);
-    const childId = pm.create('Child', 5, parentId);
+  TEST(
+    'Progress',
+    'ProgressManager create with parent establishes hierarchy',
+    () => {
+      const pm = new ProgressManager(false);
+      const parentId = pm.create('Parent', 10);
+      const childId = pm.create('Child', 5, parentId);
 
-    const tasks = pm.getTasks();
-    const parent = tasks.get(parentId)!;
-    const child = tasks.get(childId)!;
+      const tasks = pm.getTasks();
+      const parent = tasks.get(parentId)!;
+      const child = tasks.get(childId)!;
 
-    assertTrue(parent.children.includes(childId));
-    assertEquals(child.parentId, parentId);
-    assertEquals(parent.depth, 0);
-    assertEquals(child.depth, 1);
-  });
+      assertTrue(parent.children.includes(childId));
+      assertEquals(child.parentId, parentId);
+      assertEquals(parent.depth, 0);
+      assertEquals(child.depth, 1);
+    },
+  );
 
-  TEST('Progress', 'ProgressManager create throws for nonexistent parent', () => {
-    const pm = new ProgressManager(false);
-    assertThrows(() => {
-      pm.create('Orphan', 10, 'nonexistent-parent');
-    });
-  });
+  TEST(
+    'Progress',
+    'ProgressManager create throws for nonexistent parent',
+    () => {
+      const pm = new ProgressManager(false);
+      assertThrows(() => {
+        pm.create('Orphan', 10, 'nonexistent-parent');
+      });
+    },
+  );
 
   TEST('Progress', 'ProgressManager update modifies task', () => {
     const pm = new ProgressManager(false);
@@ -345,12 +369,16 @@ export default function setupProgressTests(): void {
     });
   });
 
-  TEST('Progress', 'ProgressManager create throws for whitespace-only title', () => {
-    const pm = new ProgressManager(false);
-    assertThrows(() => {
-      pm.create('   ', 10);
-    });
-  });
+  TEST(
+    'Progress',
+    'ProgressManager create throws for whitespace-only title',
+    () => {
+      const pm = new ProgressManager(false);
+      assertThrows(() => {
+        pm.create('   ', 10);
+      });
+    },
+  );
 
   TEST('Progress', 'ProgressManager create throws for zero total', () => {
     const pm = new ProgressManager(false);
@@ -366,9 +394,13 @@ export default function setupProgressTests(): void {
     });
   });
 
-  TEST('Progress', 'ProgressManager create allows null total (indeterminate)', () => {
-    const pm = new ProgressManager(false);
-    const id = pm.create('Indeterminate Task', null);
-    assertTrue(id.startsWith('task-'));
-  });
+  TEST(
+    'Progress',
+    'ProgressManager create allows null total (indeterminate)',
+    () => {
+      const pm = new ProgressManager(false);
+      const id = pm.create('Indeterminate Task', null);
+      assertTrue(id.startsWith('task-'));
+    },
+  );
 }

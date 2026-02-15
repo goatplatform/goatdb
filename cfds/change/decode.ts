@@ -5,7 +5,7 @@ import { RichTextChange } from './richtext-change.ts';
 import { notReached } from '../../base/error.ts';
 
 export function decodeChange<EC extends EncodedChange = EncodedChange>(
-  decoder: Decoder<keyof EC & string>
+  decoder: Decoder<keyof EC & string>,
 ): Change<EC> {
   const type = decoder.get('changeType') as ChangeType;
   switch (type) {

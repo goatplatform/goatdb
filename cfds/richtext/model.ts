@@ -2,7 +2,12 @@ import {
   type CoreValue,
   isReadonlyCoreObject,
 } from '../../base/core-types/index.ts';
-import { type ElementNode, isTextNode, type RichTextValue, type TextNode } from './tree.ts';
+import {
+  type ElementNode,
+  isTextNode,
+  type RichTextValue,
+  type TextNode,
+} from './tree.ts';
 import type { WritingDirection } from '../../base/string.ts';
 
 export type MarkupElement =

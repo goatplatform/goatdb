@@ -5,12 +5,12 @@ import { FieldChange, FieldOperation } from '../../change/field-change.ts';
 import { ConcreteCoreValue } from '../../../base/core-types/index.ts';
 
 export class PrimitiveTypeOperations<
-  TValue extends ConcreteCoreValue
+  TValue extends ConcreteCoreValue,
 > extends CoreTypeOperations<TValue> {
   patch(
     curValue: TValue | undefined,
     changes: Change<EncodedChange>[],
-    options?: ValueTypeOptions
+    options?: ValueTypeOptions,
   ): TValue | undefined {
     for (const change of changes) {
       if (change instanceof FieldChange) {

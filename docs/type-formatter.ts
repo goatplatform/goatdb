@@ -1,19 +1,19 @@
 import {
-  type DeclarationReflection,
-  type Type,
-  ReferenceType,
-  UnionType,
   ArrayType,
+  ConditionalType,
+  type DeclarationReflection,
+  IndexedAccessType,
   IntrinsicType,
   LiteralType,
+  MappedType,
+  NamedTupleMember,
+  QueryType,
+  ReferenceType,
   ReflectionType,
   TupleType,
-  ConditionalType,
-  MappedType,
-  IndexedAccessType,
+  type Type,
   TypeOperatorType,
-  QueryType,
-  NamedTupleMember,
+  UnionType,
 } from 'typedoc';
 
 /**
@@ -25,8 +25,8 @@ import {
  *   and a link to the interface.
  */
 export interface InheritanceInfo {
-  extends: Array<{ 
-    name: string; 
+  extends: Array<{
+    name: string;
     link: string;
     utilityTypeInfo?: UtilityTypeAnalysis; // Only present for utility types
   }>;
@@ -76,12 +76,14 @@ export interface UtilityOperation {
  *                      elements to build the cross-reference map for.
  * @returns A Map of element names to their corresponding file paths.
  */
-export function buildCrossReferenceMap(allElements: Array<{
-  classes: DeclarationReflection[];
-  interfaces: DeclarationReflection[];
-  types: DeclarationReflection[];
-  functions: DeclarationReflection[];
-}>): Map<string, string> {
+export function buildCrossReferenceMap(
+  allElements: Array<{
+    classes: DeclarationReflection[];
+    interfaces: DeclarationReflection[];
+    types: DeclarationReflection[];
+    functions: DeclarationReflection[];
+  }>,
+): Map<string, string> {
   const crossRefMap = new Map<string, string>();
 
   // Only map actually discovered and documented types
@@ -93,7 +95,10 @@ export function buildCrossReferenceMap(allElements: Array<{
 
     // Map interfaces - use absolute paths from API root
     for (const iface of elements.interfaces) {
-      crossRefMap.set(iface.name, `/docs/api/interfaces/${iface.name.toLowerCase()}`);
+      crossRefMap.set(
+        iface.name,
+        `/docs/api/interfaces/${iface.name.toLowerCase()}`,
+      );
     }
 
     // Map types - use absolute paths from API root
@@ -119,7 +124,11 @@ export function buildCrossReferenceMap(allElements: Array<{
  *                      paths for proper linking.
  * @returns An InheritanceInfo object containing the inheritance information.
  */
-export function extractInheritanceInfo(element: DeclarationReflection, crossRefMap: Map<string, string>, allDeclarations?: Map<string, DeclarationReflection>): InheritanceInfo {
+export function extractInheritanceInfo(
+  element: DeclarationReflection,
+  crossRefMap: Map<string, string>,
+  allDeclarations?: Map<string, DeclarationReflection>,
+): InheritanceInfo {
   const inheritance: InheritanceInfo = {
     extends: [],
     implements: [],
@@ -133,25 +142,29 @@ export function extractInheritanceInfo(element: DeclarationReflection, crossRefM
         if (extendedType.name.includes('.')) {
           continue;
         }
-        
+
         // Try utility type analysis first (for Omit, Pick, etc.)
         if (extendedType instanceof ReferenceType) {
-          const utilityTypeResolution = analyzeUtilityTypeInheritance(extendedType, crossRefMap, allDeclarations);
-          
+          const utilityTypeResolution = analyzeUtilityTypeInheritance(
+            extendedType,
+            crossRefMap,
+            allDeclarations,
+          );
+
           if (utilityTypeResolution?.baseInterface) {
             // Show the meaningful parent interface instead of the utility type
             inheritance.extends.push({
               name: utilityTypeResolution.baseInterface.name,
               link: utilityTypeResolution.baseInterface.link,
-              utilityTypeInfo: utilityTypeResolution
+              utilityTypeInfo: utilityTypeResolution,
             });
             continue;
           }
         }
-        
+
         // Fallback to simple inheritance (existing logic)
-        const parentInterfaceLink = crossRefMap.get(extendedType.name) || 
-          (element.kind === 256 
+        const parentInterfaceLink = crossRefMap.get(extendedType.name) ||
+          (element.kind === 256
             ? `/docs/api/interfaces/${extendedType.name.toLowerCase()}`
             : `/docs/api/classes/${extendedType.name.toLowerCase()}`);
 
@@ -167,9 +180,10 @@ export function extractInheritanceInfo(element: DeclarationReflection, crossRefM
   if (element.implementedTypes) {
     for (const implementedType of element.implementedTypes) {
       if (implementedType.type === 'reference' && implementedType.name) {
-        const implementedInterfaceLink = crossRefMap.get(implementedType.name) || 
+        const implementedInterfaceLink =
+          crossRefMap.get(implementedType.name) ||
           `/docs/api/interfaces/${implementedType.name.toLowerCase()}`;
-        
+
         inheritance.implements.push({
           name: implementedType.name,
           link: implementedInterfaceLink,
@@ -193,7 +207,10 @@ export function extractInheritanceInfo(element: DeclarationReflection, crossRefM
  *                      paths.
  * @returns The formatted type string.
  */
-export function formatLinkedType(type: Type | undefined, crossRefMap: Map<string, string>): string {
+export function formatLinkedType(
+  type: Type | undefined,
+  crossRefMap: Map<string, string>,
+): string {
   if (!type) return 'any';
 
   switch (type.type) {
@@ -205,30 +222,50 @@ export function formatLinkedType(type: Type | undefined, crossRefMap: Map<string
 
     case 'reference': {
       if (type instanceof ReferenceType) {
-        const typeName = type.name || throwTypeError('reference type missing name', type);
-        
+        const typeName = type.name ||
+          throwTypeError('reference type missing name', type);
+
         // Don't link TypeScript utility types - render as inline code
         const TYPESCRIPT_UTILITY_TYPES = new Set([
-          'Omit', 'Pick', 'Partial', 'Required', 'Record', 'Exclude', 'Extract', 
-          'NonNullable', 'Parameters', 'ConstructorParameters', 'ReturnType', 
-          'InstanceType', 'ThisParameterType', 'OmitThisParameter'
+          'Omit',
+          'Pick',
+          'Partial',
+          'Required',
+          'Record',
+          'Exclude',
+          'Extract',
+          'NonNullable',
+          'Parameters',
+          'ConstructorParameters',
+          'ReturnType',
+          'InstanceType',
+          'ThisParameterType',
+          'OmitThisParameter',
         ]);
         if (TYPESCRIPT_UTILITY_TYPES.has(typeName)) {
           const typeArgs = type.typeArguments
-            ? `<${type.typeArguments.map((t: Type) => formatLinkedType(t, crossRefMap)).join(', ')}>`
+            ? `<${
+              type.typeArguments.map((t: Type) =>
+                formatLinkedType(t, crossRefMap)
+              ).join(', ')
+            }>`
             : '';
           return `${typeName}${typeArgs}`;
         }
-        
+
         // Don't link single-letter generic types (like T, U, N, etc.)
         if (typeName.length === 1 && /[A-Z]/.test(typeName)) {
           return typeName;
         }
-        
+
         const link = crossRefMap.get(typeName);
         const linkedName = link ? `[${typeName}](${link})` : typeName;
         const typeArgs = type.typeArguments
-          ? `<${type.typeArguments.map((t: Type) => formatLinkedType(t, crossRefMap)).join(', ')}>`
+          ? `<${
+            type.typeArguments.map((t: Type) =>
+              formatLinkedType(t, crossRefMap)
+            ).join(', ')
+          }>`
           : '';
         return linkedName + typeArgs;
       }
@@ -237,13 +274,15 @@ export function formatLinkedType(type: Type | undefined, crossRefMap: Map<string
 
     case 'union':
       if (type instanceof UnionType) {
-        return type.types.map((t: Type) => formatLinkedType(t, crossRefMap)).join(' | ');
+        return type.types.map((t: Type) => formatLinkedType(t, crossRefMap))
+          .join(' | ');
       }
       return 'any';
 
     case 'intersection':
       if (type instanceof UnionType) { // UnionType is used for both union and intersection
-        return type.types.map((t: Type) => formatLinkedType(t, crossRefMap)).join(' & ');
+        return type.types.map((t: Type) => formatLinkedType(t, crossRefMap))
+          .join(' & ');
       }
       return 'any';
 
@@ -255,7 +294,11 @@ export function formatLinkedType(type: Type | undefined, crossRefMap: Map<string
 
     case 'tuple':
       if (type instanceof TupleType) {
-        return `[${type.elements.map((t: Type) => formatLinkedType(t, crossRefMap)).join(', ')}]`;
+        return `[${
+          type.elements.map((t: Type) => formatLinkedType(t, crossRefMap)).join(
+            ', ',
+          )
+        }]`;
       }
       return 'any[]';
 
@@ -270,7 +313,9 @@ export function formatLinkedType(type: Type | undefined, crossRefMap: Map<string
     case 'literal':
       if (type instanceof LiteralType) {
         // For string literals, preserve quotes; for others, use the value directly
-        return typeof type.value === 'string' ? `'${type.value}'` : String(type.value);
+        return typeof type.value === 'string'
+          ? `'${type.value}'`
+          : String(type.value);
       }
       return 'any';
 
@@ -325,17 +370,23 @@ export function formatLinkedType(type: Type | undefined, crossRefMap: Map<string
           // Function type
           const sig = type.declaration.signatures[0];
           const params = sig.parameters?.map((p) => {
-            const paramType = p.type ? formatLinkedType(p.type, crossRefMap) : 'any';
+            const paramType = p.type
+              ? formatLinkedType(p.type, crossRefMap)
+              : 'any';
             return `${p.name}: ${paramType}`;
           }).join(', ') || '';
-          const returnType = sig.type ? formatLinkedType(sig.type, crossRefMap) : 'void';
+          const returnType = sig.type
+            ? formatLinkedType(sig.type, crossRefMap)
+            : 'void';
           return `(${params}) => ${returnType}`;
         } else if (type.declaration?.children) {
           // Object type
           const properties = type.declaration.children
             .filter((child) => !child.flags?.isPrivate)
             .map((child) => {
-              const propType = child.type ? formatLinkedType(child.type, crossRefMap) : 'any';
+              const propType = child.type
+                ? formatLinkedType(child.type, crossRefMap)
+                : 'any';
               return `${child.name}: ${propType}`;
             });
           return properties.length > 0 ? `{ ${properties.join('; ')} }` : '{}';
@@ -355,10 +406,14 @@ function throwTypeError(message: string, type: Type): never {
   const debugInfo = {
     type: type.type,
     constructor: type.constructor.name,
-    keys: Object.keys(type)
+    keys: Object.keys(type),
   };
-  
-  throw new Error(`TypeDoc type parsing error: ${message}. Type info: ${JSON.stringify(debugInfo, null, 2)}`);
+
+  throw new Error(
+    `TypeDoc type parsing error: ${message}. Type info: ${
+      JSON.stringify(debugInfo, null, 2)
+    }`,
+  );
 }
 
 /**
@@ -379,7 +434,7 @@ export function formatLinkedTypeSignature(
   const returnType = sig.type
     ? formatLinkedType(sig.type, crossRefMap)
     : 'void';
-  
+
   return `${element.name}(${params}): ${returnType}`;
 }
 
@@ -397,7 +452,10 @@ export function escapeForCodeTag(content: string): string {
 /**
  * Collects type references from a TypeDoc type for validation purposes
  */
-export function collectTypeReferences(type: Type, referencedTypes: Set<string>): void {
+export function collectTypeReferences(
+  type: Type,
+  referencedTypes: Set<string>,
+): void {
   switch (type.type) {
     case 'reference':
       if (type instanceof ReferenceType && type.name) {
@@ -502,7 +560,7 @@ export function collectTypeReferences(type: Type, referencedTypes: Set<string>):
       }
       break;
 
-    // For other types (intrinsic, literal, etc.), no references to collect
+      // For other types (intrinsic, literal, etc.), no references to collect
   }
 }
 
@@ -513,12 +571,17 @@ export function collectTypeReferences(type: Type, referencedTypes: Set<string>):
 /**
  * Supported TypeScript utility types for inheritance analysis.
  */
-const SUPPORTED_UTILITY_TYPES = new Set(['Omit', 'Pick', 'Partial', 'Required']);
+const SUPPORTED_UTILITY_TYPES = new Set([
+  'Omit',
+  'Pick',
+  'Partial',
+  'Required',
+]);
 
 /**
  * Analyzes utility type inheritance to extract meaningful parent relationships.
  * Handles common TypeScript utility types like Omit, Pick, Partial, Required.
- * 
+ *
  * @param extendedType - The TypeDoc reference type to analyze
  * @param crossRefMap - Cross-reference map for link resolution
  * @returns Analysis result or null if not a supported utility type
@@ -526,11 +589,13 @@ const SUPPORTED_UTILITY_TYPES = new Set(['Omit', 'Pick', 'Partial', 'Required'])
 export function analyzeUtilityTypeInheritance(
   extendedType: ReferenceType,
   crossRefMap: Map<string, string>,
-  allDeclarations?: Map<string, DeclarationReflection>
+  allDeclarations?: Map<string, DeclarationReflection>,
 ): UtilityTypeAnalysis | null {
   const utilityTypeName = extendedType.name;
-  
-  if (!SUPPORTED_UTILITY_TYPES.has(utilityTypeName) || !extendedType.typeArguments) {
+
+  if (
+    !SUPPORTED_UTILITY_TYPES.has(utilityTypeName) || !extendedType.typeArguments
+  ) {
     return null;
   }
 
@@ -542,18 +607,41 @@ export function analyzeUtilityTypeInheritance(
 
     switch (utilityTypeName) {
       case 'Omit':
-        return analyzeOmitType(extendedType, analysis, crossRefMap, allDeclarations);
+        return analyzeOmitType(
+          extendedType,
+          analysis,
+          crossRefMap,
+          allDeclarations,
+        );
       case 'Pick':
-        return analyzePickType(extendedType, analysis, crossRefMap, allDeclarations);
+        return analyzePickType(
+          extendedType,
+          analysis,
+          crossRefMap,
+          allDeclarations,
+        );
       case 'Partial':
-        return analyzePartialType(extendedType, analysis, crossRefMap, allDeclarations);
+        return analyzePartialType(
+          extendedType,
+          analysis,
+          crossRefMap,
+          allDeclarations,
+        );
       case 'Required':
-        return analyzeRequiredType(extendedType, analysis, crossRefMap, allDeclarations);
+        return analyzeRequiredType(
+          extendedType,
+          analysis,
+          crossRefMap,
+          allDeclarations,
+        );
       default:
         return null;
     }
   } catch (error) {
-    console.warn(`Warning: Failed to analyze utility type ${utilityTypeName}:`, error instanceof Error ? error.message : String(error));
+    console.warn(
+      `Warning: Failed to analyze utility type ${utilityTypeName}:`,
+      error instanceof Error ? error.message : String(error),
+    );
     return null;
   }
 }
@@ -565,11 +653,13 @@ function analyzeOmitType(
   extendedType: ReferenceType,
   analysis: Partial<UtilityTypeAnalysis>,
   crossRefMap: Map<string, string>,
-  allDeclarations?: Map<string, DeclarationReflection>
+  allDeclarations?: Map<string, DeclarationReflection>,
 ): UtilityTypeAnalysis | null {
   const typeArgs = extendedType.typeArguments!;
   if (typeArgs.length !== 2) {
-    console.warn(`Warning: Omit type has ${typeArgs.length} arguments, expected 2`);
+    console.warn(
+      `Warning: Omit type has ${typeArgs.length} arguments, expected 2`,
+    );
     return null;
   }
 
@@ -581,24 +671,28 @@ function analyzeOmitType(
   }
 
   const omittedKeys = extractStringLiteralKeys(keysType);
-  
+
   const result = {
     ...analysis,
     baseInterface,
     operation: {
       type: 'omit',
       keys: omittedKeys,
-      description: omittedKeys.length > 0 
-        ? `excluding ${omittedKeys.map(k => `'${k}'`).join(', ')}`
-        : 'excluding specified keys'
-    }
+      description: omittedKeys.length > 0
+        ? `excluding ${omittedKeys.map((k) => `'${k}'`).join(', ')}`
+        : 'excluding specified keys',
+    },
   } as UtilityTypeAnalysis;
 
   // Resolve actual properties if declarations are available
   if (allDeclarations) {
-    result.resolvedProperties = resolveUtilityTypeProperties(result, crossRefMap, allDeclarations);
+    result.resolvedProperties = resolveUtilityTypeProperties(
+      result,
+      crossRefMap,
+      allDeclarations,
+    );
   }
-  
+
   return result;
 }
 
@@ -609,11 +703,13 @@ function analyzePickType(
   extendedType: ReferenceType,
   analysis: Partial<UtilityTypeAnalysis>,
   crossRefMap: Map<string, string>,
-  allDeclarations?: Map<string, DeclarationReflection>
+  allDeclarations?: Map<string, DeclarationReflection>,
 ): UtilityTypeAnalysis | null {
   const typeArgs = extendedType.typeArguments!;
   if (typeArgs.length !== 2) {
-    console.warn(`Warning: Pick type has ${typeArgs.length} arguments, expected 2`);
+    console.warn(
+      `Warning: Pick type has ${typeArgs.length} arguments, expected 2`,
+    );
     return null;
   }
 
@@ -626,7 +722,7 @@ function analyzePickType(
   }
 
   const pickedKeys = extractStringLiteralKeys(keysType);
-  
+
   const result = {
     ...analysis,
     baseInterface,
@@ -634,15 +730,19 @@ function analyzePickType(
       type: 'pick',
       keys: pickedKeys,
       description: pickedKeys.length > 0
-        ? `selecting only ${pickedKeys.map(k => `'${k}'`).join(', ')}`
-        : 'selecting specified keys'
-    }
+        ? `selecting only ${pickedKeys.map((k) => `'${k}'`).join(', ')}`
+        : 'selecting specified keys',
+    },
   } as UtilityTypeAnalysis;
 
   if (allDeclarations) {
-    result.resolvedProperties = resolveUtilityTypeProperties(result, crossRefMap, allDeclarations);
+    result.resolvedProperties = resolveUtilityTypeProperties(
+      result,
+      crossRefMap,
+      allDeclarations,
+    );
   }
-  
+
   return result;
 }
 
@@ -653,11 +753,13 @@ function analyzePartialType(
   extendedType: ReferenceType,
   analysis: Partial<UtilityTypeAnalysis>,
   crossRefMap: Map<string, string>,
-  allDeclarations?: Map<string, DeclarationReflection>
+  allDeclarations?: Map<string, DeclarationReflection>,
 ): UtilityTypeAnalysis | null {
   const typeArgs = extendedType.typeArguments!;
   if (typeArgs.length !== 1) {
-    console.warn(`Warning: Partial type has ${typeArgs.length} arguments, expected 1`);
+    console.warn(
+      `Warning: Partial type has ${typeArgs.length} arguments, expected 1`,
+    );
     return null;
   }
 
@@ -666,20 +768,24 @@ function analyzePartialType(
     console.warn('Warning: Could not extract base interface for Partial type');
     return null;
   }
-  
+
   const result = {
     ...analysis,
     baseInterface,
     operation: {
       type: 'partial',
-      description: 'making all properties optional'
-    }
+      description: 'making all properties optional',
+    },
   } as UtilityTypeAnalysis;
 
   if (allDeclarations) {
-    result.resolvedProperties = resolveUtilityTypeProperties(result, crossRefMap, allDeclarations);
+    result.resolvedProperties = resolveUtilityTypeProperties(
+      result,
+      crossRefMap,
+      allDeclarations,
+    );
   }
-  
+
   return result;
 }
 
@@ -690,11 +796,13 @@ function analyzeRequiredType(
   extendedType: ReferenceType,
   analysis: Partial<UtilityTypeAnalysis>,
   crossRefMap: Map<string, string>,
-  allDeclarations?: Map<string, DeclarationReflection>
+  allDeclarations?: Map<string, DeclarationReflection>,
 ): UtilityTypeAnalysis | null {
   const typeArgs = extendedType.typeArguments!;
   if (typeArgs.length !== 1) {
-    console.warn(`Warning: Required type has ${typeArgs.length} arguments, expected 1`);
+    console.warn(
+      `Warning: Required type has ${typeArgs.length} arguments, expected 1`,
+    );
     return null;
   }
 
@@ -703,20 +811,24 @@ function analyzeRequiredType(
     console.warn('Warning: Could not extract base interface for Required type');
     return null;
   }
-  
+
   const result = {
     ...analysis,
     baseInterface,
     operation: {
       type: 'required',
-      description: 'making all properties required'
-    }
+      description: 'making all properties required',
+    },
   } as UtilityTypeAnalysis;
 
   if (allDeclarations) {
-    result.resolvedProperties = resolveUtilityTypeProperties(result, crossRefMap, allDeclarations);
+    result.resolvedProperties = resolveUtilityTypeProperties(
+      result,
+      crossRefMap,
+      allDeclarations,
+    );
   }
-  
+
   return result;
 }
 
@@ -725,9 +837,11 @@ function analyzeRequiredType(
  */
 function extractBaseInterface(
   type: Type,
-  crossRefMap: Map<string, string>
+  crossRefMap: Map<string, string>,
 ): { name: string; link: string } | null {
-  if (type.type !== 'reference' || !(type instanceof ReferenceType) || !type.name) {
+  if (
+    type.type !== 'reference' || !(type instanceof ReferenceType) || !type.name
+  ) {
     return null;
   }
 
@@ -742,13 +856,13 @@ function extractBaseInterface(
     // Return the name without a link for cross-module references
     return {
       name: type.name,
-      link: '' // No link available
+      link: '', // No link available
     };
   }
 
   return {
     name: type.name,
-    link
+    link,
   };
 }
 
@@ -764,7 +878,9 @@ function extractStringLiteralKeys(type: Type): string[] {
     }
   } else if (type.type === 'union' && type instanceof UnionType) {
     for (const unionMember of type.types) {
-      if (unionMember.type === 'literal' && unionMember instanceof LiteralType) {
+      if (
+        unionMember.type === 'literal' && unionMember instanceof LiteralType
+      ) {
         if (typeof unionMember.value === 'string') {
           keys.push(unionMember.value);
         }
@@ -782,28 +898,38 @@ function extractStringLiteralKeys(type: Type): string[] {
 function resolveUtilityTypeProperties(
   analysis: UtilityTypeAnalysis,
   crossRefMap: Map<string, string>,
-  allDeclarations: Map<string, DeclarationReflection>
+  allDeclarations: Map<string, DeclarationReflection>,
 ): ResolvedProperty[] {
   const baseInterfaceName = analysis.baseInterface.name;
   const baseDeclaration = allDeclarations.get(baseInterfaceName);
-  
+
   if (!baseDeclaration) {
     // Base interface not found - this is common for internal/cross-module types
     // Return empty array so we fall back to generic description
     return [];
   }
-  
+
   let baseProperties: ResolvedProperty[] = [];
-  
+
   // Handle type aliases with reflection types
-  if (baseDeclaration.type?.type === 'reflection' && baseDeclaration.type.declaration?.children) {
-    baseProperties = extractPropertiesFromChildren(baseDeclaration.type.declaration.children, baseInterfaceName, crossRefMap);
-  }
-  // Handle interfaces with direct children
+  if (
+    baseDeclaration.type?.type === 'reflection' &&
+    baseDeclaration.type.declaration?.children
+  ) {
+    baseProperties = extractPropertiesFromChildren(
+      baseDeclaration.type.declaration.children,
+      baseInterfaceName,
+      crossRefMap,
+    );
+  } // Handle interfaces with direct children
   else if (baseDeclaration.children) {
-    baseProperties = extractPropertiesFromChildren(baseDeclaration.children, baseInterfaceName, crossRefMap);
+    baseProperties = extractPropertiesFromChildren(
+      baseDeclaration.children,
+      baseInterfaceName,
+      crossRefMap,
+    );
   }
-  
+
   // Apply utility type operation (Omit, Pick, etc.)
   return applyUtilityOperation(baseProperties, analysis.operation);
 }
@@ -814,17 +940,17 @@ function resolveUtilityTypeProperties(
 function extractPropertiesFromChildren(
   children: DeclarationReflection[],
   sourceInterface: string,
-  crossRefMap: Map<string, string>
+  crossRefMap: Map<string, string>,
 ): ResolvedProperty[] {
   return children
-    .filter(child => child.kind === 1024) // Property kind
-    .map(prop => ({
+    .filter((child) => child.kind === 1024) // Property kind
+    .map((prop) => ({
       name: prop.name,
       type: prop.type ? formatLinkedType(prop.type, crossRefMap) : 'any',
-      documentation: prop.comment?.summary?.map(s => s.text).join('') || '',
+      documentation: prop.comment?.summary?.map((s) => s.text).join('') || '',
       isOptional: prop.flags?.isOptional || false,
       source: 'inherited' as const,
-      sourceInterface
+      sourceInterface,
     }));
 }
 
@@ -833,25 +959,25 @@ function extractPropertiesFromChildren(
  */
 function applyUtilityOperation(
   properties: ResolvedProperty[],
-  operation: UtilityOperation
+  operation: UtilityOperation,
 ): ResolvedProperty[] {
   switch (operation.type) {
     case 'omit': {
       const omittedKeys = new Set(operation.keys || []);
-      return properties.filter(prop => !omittedKeys.has(prop.name));
+      return properties.filter((prop) => !omittedKeys.has(prop.name));
     }
-    
+
     case 'pick': {
       const pickedKeys = new Set(operation.keys || []);
-      return properties.filter(prop => pickedKeys.has(prop.name));
+      return properties.filter((prop) => pickedKeys.has(prop.name));
     }
-    
+
     case 'partial':
-      return properties.map(prop => ({ ...prop, isOptional: true }));
-    
+      return properties.map((prop) => ({ ...prop, isOptional: true }));
+
     case 'required':
-      return properties.map(prop => ({ ...prop, isOptional: false }));
-    
+      return properties.map((prop) => ({ ...prop, isOptional: false }));
+
     default:
       return properties;
   }
@@ -873,89 +999,123 @@ export interface TypeClassification {
 /**
  * Classifies a type name based on its intended usage and stability.
  */
-export function classifyType(typeName: string, sourceModule: string): TypeClassification {
+export function classifyType(
+  typeName: string,
+  sourceModule: string,
+): TypeClassification {
   // Built-in types first
   if (isBuiltInType(typeName)) {
     return { classification: 'builtin', stability: 'stable' };
   }
-  
+
   // Internal implementation types (marked with @internal or implementation details)
   const internalTypes = new Set([
     // Types we've explicitly marked with @internal JSDoc tags
-    'DataChanges',              // CRDT object diff (marked @internal)
-    'Dictionary',               // Internal collection abstraction (marked @internal)
-    'EncodedItem',              // Serialization representation (marked @internal)
-    'Readwrite',                // Utility type for removing readonly (marked @internal)
-    
+    'DataChanges', // CRDT object diff (marked @internal)
+    'Dictionary', // Internal collection abstraction (marked @internal)
+    'EncodedItem', // Serialization representation (marked @internal)
+    'Readwrite', // Utility type for removing readonly (marked @internal)
+
     // Other internal implementation types
-    'MD5State',                 // Low-level hash implementation
-    'MurmurHash3',              // Low-level hash implementation
-    'StaticAssets',             // Build system internals
-    'PrimitiveMap',             // Internal collection type
-    'OrderedMap',               // Internal collection type
-    'WritingDirection',         // Internal string utility
-    'Edit',                     // Internal CRDT type
-    'FlatRepAtom',              // Internal richtext type
-    'CompareOptions',           // Internal comparison options
-    'EqualOptions',             // Internal equality options
-    
+    'MD5State', // Low-level hash implementation
+    'MurmurHash3', // Low-level hash implementation
+    'StaticAssets', // Build system internals
+    'PrimitiveMap', // Internal collection type
+    'OrderedMap', // Internal collection type
+    'WritingDirection', // Internal string utility
+    'Edit', // Internal CRDT type
+    'FlatRepAtom', // Internal richtext type
+    'CompareOptions', // Internal comparison options
+    'EqualOptions', // Internal equality options
     // Pattern-based internal types
   ]);
-  
+
   // Check explicit internal types first
   if (internalTypes.has(typeName)) {
     return { classification: 'internal', stability: 'internal' };
   }
-  
+
   // Pattern-based internal types
   const internalPatterns = [
-    /^_\w+/,                    // _InternalType
-    /\w+Impl$/,                 // TypeImpl  
-    /\w+Internal$/,             // TypeInternal
+    /^_\w+/, // _InternalType
+    /\w+Impl$/, // TypeImpl
+    /\w+Internal$/, // TypeInternal
   ];
-  
+
   for (const pattern of internalPatterns) {
     if (pattern.test(typeName)) {
       return { classification: 'internal', stability: 'internal' };
     }
   }
-  
+
   // Module-specific types that are legitimate public API
   const moduleTypes: Record<string, string[]> = {
     'server': [
-      'AppConfig', 'BuilderInfo', 'CompileOptions', 'CPUArch', 'TargetOS',
-      'DebugServerOptions', 'LiveReloadOptions', 'ExecutableOptions',
-      'EmailBuilder', 'EmailInfo', 'AutoCreateUserInfo', 'DomainConfig',
-      'EmailConfig', 'EmailMessage', 'EmailService', 'OpenOptions',
+      'AppConfig',
+      'BuilderInfo',
+      'CompileOptions',
+      'CPUArch',
+      'TargetOS',
+      'DebugServerOptions',
+      'LiveReloadOptions',
+      'ExecutableOptions',
+      'EmailBuilder',
+      'EmailInfo',
+      'AutoCreateUserInfo',
+      'DomainConfig',
+      'EmailConfig',
+      'EmailMessage',
+      'EmailService',
+      'OpenOptions',
     ],
     'react': [
-      'UseItemOpts', 'UseQueryOpts', 'PropsWithPath',
+      'UseItemOpts',
+      'UseQueryOpts',
+      'PropsWithPath',
     ],
     'core': [
-      'QueryConfig', 'AuthConfig', 'AuthOp', 'AuthRule', 'AuthRuleInfo',
-      'IterableFilterFunc', 'ObjFieldsFilterFunc', 'Predicate', 'PredicateInfo',
-      'SortDescriptor', 'SortInfo', 'Entry', 'FieldDef', 'FieldValue',
-      'ItemConfig', 'EmailLoginWithMagicLink', 'GoatRequest', 'ServeHandlerInfo',
-      'RepoClient', 'LogEntry', 'Logger', 'NormalizedLogEntry', 'Severity',
+      'QueryConfig',
+      'AuthConfig',
+      'AuthOp',
+      'AuthRule',
+      'AuthRuleInfo',
+      'IterableFilterFunc',
+      'ObjFieldsFilterFunc',
+      'Predicate',
+      'PredicateInfo',
+      'SortDescriptor',
+      'SortInfo',
+      'Entry',
+      'FieldDef',
+      'FieldValue',
+      'ItemConfig',
+      'EmailLoginWithMagicLink',
+      'GoatRequest',
+      'ServeHandlerInfo',
+      'RepoClient',
+      'LogEntry',
+      'Logger',
+      'NormalizedLogEntry',
+      'Severity',
     ],
   };
-  
+
   // Check if this type belongs to a specific module
   for (const [moduleName, types] of Object.entries(moduleTypes)) {
     if (types.includes(typeName)) {
-      return { 
-        classification: 'public', 
-        stability: 'stable', 
-        module: moduleName 
+      return {
+        classification: 'public',
+        stability: 'stable',
+        module: moduleName,
       };
     }
   }
-  
+
   // Default: assume it's a public type from the current module
-  return { 
-    classification: 'public', 
-    stability: 'stable', 
-    module: sourceModule 
+  return {
+    classification: 'public',
+    stability: 'stable',
+    module: sourceModule,
   };
 }
 
@@ -966,39 +1126,85 @@ export function classifyType(typeName: string, sourceModule: string): TypeClassi
 export function isBuiltInType(typeName: string): boolean {
   const builtInTypes = new Set([
     // Primitive types
-    'string', 'number', 'boolean', 'undefined', 'null', 'void', 'any', 'unknown', 'never',
-    'object', 'symbol', 'bigint',
-    
+    'string',
+    'number',
+    'boolean',
+    'undefined',
+    'null',
+    'void',
+    'any',
+    'unknown',
+    'never',
+    'object',
+    'symbol',
+    'bigint',
+
     // Built-in objects
-    'Array', 'Object', 'Function', 'String', 'Number', 'Boolean', 'Date', 'RegExp',
-    'Error', 'Promise', 'Map', 'Set', 'WeakMap', 'WeakSet',
-    
+    'Array',
+    'Object',
+    'Function',
+    'String',
+    'Number',
+    'Boolean',
+    'Date',
+    'RegExp',
+    'Error',
+    'Promise',
+    'Map',
+    'Set',
+    'WeakMap',
+    'WeakSet',
+
     // Web APIs / Node.js / Deno built-ins
-    'Response', 'Crypto', 'CryptoKey', 'CryptoKeyPair', 'Iterable', 'Generator',
-    
+    'Response',
+    'Crypto',
+    'CryptoKey',
+    'CryptoKeyPair',
+    'Iterable',
+    'Generator',
+
     // TypeScript utility types
-    'Omit', 'Pick', 'Partial', 'Required', 'Record', 'Exclude', 'Extract',
-    'NonNullable', 'Parameters', 'ConstructorParameters', 'ReturnType',
-    'InstanceType', 'ThisParameterType', 'OmitThisParameter',
-    
+    'Omit',
+    'Pick',
+    'Partial',
+    'Required',
+    'Record',
+    'Exclude',
+    'Extract',
+    'NonNullable',
+    'Parameters',
+    'ConstructorParameters',
+    'ReturnType',
+    'InstanceType',
+    'ThisParameterType',
+    'OmitThisParameter',
+
     // Single-letter generics
-    'T', 'U', 'V', 'K', 'P', 'R', 'S', 'N', 'E',
+    'T',
+    'U',
+    'V',
+    'K',
+    'P',
+    'R',
+    'S',
+    'N',
+    'E',
   ]);
-  
+
   // Built-in types
   if (builtInTypes.has(typeName)) return true;
-  
+
   // Single-letter generics
   if (/^[A-Z]$/.test(typeName)) return true;
-  
+
   // Constants (starting with k)
   if (typeName.startsWith('k')) return true;
-  
+
   // Internal/private types (containing dots, indicating nested access)
   if (typeName.includes('.')) return true;
-  
+
   // Short generic-like names (often internal)
   if (/^[A-Z]{2,3}$/.test(typeName)) return true;
-  
+
   return false;
 }

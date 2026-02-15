@@ -31,8 +31,7 @@ export abstract class BaseEncoder<
   PT extends CoreValue,
   T extends PT,
   OT extends CoreOptions,
-> implements Encoder<string, CoreValue, T, OT>
-{
+> implements Encoder<string, CoreValue, T, OT> {
   readonly objectFilterFields: ObjFieldsFilterFunc;
   readonly iterableFilter?: IterableFilterFunc;
 

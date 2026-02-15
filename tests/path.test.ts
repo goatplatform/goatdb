@@ -1,15 +1,15 @@
 import { TEST } from './mod.ts';
 import { assertEquals } from './asserts.ts';
 import {
-  normalize,
-  dirname,
   basename,
+  dirname,
   extname,
-  join,
+  fromFileUrl,
   isAbsolute,
+  join,
+  normalize,
   resolve,
   toAbsolutePath,
-  fromFileUrl,
 } from '../base/path.ts';
 import { assertThrows } from './asserts.ts';
 
@@ -168,7 +168,10 @@ export default function setupPathTests(): void {
 
   TEST('Path', 'fromFileUrl converts Windows file URLs', () => {
     assertEquals(fromFileUrl('file:///C:/Users/foo'), 'C:/Users/foo');
-    assertEquals(fromFileUrl('file:///D:/path/to/file.txt'), 'D:/path/to/file.txt');
+    assertEquals(
+      fromFileUrl('file:///D:/path/to/file.txt'),
+      'D:/path/to/file.txt',
+    );
   });
 
   TEST('Path', 'fromFileUrl handles URL objects', () => {
@@ -177,7 +180,10 @@ export default function setupPathTests(): void {
   });
 
   TEST('Path', 'fromFileUrl decodes encoded characters', () => {
-    assertEquals(fromFileUrl('file:///path/with%20spaces'), '/path/with spaces');
+    assertEquals(
+      fromFileUrl('file:///path/with%20spaces'),
+      '/path/with spaces',
+    );
     assertEquals(fromFileUrl('file:///path/%E2%9C%93'), '/path/\u2713');
   });
 

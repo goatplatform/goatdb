@@ -15,7 +15,7 @@ export class SortedQueue<T> {
 
   constructor(
     comparator?: (x: T, y: T) => number,
-    eq?: (a: T, y: T) => boolean
+    eq?: (a: T, y: T) => boolean,
   ) {
     this._arr = [];
     this._comparator = comparator || defaultComparator;

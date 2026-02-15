@@ -39,7 +39,7 @@ export class ServerError extends Error implements IServerError {
     msg: string | Code,
     info?: any,
     code?: Code,
-    internalInfo?: JSONValue
+    internalInfo?: JSONValue,
   ) {
     if (typeof msg !== 'string') {
       code = msg;
@@ -99,13 +99,13 @@ export function notFound(message?: string): ServerError {
 
 export function badRequest(
   message?: string,
-  internalInfo?: JSONValue
+  internalInfo?: JSONValue,
 ): ServerError {
   return new ServerError(
     message || Code.BadRequest,
     undefined,
     Code.BadRequest,
-    internalInfo
+    internalInfo,
   );
 }
 
@@ -134,7 +134,7 @@ export function serviceUnavailable(): ServerError {
 
 export function incompatibleCFDSVersion(
   serverVersion: string,
-  clientVersion: string
+  clientVersion: string,
 ): ServerError {
   return new ServerError(Code.BadRequest, {
     sv: serverVersion,
@@ -148,7 +148,7 @@ export function unknownCommand(cmd: string, code: Code): ServerError {
     {
       cmd: cmd,
     },
-    undefined
+    undefined,
   );
 }
 

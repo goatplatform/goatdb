@@ -4,9 +4,15 @@ import Diagram from '../Diagram';
 export default function CommitStorage() {
   return (
     <Diagram>
-      <svg width="720" height="400" viewBox="0 0 720 400" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        width='720'
+        height='400'
+        viewBox='0 0 720 400'
+        xmlns='http://www.w3.org/2000/svg'
+      >
         <defs>
-          <style>{`
+          <style>
+            {`
             .commit-box { 
               fill: var(--ifm-color-emphasis-100); 
               stroke: var(--ifm-color-primary); 
@@ -75,99 +81,212 @@ export default function CommitStorage() {
               fill: var(--ifm-background-surface-color);
               stroke: var(--ifm-color-emphasis-400);
             }
-          `}</style>
+          `}
+          </style>
         </defs>
-        
-        <g transform="translate(0, 0)">
-          <rect width="720" height="400" rx="8" ry="8" className="bg-section"/>
-          
+
+        <g transform='translate(0, 0)'>
+          <rect width='720' height='400' rx='8' ry='8' className='bg-section' />
+
           {/* Timeline header */}
-          <text x="30" y="40" className="text-heading">Commit Timeline</text>
-          
+          <text x='30' y='40' className='text-heading'>Commit Timeline</text>
+
           {/* Commits - centered and spread */}
-          <g transform="translate(60, 70)">
+          <g transform='translate(60, 70)'>
             {/* Commit 1 */}
-            <g transform="translate(0, 0)">
-              <rect x="0" y="0" width="120" height="60" rx="4" ry="4" className="commit-box"/>
-              <text x="60" y="25" className="text-body" textAnchor="middle">Commit A</text>
-              <text x="60" y="45" className="text-label" textAnchor="middle">ID: abc123</text>
+            <g transform='translate(0, 0)'>
+              <rect
+                x='0'
+                y='0'
+                width='120'
+                height='60'
+                rx='4'
+                ry='4'
+                className='commit-box'
+              />
+              <text x='60' y='25' className='text-body' textAnchor='middle'>
+                Commit A
+              </text>
+              <text x='60' y='45' className='text-label' textAnchor='middle'>
+                ID: abc123
+              </text>
             </g>
-            
+
             {/* Commit 2 */}
-            <g transform="translate(150, 0)">
-              <rect x="0" y="0" width="120" height="60" rx="4" ry="4" className="commit-box"/>
-              <text x="60" y="25" className="text-body" textAnchor="middle">Commit B</text>
-              <text x="60" y="45" className="text-label" textAnchor="middle">ID: def456</text>
+            <g transform='translate(150, 0)'>
+              <rect
+                x='0'
+                y='0'
+                width='120'
+                height='60'
+                rx='4'
+                ry='4'
+                className='commit-box'
+              />
+              <text x='60' y='25' className='text-body' textAnchor='middle'>
+                Commit B
+              </text>
+              <text x='60' y='45' className='text-label' textAnchor='middle'>
+                ID: def456
+              </text>
             </g>
-            
+
             {/* Commit 3 */}
-            <g transform="translate(300, 0)">
-              <rect x="0" y="0" width="120" height="60" rx="4" ry="4" className="commit-box"/>
-              <text x="60" y="25" className="text-body" textAnchor="middle">Commit C</text>
-              <text x="60" y="45" className="text-label" textAnchor="middle">ID: ghi789</text>
+            <g transform='translate(300, 0)'>
+              <rect
+                x='0'
+                y='0'
+                width='120'
+                height='60'
+                rx='4'
+                ry='4'
+                className='commit-box'
+              />
+              <text x='60' y='25' className='text-body' textAnchor='middle'>
+                Commit C
+              </text>
+              <text x='60' y='45' className='text-label' textAnchor='middle'>
+                ID: ghi789
+              </text>
             </g>
-            
+
             {/* Commit 4 */}
-            <g transform="translate(450, 0)">
-              <rect x="0" y="0" width="120" height="60" rx="4" ry="4" className="commit-box"/>
-              <text x="60" y="25" className="text-body" textAnchor="middle">Commit D</text>
-              <text x="60" y="45" className="text-label" textAnchor="middle">ID: jkl012</text>
+            <g transform='translate(450, 0)'>
+              <rect
+                x='0'
+                y='0'
+                width='120'
+                height='60'
+                rx='4'
+                ry='4'
+                className='commit-box'
+              />
+              <text x='60' y='25' className='text-body' textAnchor='middle'>
+                Commit D
+              </text>
+              <text x='60' y='45' className='text-label' textAnchor='middle'>
+                ID: jkl012
+              </text>
             </g>
           </g>
-          
+
           {/* Arrows - adjusted for new centering */}
-          <g transform="translate(60, 160)">
-            <path d="M 60 0 L 60 40" className="arrow-line"/>
-            <path d="M 210 0 L 210 40" className="arrow-line"/>
-            <path d="M 360 0 L 360 40" className="arrow-line"/>
-            <path d="M 510 0 L 510 40" className="arrow-line"/>
+          <g transform='translate(60, 160)'>
+            <path d='M 60 0 L 60 40' className='arrow-line' />
+            <path d='M 210 0 L 210 40' className='arrow-line' />
+            <path d='M 360 0 L 360 40' className='arrow-line' />
+            <path d='M 510 0 L 510 40' className='arrow-line' />
           </g>
-          
+
           {/* Age assignments - aligned with caption */}
-          <g transform="translate(30, 220)">
-            <text x="0" y="0" className="text-heading">Local Age Assignment</text>
-            
+          <g transform='translate(30, 220)'>
+            <text x='0' y='0' className='text-heading'>
+              Local Age Assignment
+            </text>
+
             {/* Age 1 */}
-            <g transform="translate(30, 20)">
-              <rect x="30" y="0" width="60" height="40" rx="4" ry="4" className="age-box"/>
-              <text x="60" y="25" className="text-age" textAnchor="middle">Age: 1</text>
+            <g transform='translate(30, 20)'>
+              <rect
+                x='30'
+                y='0'
+                width='60'
+                height='40'
+                rx='4'
+                ry='4'
+                className='age-box'
+              />
+              <text x='60' y='25' className='text-age' textAnchor='middle'>
+                Age: 1
+              </text>
             </g>
-            
+
             {/* Age 2 */}
-            <g transform="translate(180, 20)">
-              <rect x="30" y="0" width="60" height="40" rx="4" ry="4" className="age-box"/>
-              <text x="60" y="25" className="text-age" textAnchor="middle">Age: 2</text>
+            <g transform='translate(180, 20)'>
+              <rect
+                x='30'
+                y='0'
+                width='60'
+                height='40'
+                rx='4'
+                ry='4'
+                className='age-box'
+              />
+              <text x='60' y='25' className='text-age' textAnchor='middle'>
+                Age: 2
+              </text>
             </g>
-            
+
             {/* Age 3 */}
-            <g transform="translate(330, 20)">
-              <rect x="30" y="0" width="60" height="40" rx="4" ry="4" className="age-box"/>
-              <text x="60" y="25" className="text-age" textAnchor="middle">Age: 3</text>
+            <g transform='translate(330, 20)'>
+              <rect
+                x='30'
+                y='0'
+                width='60'
+                height='40'
+                rx='4'
+                ry='4'
+                className='age-box'
+              />
+              <text x='60' y='25' className='text-age' textAnchor='middle'>
+                Age: 3
+              </text>
             </g>
-            
+
             {/* Age 4 */}
-            <g transform="translate(480, 20)">
-              <rect x="30" y="0" width="60" height="40" rx="4" ry="4" className="age-box"/>
-              <text x="60" y="25" className="text-age" textAnchor="middle">Age: 4</text>
+            <g transform='translate(480, 20)'>
+              <rect
+                x='30'
+                y='0'
+                width='60'
+                height='40'
+                rx='4'
+                ry='4'
+                className='age-box'
+              />
+              <text x='60' y='25' className='text-age' textAnchor='middle'>
+                Age: 4
+              </text>
             </g>
           </g>
-          
+
           {/* Arrow marker */}
           <defs>
-            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-              <polygon points="0 0, 10 3.5, 0 7" fill="var(--ifm-color-emphasis-600)"/>
+            <marker
+              id='arrowhead'
+              markerWidth='10'
+              markerHeight='7'
+              refX='9'
+              refY='3.5'
+              orient='auto'
+            >
+              <polygon
+                points='0 0, 10 3.5, 0 7'
+                fill='var(--ifm-color-emphasis-600)'
+              />
             </marker>
           </defs>
-          
+
           {/* Caption */}
-          <g transform="translate(30, 320)">
-            <rect x="0" y="0" width="660" height="60" rx="4" ry="4" className="caption-box"/>
-            <text x="20" y="25" className="text-icon-small">🔢</text>
-            <text x="45" y="25" className="text-body">
-              <tspan fontWeight="600" fill="var(--ifm-color-primary-darker)">Local Age Tracking:</tspan>
-              <tspan dx="5">Sequential numbers track commit order</tspan>
+          <g transform='translate(30, 320)'>
+            <rect
+              x='0'
+              y='0'
+              width='660'
+              height='60'
+              rx='4'
+              ry='4'
+              className='caption-box'
+            />
+            <text x='20' y='25' className='text-icon-small'>🔢</text>
+            <text x='45' y='25' className='text-body'>
+              <tspan fontWeight='600' fill='var(--ifm-color-primary-darker)'>
+                Local Age Tracking:
+              </tspan>
+              <tspan dx='5'>Sequential numbers track commit order</tspan>
             </text>
-            <text x="45" y="45" className="text-body">Never synchronized • Enables fast incremental updates</text>
+            <text x='45' y='45' className='text-body'>
+              Never synchronized • Enables fast incremental updates
+            </text>
           </g>
         </g>
       </svg>

@@ -1,92 +1,204 @@
-<svg width="800" height="480" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="14px">
+<svg
+  width="800"
+  height="480"
+  xmlns="http://www.w3.org/2000/svg"
+  font-family="Inter, sans-serif"
+  font-size="14px"
+>
   <defs>
     <style>
-      .bg-card { fill: #ffffff; stroke: #dee2e6; stroke-width: 1; }
-      .bg-section-blue { fill: #e7f1ff; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
-      .bg-section-gray { fill: #f8f9fa; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
-      .bg-signed-op { fill: #f4f8ff; stroke: #dee2e6; stroke-width: 1; }
-      .text-title { font-size: 16px; font-weight: 600; fill: #0a58ca; }
-      .text-heading { font-size: 14px; font-weight: 500; fill: #212529; }
-      .text-body { font-size: 12px; fill: #495057; }
-      .text-code { font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; fill: #d63384; } /* Adjusted color */
-      .text-key-private { fill: #dc3545; }
-      .text-key-public { fill: #198754; }
-      .text-signed { fill: #0a58ca; }
-      .text-success { fill: #198754; }
-      .text-icon { font-size: 20px; }
-      .text-icon-small { font-size: 16px; }
-      .text-icon-large { font-size: 24px; }
-      .arrow-line { stroke: #0d6efd; stroke-width: 2; }
-      .arrow-head { fill: #0d6efd; }
-      .plus-equals { font-size: 18px; fill: #6c757d; }
+    .bg-card {
+      fill: #ffffff;
+      stroke: #dee2e6;
+      stroke-width: 1;
+    }
+    .bg-section-blue {
+      fill: #e7f1ff;
+      stroke: #6c757d;
+      stroke-width: 1;
+      stroke-dasharray: 4 2;
+    }
+    .bg-section-gray {
+      fill: #f8f9fa;
+      stroke: #6c757d;
+      stroke-width: 1;
+      stroke-dasharray: 4 2;
+    }
+    .bg-signed-op {
+      fill: #f4f8ff;
+      stroke: #dee2e6;
+      stroke-width: 1;
+    }
+    .text-title {
+      font-size: 16px;
+      font-weight: 600;
+      fill: #0a58ca;
+    }
+    .text-heading {
+      font-size: 14px;
+      font-weight: 500;
+      fill: #212529;
+    }
+    .text-body {
+      font-size: 12px;
+      fill: #495057;
+    }
+    .text-code {
+      font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      fill: #d63384;
+    } /* Adjusted color */
+    .text-key-private {
+      fill: #dc3545;
+    }
+    .text-key-public {
+      fill: #198754;
+    }
+    .text-signed {
+      fill: #0a58ca;
+    }
+    .text-success {
+      fill: #198754;
+    }
+    .text-icon {
+      font-size: 20px;
+    }
+    .text-icon-small {
+      font-size: 16px;
+    }
+    .text-icon-large {
+      font-size: 24px;
+    }
+    .arrow-line {
+      stroke: #0d6efd;
+      stroke-width: 2;
+    }
+    .arrow-head {
+      fill: #0d6efd;
+    }
+    .plus-equals {
+      font-size: 18px;
+      fill: #6c757d;
+    }
     </style>
-    <marker id="arrowhead-op" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+    <marker
+      id="arrowhead-op"
+      markerWidth="10"
+      markerHeight="7"
+      refX="0"
+      refY="3.5"
+      orient="auto"
+    >
       <polygon points="0 0, 10 3.5, 0 7" class="arrow-head" />
     </marker>
   </defs>
 
-  <text x="400" y="30" text-anchor="middle" class="text-title">2. Commit Signing &amp; Verification</text>
+  <text x="400" y="30" text-anchor="middle" class="text-title"
+  >2. Commit Signing &amp; Verification</text>
 
   <g transform="translate(20, 60)">
-      <rect width="300" height="360" rx="8" ry="8" class="bg-section-blue"/>
-      <text x="150" y="30" text-anchor="middle" class="text-icon-large">💻</text>
-      <text x="150" y="55" text-anchor="middle" class="text-heading">On Peer Machine</text>
+    <rect width="300" height="360" rx="8" ry="8" class="bg-section-blue" />
+    <text x="150" y="30" text-anchor="middle" class="text-icon-large">💻</text>
+    <text x="150" y="55" text-anchor="middle" class="text-heading"
+    >On Peer Machine</text>
 
-      <rect x="75" y="80" width="150" height="60" rx="4" ry="4" class="bg-card"/>
-      <text x="90" y="105" class="text-icon">📄</text>
-      <text x="115" y="105" class="text-heading">Operation</text>
-      <text x="150" y="125" text-anchor="middle" class="text-body">(e.g., write)</text>
+    <rect x="75" y="80" width="150" height="60" rx="4" ry="4" class="bg-card" />
+    <text x="90" y="105" class="text-icon">📄</text>
+    <text x="115" y="105" class="text-heading">Operation</text>
+    <text x="150" y="125" text-anchor="middle" class="text-body"
+    >(e.g., write)</text>
 
-      <text x="150" y="165" text-anchor="middle" class="plus-equals">+</text>
+    <text x="150" y="165" text-anchor="middle" class="plus-equals">+</text>
 
-      <rect x="75" y="180" width="150" height="50" rx="4" ry="4" class="bg-card"/>
-      <text x="90" y="205" class="text-icon-small text-key-private">🔑</text>
-      <text x="115" y="205" class="text-code text-key-private">Private Key</text>
+    <rect
+      x="75"
+      y="180"
+      width="150"
+      height="50"
+      rx="4"
+      ry="4"
+      class="bg-card"
+    />
+    <text x="90" y="205" class="text-icon-small text-key-private">🔑</text>
+    <text x="115" y="205" class="text-code text-key-private">Private Key</text>
 
-      <text x="150" y="255" text-anchor="middle" class="plus-equals">=</text>
+    <text x="150" y="255" text-anchor="middle" class="plus-equals">=</text>
 
-      <rect x="75" y="270" width="150" height="50" rx="4" ry="4" class="bg-signed-op"/>
-      <text x="90" y="295" class="text-icon-small text-signed">✍️</text>
-      <text x="115" y="295" class="text-heading text-signed">Signed Commit</text>
+    <rect
+      x="75"
+      y="270"
+      width="150"
+      height="50"
+      rx="4"
+      ry="4"
+      class="bg-signed-op"
+    />
+    <text x="90" y="295" class="text-icon-small text-signed">✍️</text>
+    <text x="115" y="295" class="text-heading text-signed">Signed Commit</text>
 
-      <text x="150" y="340" text-anchor="middle" class="text-body" width="280">
-         <tspan x="150" dy="0em">Signed using session's</tspan>
-         <tspan x="150" dy="1.2em">private key.</tspan>
-      </text>
+    <text x="150" y="340" text-anchor="middle" class="text-body" width="280">
+      <tspan x="150" dy="0em">Signed using session's</tspan>
+      <tspan x="150" dy="1.2em">private key.</tspan>
+    </text>
   </g>
 
-   <g transform="translate(330, 240)">
-     <line x1="0" y1="0" x2="60" y2="0" class="arrow-line" marker-end="url(#arrowhead-op)" />
-     <text x="30" y="20" text-anchor="middle" class="text-body">Sent</text>
+  <g transform="translate(330, 240)">
+    <line
+      x1="0"
+      y1="0"
+      x2="60"
+      y2="0"
+      class="arrow-line"
+      marker-end="url(#arrowhead-op)"
+    />
+    <text x="30" y="20" text-anchor="middle" class="text-body">Sent</text>
   </g>
 
   <g transform="translate(420, 60)">
-      <rect width="360" height="360" rx="8" ry="8" class="bg-section-gray"/>
-      <text x="180" y="30" text-anchor="middle" class="text-icon-large">🌐</text>
-      <text x="180" y="55" text-anchor="middle" class="text-heading">In GoatDB Network (Peers)</text>
+    <rect width="360" height="360" rx="8" ry="8" class="bg-section-gray" />
+    <text x="180" y="30" text-anchor="middle" class="text-icon-large">🌐</text>
+    <text x="180" y="55" text-anchor="middle" class="text-heading"
+    >In GoatDB Network (Peers)</text>
 
-      <rect x="105" y="80" width="150" height="50" rx="4" ry="4" class="bg-signed-op"/>
-      <text x="120" y="105" class="text-icon-small text-signed">✍️</text>
-      <text x="145" y="105" class="text-heading text-signed">Signed Commit</text>
+    <rect
+      x="105"
+      y="80"
+      width="150"
+      height="50"
+      rx="4"
+      ry="4"
+      class="bg-signed-op"
+    />
+    <text x="120" y="105" class="text-icon-small text-signed">✍️</text>
+    <text x="145" y="105" class="text-heading text-signed">Signed Commit</text>
 
-      <text x="180" y="155" text-anchor="middle" class="plus-equals">+</text>
+    <text x="180" y="155" text-anchor="middle" class="plus-equals">+</text>
 
-      <rect x="105" y="170" width="150" height="60" rx="4" ry="4" class="bg-card"/>
-      <text x="120" y="195" class="text-icon-small text-key-public">🔑</text>
-      <text x="145" y="195" class="text-code text-key-public">Public Key</text>
-       <text x="180" y="215" text-anchor="middle" class="text-body">(From session)</text>
+    <rect
+      x="105"
+      y="170"
+      width="150"
+      height="60"
+      rx="4"
+      ry="4"
+      class="bg-card"
+    />
+    <text x="120" y="195" class="text-icon-small text-key-public">🔑</text>
+    <text x="145" y="195" class="text-code text-key-public">Public Key</text>
+    <text x="180" y="215" text-anchor="middle" class="text-body"
+    >(From session)</text>
 
-      <g transform="translate(180, 260)" text-anchor="middle">
-            <text y="0" class="text-icon-large text-success">✅</text>
-            <text y="25" class="text-heading text-success">Verification Successful</text>
-            <text y="45" class="text-body">• Content Integrity Confirmed</text>
-            <text y="60" class="text-body">• Creator Identity Proven</text>
-       </g>
+    <g transform="translate(180, 260)" text-anchor="middle">
+      <text y="0" class="text-icon-large text-success">✅</text>
+      <text y="25" class="text-heading text-success"
+      >Verification Successful</text>
+      <text y="45" class="text-body">• Content Integrity Confirmed</text>
+      <text y="60" class="text-body">• Creator Identity Proven</text>
+    </g>
 
-       <text x="180" y="340" text-anchor="middle" class="text-body" width="340">
-         <tspan x="180" dy="0em">Peers verify signature</tspan>
-         <tspan x="180" dy="1.2em">using public key.</tspan>
-      </text>
+    <text x="180" y="340" text-anchor="middle" class="text-body" width="340">
+      <tspan x="180" dy="0em">Peers verify signature</tspan>
+      <tspan x="180" dy="1.2em">using public key.</tspan>
+    </text>
   </g>
-
 </svg>

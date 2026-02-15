@@ -67,10 +67,10 @@ async function main(): Promise<void> {
     suiteName,
     testName,
   );
-  
+
   // Print summary
   TestsRunner.printSummary(summary);
-  
+
   // Exit with code 1 if any tests failed, 0 if all passed
   const exitCode = summary.failed > 0 ? 1 : 0;
   await exit(exitCode);

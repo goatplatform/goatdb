@@ -15,7 +15,7 @@ export class CoroutineTimer implements Timer {
     readonly scheduler: Scheduler,
     callback: TimerCallback,
     readonly priority: SchedulerPriority = SchedulerPriority.Normal,
-    readonly name?: string
+    readonly name?: string,
   ) {
     this._callback = callback;
     this._scheduled = false;

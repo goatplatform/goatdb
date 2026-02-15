@@ -10,17 +10,19 @@ interface NodeProps {
   onClick?: () => void;
 }
 
-export default function Node({ 
-  type, 
-  label, 
+export default function Node({
+  type,
+  label,
   status = 'active',
   size = 'medium',
   className = '',
-  onClick
+  onClick,
 }: NodeProps) {
   return (
-    <div 
-      className={`${styles.node} ${styles[`node--${type}`]} ${styles[`node--${status}`]} ${styles[`node--${size}`]} ${className}`}
+    <div
+      className={`${styles.node} ${styles[`node--${type}`]} ${
+        styles[`node--${status}`]
+      } ${styles[`node--${size}`]} ${className}`}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}

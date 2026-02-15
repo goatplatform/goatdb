@@ -18,22 +18,22 @@ import { encodableValueHash } from '../../base/core-types/encoding/index.ts';
 import { MergeContext } from './merge-context.ts';
 import { StringRep } from './string-rep.ts';
 import {
-  kCoreValueTreeNodeOpts,
-  TextNode,
-  ElementNode,
-  isElementNode,
-  isTextNode,
-  Pointer,
-  RichText,
-  TreeNode,
   comparePointers,
+  ElementNode,
+  findLastTextNode,
+  isElementNode,
+  isExpiredPointer,
   isPointer,
+  isTextNode,
+  isTrivialTextNode,
+  kCoreValueTreeNodeOpts,
+  Pointer,
   PointerDirection,
   PointerType,
+  RichText,
   RichTextValue,
-  isExpiredPointer,
-  isTrivialTextNode,
-  findLastTextNode,
+  TextNode,
+  TreeNode,
 } from './tree.ts';
 
 /**
@@ -262,7 +262,7 @@ export function* splitTextNodeOnPointers(
   const sortedPtrsForNode = Array.from(
     pointersForNode(sortedPointers, node, local),
   ).sort((p1, p2) =>
-    p1.offset === p2.offset ? comparePointers(p1, p2) : p1.offset - p2.offset,
+    p1.offset === p2.offset ? comparePointers(p1, p2) : p1.offset - p2.offset
   );
   // Break the node to a stream of text nodes and pointer values
   const nodeText = node.text;
@@ -343,13 +343,15 @@ function* flattenChildNodes(
       didOpen = true;
     }
     // Recursively flatten this child
-    for (const atom of flattenTreeNode(
-      child,
-      parentDepth + 1,
-      local,
-      sortedPointers,
-      flattenText,
-    )) {
+    for (
+      const atom of flattenTreeNode(
+        child,
+        parentDepth + 1,
+        local,
+        sortedPointers,
+        flattenText,
+      )
+    ) {
       yield atom;
     }
   }
@@ -395,13 +397,15 @@ function* flattenTreeNode(
   } else if (isElementNode(node)) {
     yield kElementSpacer;
     yield node;
-    for (const v of flattenChildNodes(
-      node,
-      depth,
-      local,
-      sortedPointers,
-      flattenText,
-    )) {
+    for (
+      const v of flattenChildNodes(
+        node,
+        depth,
+        local,
+        sortedPointers,
+        flattenText,
+      )
+    ) {
       yield v;
     }
   } else {
@@ -454,20 +458,21 @@ export function* flattenSiblingNodes(
 ): Generator<FlatRepAtom> {
   // Sort all pointers so our flat representation is consistent where multiple
   // pointers are present at the same location.
-  const sortedPointers =
-    pointers !== undefined
-      ? Array.from<Pointer>(stripDuplicatePointers(pointers)).sort(
-          comparePointers,
-        )
-      : undefined;
+  const sortedPointers = pointers !== undefined
+    ? Array.from<Pointer>(stripDuplicatePointers(pointers)).sort(
+      comparePointers,
+    )
+    : undefined;
   for (const atom of iter) {
-    for (const flatAtom of flattenTreeNode(
-      atom,
-      parentDepth,
-      local,
-      sortedPointers,
-      flattenText,
-    )) {
+    for (
+      const flatAtom of flattenTreeNode(
+        atom,
+        parentDepth,
+        local,
+        sortedPointers,
+        flattenText,
+      )
+    ) {
       yield flatAtom;
     }
   }

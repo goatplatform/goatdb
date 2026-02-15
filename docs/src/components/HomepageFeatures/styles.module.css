@@ -46,8 +46,12 @@
 }
 
 @keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
 }
 
 .feature h3 {
@@ -135,28 +139,28 @@
   .features {
     padding: 2rem 0;
   }
-  
+
   .feature {
     padding: 1rem 0.5rem;
   }
-  
+
   .featuresHeader h2 {
     font-size: 1.75rem;
   }
-  
+
   .featuresHeader p {
     font-size: 1rem;
   }
-  
+
   .architectureSection {
     padding: 2rem 1rem;
   }
-  
+
   .architectureFeatures {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 1rem;
   }
-  
+
   .architectureFeature {
     padding: 1rem 0.5rem;
   }

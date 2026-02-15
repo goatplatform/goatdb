@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { GoatDB, DataRegistry } from '@goatdb/goatdb';
+import { DataRegistry, GoatDB } from '@goatdb/goatdb';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -15,8 +15,8 @@ const taskSchema = {
     text: { type: 'string', required: true },
     done: { type: 'boolean', default: () => false },
     priority: { type: 'string', default: () => 'medium' },
-    tags: { type: 'set', default: () => new Set() }
-  }
+    tags: { type: 'set', default: () => new Set() },
+  },
 };
 
 // Register the schema
@@ -25,33 +25,33 @@ DataRegistry.default.registerSchema(taskSchema);
 async function main() {
   // Initialize database
   const db = new GoatDB({
-    path: join(__dirname, "data"),
+    path: join(__dirname, 'data'),
   });
-  
+
   await db.readyPromise();
   console.log('🐐 GoatDB initialized');
 
   // Create sample tasks
   const task1 = db.create('/data/todos/task-1', taskSchema, {
     text: 'Learn GoatDB basics',
-    priority: 'high'
+    priority: 'high',
   });
 
   const task2 = db.create('/data/todos/task-2', taskSchema, {
     text: 'Build Node.js app',
-    priority: 'medium'
+    priority: 'medium',
   });
 
   db.create('/data/todos/task-3', taskSchema, {
     text: 'Write documentation',
-    done: true
+    done: true,
   });
 
   // Query incomplete tasks
   const incompleteTasks = db.query({
     source: '/data/todos',
     schema: taskSchema,
-    predicate: ({ item }) => !item.get('done')
+    predicate: ({ item }) => !item.get('done'),
   });
 
   console.log('📋 Incomplete tasks:', incompleteTasks.results().length);
@@ -62,7 +62,11 @@ async function main() {
 
   // Set up reactive query
   incompleteTasks.onResultsChanged(() => {
-    console.log('🔄 Tasks updated:', incompleteTasks.results().length, 'remaining');
+    console.log(
+      '🔄 Tasks updated:',
+      incompleteTasks.results().length,
+      'remaining',
+    );
   });
 
   // Make changes to see reactive updates
@@ -70,7 +74,7 @@ async function main() {
   setTimeout(() => {
     db.create('/data/todos/task-4', taskSchema, {
       text: 'Test reactive queries',
-      priority: 'high'
+      priority: 'high',
     });
   }, 2000); // Add new task after 2s to demonstrate reactivity
 

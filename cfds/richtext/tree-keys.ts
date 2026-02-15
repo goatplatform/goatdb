@@ -2,9 +2,9 @@ import { Dictionary } from '../../base/collections/dict.ts';
 import { HashMap } from '../../base/collections/hash-map.ts';
 import {
   Clonable,
-  Equatable,
   CoreValue,
   coreValueEquals,
+  Equatable,
 } from '../../base/core-types/index.ts';
 import { encodableValueHash } from '../../base/core-types/encoding/index.ts';
 import { dfs, ElementNode, kCoreValueTreeNodeOpts } from './tree.ts';
@@ -37,8 +37,7 @@ export class TreeKeys implements Clonable, Equatable<TreeKeys> {
     if (!result) {
       const hash = encodableValueHash(node, kCoreValueTreeNodeOpts);
       const idx: number = this._hashToCount.get(hash) || 0;
-      const tagName =
-        (isElementNode(node) && node.tagName) ||
+      const tagName = (isElementNode(node) && node.tagName) ||
         (isTextNode(node) && 'text') ||
         undefined;
       result = `${tagName || ''}/${hash}/${idx}`;

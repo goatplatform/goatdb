@@ -105,21 +105,24 @@ let gReqId = 0;
 // Track all pending operations per file
 const gPendingFileOperations = new Map<JSONLogFile, Set<Promise<any>>>();
 
-function trackFileOperation<T>(file: JSONLogFile, operation: Promise<T>): Promise<T> {
+function trackFileOperation<T>(
+  file: JSONLogFile,
+  operation: Promise<T>,
+): Promise<T> {
   if (!gPendingFileOperations.has(file)) {
     gPendingFileOperations.set(file, new Set());
   }
-  
+
   const pendingSet = gPendingFileOperations.get(file)!;
   pendingSet.add(operation);
-  
+
   operation.finally(() => {
     pendingSet.delete(operation);
     if (pendingSet.size === 0) {
       gPendingFileOperations.delete(file);
     }
   });
-  
+
   return operation;
 }
 

@@ -1,11 +1,11 @@
 export type {
-  ReadonlyDecodedObject,
-  DecodedValue,
-  DecodableKey,
-  ReadonlyDecodedArray,
-  Decoder,
-  Decodable,
   ConstructorDecoderConfig,
+  Decodable,
+  DecodableKey,
+  DecodedValue,
+  Decoder,
+  ReadonlyDecodedArray,
+  ReadonlyDecodedObject,
 } from './types.ts';
 
 export { isDecoderConfig } from './utils.ts';

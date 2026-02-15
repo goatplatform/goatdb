@@ -25,7 +25,7 @@ export class MapTypeOperations extends CoreTypeOperations<
   patch(
     curValue: Dictionary<CoreKey, ConcreteCoreValue> | undefined,
     changes: Change<EncodedChange>[],
-    options?: ValueTypeOptions
+    options?: ValueTypeOptions,
   ) {
     for (const change of changes) {
       if (change instanceof FieldChange) {
@@ -41,7 +41,7 @@ export class MapTypeOperations extends CoreTypeOperations<
 
   private patchInsert(
     curMap: Dictionary<CoreKey, ConcreteCoreValue> | undefined,
-    change: FieldChange<Dictionary<CoreKey, ConcreteCoreValue>>
+    change: FieldChange<Dictionary<CoreKey, ConcreteCoreValue>>,
   ) {
     if (!curMap) {
       curMap = this.createMap();
@@ -55,7 +55,7 @@ export class MapTypeOperations extends CoreTypeOperations<
 
   private patchDelete(
     curMap: Dictionary<CoreKey, ConcreteCoreValue> | undefined,
-    change: FieldChange<Dictionary<CoreKey, ConcreteCoreValue>>
+    change: FieldChange<Dictionary<CoreKey, ConcreteCoreValue>>,
   ) {
     if (curMap === undefined) return curMap;
 
@@ -75,7 +75,7 @@ export class MapTypeOperations extends CoreTypeOperations<
   valueChangedDiff(
     map1: Dictionary<CoreKey, ConcreteCoreValue>,
     map2: Dictionary<CoreKey, ConcreteCoreValue>,
-    options?: ValueTypeOptions
+    options?: ValueTypeOptions,
   ) {
     map1 = map1 || this.createMap();
     map2 = map2 || this.createMap();
@@ -133,14 +133,14 @@ export class MapTypeOperations extends CoreTypeOperations<
   }
 
   override gc(
-    value: Dictionary<CoreKey, ConcreteCoreValue>
+    value: Dictionary<CoreKey, ConcreteCoreValue>,
   ): Dictionary<CoreKey, ConcreteCoreValue> | undefined {
     return undefined;
   }
 
   override fillRefs(
     refs: Set<string>,
-    dict: Dictionary<ConcreteCoreValue, ConcreteCoreValue>
+    dict: Dictionary<ConcreteCoreValue, ConcreteCoreValue>,
   ): void {
     if (this.isRef && dict !== undefined) {
       for (const [key, value] of dict) {
@@ -157,7 +157,7 @@ export class MapTypeOperations extends CoreTypeOperations<
   override rewriteRefs(
     keyMapping: Map<string, string>,
     dict: Dictionary<string, ConcreteCoreValue>,
-    deleteRefs?: Set<string>
+    deleteRefs?: Set<string>,
   ): Dictionary<string, ConcreteCoreValue> {
     if (!this.isRef) {
       return dict;
@@ -169,7 +169,7 @@ export class MapTypeOperations extends CoreTypeOperations<
       }
       result.set(
         keyMapping.get(key as string) || key,
-        keyMapping.get(value as string) || value
+        keyMapping.get(value as string) || value,
       );
     }
     return result;

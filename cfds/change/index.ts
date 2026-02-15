@@ -23,8 +23,7 @@ export interface EncodedChange extends ReadonlyCoreObject {
 export interface ChangeValueConfig {}
 
 export abstract class Change<EC extends EncodedChange>
-  implements Encodable<keyof EC, CoreValue>, Equatable, Clonable
-{
+  implements Encodable<keyof EC, CoreValue>, Equatable, Clonable {
   constructor(config?: ChangeValueConfig | ConstructorDecoderConfig<EC>) {
     if (isDecoderConfig(config)) {
       // Safe cast: EC extends EncodedChange which always has changeType

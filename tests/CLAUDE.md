@@ -3,21 +3,26 @@
 ## Quick Start
 
 - Run all tests: `deno task test`
-- Debug specific test: `deno task test --suite=DatabaseFeature --test="should initialize" --deno-inspect-brk`
+- Debug specific test:
+  `deno task test --suite=DatabaseFeature --test="should initialize" --deno-inspect-brk`
 - Node.js only: `deno task test --runtime=node`
 
 ## Architecture Overview
 
-The testing system is a custom, lightweight framework designed for cross-platform compatibility:
+The testing system is a custom, lightweight framework designed for
+cross-platform compatibility:
 
 - **Test runner**: @tests/run.ts - Orchestrates cross-platform execution
-- **Test framework**: @tests/mod.ts - Provides TEST() function and TestSuite class
+- **Test framework**: @tests/mod.ts - Provides TEST() function and TestSuite
+  class
 - **Entry point**: @tests/tests-entry.ts - Imports all test files
-- **Node support**: @tests/node-run.ts - Handles TypeScript compilation for Node.js
+- **Node support**: @tests/node-run.ts - Handles TypeScript compilation for
+  Node.js
 
 ### Key Design Principles
 
-1. **No external dependencies** - Custom framework avoids third-party test runners
+1. **No external dependencies** - Custom framework avoids third-party test
+   runners
 2. **Cross-platform** - Same tests run in Deno, Node.js, and browsers
 3. **Sequential execution** - Tests run one at a time for consistency
 4. **Resource management** - Automatic cleanup of temporary files/directories
@@ -28,28 +33,28 @@ The testing system is a custom, lightweight framework designed for cross-platfor
 
 ### Basic Commands
 
-| Command | Description |
-|---------|-------------|
-| `deno task test` | Run all tests in all environments |
-| `deno task test --runtime=deno` | Run tests in Deno only |
-| `deno task test --runtime=node` | Run tests in Node.js only |
+| Command                               | Description                       |
+| ------------------------------------- | --------------------------------- |
+| `deno task test`                      | Run all tests in all environments |
+| `deno task test --runtime=deno`       | Run tests in Deno only            |
+| `deno task test --runtime=node`       | Run tests in Node.js only         |
 | `deno test -A tests/specific.test.ts` | Run a specific test file directly |
 
 ### Debugging Commands
 
-| Command | Description |
-|---------|-------------|
-| `--deno-inspect-brk` | Attach Deno debugger (waits for debugger) |
+| Command              | Description                                  |
+| -------------------- | -------------------------------------------- |
+| `--deno-inspect-brk` | Attach Deno debugger (waits for debugger)    |
 | `--node-inspect-brk` | Attach Node.js debugger (waits for debugger) |
-| `--suite=NAME` | Run only tests in specified suite |
-| `--test=NAME` | Run only tests matching name |
+| `--suite=NAME`       | Run only tests in specified suite            |
+| `--test=NAME`        | Run only tests matching name                 |
 
 ### Environment Variables
 
-| Variable | Description |
-|----------|-------------|
+| Variable       | Description                  |
+| -------------- | ---------------------------- |
 | `GOATDB_SUITE` | Filter to run specific suite |
-| `GOATDB_TEST` | Filter to run specific test |
+| `GOATDB_TEST`  | Filter to run specific test  |
 
 ## Writing Tests
 
@@ -66,6 +71,7 @@ export default function setupMyTests() {
 ```
 
 **BROKEN PATTERN - Never do this:**
+
 ```typescript
 export default function setupMyTests() {
   // Empty function breaks test registration
@@ -79,6 +85,7 @@ TEST('suite', 'test', () => {}); // Outside setup = broken
 ### Basic Test Structure
 
 Every test file must:
+
 1. Import TEST function from @tests/mod.ts
 2. Import assertions from @tests/asserts.ts
 3. Export a default `setup()` function that registers tests
@@ -98,18 +105,24 @@ All assertion functions are exported from @tests/asserts.ts:
 
 ### Test Context Utilities
 
-Each test receives a TestSuite context - see @tests/mod.ts:19-30 for available methods:
-- `tempDir(subPath?)` - Creates a temporary directory that's automatically cleaned up
+Each test receives a TestSuite context - see @tests/mod.ts:19-30 for available
+methods:
+
+- `tempDir(subPath?)` - Creates a temporary directory that's automatically
+  cleaned up
 
 ## AI Agent Guidelines
 
 **Test File Rules:**
-1. **Setup function MUST contain all TEST() calls** - empty setup functions break registration
+
+1. **Setup function MUST contain all TEST() calls** - empty setup functions
+   break registration
 2. **Export setup as default** - `export default function setupX() { ... }`
 3. **Import in tests-entry.ts** - Add `setupX()` call to main()
 4. **Follow existing patterns** - Check similar test files first
 
 **Common Failures:**
+
 - Empty setup functions with TEST() calls outside
 - Missing default export
 - Setup function not called in tests-entry.ts
@@ -118,7 +131,8 @@ Each test receives a TestSuite context - see @tests/mod.ts:19-30 for available m
 
 1. **File placement**: Create test files in `/tests` with `.test.ts` suffix
 2. **Export setup**: Every test file must export a default `setup()` function
-3. **Descriptive names**: Use clear suite and test names that explain what's being tested
+3. **Descriptive names**: Use clear suite and test names that explain what's
+   being tested
 4. **Resource cleanup**: Always clean up resources in finally blocks
 5. **Path format**: Remember GoatDB paths follow `/type/repo/item` format
 
@@ -131,25 +145,34 @@ Each test receives a TestSuite context - see @tests/mod.ts:19-30 for available m
 ### Common Test Patterns
 
 #### Database Test Pattern
-See @tests/db-trusted.test.ts:14-24 for database initialization tests. Key points:
+
+See @tests/db-trusted.test.ts:14-24 for database initialization tests. Key
+points:
+
 - Create database with `tempDir()` for isolation
 - Always await `db.readyPromise()` before operations
 - Clean up with `db.flushAll()` in finally block
 
 #### Item Test Pattern
+
 See @tests/db.test.ts:112-130 for item creation and update patterns:
+
 - Use correct path format: `/type/repo/item`
 - Register schemas before use
 - Test both creation and updates separately
 
 #### Query Test Pattern
+
 See @tests/query.test.ts for comprehensive query examples:
+
 - Create test data with known values
 - Test predicates, sorting, and limit behavior
 - Verify reactive updates work correctly
 
 #### Schema Test Pattern
+
 See @tests/cfds-validation.test.ts for schema validation examples:
+
 - Test required fields enforcement
 - Verify type checking works
 - Check default values are applied
@@ -166,20 +189,27 @@ See @tests/cfds-validation.test.ts for schema validation examples:
 ### Common Issues
 
 #### Tests Hanging
+
 - **Cause**: Unclosed database connections or pending promises
-- **Solution**: Ensure all databases are closed with `await db.flushAll()` in finally blocks
+- **Solution**: Ensure all databases are closed with `await db.flushAll()` in
+  finally blocks
 
 #### Node.js Test Failures
+
 - **Cause**: TypeScript compilation errors or Node.js compatibility issues
-- **Solution**: Check console output for esbuild errors, ensure code is Node-compatible
+- **Solution**: Check console output for esbuild errors, ensure code is
+  Node-compatible
 
 #### Permission Errors
+
 - **Cause**: Tests need file system access for temporary directories
 - **Solution**: Run tests with appropriate permissions (`deno run -A`)
 
 #### Flaky Tests
+
 - **Cause**: Tests depending on timing or external state
-- **Solution**: Tests run sequentially, but ensure no dependency on execution order
+- **Solution**: Tests run sequentially, but ensure no dependency on execution
+  order
 
 ### Debug Tips
 
@@ -213,15 +243,18 @@ See @tests/cfds-validation.test.ts for schema validation examples:
 
 ### Creating Test Databases
 
-The `createTestDB` helper is available in various test files. See @tests/db.test.ts:10-20 for an example implementation.
+The `createTestDB` helper is available in various test files. See
+@tests/db.test.ts:10-20 for an example implementation.
 
 ### Generating Test Data
 
-For ID generation patterns, see @tests/sync.test.ts where unique IDs are created for test isolation.
+For ID generation patterns, see @tests/sync.test.ts where unique IDs are created
+for test isolation.
 
 ### Test Schemas
 
 Common test schemas are defined in:
+
 - @tests/test-schemas.ts - Reusable schemas for testing
 - Individual test files often define inline schemas for specific tests
 
@@ -245,4 +278,5 @@ When contributing new tests:
 5. Document any special setup or teardown requirements
 6. Use meaningful assertion messages for debugging
 
-Remember: Tests are documentation. Write them clearly so others (including AI assistants) can understand the expected behavior.
+Remember: Tests are documentation. Write them clearly so others (including AI
+assistants) can understand the expected behavior.

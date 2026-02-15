@@ -254,16 +254,15 @@ export function decomposeRanges(doc: UnkeyedDocument): Set<Pointer> {
     // }
     const anchorNodeOffset = nodesToIndexes.get(range.anchor.node)!;
     const focusNodeOffset = nodesToIndexes.get(range.focus.node)!;
-    const dir =
-      anchorNodeOffset < focusNodeOffset
-        ? PointerDirection.Forward
-        : anchorNodeOffset > focusNodeOffset
-        ? PointerDirection.Backward
-        : range.anchor.offset < range.focus.offset
-        ? PointerDirection.Forward
-        : range.anchor.offset > range.focus.offset
-        ? PointerDirection.Backward
-        : PointerDirection.None;
+    const dir = anchorNodeOffset < focusNodeOffset
+      ? PointerDirection.Forward
+      : anchorNodeOffset > focusNodeOffset
+      ? PointerDirection.Backward
+      : range.anchor.offset < range.focus.offset
+      ? PointerDirection.Forward
+      : range.anchor.offset > range.focus.offset
+      ? PointerDirection.Backward
+      : PointerDirection.None;
     result.add(buildRangePointer(key, range, 'anchor', dir));
     result.add(buildRangePointer(key, range, 'focus', dir));
   }

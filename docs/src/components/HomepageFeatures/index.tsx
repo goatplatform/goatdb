@@ -24,8 +24,8 @@ const FeatureList: FeatureItem[] = [
     Icon: OfflineIcon,
     description: (
       <>
-        Your app works without internet. 
-        Changes sync automatically when reconnected.
+        Your app works without internet. Changes sync automatically when
+        reconnected.
       </>
     ),
   },
@@ -34,8 +34,8 @@ const FeatureList: FeatureItem[] = [
     Icon: SelfHealingIcon,
     description: (
       <>
-        Cryptographically signed commits enable clients to restore 
-        crashed servers. Ultra-cheap single-tenant deployments.
+        Cryptographically signed commits enable clients to restore crashed
+        servers. Ultra-cheap single-tenant deployments.
       </>
     ),
   },
@@ -44,8 +44,8 @@ const FeatureList: FeatureItem[] = [
     Icon: InstantUpdateIcon,
     description: (
       <>
-        Local changes are instant. Remote changes stream in real-time. 
-        No spinners. No loading states. No waiting.
+        Local changes are instant. Remote changes stream in real-time. No
+        spinners. No loading states. No waiting.
       </>
     ),
   },
@@ -54,8 +54,8 @@ const FeatureList: FeatureItem[] = [
     Icon: ConflictResolutionIcon,
     description: (
       <>
-        Like Git's three-way merge but for live data. 
-        Multiple users edit simultaneously without conflicts.
+        Like Git's three-way merge but for live data. Multiple users edit
+        simultaneously without conflicts.
       </>
     ),
   },
@@ -64,8 +64,8 @@ const FeatureList: FeatureItem[] = [
     Icon: TypeScriptIcon,
     description: (
       <>
-        TypeScript schemas. JavaScript queries. 
-        No SQL. No query language. Just your code.
+        TypeScript schemas. JavaScript queries. No SQL. No query language. Just
+        your code.
       </>
     ),
   },
@@ -74,22 +74,22 @@ const FeatureList: FeatureItem[] = [
     Icon: DeployIcon,
     description: (
       <>
-        Deno compiles everything into one binary. Deploy on cheap VMs. 
-        Each customer gets their own instance. Scale by adding instances.
+        Deno compiles everything into one binary. Deploy on cheap VMs. Each
+        customer gets their own instance. Scale by adding instances.
       </>
     ),
   },
 ];
 
-function Feature({title, Icon, description}: FeatureItem) {
+function Feature({ title, Icon, description }: FeatureItem) {
   return (
     <div className={clsx('col col--4')}>
       <div className={styles.feature}>
         <div className={styles.featureIcon}>
           <Icon className={styles.icon} />
         </div>
-        <div className="padding-horiz--md">
-          <Heading as="h3">{title}</Heading>
+        <div className='padding-horiz--md'>
+          <Heading as='h3'>{title}</Heading>
           <p>{description}</p>
         </div>
       </div>
@@ -100,15 +100,21 @@ function Feature({title, Icon, description}: FeatureItem) {
 export default function HomepageFeatures(): JSX.Element {
   return (
     <section className={styles.features}>
-      <div className="container">
+      <div className='container'>
         <div className={styles.featuresHeader}>
           <h2>Why developers choose GoatDB</h2>
-          <p>The only database where clients can securely restore a crashed server. Perfect for single-tenant SaaS.</p>
+          <p>
+            The only database where clients can securely restore a crashed
+            server. Perfect for single-tenant SaaS.
+          </p>
         </div>
         <div className={styles.architectureSection}>
           <h3>Never lose a change</h3>
-          <p className={styles.architectureDescription}>Each document has its own commit graph. Branches merge automatically using 
-          three-way merge with ephemeral CRDTs. No merge conflicts, ever.</p>
+          <p className={styles.architectureDescription}>
+            Each document has its own commit graph. Branches merge automatically
+            using three-way merge with ephemeral CRDTs. No merge conflicts,
+            ever.
+          </p>
           <div className={styles.architectureFeatures}>
             <div className={styles.architectureFeature}>
               <div className={styles.architectureIconWrapper}>
@@ -140,10 +146,8 @@ export default function HomepageFeatures(): JSX.Element {
             </div>
           </div>
         </div>
-        <div className="row">
-          {FeatureList.map((props, idx) => (
-            <Feature key={idx} {...props} />
-          ))}
+        <div className='row'>
+          {FeatureList.map((props, idx) => <Feature key={idx} {...props} />)}
         </div>
       </div>
     </section>

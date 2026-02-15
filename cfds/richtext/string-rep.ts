@@ -25,7 +25,7 @@ export class StringRep {
   constructor(opts?: CoreOptions) {
     this._dict = new HashMap<FlatRepAtom, string>(
       (v) => encodableValueHash(v, opts),
-      (v1, v2) => coreValueEquals(v1, v2, opts)
+      (v1, v2) => coreValueEquals(v1, v2, opts),
     );
     this._reverseMapping = [];
   }
@@ -70,7 +70,7 @@ export class StringRep {
       assert(
         codePoint < reverseMapping.length ||
           kReservedCodePoints.has(String.fromCodePoint(codePoint)),
-        'Unexpected code point'
+        'Unexpected code point',
       );
       const value = reverseMapping[codePoint];
       // Skip reserved characters

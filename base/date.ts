@@ -64,7 +64,7 @@ export function numberOfDaysLeftInCurrentMonth(): number {
   const startOfNextMonth = new Date(
     today.getFullYear(),
     today.getMonth() + 1,
-    1
+    1,
   );
   return Math.round((startOfNextMonth.getTime() - today.getTime()) / kDayMs);
 }
@@ -76,7 +76,7 @@ export function startOfDay(d: Date): Date {
       d.getUTCMinutes() * kMinuteMs -
       d.getUTCSeconds() * kSecondMs -
       d.getUTCMilliseconds() +
-      d.getTimezoneOffset() * kMinuteMs
+      d.getTimezoneOffset() * kMinuteMs,
   );
   return d;
 }

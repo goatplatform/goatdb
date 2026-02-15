@@ -130,7 +130,11 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
     return false;
   }
 
-  override equals(val1: RichText, val2: RichText, options?: ValueTypeOptions): boolean {
+  override equals(
+    val1: RichText,
+    val2: RichText,
+    options?: ValueTypeOptions,
+  ): boolean {
     const local = options?.local === true; //Default is false
 
     const func = local ? undefined : onlyNoneLocal;

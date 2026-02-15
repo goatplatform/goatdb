@@ -10,24 +10,42 @@
   position: relative;
 }
 
-.box[role="button"] {
+.box[role='button'] {
   cursor: pointer;
 }
 
-.box[role="button"]:hover {
+.box[role='button']:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
-.box--primary { border-color: var(--ifm-color-primary); }
-.box--secondary { border-color: var(--ifm-color-secondary); }
-.box--success { border-color: var(--ifm-color-success); }
-.box--danger { border-color: var(--ifm-color-danger); }
-.box--info { border-color: var(--ifm-color-info); }
+.box--primary {
+  border-color: var(--ifm-color-primary);
+}
+.box--secondary {
+  border-color: var(--ifm-color-secondary);
+}
+.box--success {
+  border-color: var(--ifm-color-success);
+}
+.box--danger {
+  border-color: var(--ifm-color-danger);
+}
+.box--info {
+  border-color: var(--ifm-color-info);
+}
 
-.box--small { padding: calc(var(--ifm-spacing-vertical) * 0.5) calc(var(--ifm-spacing-horizontal) * 0.5); }
-.box--medium { padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal); }
-.box--large { padding: calc(var(--ifm-spacing-vertical) * 1.5) calc(var(--ifm-spacing-horizontal) * 1.5); }
+.box--small {
+  padding: calc(var(--ifm-spacing-vertical) * 0.5)
+    calc(var(--ifm-spacing-horizontal) * 0.5);
+}
+.box--medium {
+  padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal);
+}
+.box--large {
+  padding: calc(var(--ifm-spacing-vertical) * 1.5)
+    calc(var(--ifm-spacing-horizontal) * 1.5);
+}
 
 .boxLabel {
   font-weight: var(--ifm-font-weight-semibold);
@@ -76,7 +94,7 @@
   transition: all 0.2s ease;
 }
 
-.node[role="button"] {
+.node[role='button'] {
   cursor: pointer;
 }
 
@@ -100,22 +118,31 @@
   transform: rotate(-45deg);
 }
 
-.node--small { width: 60px; height: 60px; }
-.node--medium { width: 80px; height: 80px; }
-.node--large { width: 100px; height: 100px; }
+.node--small {
+  width: 60px;
+  height: 60px;
+}
+.node--medium {
+  width: 80px;
+  height: 80px;
+}
+.node--large {
+  width: 100px;
+  height: 100px;
+}
 
-.node--active { 
+.node--active {
   border-color: var(--ifm-color-success);
   background: var(--ifm-color-success-lightest);
 }
 
-.node--inactive { 
+.node--inactive {
   border-color: var(--ifm-color-danger);
   background: var(--ifm-color-danger-lightest);
   opacity: 0.6;
 }
 
-.node--processing { 
+.node--processing {
   border-color: var(--ifm-color-warning);
   background: var(--ifm-color-warning-lightest);
   animation: pulse 1s infinite;
@@ -183,7 +210,8 @@
 
 .complexityItem,
 .simplicityItem {
-  padding: calc(var(--ifm-spacing-vertical) * 0.5) var(--ifm-spacing-horizontal);
+  padding: calc(var(--ifm-spacing-vertical) * 0.5)
+    var(--ifm-spacing-horizontal);
   background: var(--ifm-background-color);
   border-radius: var(--ifm-global-radius);
 }
@@ -201,7 +229,8 @@
 }
 
 .miniBox {
-  padding: calc(var(--ifm-spacing-vertical) * 0.25) calc(var(--ifm-spacing-horizontal) * 0.5);
+  padding: calc(var(--ifm-spacing-vertical) * 0.25)
+    calc(var(--ifm-spacing-horizontal) * 0.5);
   background: var(--ifm-color-success-lighter);
   border-radius: var(--ifm-global-radius);
   font-size: var(--ifm-font-size-small);
@@ -210,7 +239,8 @@
 .toggleButton {
   display: block;
   margin: 0 auto;
-  padding: var(--ifm-button-padding-vertical) var(--ifm-button-padding-horizontal);
+  padding: var(--ifm-button-padding-vertical)
+    var(--ifm-button-padding-horizontal);
   background: var(--ifm-button-background-color);
   color: var(--ifm-button-color);
   border: 1px solid var(--ifm-button-border-color);
@@ -316,7 +346,8 @@
 }
 
 .flowButton {
-  padding: calc(var(--ifm-spacing-vertical) * 0.5) var(--ifm-spacing-horizontal);
+  padding: calc(var(--ifm-spacing-vertical) * 0.5)
+    var(--ifm-spacing-horizontal);
   background: var(--ifm-background-surface-color);
   border: 1px solid var(--ifm-color-emphasis-300);
   border-radius: var(--ifm-global-radius);
@@ -416,7 +447,8 @@
 
 .complexityIndicator {
   font-size: var(--ifm-font-size-small);
-  padding: calc(var(--ifm-spacing-vertical) * 0.25) calc(var(--ifm-spacing-horizontal) * 0.5);
+  padding: calc(var(--ifm-spacing-vertical) * 0.25)
+    calc(var(--ifm-spacing-horizontal) * 0.5);
   border-radius: var(--ifm-global-radius);
 }
 
@@ -520,7 +552,8 @@
 }
 
 .controlButton {
-  padding: var(--ifm-button-padding-vertical) var(--ifm-button-padding-horizontal);
+  padding: var(--ifm-button-padding-vertical)
+    var(--ifm-button-padding-horizontal);
   background: var(--ifm-button-background-color);
   color: var(--ifm-button-color);
   border: 1px solid var(--ifm-button-border-color);
@@ -551,13 +584,21 @@
 
 /* Animations */
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes fadeInUp {
@@ -583,8 +624,12 @@
 }
 
 @keyframes pushData {
-  0%, 100% { transform: translate(-50%, 0); }
-  50% { transform: translate(-50%, -5px); }
+  0%, 100% {
+    transform: translate(-50%, 0);
+  }
+  50% {
+    transform: translate(-50%, -5px);
+  }
 }
 
 /* Accessibility */

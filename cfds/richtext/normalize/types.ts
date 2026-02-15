@@ -45,14 +45,16 @@ export type NodeCondition =
   | IsTextCondition
   | IsRefMarkerCondition;
 
-type RuleCondition = { source: ConditionSource } & (
-  | SingleTagCondition
-  | MultipleTagsCondition
-  | IsDefinedCondition
-  | HasTagMarkerCondition
-  | IsElementCondition
-  | FuncCondition
-);
+type RuleCondition =
+  & { source: ConditionSource }
+  & (
+    | SingleTagCondition
+    | MultipleTagsCondition
+    | IsDefinedCondition
+    | HasTagMarkerCondition
+    | IsElementCondition
+    | FuncCondition
+  );
 
 export interface ToSiblingAction {
   name: 'to-sibling-below';

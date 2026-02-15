@@ -102,8 +102,9 @@ export interface GenericLogEntry extends BaseLogEntry {
   message: string;
 }
 
-export type NormalizedLogEntry<T extends BaseLogEntry = BaseLogEntry> = T &
-  TechnicalLogData;
+export type NormalizedLogEntry<T extends BaseLogEntry = BaseLogEntry> =
+  & T
+  & TechnicalLogData;
 
 export function normalizeLogEntry<T extends BaseLogEntry = BaseLogEntry>(
   e: T,

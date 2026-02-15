@@ -8,14 +8,14 @@ export function downloadJSON(fileName: string, json: ReadonlyJSONObject): void {
       const outputPath = `${homeDir}/Downloads/${fileName}`;
       Deno.writeFileSync(
         outputPath,
-        new TextEncoder().encode(JSON.stringify(json))
+        new TextEncoder().encode(JSON.stringify(json)),
       );
     }
     return;
   }
   const jsonString = prettyJSON(json);
   const url = window.URL.createObjectURL(
-    new Blob([jsonString], { type: 'text/json' })
+    new Blob([jsonString], { type: 'text/json' }),
   );
   const a = document.createElement('a');
   a.style.display = 'none';

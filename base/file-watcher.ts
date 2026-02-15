@@ -168,9 +168,18 @@ function createChokidarWatcher(
 
   const { pushEvent, watcher } = createQueuedWatcher(() => underlying.close());
 
-  underlying.on('add', (path: string) => pushEvent({ paths: [path], kind: 'create' }));
-  underlying.on('change', (path: string) => pushEvent({ paths: [path], kind: 'modify' }));
-  underlying.on('unlink', (path: string) => pushEvent({ paths: [path], kind: 'remove' }));
+  underlying.on(
+    'add',
+    (path: string) => pushEvent({ paths: [path], kind: 'create' }),
+  );
+  underlying.on(
+    'change',
+    (path: string) => pushEvent({ paths: [path], kind: 'modify' }),
+  );
+  underlying.on(
+    'unlink',
+    (path: string) => pushEvent({ paths: [path], kind: 'remove' }),
+  );
 
   return watcher;
 }
@@ -185,7 +194,9 @@ function createNativeFsWatcher(
 
   underlying.on('change', (eventType, filename) => {
     if (!filename) return;
-    const kind: FileWatchEvent['kind'] = eventType === 'rename' ? 'any' : 'modify';
+    const kind: FileWatchEvent['kind'] = eventType === 'rename'
+      ? 'any'
+      : 'modify';
     pushEvent({ paths: [String(filename)], kind });
   });
 

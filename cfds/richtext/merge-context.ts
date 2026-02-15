@@ -15,7 +15,7 @@ import { FlatRepAtom, flattenTextNode } from './flat-rep.ts';
 import { Dictionary } from '../../base/collections/dict.ts';
 import { StringRep } from './string-rep.ts';
 import { RichTextChange } from '../change/richtext-change.ts';
-import { TreeNode, isTextNode, isElementNode } from './tree.ts';
+import { isElementNode, isTextNode, TreeNode } from './tree.ts';
 import * as ArrayUtils from '../../base/array.ts';
 
 export enum Operation {
@@ -113,7 +113,7 @@ export class MergeContext {
 
   findLastBefore(
     searchEndIdx: number,
-    selector: (atom: FlatRepAtom) => boolean
+    selector: (atom: FlatRepAtom) => boolean,
   ): FlatRepAtom | undefined {
     let result: FlatRepAtom | undefined;
     let idx = 0;
@@ -160,7 +160,7 @@ export class MergeContext {
   }
 
   private boxValueIfNeeded(
-    value: FlatRepAtom | Iterable<FlatRepAtom>
+    value: FlatRepAtom | Iterable<FlatRepAtom>,
   ): FlatRepAtom[] {
     const type = getCoreType(value as CoreValue);
     switch (type) {
@@ -190,7 +190,7 @@ export class MergeContext {
    */
   private mergeValues(
     curValue: FlatRepAtom[],
-    insertedValue: FlatRepAtom | Iterable<FlatRepAtom>
+    insertedValue: FlatRepAtom | Iterable<FlatRepAtom>,
   ): FlatRepAtom[] {
     const strRep = new StringRep(this._eqOpts);
     const curStr = strRep.encode(curValue);
@@ -234,7 +234,7 @@ export class MergeContext {
          * Empty diffs is a open bug in the diff-match-patch package:
          * https://github.com/google/diff-match-patch/issues/105
          * Currently the practice is to ignore it
-         *  */
+         */
         continue;
       }
       switch (op) {
@@ -283,7 +283,7 @@ export class MergeContext {
  * @returns A flat rep with single character text nodes.
  */
 function* recursiveFlattenTextNodes(
-  changeNodes: TreeNode[]
+  changeNodes: TreeNode[],
 ): Generator<FlatRepAtom> {
   for (const node of changeNodes) {
     if (isTextNode(node)) {

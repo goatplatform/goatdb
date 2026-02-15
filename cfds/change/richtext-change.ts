@@ -1,10 +1,10 @@
-import { EncodedChange, Change, ChangeType } from './index.ts';
+import { Change, ChangeType, EncodedChange } from './index.ts';
 import {
-  CoreValue,
-  Encoder,
-  coreValueClone,
   CoreOptions,
+  CoreValue,
+  coreValueClone,
   coreValueEquals,
+  Encoder,
 } from '../../base/core-types/index.ts';
 import {
   ConstructorDecoderConfig,
@@ -36,7 +36,7 @@ export class RichTextChange extends Change<EncodedRTChange> {
   readonly values?: TreeNode[];
 
   constructor(
-    config: RichTextChangeConfig | ConstructorDecoderConfig<EncodedRTChange>
+    config: RichTextChangeConfig | ConstructorDecoderConfig<EncodedRTChange>,
   ) {
     super(config);
     if (isDecoderConfig(config)) {
@@ -61,7 +61,7 @@ export class RichTextChange extends Change<EncodedRTChange> {
   }
 
   clone<T extends Change<EncodedRTChange>>(
-    _opts?: CoreValueCloneOpts | undefined
+    _opts?: CoreValueCloneOpts | undefined,
   ): T {
     return new RichTextChange({
       op: this.op,
@@ -77,7 +77,7 @@ export class RichTextChange extends Change<EncodedRTChange> {
 
   override serialize(
     encoder: Encoder<keyof EncodedRTChange, CoreValue>,
-    opts?: CoreOptions
+    opts?: CoreOptions,
   ): void {
     super.serialize(encoder, opts);
     encoder.set('op', this.op);

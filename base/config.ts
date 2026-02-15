@@ -9,6 +9,7 @@ export interface GoatConfig {
   clientData?: unknown;
   serverURL?: string;
   serverData?: unknown;
+  serverPort?: number;
 }
 
 // deno-lint-ignore no-var
@@ -24,8 +25,8 @@ export function getGoatConfig(): GoatConfig {
     | GoatConfig
     | undefined;
   if (!config) {
-    assert(!isBrowser() || config !== undefined, 'GoatDBConfig not found');
-    config = config || {
+    assert(!isBrowser(), 'GoatDBConfig not found');
+    config = {
       version: VCurrent,
       debug: false,
       orgId: 'localhost',

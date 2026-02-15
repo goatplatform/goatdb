@@ -84,7 +84,7 @@ async function main(): Promise<void> {
   TestsRunner.default.attach('testStart', (data) => {
     globalThis.dispatchEvent(new CustomEvent('testStart', { detail: data }));
   });
-  
+
   TestsRunner.default.attach('testComplete', (data) => {
     globalThis.dispatchEvent(new CustomEvent('testComplete', { detail: data }));
   });

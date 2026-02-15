@@ -1,5 +1,5 @@
-import {themes as prismThemes} from 'prism-react-renderer';
-import type {Config} from '@docusaurus/types';
+import { themes as prismThemes } from 'prism-react-renderer';
+import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -8,7 +8,8 @@ import rehypeKatex from 'rehype-katex';
 
 const config: Config = {
   title: 'GoatDB',
-  tagline: 'Embedded database with real-time sync and automatic conflict resolution',
+  tagline:
+    'Embedded database with real-time sync and automatic conflict resolution',
   favicon: 'img/favicon.png',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
@@ -37,7 +38,6 @@ const config: Config = {
     defaultLocale: 'en',
     locales: ['en'],
   },
-
 
   plugins: [
     [
@@ -74,8 +74,7 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/goatplatform/goatdb/tree/main/docs/',
+          editUrl: 'https://github.com/goatplatform/goatdb/tree/main/docs/',
           remarkPlugins: [remarkMath],
           rehypePlugins: [rehypeKatex],
         },
@@ -181,7 +180,9 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} GoatDB · Apache 2.0 License`,
+      copyright: `Copyright © ${
+        new Date().getFullYear()
+      } GoatDB · Apache 2.0 License`,
     },
     prism: {
       theme: prismThemes.github,

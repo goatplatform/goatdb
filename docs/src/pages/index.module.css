@@ -23,11 +23,11 @@
   .heroBanner {
     padding: 1.5rem;
   }
-  
+
   .heroTitle {
     font-size: 2.5rem;
   }
-  
+
   .heroSubtitle {
     font-size: 1.1rem;
   }
@@ -158,22 +158,22 @@
     width: 100%;
     padding: 0 1rem;
   }
-  
+
   .buttons .button {
     width: 100%;
     max-width: 280px;
   }
-  
+
   .useCaseGrid {
     grid-template-columns: 1fr;
     gap: 1.5rem;
   }
-  
+
   .openSourceButtons {
     flex-direction: column;
     align-items: center;
   }
-  
+
   .openSourceButtons .button {
     width: 200px;
   }

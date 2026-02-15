@@ -4,9 +4,15 @@ import Diagram from '../Diagram';
 export default function SigningVerification() {
   return (
     <Diagram>
-      <svg width="720" height="490" viewBox="0 0 720 490" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        width='720'
+        height='490'
+        viewBox='0 0 720 490'
+        xmlns='http://www.w3.org/2000/svg'
+      >
         <defs>
-          <style>{`
+          <style>
+            {`
             .machine-box { 
               fill: var(--ifm-color-emphasis-100); 
               stroke: var(--ifm-color-emphasis-400); 
@@ -135,101 +141,256 @@ export default function SigningVerification() {
               fill: var(--ifm-background-surface-color);
               stroke: var(--ifm-color-emphasis-400);
             }
-          `}</style>
-          <marker id="arrowhead2" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-            <polygon points="0 0, 10 3.5, 0 7" fill="var(--ifm-color-primary)"/>
+          `}
+          </style>
+          <marker
+            id='arrowhead2'
+            markerWidth='10'
+            markerHeight='7'
+            refX='9'
+            refY='3.5'
+            orient='auto'
+          >
+            <polygon
+              points='0 0, 10 3.5, 0 7'
+              fill='var(--ifm-color-primary)'
+            />
           </marker>
         </defs>
-        
-        <g transform="translate(0, 0)">
+
+        <g transform='translate(0, 0)'>
           {/* On Peer Machine */}
-          <g transform="translate(20, 30)">
-            <rect x="0" y="0" width="280" height="380" rx="8" ry="8" className="machine-box"/>
-            <text x="140" y="30" className="text-icon-large" textAnchor="middle">💻</text>
-            <text x="140" y="55" className="text-heading" textAnchor="middle">On Peer Machine</text>
-            
-            {/* Operation */}
-            <g transform="translate(65, 80)">
-              <rect x="0" y="0" width="150" height="60" rx="4" ry="4" className="operation-box"/>
-              <text x="15" y="25" className="text-icon">📄</text>
-              <text x="40" y="25" className="text-heading">Operation</text>
-              <text x="75" y="45" className="text-body" textAnchor="middle">(e.g., write)</text>
-            </g>
-            
-            <text x="140" y="160" className="text-operator" textAnchor="middle">+</text>
-            
-            {/* Private Key */}
-            <g transform="translate(65, 175)" className="private-key-box">
-              <rect x="0" y="0" width="150" height="50" rx="4" ry="4" className="operation-box"/>
-              <text x="15" y="25" className="text-icon-small">🔑</text>
-              <text x="40" y="25" className="text-code text-danger">Private Key</text>
-            </g>
-            
-            <text x="140" y="245" className="text-operator" textAnchor="middle">=</text>
-            
-            {/* Signed Commit */}
-            <g transform="translate(65, 260)" className="signed-commit-box">
-              <rect x="0" y="0" width="150" height="60" rx="4" ry="4" className="operation-box"/>
-              <text x="15" y="30" className="text-icon-small">✍️</text>
-              <text x="75" y="25" className="text-heading text-primary" textAnchor="middle">Signed</text>
-              <text x="75" y="45" className="text-heading text-primary" textAnchor="middle">Commit</text>
-            </g>
-            
-            <text x="140" y="340" className="text-body" textAnchor="middle">Signed using session's</text>
-            <text x="140" y="360" className="text-body" textAnchor="middle">private key</text>
-          </g>
-          
-          {/* Send arrow */}
-          <g transform="translate(300, 235)">
-            <path d="M 10 0 L 70 0" className="send-arrow"/>
-            <text x="40" y="-12" className="text-small" textAnchor="middle">Sent</text>
-          </g>
-          
-          {/* In GoatDB Network */}
-          <g transform="translate(380, 30)">
-            <rect x="0" y="0" width="320" height="380" rx="8" ry="8" className="network-box"/>
-            <text x="160" y="30" className="text-icon-large" textAnchor="middle">🌐</text>
-            <text x="160" y="55" className="text-heading" textAnchor="middle">In GoatDB Network (Peers)</text>
-            
-            {/* Signed Commit */}
-            <g transform="translate(85, 80)" className="signed-commit-box">
-              <rect x="0" y="0" width="150" height="60" rx="4" ry="4" className="operation-box"/>
-              <text x="15" y="30" className="text-icon-small">✍️</text>
-              <text x="75" y="25" className="text-heading text-primary" textAnchor="middle">Signed</text>
-              <text x="75" y="45" className="text-heading text-primary" textAnchor="middle">Commit</text>
-            </g>
-            
-            <text x="160" y="160" className="text-operator" textAnchor="middle">+</text>
-            
-            {/* Public Key */}
-            <g transform="translate(85, 180)" className="public-key-box">
-              <rect x="0" y="0" width="150" height="60" rx="4" ry="4" className="operation-box"/>
-              <text x="15" y="25" className="text-icon-small">🔑</text>
-              <text x="40" y="25" className="text-code text-success">Public Key</text>
-              <text x="75" y="45" className="text-small" textAnchor="middle">(From session)</text>
-            </g>
-            
-            {/* Verification Result */}
-            <g transform="translate(160, 265)" textAnchor="middle">
-              <text y="4" className="text-icon-large text-success">✅</text>
-              <text y="25" className="text-heading text-success">Verification Successful</text>
-              <text y="45" className="text-body">• Content Integrity Confirmed</text>
-              <text y="61" className="text-body">• Creator Identity Proven</text>
-            </g>
-            
-            <text x="160" y="346" className="text-body" textAnchor="middle">Peers verify signature</text>
-            <text x="160" y="364" className="text-body" textAnchor="middle">using public key</text>
-          </g>
-          
-          {/* Caption */}
-          <g transform="translate(30, 420)">
-            <rect x="0" y="0" width="660" height="60" rx="4" ry="4" className="caption-box"/>
-            <text x="20" y="25" className="text-icon-small">🔏</text>
-            <text x="45" y="25" className="text-body">
-              <tspan fontWeight="600" fill="var(--ifm-color-primary-darker)">Cryptographic Signing:</tspan>
-              <tspan dx="5">Every commit signed with private key</tspan>
+          <g transform='translate(20, 30)'>
+            <rect
+              x='0'
+              y='0'
+              width='280'
+              height='380'
+              rx='8'
+              ry='8'
+              className='machine-box'
+            />
+            <text
+              x='140'
+              y='30'
+              className='text-icon-large'
+              textAnchor='middle'
+            >
+              💻
             </text>
-            <text x="45" y="45" className="text-body">Dual verification: Content integrity + Creator identity</text>
+            <text x='140' y='55' className='text-heading' textAnchor='middle'>
+              On Peer Machine
+            </text>
+
+            {/* Operation */}
+            <g transform='translate(65, 80)'>
+              <rect
+                x='0'
+                y='0'
+                width='150'
+                height='60'
+                rx='4'
+                ry='4'
+                className='operation-box'
+              />
+              <text x='15' y='25' className='text-icon'>📄</text>
+              <text x='40' y='25' className='text-heading'>Operation</text>
+              <text x='75' y='45' className='text-body' textAnchor='middle'>
+                (e.g., write)
+              </text>
+            </g>
+
+            <text x='140' y='160' className='text-operator' textAnchor='middle'>
+              +
+            </text>
+
+            {/* Private Key */}
+            <g transform='translate(65, 175)' className='private-key-box'>
+              <rect
+                x='0'
+                y='0'
+                width='150'
+                height='50'
+                rx='4'
+                ry='4'
+                className='operation-box'
+              />
+              <text x='15' y='25' className='text-icon-small'>🔑</text>
+              <text x='40' y='25' className='text-code text-danger'>
+                Private Key
+              </text>
+            </g>
+
+            <text x='140' y='245' className='text-operator' textAnchor='middle'>
+              =
+            </text>
+
+            {/* Signed Commit */}
+            <g transform='translate(65, 260)' className='signed-commit-box'>
+              <rect
+                x='0'
+                y='0'
+                width='150'
+                height='60'
+                rx='4'
+                ry='4'
+                className='operation-box'
+              />
+              <text x='15' y='30' className='text-icon-small'>✍️</text>
+              <text
+                x='75'
+                y='25'
+                className='text-heading text-primary'
+                textAnchor='middle'
+              >
+                Signed
+              </text>
+              <text
+                x='75'
+                y='45'
+                className='text-heading text-primary'
+                textAnchor='middle'
+              >
+                Commit
+              </text>
+            </g>
+
+            <text x='140' y='340' className='text-body' textAnchor='middle'>
+              Signed using session's
+            </text>
+            <text x='140' y='360' className='text-body' textAnchor='middle'>
+              private key
+            </text>
+          </g>
+
+          {/* Send arrow */}
+          <g transform='translate(300, 235)'>
+            <path d='M 10 0 L 70 0' className='send-arrow' />
+            <text x='40' y='-12' className='text-small' textAnchor='middle'>
+              Sent
+            </text>
+          </g>
+
+          {/* In GoatDB Network */}
+          <g transform='translate(380, 30)'>
+            <rect
+              x='0'
+              y='0'
+              width='320'
+              height='380'
+              rx='8'
+              ry='8'
+              className='network-box'
+            />
+            <text
+              x='160'
+              y='30'
+              className='text-icon-large'
+              textAnchor='middle'
+            >
+              🌐
+            </text>
+            <text x='160' y='55' className='text-heading' textAnchor='middle'>
+              In GoatDB Network (Peers)
+            </text>
+
+            {/* Signed Commit */}
+            <g transform='translate(85, 80)' className='signed-commit-box'>
+              <rect
+                x='0'
+                y='0'
+                width='150'
+                height='60'
+                rx='4'
+                ry='4'
+                className='operation-box'
+              />
+              <text x='15' y='30' className='text-icon-small'>✍️</text>
+              <text
+                x='75'
+                y='25'
+                className='text-heading text-primary'
+                textAnchor='middle'
+              >
+                Signed
+              </text>
+              <text
+                x='75'
+                y='45'
+                className='text-heading text-primary'
+                textAnchor='middle'
+              >
+                Commit
+              </text>
+            </g>
+
+            <text x='160' y='160' className='text-operator' textAnchor='middle'>
+              +
+            </text>
+
+            {/* Public Key */}
+            <g transform='translate(85, 180)' className='public-key-box'>
+              <rect
+                x='0'
+                y='0'
+                width='150'
+                height='60'
+                rx='4'
+                ry='4'
+                className='operation-box'
+              />
+              <text x='15' y='25' className='text-icon-small'>🔑</text>
+              <text x='40' y='25' className='text-code text-success'>
+                Public Key
+              </text>
+              <text x='75' y='45' className='text-small' textAnchor='middle'>
+                (From session)
+              </text>
+            </g>
+
+            {/* Verification Result */}
+            <g transform='translate(160, 265)' textAnchor='middle'>
+              <text y='4' className='text-icon-large text-success'>✅</text>
+              <text y='25' className='text-heading text-success'>
+                Verification Successful
+              </text>
+              <text y='45' className='text-body'>
+                • Content Integrity Confirmed
+              </text>
+              <text y='61' className='text-body'>
+                • Creator Identity Proven
+              </text>
+            </g>
+
+            <text x='160' y='346' className='text-body' textAnchor='middle'>
+              Peers verify signature
+            </text>
+            <text x='160' y='364' className='text-body' textAnchor='middle'>
+              using public key
+            </text>
+          </g>
+
+          {/* Caption */}
+          <g transform='translate(30, 420)'>
+            <rect
+              x='0'
+              y='0'
+              width='660'
+              height='60'
+              rx='4'
+              ry='4'
+              className='caption-box'
+            />
+            <text x='20' y='25' className='text-icon-small'>🔏</text>
+            <text x='45' y='25' className='text-body'>
+              <tspan fontWeight='600' fill='var(--ifm-color-primary-darker)'>
+                Cryptographic Signing:
+              </tspan>
+              <tspan dx='5'>Every commit signed with private key</tspan>
+            </text>
+            <text x='45' y='45' className='text-body'>
+              Dual verification: Content integrity + Creator identity
+            </text>
           </g>
         </g>
       </svg>

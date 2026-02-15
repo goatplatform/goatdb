@@ -129,8 +129,9 @@ export function getTypeOperationsByValue<T extends CoreValue>(
 
 registerTypeOperations();
 function registerType<T extends CoreValue>(op: IValueTypeOperations<T>): void {
-  registeredTypeOperations[op.valueType] =
-    op as IValueTypeOperations<CoreValue>;
+  registeredTypeOperations[op.valueType] = op as IValueTypeOperations<
+    CoreValue
+  >;
 }
 
 function registerTypeOperations(): void {

@@ -1,6 +1,7 @@
 # GoatDB Node.js Basic Example
 
-A simple example showing GoatDB usage in Node.js with CRUD operations, schemas, and reactive queries.
+A simple example showing GoatDB usage in Node.js with CRUD operations, schemas,
+and reactive queries.
 
 ## Installation & Running
 
@@ -12,7 +13,7 @@ npm start
 ## What it demonstrates
 
 ```javascript
-import { GoatDB, DataRegistry } from '@goatdb/goatdb';
+import { DataRegistry, GoatDB } from '@goatdb/goatdb';
 
 // 1. Define and register schema
 const taskSchema = {
@@ -20,8 +21,8 @@ const taskSchema = {
   version: 1,
   fields: {
     text: { type: 'string', required: true },
-    done: { type: 'boolean', default: () => false }
-  }
+    done: { type: 'boolean', default: () => false },
+  },
 };
 DataRegistry.default.registerSchema(taskSchema);
 
@@ -31,14 +32,14 @@ await db.readyPromise();
 
 // 3. Create items
 const task = db.create('/data/todos/task-1', taskSchema, {
-  text: 'Learn GoatDB'
+  text: 'Learn GoatDB',
 });
 
 // 4. Query with predicates
 const incompleteTasks = db.query({
   source: '/data/todos',
   schema: taskSchema,
-  predicate: ({ item }) => !item.get('done')
+  predicate: ({ item }) => !item.get('done'),
 });
 
 // 5. Reactive updates
@@ -56,4 +57,6 @@ task.set('done', true);
 - **Schema registration**: Required before creating items
 - **Reactive queries**: Automatically update when data changes
 - **Memory-first**: Fast operations with persistent storage
-- **Security mode**: Uses default security settings. For backend-only applications in secure environments, see [trusted mode documentation](https://goatdb.dev/sessions#trusted-mode)
+- **Security mode**: Uses default security settings. For backend-only
+  applications in secure environments, see
+  [trusted mode documentation](https://goatdb.dev/sessions#trusted-mode)

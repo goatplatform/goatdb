@@ -10,7 +10,11 @@
  */
 
 import { isBrowser } from '../base/common.ts';
-import { getRuntime, isInteractiveTerminal, terminalSize } from '../base/runtime/index.ts';
+import {
+  getRuntime,
+  isInteractiveTerminal,
+  terminalSize,
+} from '../base/runtime/index.ts';
 
 // ============================================================================
 // Types
@@ -178,7 +182,12 @@ export class Task {
  */
 export interface Renderer {
   /** Render the current task state */
-  render(tasks: Map<TaskId, Task>, roots: TaskId[], changed: TaskId[], spinnerFrame: number): void;
+  render(
+    tasks: Map<TaskId, Task>,
+    roots: TaskId[],
+    changed: TaskId[],
+    spinnerFrame: number,
+  ): void;
   /** Clear all rendered output */
   clear(): void;
   /** Finalize rendering (cleanup) */
@@ -287,7 +296,9 @@ export class InteractiveRenderer implements Renderer {
     // Re-sort result to maintain depth-first order
     // Since we may have added parents after children during truncation
     const orderMap = new Map(allVisible.map((t, i) => [t.id, i]));
-    result.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+    result.sort((a, b) =>
+      (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0)
+    );
 
     // Final truncation if still over limit - remove from end (deepest)
     while (result.length > maxLines) {
@@ -303,7 +314,8 @@ export class InteractiveRenderer implements Renderer {
   private formatBar(progress: number | null, width = 12): string {
     if (progress === null) {
       // Indeterminate: show spinner
-      const frame = SPINNER_FRAMES[this.currentSpinnerFrame % SPINNER_FRAMES.length];
+      const frame =
+        SPINNER_FRAMES[this.currentSpinnerFrame % SPINNER_FRAMES.length];
       return frame;
     }
     const filled = Math.floor(progress * width);
@@ -350,12 +362,16 @@ export class InteractiveRenderer implements Renderer {
     return line;
   }
 
-  render(tasks: Map<TaskId, Task>, roots: TaskId[], _changed: TaskId[], spinnerFrame: number): void {
+  render(
+    tasks: Map<TaskId, Task>,
+    roots: TaskId[],
+    _changed: TaskId[],
+    spinnerFrame: number,
+  ): void {
     if (!this.enabled) return;
 
     this.currentSpinnerFrame = spinnerFrame;
     const visibleTasks = this.collectVisibleTasks(tasks, roots);
-
 
     const hiddenCount = tasks.size - visibleTasks.length;
 
@@ -479,7 +495,12 @@ export class CompactRenderer implements Renderer {
     return parts.join(' > ');
   }
 
-  render(tasks: Map<TaskId, Task>, roots: TaskId[], _changed: TaskId[], spinnerFrame: number): void {
+  render(
+    tasks: Map<TaskId, Task>,
+    roots: TaskId[],
+    _changed: TaskId[],
+    spinnerFrame: number,
+  ): void {
     if (!this.enabled) return;
 
     this.currentSpinnerFrame = spinnerFrame;
@@ -620,7 +641,12 @@ export class SimpleRenderer implements Renderer {
 
   constructor(private writeFn: WriteFn) {}
 
-  render(tasks: Map<TaskId, Task>, _roots: TaskId[], changed: TaskId[], _spinnerFrame: number): void {
+  render(
+    tasks: Map<TaskId, Task>,
+    _roots: TaskId[],
+    changed: TaskId[],
+    _spinnerFrame: number,
+  ): void {
     if (!this.enabled) return;
 
     for (const taskId of changed) {
@@ -635,8 +661,9 @@ export class SimpleRenderer implements Renderer {
 
       const indent = '  '.repeat(task.depth);
       const label = STATUS_LABELS[task.status];
-      const progress =
-        task.total !== null ? ` (${task.current}/${task.total})` : '';
+      const progress = task.total !== null
+        ? ` (${task.current}/${task.total})`
+        : '';
       const line = `[${label}] ${indent}${task.title}${progress}\n`;
 
       try {
@@ -805,8 +832,9 @@ export class ProgressManager {
 
   constructor(options: ProgressManagerOptions | boolean = {}) {
     // Handle legacy boolean argument
-    const opts: ProgressManagerOptions =
-      typeof options === 'boolean' ? { enabled: options } : options;
+    const opts: ProgressManagerOptions = typeof options === 'boolean'
+      ? { enabled: options }
+      : options;
 
     const enabled = opts.enabled ?? true;
     const mode = opts.mode ?? 'compact';
@@ -869,7 +897,9 @@ export class ProgressManager {
 
     // Validate total
     if (total !== null && total <= 0) {
-      throw new Error('Task total must be greater than 0, or null for indeterminate');
+      throw new Error(
+        'Task total must be greater than 0, or null for indeterminate',
+      );
     }
 
     if (this.tasks.size >= MAX_TASKS) {
@@ -987,7 +1017,12 @@ export class ProgressManager {
     queueMicrotask(() => {
       this.renderPending = false;
       this._spinnerFrame = (this._spinnerFrame + 1) % SPINNER_FRAMES.length;
-      this.renderer?.render(this.tasks, this.roots, [...this.changed], this._spinnerFrame);
+      this.renderer?.render(
+        this.tasks,
+        this.roots,
+        [...this.changed],
+        this._spinnerFrame,
+      );
       this.changed.length = 0;
     });
   }
@@ -1067,7 +1102,8 @@ export class ProgressBar {
     const filled = Math.floor((percent / 100) * width);
     const bar = '█'.repeat(filled) + '░'.repeat(width - filled);
 
-    const progressLine = `[${bar}] ${this.current}/${this.total} ${this.message}`;
+    const progressLine =
+      `[${bar}] ${this.current}/${this.total} ${this.message}`;
 
     // deno-lint-ignore no-explicit-any
     const stdout = (globalThis as any).process?.stdout ||
@@ -1135,7 +1171,9 @@ export class ProgressBar {
    * Does nothing if not enabled or if nothing was rendered.
    */
   clear() {
-    if (!this.enabled || (this.lastLineCount === 0 && this.titleLines === 0)) return;
+    if (!this.enabled || (this.lastLineCount === 0 && this.titleLines === 0)) {
+      return;
+    }
 
     // deno-lint-ignore no-explicit-any
     const stdout = (globalThis as any).process?.stdout ||

@@ -1,25 +1,25 @@
 import { assert } from '../../base/error.ts';
 import {
-  reconstructRichText,
-  flattenRichText,
-  FlatRepAtom,
   DepthMarker,
+  FlatRepAtom,
+  flattenRichText,
   isDepthMarker,
+  reconstructRichText,
 } from './flat-rep.ts';
 import {
+  isRefMarker,
   isRefNode,
   RefMarker,
   RefNode,
   RefType,
-  isRefMarker,
 } from './model.ts';
 import {
-  ElementNode,
-  TextNode,
-  RichText,
   dfs,
+  ElementNode,
   isElementNode,
   isRichText,
+  RichText,
+  TextNode,
 } from './tree.ts';
 
 export enum RefPlaceholder {

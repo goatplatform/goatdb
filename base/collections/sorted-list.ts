@@ -1,7 +1,7 @@
 import { bsearch } from '../algorithms.ts';
 import {
-  Scheduler,
   CoroutineScheduler,
+  Scheduler,
   SchedulerPriority,
 } from '../coroutine.ts';
 
@@ -20,7 +20,7 @@ export class SortedList<T> {
 
   constructor(
     comparator?: (x: T, y: T) => number,
-    eq?: (a: T, y: T) => boolean
+    eq?: (a: T, y: T) => boolean,
   ) {
     this._arr = [];
     this.comparator = comparator || defaultComparator;
@@ -45,7 +45,7 @@ export class SortedList<T> {
 
   *entries(
     inclusiveStart = 0,
-    exclusiveEnd = this._arr.length
+    exclusiveEnd = this._arr.length,
   ): Generator<[number, T]> {
     for (let i = inclusiveStart; i < exclusiveEnd; i++) {
       const element = this._arr[i];
@@ -144,7 +144,7 @@ export class SortedList<T> {
     func: (val: T, idx: number) => void,
     scheduler?: Scheduler,
     priority?: SchedulerPriority,
-    name?: string
+    name?: string,
   ): Promise<void> {
     if (!scheduler) {
       scheduler = CoroutineScheduler.sharedScheduler();
@@ -152,7 +152,7 @@ export class SortedList<T> {
     return scheduler.schedule(
       _forEachAsyncGen(this._arr, func),
       priority,
-      name
+      name,
     );
   }
 
@@ -163,7 +163,7 @@ export class SortedList<T> {
 
 function* _forEachAsyncGen<T>(
   arr: T[],
-  func: (val: T, idx: number) => void
+  func: (val: T, idx: number) => void,
 ): Generator<void> {
   for (let i = 0; i < arr.length; ++i) {
     func(arr[i], i);

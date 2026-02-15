@@ -6,10 +6,10 @@ import {
   type ServerOptions,
 } from '../net/server/server.ts';
 import {
-  GoatRequest,
-  type ServeHandlerInfo,
   createGoatHeaders,
+  GoatRequest,
   NodeHeadersPolyfill,
+  type ServeHandlerInfo,
 } from '../net/server/http-compat.ts';
 import { TEST } from './mod.ts';
 import { assertEquals, assertTrue } from './asserts.ts';
@@ -215,19 +215,28 @@ export default async function setupServerArchitectureTest() {
     const resp = await server.processRequest(req, info);
     assertEquals(resp.status, 404);
   });
-  
+
   // --- createGoatHeaders tests ---
   TEST(
     'ServerArchitecture',
     'createGoatHeaders returns the correct implementation',
     () => {
       const headers = createGoatHeaders();
-      
+
       // Verify the correct implementation is returned based on runtime
-      if (isDeno() || (typeof globalThis !== 'undefined' && 'Headers' in globalThis)) {
-        assertTrue(headers instanceof Headers, 'Should return Headers instance in Deno/browser');
+      if (
+        isDeno() ||
+        (typeof globalThis !== 'undefined' && 'Headers' in globalThis)
+      ) {
+        assertTrue(
+          headers instanceof Headers,
+          'Should return Headers instance in Deno/browser',
+        );
       } else if (isNode()) {
-        assertTrue(headers instanceof NodeHeadersPolyfill, 'Should return NodeHeadersPolyfill in Node.js');
+        assertTrue(
+          headers instanceof NodeHeadersPolyfill,
+          'Should return NodeHeadersPolyfill in Node.js',
+        );
       }
     },
   );
@@ -237,13 +246,15 @@ export default async function setupServerArchitectureTest() {
     'createGoatHeaders initializes with object literal',
     async () => {
       // Import the createGoatHeaders function
-      const { createGoatHeaders } = await import('../net/server/http-compat.ts');
-      
+      const { createGoatHeaders } = await import(
+        '../net/server/http-compat.ts'
+      );
+
       const headers = createGoatHeaders({
         'Content-Type': 'application/json',
         'Authorization': 'Bearer token123',
       });
-      
+
       assertEquals(
         headers.get('content-type'),
         'application/json',
@@ -262,13 +273,15 @@ export default async function setupServerArchitectureTest() {
     'createGoatHeaders initializes with array of entries',
     async () => {
       // Import the createGoatHeaders function
-      const { createGoatHeaders } = await import('../net/server/http-compat.ts');
-      
+      const { createGoatHeaders } = await import(
+        '../net/server/http-compat.ts'
+      );
+
       const headers = createGoatHeaders([
         ['Content-Type', 'application/json'],
         ['X-API-Key', 'abc123'],
       ]);
-      
+
       assertEquals(
         headers.get('content-type'),
         'application/json',
@@ -287,21 +300,23 @@ export default async function setupServerArchitectureTest() {
     'createGoatHeaders initializes with existing headers',
     async () => {
       // Import the createGoatHeaders function
-      const { createGoatHeaders } = await import('../net/server/http-compat.ts');
-      
+      const { createGoatHeaders } = await import(
+        '../net/server/http-compat.ts'
+      );
+
       // Create initial headers
       const initialHeaders = createGoatHeaders();
       initialHeaders.set('Content-Type', 'text/plain');
       initialHeaders.set('X-Custom', 'test-value');
-      
+
       // Create new headers by extracting entries from existing headers
       const entries: [string, string][] = [];
       initialHeaders.forEach((value, key) => {
         entries.push([key, value]);
       });
-      
+
       const headers = createGoatHeaders(entries);
-      
+
       assertEquals(
         headers.get('content-type'),
         'text/plain',

@@ -194,7 +194,7 @@ const gActiveDecoders: JSONCyclicalDecoder[] = [];
 
 export class JSONCyclicalDecoder extends JSONDecoder {
   private _tempRefs?: ReadonlyJSONObject[][];
-  protected declare _data: ReadonlyJSONObject;
+  declare protected _data: ReadonlyJSONObject;
 
   private constructor(encodedValue: ReadonlyJSONObject | undefined) {
     super(encodedValue);

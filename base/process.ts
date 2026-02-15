@@ -1,9 +1,9 @@
-import { isDeno, isNode, isBrowser } from './common.ts';
+import { isBrowser, isDeno, isNode } from './common.ts';
 import { notReached } from './error.ts';
 
 /**
  * Exits the current process with the specified exit code.
- * 
+ *
  * In browser test context, this signals test completion to automation
  * rather than terminating the browser process.
  *
@@ -39,23 +39,25 @@ function signalBrowserTestCompletion(code: number): Promise<never> {
       exitCode: code,
       completed: true,
     };
-    
+
     // Set global test results for Playwright to read
     (globalThis as any).testResults = summary;
-    
+
     // Dispatch completion event
-    globalThis.dispatchEvent(new CustomEvent('testsComplete', { 
-      detail: summary 
-    }));
+    globalThis.dispatchEvent(
+      new CustomEvent('testsComplete', {
+        detail: summary,
+      }),
+    );
   } else {
     // Ensure existing summary is marked as completed with correct exit code
     summary.completed = true;
     summary.exitCode = code;
   }
-  
+
   // Update DOM if test runner page exists
   updateBrowserTestDisplay(summary);
-  
+
   // For browser, we throw to halt execution since we can't actually exit
   // if (code === 0) {
   //   throw new Error('TEST_COMPLETION_SUCCESS');
@@ -68,8 +70,10 @@ function signalBrowserTestCompletion(code: number): Promise<never> {
 function updateBrowserTestDisplay(summary: any): void {
   const statusEl = document.getElementById('status');
   if (statusEl) {
-    statusEl.className = `status ${summary.exitCode === 0 ? 'passed' : 'failed'}`;
-    statusEl.textContent = summary.exitCode === 0 
+    statusEl.className = `status ${
+      summary.exitCode === 0 ? 'passed' : 'failed'
+    }`;
+    statusEl.textContent = summary.exitCode === 0
       ? 'Tests completed successfully'
       : `Tests failed with exit code ${summary.exitCode}`;
   }

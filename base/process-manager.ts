@@ -9,10 +9,14 @@ export class ProcessManager {
   /**
    * Spawn a new child process and track it for cleanup.
    */
-  spawn(command: string, args: string[], options?: Deno.CommandOptions): Deno.ChildProcess {
+  spawn(
+    command: string,
+    args: string[],
+    options?: Deno.CommandOptions,
+  ): Deno.ChildProcess {
     const process = new Deno.Command(command, { args, ...options }).spawn();
     this.processes.add(process);
-    
+
     // Auto-cleanup when process exits naturally
     process.status.finally(() => this.processes.delete(process));
     return process;
@@ -24,9 +28,9 @@ export class ProcessManager {
    */
   async cleanup(gracefulTimeoutMs = 3000): Promise<void> {
     if (this.processes.size === 0) return;
-    
+
     console.log(`Cleaning up ${this.processes.size} processes...`);
-    
+
     // Phase 1: Send SIGTERM to all processes
     for (const process of this.processes) {
       try {
@@ -35,10 +39,10 @@ export class ProcessManager {
         // Process may already be dead
       }
     }
-    
+
     // Phase 2: Wait for graceful shutdown
-    await new Promise(resolve => setTimeout(resolve, gracefulTimeoutMs));
-    
+    await new Promise((resolve) => setTimeout(resolve, gracefulTimeoutMs));
+
     // Phase 3: Force kill any remaining processes
     for (const process of this.processes) {
       try {
@@ -47,7 +51,7 @@ export class ProcessManager {
         // Process may already be dead
       }
     }
-    
+
     this.processes.clear();
     console.log('Process cleanup completed');
   }

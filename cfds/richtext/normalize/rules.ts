@@ -68,7 +68,7 @@ function getKeysForNode(node: TreeNode) {
 export function* getRuleActions(
   node: TreeNode,
   parent: ElementNode,
-  grandParent?: ElementNode
+  grandParent?: ElementNode,
 ): Generator<RuleAction, void, void> {
   for (const key of getKeysForNode(node)) {
     if (rules[key] !== undefined) {
@@ -109,12 +109,11 @@ export function* getRuleActions(
 
 function checkCondition(
   condition: SingleRuleCondition,
-  node: TreeNode | undefined
+  node: TreeNode | undefined,
 ) {
-  const nodeTagName =
-    node !== undefined && typeof node.tagName === 'string'
-      ? node.tagName
-      : undefined;
+  const nodeTagName = node !== undefined && typeof node.tagName === 'string'
+    ? node.tagName
+    : undefined;
 
   if (condition.tags !== undefined && nodeTagName !== undefined) {
     if (condition.tags.has(nodeTagName)) {
@@ -201,7 +200,7 @@ function convertRuleCondition(condition: any): SingleRuleCondition | undefined {
   if (condition.tags !== undefined && Array.isArray(condition.tags)) {
     converted.tags = SetUtils.union(
       converted.tags || new Set<string>(),
-      condition.tags
+      condition.tags,
     );
   }
   if (typeof condition.isDefined === 'boolean') {

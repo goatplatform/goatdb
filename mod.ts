@@ -91,9 +91,9 @@ import {
   itemPath,
   itemPathGetPart,
   itemPathGetRepoId,
+  itemPathIsValid,
   itemPathJoin,
   itemPathNormalize,
-  itemPathIsValid,
 } from './db/path.ts';
 import { Repository } from './repo/repo.ts';
 import { ManagedItem } from './db/managed-item.ts';
@@ -134,9 +134,9 @@ export {
   itemPath,
   itemPathGetPart,
   itemPathGetRepoId,
+  itemPathIsValid,
   itemPathJoin,
   itemPathNormalize,
-  itemPathIsValid,
   JSONLogStream,
   ManagedItem,
   normalizeEmail,

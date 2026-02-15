@@ -62,8 +62,9 @@ export abstract class ChecksumEncoder<
   }
 
   protected isNativeValue(value: CoreValue, options?: OT): value is string {
-    const typeSafe =
-      typeof options?.typeSafe === 'boolean' ? options.typeSafe : this.typeSafe;
+    const typeSafe = typeof options?.typeSafe === 'boolean'
+      ? options.typeSafe
+      : this.typeSafe;
     return typeSafe ? false : typeof value === 'string';
   }
 
@@ -82,8 +83,9 @@ export abstract class ChecksumEncoder<
       return v;
     }
     const converted = super.convertValue(value as CoreValue, options);
-    const typeSafe =
-      typeof options?.typeSafe === 'boolean' ? options.typeSafe : this.typeSafe;
+    const typeSafe = typeof options?.typeSafe === 'boolean'
+      ? options.typeSafe
+      : this.typeSafe;
     return typeSafe ? String(type) + converted : converted;
   }
 

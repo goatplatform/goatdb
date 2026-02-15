@@ -49,31 +49,31 @@ async function main(): Promise<void> {
     // Forward benchmark events to DOM
     BenchmarkRunner.default.attach('progress', (data: any) => {
       globalThis.dispatchEvent(
-        new CustomEvent('benchmarkStart', { detail: data })
+        new CustomEvent('benchmarkStart', { detail: data }),
       );
     });
 
     BenchmarkRunner.default.attach('benchmarkComplete', (result: any) => {
       globalThis.dispatchEvent(
-        new CustomEvent('benchmarkComplete', { detail: result })
+        new CustomEvent('benchmarkComplete', { detail: result }),
       );
     });
   }
 
   console.log('Running benchmarks in browser environment...');
-  
+
   // Register all browser-compatible benchmarks
   setupGoatDB();
   setupSQLiteBrowser(); // Browser-specific SQLite with OPFS
-  
+
   // Get benchmark filter from environment/config
-  const benchmarkName = getEnvVar('GOATDB_BENCHMARK') || 
+  const benchmarkName = getEnvVar('GOATDB_BENCHMARK') ||
     (window as any).GoatDBConfig?.benchmark;
   const outputJson = getEnvVar('GOATDB_OUTPUT_JSON') === 'true';
-  
+
   // Run benchmarks
   const summary = await BenchmarkRunner.default.run(benchmarkName, outputJson);
-  
+
   if (isBrowser()) {
     // Set global results for automation with completed flag
     (globalThis as any).testResults = { ...summary, completed: true };
@@ -81,7 +81,7 @@ async function main(): Promise<void> {
       new CustomEvent('benchmarksComplete', { detail: summary }),
     );
   }
-  
+
   // Exit with appropriate code
   const exitCode = summary.summary.failed > 0 ? 1 : 0;
   await exit(exitCode);
@@ -91,5 +91,7 @@ async function main(): Promise<void> {
 if (isBrowser()) {
   main();
 } else {
-  notReached('Benchmarks browser entry point should only be used in browser environment');
+  notReached(
+    'Benchmarks browser entry point should only be used in browser environment',
+  );
 }

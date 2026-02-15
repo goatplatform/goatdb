@@ -12,14 +12,14 @@ import { getCoreType, isClonable } from './utils.ts';
 
 export function coreValueClone<T extends CoreValue>(
   e: T,
-  opts?: CoreValueCloneOpts
+  opts?: CoreValueCloneOpts,
 ): T {
   return internalCoreValueClone(e, undefined, opts);
 }
 
 export function coreObjectClone<T extends Object>(
   obj: T,
-  opts?: CoreValueCloneOpts
+  opts?: CoreValueCloneOpts,
 ) {
   return internalCoreValueClone(obj as any, undefined, opts);
 }
@@ -27,7 +27,7 @@ export function coreObjectClone<T extends Object>(
 function internalCoreValueClone<T extends CoreValue>(
   e: T,
   objectsCache: Map<CoreObject, CoreObject> | undefined,
-  opts?: CoreValueCloneOpts
+  opts?: CoreValueCloneOpts,
 ): T {
   switch (getCoreType(e)) {
     case CoreType.String:
@@ -61,8 +61,9 @@ function internalCoreValueClone<T extends CoreValue>(
     }
 
     case CoreType.Object: {
-      if (objectsCache === undefined)
+      if (objectsCache === undefined) {
         objectsCache = new Map<CoreObject, CoreObject>();
+      }
       const obj = e as { [key: string]: CoreValue };
       const cached = objectsCache.get(obj);
       if (cached !== undefined) return cached as T;

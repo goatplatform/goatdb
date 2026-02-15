@@ -29,18 +29,18 @@ function createTestTable(db: any): void {
   `);
 }
 
-
 async function populateDatabase(
   dbPath: string,
   count: number,
 ): Promise<void> {
   // Dynamic import to avoid issues in browser
   const { DatabaseSync } = await import('node:sqlite');
-  
+
   const db = new DatabaseSync(dbPath);
   createTestTable(db);
 
-  const countResult = db.prepare('SELECT COUNT(*) as count FROM test_items').get() as { count: number } | undefined;
+  const countResult = db.prepare('SELECT COUNT(*) as count FROM test_items')
+    .get() as { count: number } | undefined;
   const currentCount = countResult?.count ?? 0;
 
   if (currentCount < count) {
@@ -68,11 +68,11 @@ export default function setup(): void {
     const { DatabaseSync } = await import('node:sqlite');
     const tempDir = await ctx.tempDir('sqlite-create');
     const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
-    
+
     ctx.start();
     const db = new DatabaseSync(dbPath);
     ctx.end();
-    
+
     return () => db.close();
   });
 
@@ -80,13 +80,13 @@ export default function setup(): void {
     const { DatabaseSync } = await import('node:sqlite');
     const tempDir = await ctx.tempDir('sqlite-table');
     const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
-    
+
     const db = new DatabaseSync(dbPath);
-    
+
     ctx.start();
     createTestTable(db);
     ctx.end();
-    
+
     return () => db.close();
   });
 
@@ -94,13 +94,13 @@ export default function setup(): void {
     const { DatabaseSync } = await import('node:sqlite');
     const tempDir = await ctx.tempDir('sqlite-100k');
     const dbPath = path.join(tempDir, 'temp_bench_sqlite_100k.db');
-    
+
     await populateDatabase(dbPath, 100000);
 
     ctx.start();
     const db = new DatabaseSync(dbPath);
     ctx.end();
-    
+
     return () => db.close();
   });
 
@@ -108,18 +108,18 @@ export default function setup(): void {
     const { DatabaseSync } = await import('node:sqlite');
     const tempDir = await ctx.tempDir('sqlite-read-100k');
     const dbPath = path.join(tempDir, 'temp_bench_sqlite_100k.db');
-    
+
     await populateDatabase(dbPath, 100000);
 
     const db = new DatabaseSync(dbPath);
-    
+
     ctx.start();
     const stmt = db.prepare('SELECT * FROM test_items');
     const res = stmt.all();
     ctx.end();
 
     assert(res.length === 100000, 'Database should have 100000 items');
-    
+
     return () => db.close();
   });
 
@@ -127,7 +127,7 @@ export default function setup(): void {
     const { DatabaseSync } = await import('node:sqlite');
     const tempDir = await ctx.tempDir('sqlite-create-single');
     const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
-    
+
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
@@ -145,7 +145,7 @@ export default function setup(): void {
     const { DatabaseSync } = await import('node:sqlite');
     const tempDir = await ctx.tempDir('sqlite-read-item');
     const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
-    
+
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
@@ -168,7 +168,7 @@ export default function setup(): void {
 
     assert(readItem.title === 'Test read item', 'Item title should match');
     assert(readItem.count === 42, 'Item count should match');
-    
+
     return () => db.close();
   });
 
@@ -176,7 +176,7 @@ export default function setup(): void {
     const { DatabaseSync } = await import('node:sqlite');
     const tempDir = await ctx.tempDir('sqlite-update');
     const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
-    
+
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
     const itemId = uniqueId();
@@ -211,7 +211,7 @@ export default function setup(): void {
     const { DatabaseSync } = await import('node:sqlite');
     const tempDir = await ctx.tempDir('sqlite-bulk-create');
     const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
-    
+
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
@@ -234,7 +234,7 @@ export default function setup(): void {
     const { DatabaseSync } = await import('node:sqlite');
     const tempDir = await ctx.tempDir('sqlite-bulk-read');
     const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
-    
+
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
@@ -266,7 +266,7 @@ export default function setup(): void {
     const { DatabaseSync } = await import('node:sqlite');
     const tempDir = await ctx.tempDir('sqlite-simple-query');
     const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
-    
+
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
@@ -287,7 +287,7 @@ export default function setup(): void {
     const results = query.all();
 
     assert(results.length === 49, 'Query should return 49 items');
-    
+
     return () => db.close();
   });
 
@@ -295,7 +295,7 @@ export default function setup(): void {
     const { DatabaseSync } = await import('node:sqlite');
     const tempDir = await ctx.tempDir('sqlite-complex-query');
     const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
-    
+
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
@@ -326,7 +326,7 @@ export default function setup(): void {
     const { DatabaseSync } = await import('node:sqlite');
     const tempDir = await ctx.tempDir('sqlite-count');
     const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
-    
+
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
@@ -351,7 +351,7 @@ export default function setup(): void {
     const count = countResult.count;
 
     assert(count === 10, 'Table should contain 10 items');
-    
+
     return () => db.close();
   });
 
@@ -359,7 +359,7 @@ export default function setup(): void {
     const { DatabaseSync } = await import('node:sqlite');
     const tempDir = await ctx.tempDir('sqlite-keys');
     const dbPath = path.join(tempDir, `temp_bench_sqlite_${uniqueId()}.db`);
-    
+
     const db = new DatabaseSync(dbPath);
     createTestTable(db);
 
@@ -383,7 +383,7 @@ export default function setup(): void {
     const keys = keysResult.map((row: any) => row.id);
 
     assert(keys.length === 10, 'Table should have 10 keys');
-    
+
     return () => db.close();
   });
 }

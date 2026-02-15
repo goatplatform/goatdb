@@ -1,29 +1,29 @@
 export type {
-  CoreOptions,
   Clonable,
   Comparable,
+  ConcreteCoreValue,
   CoreArray,
   CoreClassObject,
   CoreDictionary,
+  CoreKey,
   CoreObject,
+  CoreOptions,
   CoreSet,
   CoreValue,
+  CoreValueCloneOpts,
   Encodable,
   Encoder,
   Equatable,
   ReadonlyCoreArray,
   ReadonlyCoreObject,
-  CoreValueCloneOpts,
-  ConcreteCoreValue,
-  CoreKey,
 } from './base.ts';
 
 export { CoreType } from './base.ts';
 
 export {
   getCoreType,
-  isReadonlyCoreObject,
   getCoreTypeOrUndef,
+  isReadonlyCoreObject,
 } from './utils.ts';
 
 export { coreValueClone } from './clone.ts';

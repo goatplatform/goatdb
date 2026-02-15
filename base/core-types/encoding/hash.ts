@@ -9,7 +9,7 @@ const kMurmurEncoder = new Murmur3Checksum({ typeSafe: false });
 
 export function coreValueHash(
   v: CoreValue | object,
-  options?: CoreOptions | ChecksumEncoderOpts
+  options?: CoreOptions | ChecksumEncoderOpts,
 ): string {
   return kMurmurEncoder.checksumForValue(v, options as Murmur3Opts);
 }

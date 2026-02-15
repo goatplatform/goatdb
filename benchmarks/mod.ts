@@ -436,9 +436,15 @@ async function formatSummary(summary: RunSummary): Promise<string> {
 
   // System information header
   const systemInfo = await getSystemInfo();
-  lines.push(`System: ${systemInfo.hardware.cpu || 'unknown'}, ${systemInfo.hardware.memory || 'unknown'} RAM`);
+  lines.push(
+    `System: ${systemInfo.hardware.cpu || 'unknown'}, ${
+      systemInfo.hardware.memory || 'unknown'
+    } RAM`,
+  );
   lines.push(`Storage: ${systemInfo.hardware.storage}`);
-  lines.push(`Runtime: ${systemInfo.runtime.runtime} ${systemInfo.runtime.version} (${systemInfo.runtime.platform})`);
+  lines.push(
+    `Runtime: ${systemInfo.runtime.runtime} ${systemInfo.runtime.version} (${systemInfo.runtime.platform})`,
+  );
   lines.push('');
 
   lines.push('Benchmark Results');

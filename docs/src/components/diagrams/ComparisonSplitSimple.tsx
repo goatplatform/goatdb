@@ -14,31 +14,35 @@ interface ComparisonProps {
   };
 }
 
-export default function ComparisonSplitSimple({ title, traditional, goatdb }: ComparisonProps) {
+export default function ComparisonSplitSimple(
+  { title, traditional, goatdb }: ComparisonProps,
+) {
   const containerStyle: React.CSSProperties = {
     margin: '2rem 0',
   };
-  
+
   const titleStyle: React.CSSProperties = {
     textAlign: 'center',
     marginBottom: '1.5rem',
     fontSize: '1.3rem',
     fontWeight: 600,
   };
-  
+
   const splitContainerStyle: React.CSSProperties = {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: '1rem',
   };
-  
+
   const panelStyle = (type: 'traditional' | 'goatdb'): React.CSSProperties => ({
     padding: '1.5rem',
-    border: `2px solid var(--ifm-color-${type === 'traditional' ? 'danger' : 'success'}-lighter)`,
+    border: `2px solid var(--ifm-color-${
+      type === 'traditional' ? 'danger' : 'success'
+    }-lighter)`,
     borderRadius: 'var(--ifm-global-radius)',
     background: 'var(--ifm-background-surface-color)',
   });
-  
+
   const panelHeaderStyle: React.CSSProperties = {
     display: 'flex',
     justifyContent: 'space-between',
@@ -47,17 +51,26 @@ export default function ComparisonSplitSimple({ title, traditional, goatdb }: Co
     paddingBottom: '1rem',
     borderBottom: '1px solid var(--ifm-color-emphasis-200)',
   };
-  
+
   const labelStyle: React.CSSProperties = {
     fontSize: '1.1rem',
     fontWeight: 600,
   };
-  
+
   const getComplexityStyle = (complexity: string): React.CSSProperties => {
     const colors = {
-      high: { bg: 'var(--ifm-color-danger-lightest)', text: 'var(--ifm-color-danger-darkest)' },
-      medium: { bg: 'var(--ifm-color-warning-lightest)', text: 'var(--ifm-color-warning-darkest)' },
-      low: { bg: 'var(--ifm-color-success-lightest)', text: 'var(--ifm-color-success-darkest)' },
+      high: {
+        bg: 'var(--ifm-color-danger-lightest)',
+        text: 'var(--ifm-color-danger-darkest)',
+      },
+      medium: {
+        bg: 'var(--ifm-color-warning-lightest)',
+        text: 'var(--ifm-color-warning-darkest)',
+      },
+      low: {
+        bg: 'var(--ifm-color-success-lightest)',
+        text: 'var(--ifm-color-success-darkest)',
+      },
     };
     const color = colors[complexity as keyof typeof colors];
     return {
@@ -68,13 +81,13 @@ export default function ComparisonSplitSimple({ title, traditional, goatdb }: Co
       color: color.text,
     };
   };
-  
+
   const itemsStyle: React.CSSProperties = {
     listStyle: 'none',
     padding: 0,
     margin: 0,
   };
-  
+
   const itemStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'flex-start',
@@ -84,20 +97,23 @@ export default function ComparisonSplitSimple({ title, traditional, goatdb }: Co
     lineHeight: '1.4',
   };
 
-
   const descStyle: React.CSSProperties = {
-    marginTop: "1rem",
+    marginTop: '1rem',
   };
-  
-  const bulletStyle = (type: 'traditional' | 'goatdb'): React.CSSProperties => ({
+
+  const bulletStyle = (
+    type: 'traditional' | 'goatdb',
+  ): React.CSSProperties => ({
     marginRight: '0.5rem',
     fontWeight: 'bold',
     fontSize: '1.2rem',
-    color: type === 'traditional' ? 'var(--ifm-color-danger)' : 'var(--ifm-color-success)',
+    color: type === 'traditional'
+      ? 'var(--ifm-color-danger)'
+      : 'var(--ifm-color-success)',
     position: 'relative',
-    bottom: "4px",
+    bottom: '4px',
   });
-  
+
   // Mobile responsive style
   const mobileStyle = `
     @media (max-width: 768px) {
@@ -106,13 +122,13 @@ export default function ComparisonSplitSimple({ title, traditional, goatdb }: Co
       }
     }
   `;
-  
+
   return (
     <div style={containerStyle} aria-label={`${title} comparison`}>
       <style>{mobileStyle}</style>
       <h3 style={titleStyle}>{title}</h3>
-      
-      <div className="comparison-grid" style={splitContainerStyle}>
+
+      <div className='comparison-grid' style={splitContainerStyle}>
         {/* Traditional Approach */}
         <div style={panelStyle('traditional')}>
           <div style={panelHeaderStyle}>
@@ -130,7 +146,7 @@ export default function ComparisonSplitSimple({ title, traditional, goatdb }: Co
             ))}
           </ul>
         </div>
-        
+
         {/* GoatDB Approach */}
         <div style={panelStyle('goatdb')}>
           <div style={panelHeaderStyle}>
@@ -149,12 +165,29 @@ export default function ComparisonSplitSimple({ title, traditional, goatdb }: Co
           </ul>
         </div>
       </div>
-      
+
       {/* SEO description */}
-      <div className="sr-only" style={{...descStyle, position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0}}>
-        Comparison of {title} between traditional approach and GoatDB approach.
-        Traditional approach has {traditional.complexity} complexity with challenges including {traditional.items.join(', ')}.
-        GoatDB approach has {goatdb.complexity} complexity with benefits including {goatdb.items.join(', ')}.
+      <div
+        className='sr-only'
+        style={{
+          ...descStyle,
+          position: 'absolute',
+          width: '1px',
+          height: '1px',
+          padding: 0,
+          margin: '-1px',
+          overflow: 'hidden',
+          clip: 'rect(0, 0, 0, 0)',
+          whiteSpace: 'nowrap',
+          border: 0,
+        }}
+      >
+        Comparison of {title}{' '}
+        between traditional approach and GoatDB approach. Traditional approach
+        has {traditional.complexity} complexity with challenges including{' '}
+        {traditional.items.join(', ')}. GoatDB approach has {goatdb.complexity}
+        {' '}
+        complexity with benefits including {goatdb.items.join(', ')}.
       </div>
     </div>
   );

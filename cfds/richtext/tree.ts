@@ -20,7 +20,7 @@ export const kCoreValueTreeNodeOpts = {
 
 /**
  * The root object for a rich text document in tree form.
- * 
+ *
  * - `root`: The root element node of the document tree.
  * - `pointers`: (Optional) A set of pointers (such as selections or cursors)
  *               within the document.
@@ -48,10 +48,9 @@ export function onlyNoneLocal(v: CoreValue) {
   return isReadonlyCoreObject(v) && v.isLocal !== true;
 }
 
-
 /**
  * Base interface for all values in the rich text tree.
- * 
+ *
  * Extends CoreObject and adds an optional `isLocal` property,
  * which indicates whether the value is local (will not be synced or persisted).
  */
@@ -69,7 +68,7 @@ export type TreeNode = TextNode | ElementNode | RichTextValue;
 
 /**
  * Represents a text node in the rich text tree.
- * 
+ *
  * Extends RichTextValue and adds a `text` property,
  * which contains the actual text content of the node.
  */
@@ -79,7 +78,7 @@ export interface TextNode extends RichTextValue {
 
 /**
  * Represents an element node in the rich text tree.
- * 
+ *
  * Extends RichTextValue and adds a `children` property,
  * which contains an array of child nodes.
  */
@@ -89,7 +88,7 @@ export interface ElementNode extends RichTextValue {
 
 /**
  * Represents the type of a pointer in the rich text document.
- * 
+ *
  * - `anchor`: The anchor pointer (start of the selection).
  * - `focus`: The focus pointer (end of the selection).
  */
@@ -97,7 +96,7 @@ export type PointerType = 'anchor' | 'focus';
 
 /**
  * Enum representing the direction of a pointer in the rich text document.
- * 
+ *
  * - Forward (1): The pointer is moving forward (e.g., right or down).
  * - Backward (-1): The pointer is moving backward (e.g., left or up).
  * - None (0): The pointer has no direction (e.g., a collapsed selection).
@@ -137,7 +136,7 @@ export interface Point extends CoreObject {
 
 /**
  * Represents a pointer in the rich text document.
- * 
+ *
  * A Pointer is a specific position within a TextNode,
  * identified by a key, type, direction, and optional expiration.
  */
@@ -376,8 +375,8 @@ export function pointFromAbsOffset(
         node: candidate,
         // If we landed on a previous node, place the pointer at its end.
         // If we landed on a later node, place the pointer at its start.
-        offset:
-          offsetsMap.get(candidate)! + (dir < 0 ? candidate.text.length : 0),
+        offset: offsetsMap.get(candidate)! +
+          (dir < 0 ? candidate.text.length : 0),
       };
     }
   }

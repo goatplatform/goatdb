@@ -16,7 +16,7 @@
  *     { type: 'done', payload: { exitCode, summary } }
  */
 
-import { TestsRunner, type TestResult, type TestSummary } from './mod.ts';
+import { type TestResult, TestsRunner, type TestSummary } from './mod.ts';
 import { registerAllTests } from './test-registry.ts';
 
 /**
@@ -135,15 +135,17 @@ async function runTests(
       currentTest++;
 
       // Notify main thread: test starting
-      self.postMessage({
-        type: 'testStart',
-        payload: {
-          suiteName: name,
-          testName: tName,
-          current: currentTest,
-          total: testCount,
-        },
-      } satisfies TestStartMessage);
+      self.postMessage(
+        {
+          type: 'testStart',
+          payload: {
+            suiteName: name,
+            testName: tName,
+            current: currentTest,
+            total: testCount,
+          },
+        } satisfies TestStartMessage,
+      );
 
       const start = performance.now();
       let passed = true;
@@ -169,16 +171,18 @@ async function runTests(
       allResults.push(result);
 
       // Notify main thread: test complete
-      self.postMessage({
-        type: 'testComplete',
-        payload: {
-          suiteName: name,
-          testName: tName,
-          passed,
-          duration,
-          error: error ? serializeError(error) : undefined,
-        },
-      } satisfies TestCompleteMessage);
+      self.postMessage(
+        {
+          type: 'testComplete',
+          payload: {
+            suiteName: name,
+            testName: tName,
+            passed,
+            duration,
+            error: error ? serializeError(error) : undefined,
+          },
+        } satisfies TestCompleteMessage,
+      );
     }
 
     // Clean up suite's temp directory (same as TestSuite.run() does)
@@ -214,19 +218,23 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
     );
 
     // Notify main thread: ready with counts
-    self.postMessage({
-      type: 'ready',
-      payload: { suiteCount, testCount },
-    } satisfies ReadyMessage);
+    self.postMessage(
+      {
+        type: 'ready',
+        payload: { suiteCount, testCount },
+      } satisfies ReadyMessage,
+    );
 
     // Run the tests
     const summary = await runTests(payload.suiteName, payload.testName);
 
     // Notify main thread: all done
     const exitCode = summary.failed > 0 ? 1 : 0;
-    self.postMessage({
-      type: 'done',
-      payload: { exitCode, summary },
-    } satisfies DoneMessage);
+    self.postMessage(
+      {
+        type: 'done',
+        payload: { exitCode, summary },
+      } satisfies DoneMessage,
+    );
   }
 };

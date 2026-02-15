@@ -22,13 +22,13 @@
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
-  --ifm-color-primary: #C6F578;
-  --ifm-color-primary-dark: #B4E85C;
-  --ifm-color-primary-darker: #A2DB40;
-  --ifm-color-primary-darkest: #8BC832;
-  --ifm-color-primary-light: #D2F894;
-  --ifm-color-primary-lighter: #DEFBB0;
-  --ifm-color-primary-lightest: #EAFDCC;
+  --ifm-color-primary: #c6f578;
+  --ifm-color-primary-dark: #b4e85c;
+  --ifm-color-primary-darker: #a2db40;
+  --ifm-color-primary-darkest: #8bc832;
+  --ifm-color-primary-light: #d2f894;
+  --ifm-color-primary-lighter: #defbb0;
+  --ifm-color-primary-lightest: #eafdcc;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 }
 
@@ -42,7 +42,7 @@
   --ifm-color-success-light: #9775ff;
   --ifm-color-success-lighter: #a891ff;
   --ifm-color-success-lightest: #c2b0ff;
-  
+
   /* Info admonition */
   --ifm-color-info: #5e35b1;
   --ifm-color-info-dark: #512da8;
@@ -55,14 +55,14 @@
 
 [data-theme='dark'] {
   /* Tip admonition (matching logo green) in dark mode */
-  --ifm-color-success: #C6F578;
-  --ifm-color-success-dark: #B4E85C;
-  --ifm-color-success-darker: #A2DB40;
-  --ifm-color-success-darkest: #8BC832;
-  --ifm-color-success-light: #D2F894;
-  --ifm-color-success-lighter: #DEFBB0;
-  --ifm-color-success-lightest: #EAFDCC;
-  
+  --ifm-color-success: #c6f578;
+  --ifm-color-success-dark: #b4e85c;
+  --ifm-color-success-darker: #a2db40;
+  --ifm-color-success-darkest: #8bc832;
+  --ifm-color-success-light: #d2f894;
+  --ifm-color-success-lighter: #defbb0;
+  --ifm-color-success-lightest: #eafdcc;
+
   /* Info admonition in dark mode - complementary teal */
   --ifm-color-info: #26c6da;
   --ifm-color-info-dark: #00acc1;
@@ -120,7 +120,7 @@ pre {
   h1 {
     font-size: 2rem;
   }
-  
+
   h2 {
     font-size: 1.5rem;
   }

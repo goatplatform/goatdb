@@ -1,26 +1,26 @@
 name: Tests
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-          
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24.x'
-          
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
@@ -28,10 +28,10 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ hashFiles('deno.lock') }}
           restore-keys: |
             ${{ runner.os }}-playwright-
-          
+
       - name: Install Playwright browsers and system dependencies
         run: deno run -A npm:playwright@^1.48.0 install --with-deps chromium
-        
+
       - name: Run Tests
         run: deno task test
         env:
