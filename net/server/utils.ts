@@ -15,8 +15,5 @@ export function getRequestPath<T extends string = string>(req: GoatRequest): T {
 export function getBaseURL<US extends Schema>(
   services: ServerServices<US>,
 ): string {
-  if (services.buildInfo.debugBuild) {
-    return 'http://localhost:8080';
-  }
   return services.domain.resolveOrg(services.db.orgId);
 }

@@ -240,13 +240,25 @@ export class NodeHeadersPolyfill extends Map<string, string> {
    * @param v - The value to append
    */
   append(k: string, v: string) {
-    const existing = this.get(k);
-    if (existing !== undefined) {
-      super.set(k, existing + ',' + v);
+    const existing = super.get(k);
+    if (existing) {
+      super.set(k, existing + ', ' + v);
     } else {
       super.set(k, v);
     }
   }
+
+  /**
+   * Returns the header value for the given name, or `null` if not set.
+   * Matches the web standard `Headers.get()` return type (`string | null`),
+   * which conflicts with `Map.get()` (`string | undefined`). The `any`
+   * return type bridges this mismatch — all callers use truthy checks.
+   */
+  // deno-lint-ignore no-explicit-any
+  override get(k: string): any {
+    return super.get(k) ?? null;
+  }
+
   /**
    * Sets a header value, overwriting any existing value.
    * This matches the behavior of the web standard Headers.set() method.
@@ -258,22 +270,6 @@ export class NodeHeadersPolyfill extends Map<string, string> {
   override set(k: string, v: string) {
     super.set(k, v);
     return this;
-  }
-  /**
-   * Gets the first value of a header, matching the behavior of the web standard
-   * Headers.get() method. For headers with multiple values (comma-separated),
-   * returns only the first value.
-   *
-   * @param k - The header name to get
-   * @returns The first value of the header, or undefined if the header doesn't exist
-   */
-  override get(k: string) {
-    const val = super.get(k);
-    if (val === undefined) {
-      return undefined;
-    }
-    // Match native Headers.get: return first value before comma
-    return val.split(',')[0];
   }
 }
 
@@ -297,17 +293,12 @@ export type MinimalNodeIncomingMessage = {
  */
 export type MinimalNodeServerResponse = {
   statusCode: number;
+  headersSent?: boolean;
   setHeader(key: string, value: string): void;
-  write(chunk: Uint8Array | string): void;
+  write(chunk: Uint8Array | string): boolean;
+  on?(event: string, listener: (...args: unknown[]) => void): void;
+  once?(event: string, listener: (...args: unknown[]) => void): void;
   end(chunk?: Uint8Array | string): void;
-};
-
-/**
- * Minimal Node.js Server type for our usage
- */
-export type MinimalNodeServer = {
-  listen(port: number, callback: () => void): void;
-  close(): void;
 };
 
 /**
@@ -393,7 +384,7 @@ export class GoatRequest {
         : {};
       for (const [k, v] of Object.entries(rawHeaders)) {
         if (v !== undefined) {
-          headers.set(k, Array.isArray(v) ? v.join(',') : v);
+          headers.set(k, Array.isArray(v) ? v.join(', ') : v);
         }
       }
       this.headers = headers;
@@ -461,6 +452,7 @@ export type HttpRemoteAddr = { hostname: string };
  */
 export type ServeHandlerInfo = {
   remoteAddr: HttpRemoteAddr;
+  /** Resolves when the response is fully sent. Natively supported in Deno; pre-resolved stub in Node.js. */
   completed: Promise<void>;
 };
 
@@ -506,7 +498,14 @@ export class DenoHttpServer implements MinimalHttpServer {
       return Promise.resolve();
     }
     this._abortController = new AbortController();
-    const combinedSignal = signal || this._abortController.signal;
+    if (signal) {
+      signal.addEventListener(
+        'abort',
+        () => this._abortController!.abort(),
+        { once: true },
+      );
+    }
+    const combinedSignal = this._abortController.signal;
     let resolve: () => void;
     const started = new Promise<void>((res) => {
       resolve = res;
@@ -519,13 +518,13 @@ export class DenoHttpServer implements MinimalHttpServer {
       },
       signal: combinedSignal,
     };
-    
+
     // Add TLS options if HTTPS is configured
     if (this._options.https) {
       serveOptions.key = this._options.https.key;
       serveOptions.cert = this._options.https.cert;
     }
-    
+
     this._server = Deno.serve(
       serveOptions,
       (req: Request, info: Deno.ServeHandlerInfo) => {
@@ -533,7 +532,7 @@ export class DenoHttpServer implements MinimalHttpServer {
         const remoteAddr: HttpRemoteAddr = {
           hostname: (info.remoteAddr as any).hostname ?? 'localhost',
         };
-        return handler(req as unknown as GoatRequest, {
+        return handler(new GoatRequest(req), {
           remoteAddr,
           completed: info.completed,
         });
@@ -591,11 +590,76 @@ export class NodeHttpServer implements MinimalHttpServer {
   }
 
   /**
+   * Handles an incoming Node.js request by converting it to a GoatRequest,
+   * invoking the handler, and streaming the response back.
+   */
+  private async _handleRequest(
+    req: MinimalNodeIncomingMessage,
+    res: MinimalNodeServerResponse,
+    handler: (req: GoatRequest, info: ServeHandlerInfo) => Promise<Response>,
+  ): Promise<void> {
+    try {
+      const goatReq = new GoatRequest(req);
+      const hostname = req.socket?.remoteAddress ?? '';
+      const info: ServeHandlerInfo = {
+        remoteAddr: { hostname },
+        // Node.js stub — no native equivalent to Deno's info.completed
+        completed: Promise.resolve(),
+      };
+      const response = await handler(goatReq, info);
+      res.statusCode = response.status;
+      response.headers.forEach((value, key) => res.setHeader(key, value));
+      if (response.body) {
+        const reader = response.body.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value != null) {
+              const chunk = value instanceof Uint8Array && this._Buffer
+                ? this._Buffer.from(value)
+                : value;
+              const ok = res.write(chunk as Uint8Array | string);
+              if (!ok && res.once) {
+                await new Promise<void>((r) => res.once!('drain', () => r()));
+              }
+            }
+          }
+        } catch (e) {
+          await reader.cancel().catch(() => {});
+          throw e;
+        }
+        reader.releaseLock();
+        res.end();
+      } else {
+        res.end();
+      }
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      if (
+        code !== 'ECONNRESET' && code !== 'EPIPE' && code !== 'ECONNABORTED'
+      ) {
+        console.error('Request handling error:', err);
+      }
+      try {
+        if (res.headersSent) {
+          res.end();
+        } else {
+          res.statusCode = 500;
+          res.end('Internal Server Error');
+        }
+      } catch {
+        // Socket already destroyed — nothing to do
+      }
+    }
+  }
+
+  /**
    * Starts the HTTP server on the specified port.
    *
    * @param handler - The request handler function that processes incoming requests
    * @param port - The port number to listen on
-   * @param _signal - Optional AbortSignal for server shutdown
+   * @param signal - Optional AbortSignal for server shutdown
    * @returns A promise that resolves when the server is ready to accept connections
    */
   async start(
@@ -604,7 +668,7 @@ export class NodeHttpServer implements MinimalHttpServer {
       info: ServeHandlerInfo,
     ) => Promise<Response>,
     port: number,
-    _signal?: AbortSignal,
+    signal?: AbortSignal,
   ): Promise<void> {
     if (this._started) {
       return;
@@ -616,139 +680,61 @@ export class NodeHttpServer implements MinimalHttpServer {
 
     // Create and configure the HTTP/HTTPS server
     if (this._options.https) {
-      // Load HTTPS module for secure connections
       const https = await import('node:https');
-      const { IncomingMessage, ServerResponse } = await getNodeHttp();
-      
       this._server = https.createServer(
         {
           key: this._options.https.key,
           cert: this._options.https.cert,
         },
-      async (
-        req: InstanceType<typeof IncomingMessage>,
-        res: InstanceType<typeof ServerResponse>,
-      ) => {
-        try {
-          // Convert Node.js request to standardized GoatRequest
-          const goatReq = new GoatRequest(req as MinimalNodeIncomingMessage);
-
-          // Extract client hostname from request socket
-          const hostname = req.socket?.remoteAddress ?? '';
-
-          // Create server info object
-          const info: ServeHandlerInfo = {
-            remoteAddr: { hostname },
-            completed: Promise.resolve(),
-          };
-
-          // Process request and get response
-          const response = await handler(goatReq, info);
-
-          // Set response status and headers
-          res.statusCode = response.status;
-          response.headers.forEach((value, key) => res.setHeader(key, value));
-
-          // Handle response body streaming
-          if (response.body) {
-            const reader = response.body.getReader();
-            const write = async () => {
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                if (value != null) {
-                  // Convert Uint8Array to Node.js Buffer if needed
-                  if (value instanceof Uint8Array && this._Buffer) {
-                    res.write(this._Buffer.from(value));
-                  } else {
-                    res.write(value);
-                  }
-                }
-              }
-              res.end();
-            };
-            write();
-          } else {
-            res.end();
-          }
-        } catch (err) {
-          // Handle errors with 500 response
-          res.statusCode = 500;
-          res.end('Internal Server Error');
-        }
-      },
-    );
+        (req, res) =>
+          this._handleRequest(
+            req as MinimalNodeIncomingMessage,
+            res as unknown as MinimalNodeServerResponse,
+            handler,
+          ),
+      );
     } else {
-      // Create regular HTTP server
-      const { createServer, IncomingMessage, ServerResponse } = await getNodeHttp();
-      
+      const { createServer } = await getNodeHttp();
       this._server = createServer(
-        async (
-          req: InstanceType<typeof IncomingMessage>,
-          res: InstanceType<typeof ServerResponse>,
-        ) => {
-          try {
-            // Convert Node.js request to standardized GoatRequest
-            const goatReq = new GoatRequest(req as MinimalNodeIncomingMessage);
-
-            // Extract client hostname from request socket
-            const hostname = req.socket?.remoteAddress ?? '';
-
-            // Create server info object
-            const info: ServeHandlerInfo = {
-              remoteAddr: { hostname },
-              completed: Promise.resolve(),
-            };
-
-            // Process request and get response
-            const response = await handler(goatReq, info);
-
-            // Set response status and headers
-            res.statusCode = response.status;
-            response.headers.forEach((value, key) => res.setHeader(key, value));
-
-            // Handle response body streaming
-            if (response.body) {
-              const reader = response.body.getReader();
-              const write = async () => {
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-
-                  if (value != null) {
-                    // Convert Uint8Array to Node.js Buffer if needed
-                    if (value instanceof Uint8Array && this._Buffer) {
-                      res.write(this._Buffer.from(value));
-                    } else {
-                      res.write(value);
-                    }
-                  }
-                }
-                res.end();
-              };
-              write();
-            } else {
-              res.end();
-            }
-          } catch (err) {
-            // Handle errors with 500 response
-            res.statusCode = 500;
-            res.end('Internal Server Error');
-          }
-        },
+        (req, res) =>
+          this._handleRequest(
+            req as MinimalNodeIncomingMessage,
+            res as unknown as MinimalNodeServerResponse,
+            handler,
+          ),
       );
     }
 
     // Start listening on specified port
-    await new Promise<void>((resolve) => this._server!.listen(port, resolve));
+    await new Promise<void>((resolve, reject) => {
+      this._server!.on('error', reject);
+      this._server!.listen(port, () => {
+        this._server!.removeListener('error', reject);
+        this._server!.on('error', (err: Error) => {
+          console.error('HTTP server error:', err);
+        });
+        resolve();
+      });
+    });
     this._started = true;
+
+    // Wire abort signal for graceful shutdown
+    if (signal) {
+      if (signal.aborted) {
+        this.stop();
+      } else {
+        signal.addEventListener('abort', () => this.stop(), { once: true });
+      }
+    }
   }
 
   /**
    * Stops the HTTP server and cleans up resources.
    */
   stop(): void {
+    if (this._server && 'closeAllConnections' in this._server) {
+      (this._server as any).closeAllConnections();
+    }
     this._server?.close();
     this._started = false;
   }
@@ -788,7 +774,9 @@ export type HttpServerInstance = DenoHttpServer | NodeHttpServer;
  * Uses the RuntimeAdapter registry to determine the current runtime.
  * Browser environments do not support HTTP server creation and will throw.
  */
-export function createHttpServer(options: HttpServerOptions = {}): HttpServerInstance {
+export function createHttpServer(
+  options: HttpServerOptions = {},
+): HttpServerInstance {
   const runtime = getRuntime();
   if (runtime.id === 'deno') {
     return new DenoHttpServer(options);

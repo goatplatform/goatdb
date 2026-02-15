@@ -92,9 +92,11 @@ export interface ServerOptions<US extends Schema> extends DBInstanceConfig {
    * The mapping is bidirectional - domains can be resolved to org IDs and
    * org IDs can be resolved to their domains.
    */
-  domain: DomainConfig;
+  domain?: DomainConfig;
   /**
-   * The port the server will listen to. Defaults to 8080.
+   * The port the server will listen to. Defaults to 8080 (HTTP) or 8443 (HTTPS).
+   * Note: When using `port: 0` (OS-assigned port), provide a custom `domain`
+   * config, as the default `resolveOrg` captures the port at construction time.
    */
   port?: number;
   /**
@@ -206,6 +208,7 @@ export interface ServerOptions<US extends Schema> extends DBInstanceConfig {
  */
 export interface ServerServices<US extends Schema> extends ServerOptions<US> {
   readonly orgId: string;
+  readonly domain: DomainConfig;
   readonly db: GoatDB<US>;
   readonly logger: Logger;
   readonly email: EmailService<US>;
@@ -322,10 +325,16 @@ export class Server<US extends Schema> {
   private readonly _endpoints: Endpoint<US>[];
   private readonly _middlewares: Middleware<US>[];
   private readonly _baseOptions: ServerOptions<US>;
+  private readonly _domain: DomainConfig;
   private readonly _servicesByOrg: Dictionary<string, ServerServices<US>>;
+  private readonly _pendingServices = new Map<
+    string,
+    Promise<ServerServices<US>>
+  >();
 
   private _abortController: AbortController | undefined;
   private _httpServer?: HttpServerInstance;
+  private _stopping = false;
 
   constructor(options: ServerOptions<US>) {
     this._endpoints = [];
@@ -334,12 +343,35 @@ export class Server<US extends Schema> {
     this._servicesByOrg = new Map();
     setGlobalLoggerStreams(options.logStreams || []);
     if (options.port === undefined) {
-      options.port = 8080;
+      options.port = options.https ? 8443 : 8080;
+    }
+    if (
+      typeof options.port !== 'number' ||
+      !Number.isInteger(options.port) ||
+      options.port < 0 ||
+      options.port > 65535
+    ) {
+      throw new Error(`Invalid port number: ${options.port}`);
     }
     if (!options.orgId) {
       options.orgId = 'localhost';
     }
+    if (!options.domain) {
+      if (options.port === 0) {
+        throw new Error(
+          'When using port: 0 (OS-assigned port), provide a custom domain ' +
+            'config. The default resolveOrg captures the port at construction time.',
+        );
+      }
+      const protocol = options.https ? 'https' : 'http';
+      options.domain = {
+        resolveOrg: (_orgId: string) =>
+          `${protocol}://localhost:${options.port}`,
+        resolveDomain: () => options.orgId!,
+      };
+    }
     this._baseOptions = options;
+    this._domain = options.domain;
     if (!options.disableDefaultEndpoints) {
       // Monitoring
       if (options.logStreams) {
@@ -361,7 +393,7 @@ export class Server<US extends Schema> {
       // Logs
       // this.registerEndpoint(new LogsEndpoint());
     }
-    
+
     // Process HTTPS configuration
     let httpsConfig: { key: string; cert: string } | undefined;
     if (options.https) {
@@ -373,7 +405,7 @@ export class Server<US extends Schema> {
         httpsConfig = options.https;
       }
     }
-    
+
     this._httpServer = createHttpServer({ https: httpsConfig });
   }
 
@@ -387,36 +419,50 @@ export class Server<US extends Schema> {
    * @returns Promise resolving to the organization's server services
    */
   async servicesForOrganization(orgId: string): Promise<ServerServices<US>> {
-    // Return cached services if they exist
-    let services = this._servicesByOrg.get(orgId);
-    if (!services) {
-      // Create new services for this organization
-      const dir = path.join(this._baseOptions.path, orgId);
-
-      // Initialize services with base configuration
-      services = {
-        ...this._baseOptions,
-        path: dir,
-        orgId,
-        db: new GoatDB({
-          ...this._baseOptions,
-          orgId,
-          path: dir,
-          debug: this._baseOptions.buildInfo.debugBuild,
-        }),
-        logger: newLogger(this._baseOptions.logStreams || []),
-        email: new EmailService(this._baseOptions.emailConfig),
-      };
-
-      // Initialize service dependencies
-      await services.email.setup(services);
-
-      // Wait for database to be ready before using it
-      await services.db.readyPromise();
-
-      // Cache the services for future requests
-      this._servicesByOrg.set(orgId, services);
+    if (this._stopping) {
+      throw new ServerError(503, 'Server is shutting down');
     }
+    const cached = this._servicesByOrg.get(orgId);
+    if (cached) return cached;
+
+    // Deduplicate concurrent creation for the same orgId
+    const pending = this._pendingServices.get(orgId);
+    if (pending) return pending;
+
+    const promise = this._createServices(orgId);
+    this._pendingServices.set(orgId, promise);
+    try {
+      return await promise;
+    } finally {
+      this._pendingServices.delete(orgId);
+    }
+  }
+
+  private async _createServices(orgId: string): Promise<ServerServices<US>> {
+    const dir = path.join(this._baseOptions.path, orgId);
+    const services: ServerServices<US> = {
+      ...this._baseOptions,
+      domain: this._domain,
+      path: dir,
+      orgId,
+      db: new GoatDB({
+        ...this._baseOptions,
+        orgId,
+        path: dir,
+        debug: this._baseOptions.buildInfo.debugBuild,
+      }),
+      logger: newLogger(this._baseOptions.logStreams || []),
+      email: new EmailService(this._baseOptions.emailConfig),
+    };
+    try {
+      await services.email.setup(services);
+      await services.db.readyPromise();
+    } catch (e: unknown) {
+      services.email.stop();
+      await services.db.close().catch(() => {});
+      throw e;
+    }
+    this._servicesByOrg.set(orgId, services);
     return services;
   }
 
@@ -478,7 +524,10 @@ export class Server<US extends Schema> {
     if (goatReq.url === 'http://AWSALB/healthy') {
       return new Response(null, { status: 200 });
     }
-    const orgId = this._baseOptions.domain.resolveDomain(goatReq.url);
+    if (this._stopping) {
+      return new Response(null, { status: 503 });
+    }
+    const orgId = this._domain.resolveDomain(goatReq.url);
     if (!orgId) {
       log({
         severity: 'METRIC',
@@ -570,16 +619,18 @@ export class Server<US extends Schema> {
    * @returns Promise that resolves when server is fully started
    */
   async start(): Promise<void> {
+    this._stopping = false; // Reset from prior stop()
+
     // Return early if server is already running
     if (this._abortController) {
-      return Promise.resolve();
+      return;
     }
 
     // Handle self-signed certificate generation if needed
     if (this._baseOptions.https && 'selfSigned' in this._baseOptions.https) {
       const hostname = this._baseOptions.https.hostname || 'localhost';
       const cert = await generateSelfSignedCertificate(hostname);
-      
+
       // Recreate HTTP server with generated certificate
       this._httpServer = createHttpServer({ https: cert });
     }
@@ -601,21 +652,13 @@ export class Server<US extends Schema> {
       unit: 'Count',
     });
 
-    // Create promise to track server start
-    let resolve: () => void = () => {};
-    const result = new Promise<void>((res) => {
-      resolve = res;
-    });
-
     // Initialize abort controller and start HTTP server
     this._abortController = new AbortController();
-    this._httpServer!.start(
+    return this._httpServer!.start(
       this.processRequest.bind(this),
       this._baseOptions.port!,
       this._abortController.signal,
-    ).then(resolve);
-
-    return result;
+    );
   }
 
   /**
@@ -638,11 +681,33 @@ export class Server<US extends Schema> {
   /**
    * Gracefully stops the server and all its services.
    * Safe to call multiple times.
+   *
+   * Shutdown sequence: stops accepting new connections, rejects new service
+   * lookups via `_stopping` flag, then flushes and closes all databases.
+   * Already-dispatched request handlers may still be running during flush —
+   * there is no request-draining mechanism.
    */
   async stop(): Promise<void> {
     if (!this._abortController) {
       return;
     }
+    // Capture and clear immediately to prevent concurrent stop() calls
+    const ac = this._abortController;
+    this._abortController = undefined;
+    this._stopping = true;
+
+    // Stop HTTP server first so no new requests hit closing DBs
+    this._httpServer?.stop();
+
+    // Await any in-flight service creation before cleanup
+    for (const pending of this._pendingServices.values()) {
+      try {
+        await pending;
+      } catch {
+        // Creation failed — nothing to clean up
+      }
+    }
+    this._pendingServices.clear();
 
     // Stop all services for each org
     for (const services of this._servicesByOrg.values()) {
@@ -653,11 +718,21 @@ export class Server<US extends Schema> {
       }
     }
 
-    // Stop HTTP server
-    this._httpServer?.stop();
+    // Flush and close all databases before aborting
+    for (const services of this._servicesByOrg.values()) {
+      try {
+        await services.db.flushAll();
+      } catch (e) {
+        console.error('Error flushing database during shutdown:', e);
+      }
+      try {
+        await services.db.close();
+      } catch (e) {
+        console.error('Error closing database during shutdown:', e);
+      }
+    }
 
-    // Abort any pending operations
-    this._abortController.abort();
-    this._abortController = undefined;
+    ac.abort();
+    this._servicesByOrg.clear();
   }
 }
