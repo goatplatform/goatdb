@@ -1,8 +1,12 @@
 import * as path from '../base/path.ts';
 import {
+  adapterStubPlugin,
   bundleResultFromBuildResult,
+  getDenoPlugins,
+  getEsbuild,
   isReBuildContext,
   type ReBuildContext,
+  stopBackgroundCompiler,
 } from '../build.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import type { AppConfig } from './app-config.ts';
@@ -13,64 +17,115 @@ import type {
 } from '../system-assets/system-assets.ts';
 import { pathExists, readFile, walkDir } from '../base/json-log/file-impl.ts';
 
-// Lazy-loaded modules to avoid bundling build-time dependencies into runtime code.
-// These packages (esbuild, @luca/esbuild-deno-loader) are Deno/JSR-specific and
-// cannot be resolved by Node.js at runtime.
-let esbuildModule: typeof import('esbuild') | undefined;
-let denoPluginsModule: typeof import('@luca/esbuild-deno-loader') | undefined;
-
-async function getEsbuild() {
-  if (!esbuildModule) {
-    esbuildModule = await import('esbuild');
-  }
-  return esbuildModule;
-}
-
-async function getDenoPlugins() {
-  if (!denoPluginsModule) {
-    denoPluginsModule = await import('@luca/esbuild-deno-loader');
-  }
-  return denoPluginsModule.denoPlugins;
-}
-
 export type EntryPoint = { in: string; out: string };
+
+/**
+ * Options for buildAssets function.
+ */
+export interface BuildAssetsOptions {
+  /**
+   * Target runtime. If 'node', skips Deno-specific plugins.
+   * Default: 'deno'
+   */
+  runtime?: 'deno' | 'node';
+  /**
+   * When true, keeps the esbuild background process alive after building.
+   * Caller is responsible for calling stopBackgroundCompiler().
+   */
+  keepEsbuildAlive?: boolean;
+}
 
 export async function buildAssets(
   ctx: ReBuildContext | undefined,
   entryPoints: EntryPoint[],
   appConfig: AppConfig,
+  options?: BuildAssetsOptions,
 ): Promise<StaticAssets> {
   let buildResults: Record<string, { source: string; map: string }>;
   let shouldStopEsbuild = false;
+  const targetRuntime = options?.runtime ?? 'deno';
 
   if (ctx && isReBuildContext(ctx)) {
     buildResults = await ctx.rebuild();
   } else {
     // No context provided, use esbuild directly
     const esbuild = await getEsbuild();
-    const denoPlugins = await getDenoPlugins();
-    buildResults = bundleResultFromBuildResult(
-      await esbuild.build({
-        entryPoints,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        plugins: [...denoPlugins()] as any,
-        bundle: true,
-        write: false,
-        sourcemap: 'linked',
-        outdir: 'output',
-        logOverride: {
-          'empty-import-meta': 'silent',
+
+    // Only load denoPlugins for Deno builds - they're incompatible with Node.js
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let plugins: any[];
+
+    if (targetRuntime === 'node') {
+      // For Node.js builds, we need a plugin to handle node:* imports that appear
+      // in library code but are behind runtime checks. These imports are never
+      // actually called in browser, but esbuild needs to resolve them.
+      // We provide empty stubs that throw if called (which should never happen).
+      const nodeStubPlugin = {
+        name: 'node-stub',
+        setup(build: { onResolve: Function; onLoad: Function }) {
+          // Match all node:* imports
+          build.onResolve({ filter: /^node:/ }, (args: { path: string }) => ({
+            path: args.path,
+            namespace: 'node-stub',
+          }));
+
+          // Return empty module that throws if accessed
+          build.onLoad(
+            { filter: /.*/, namespace: 'node-stub' },
+            (args: { path: string }) => ({
+              contents: `
+                // Stub for ${args.path} - this code should never run in browser
+                export default new Proxy({}, {
+                  get(_, prop) {
+                    throw new Error(\`Cannot access \${String(prop)} from ${args.path} in browser\`);
+                  }
+                });
+                ${
+                args.path === 'node:crypto'
+                  ? 'export const webcrypto = globalThis.crypto;'
+                  : ''
+              }
+              `,
+              loader: 'js',
+            }),
+          );
         },
-        minify: appConfig.minify,
-        jsx: 'automatic',
-      }),
+      };
+      plugins = [adapterStubPlugin(['deno', 'node']), nodeStubPlugin];
+    } else {
+      plugins = [
+        adapterStubPlugin(['deno', 'node']),
+        ...(await getDenoPlugins())(),
+      ];
+    }
+
+    // Build options for client-side code (always browser target)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buildOptions: any = {
+      entryPoints,
+      plugins,
+      bundle: true,
+      write: false,
+      sourcemap: 'linked',
+      outdir: 'output',
+      define: { '__BUNDLE_TARGET__': '"browser"' },
+      logOverride: {
+        'empty-import-meta': 'silent',
+      },
+      minify: appConfig.minify,
+      jsx: 'automatic',
+      // Client code is always for browser
+      platform: 'browser',
+    };
+
+    buildResults = bundleResultFromBuildResult(
+      await esbuild.build(buildOptions),
     );
     shouldStopEsbuild = true;
   }
 
-  if (shouldStopEsbuild) {
-    const esbuild = await getEsbuild();
-    await esbuild.stop();
+  if (shouldStopEsbuild && !options?.keepEsbuildAlive) {
+    await stopBackgroundCompiler();
   }
 
   // System assets are always included and are placed at the root

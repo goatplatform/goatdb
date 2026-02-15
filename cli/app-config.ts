@@ -52,12 +52,17 @@ export type AppConfig = {
    */
   denoJson?: string;
   /**
+   * Path to package.json (Node.js). Defaults to 'package.json' inside the
+   * current directory.
+   */
+  packageJson?: string;
+  /**
    * If set to true, the output code bundle will be minified.
    */
   minify?: boolean;
   /**
    * Application name. Extracted from the "name" field of the project's
-   * deno.json.
+   * deno.json or package.json.
    */
   appName?: string;
 };

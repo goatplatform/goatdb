@@ -12,7 +12,7 @@ import { tuple4Get, tuple4Set } from '../base/tuple.ts';
 import type { VersionNumber } from '../base/version-number.ts';
 import { createBuildContext, type ReBuildContext } from '../build.ts';
 import { getGoatConfig } from '../base/config.ts';
-import { Server, type ServerOptions, type DomainConfig } from '../net/server/server.ts';
+import { Server, type ServerOptions } from '../net/server/server.ts';
 import { buildAssets } from './build-assets.ts';
 import { notReached } from '../base/error.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
@@ -23,10 +23,11 @@ import { cli } from '../base/development.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import type { AppConfig } from './app-config.ts';
 import {
-  watchDirectory,
-  shouldRebuildAfterPathChange,
   type FileWatcher,
+  shouldRebuildAfterPathChange,
+  watchDirectory,
 } from '../base/file-watcher.ts';
+import { pathExists } from '../base/json-log/file-impl.ts';
 
 function incrementBuildNumber(version: VersionNumber): VersionNumber {
   return tuple4Set(version, 0, tuple4Get(version, 0) + 1);
@@ -138,22 +139,22 @@ export async function startDebugServer<US extends Schema>(
 ): Promise<never> {
   getGoatConfig().debug = true; // Turn on debug mode globally
 
-  const buildInfo = await generateBuildInfo(
-    options.denoJson || path.join(getCwd(), 'deno.json'),
-  );
-  buildInfo.debugBuild = true;
-
-  // Set up default domain config if not provided
-  if (typeof options.domain === 'undefined') {
-    const protocol = options.https ? 'https' : 'http';
-    const defaultPort = options.https ? 8443 : 8080;
-    const port = options.port || defaultPort;
-
-    options.domain = {
-      resolveOrg: () => `${protocol}://localhost:${port}`,
-      resolveDomain: () => 'localhost',
-    } as DomainConfig;
+  const cwd = getCwd();
+  let configPath = options.denoJson || options.packageJson;
+  if (!configPath) {
+    const denoJsonPath = path.join(cwd, 'deno.json');
+    const packageJsonPath = path.join(cwd, 'package.json');
+    configPath = await pathExists(denoJsonPath)
+      ? denoJsonPath
+      : packageJsonPath;
   }
+  if (!await pathExists(configPath)) {
+    throw new Error(
+      `No config file found. Expected deno.json or package.json in "${cwd}".`,
+    );
+  }
+  const buildInfo = await generateBuildInfo(configPath);
+  buildInfo.debugBuild = true;
 
   const server = new Server({
     ...(options as unknown as ServerOptions<US>),
@@ -187,11 +188,15 @@ export async function startDebugServer<US extends Schema>(
 
   await server.start();
 
-  const serverUrl = options.domain!.resolveOrg(options.orgId || 'localhost');
+  const serverUrl = `${
+    options.https ? 'https' : 'http'
+  }://localhost:${server.port}`;
   openBrowser(serverUrl);
 
   console.log(
-    `Bundling took ${((performance.now() - bundlingStart) / 1000).toFixed(2)}sec`,
+    `Bundling took ${
+      ((performance.now() - bundlingStart) / 1000).toFixed(2)
+    }sec`,
   );
 
   // Declare cleanup variables
@@ -242,7 +247,9 @@ export async function startDebugServer<US extends Schema>(
 
         config.version = version;
         console.log(
-          `Bundling took ${((performance.now() - bundlingStart) / 1000).toFixed(2)}sec`,
+          `Bundling took ${
+            ((performance.now() - bundlingStart) / 1000).toFixed(2)
+          }sec`,
         );
       } catch (err: unknown) {
         console.error('Build failed. Will try again on next save.');
@@ -255,7 +262,9 @@ export async function startDebugServer<US extends Schema>(
 
     for await (const event of watcher) {
       for (const p of event.paths) {
-        const relativePath = p.startsWith(cwd) ? p.substring(cwd.length + 1) : p;
+        const relativePath = p.startsWith(cwd)
+          ? p.substring(cwd.length + 1)
+          : p;
         if (filterFunc(relativePath)) {
           console.log(`Detected change at ${relativePath}`);
           rebuildTimer.schedule();
