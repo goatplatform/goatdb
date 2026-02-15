@@ -106,18 +106,22 @@ export default function setupE2ELatency() {
    * For testing, we map all localhost connections to a single test organization.
    */
   function createTestDomainConfig() {
+    let actualPort = 0;
     return {
-      // Map organization IDs to their base URLs
-      resolveOrg: (orgId: string) => `http://localhost/${orgId}`,
-
-      // Extract organization from incoming URLs (reverse mapping)
-      resolveDomain: (url: string) => {
-        try {
-          const u = new URL(url);
-          return u.hostname === 'localhost' ? 'test-org' : '';
-        } catch {
-          return '';
-        }
+      domain: {
+        resolveOrg: (orgId: string) =>
+          `http://localhost:${actualPort}/${orgId}`,
+        resolveDomain: (url: string) => {
+          try {
+            const u = new URL(url);
+            return u.hostname === 'localhost' ? 'test-org' : '';
+          } catch {
+            return '';
+          }
+        },
+      },
+      setPort: (p: number) => {
+        actualPort = p;
       },
     };
   }
@@ -147,9 +151,6 @@ export default function setupE2ELatency() {
    * The test also verifies bidirectional sync to ensure the system works symmetrically.
    */
   TEST('e2e-latency', 'measure-item-sync-latency', async (ctx: TestSuite) => {
-    // Use unique port to avoid conflicts with other tests running concurrently
-    const testPort = 9877;
-
     // Initialize all resources as null for proper cleanup in finally block
     let server: Server<typeof LatencyTestSchema> | null = null;
     let clientA: GoatDB | null = null;
@@ -161,34 +162,35 @@ export default function setupE2ELatency() {
       // ============================================================================
       // Create isolated temporary directory for server data
       const serverPath = await ctx.tempDir('latency-server');
-      const domain = createTestDomainConfig();
+      const { domain, setPort } = createTestDomainConfig();
 
-      // Initialize server with test configuration
+      // Initialize server with dynamic port allocation
       server = new Server({
-        path: serverPath, // Persistent storage location
-        orgId: 'test-org', // Organization identifier for multi-tenancy
-        port: testPort, // HTTP port for client connections
-        registry: testRegistry, // Schema registry (must match clients)
-        buildInfo: await buildInfo, // Version/build metadata
-        domain, // Domain resolution configuration
+        path: serverPath,
+        orgId: 'test-org',
+        port: 0,
+        registry: testRegistry,
+        buildInfo: await buildInfo,
+        domain,
       });
 
-      // Start HTTP server and wait for it to be ready
+      // Start HTTP server and capture the actual allocated port
       await server.start();
+      assertExists(server.port, 'Server port must be assigned after start()');
+      const testPort = server.port;
+      setPort(testPort);
 
       // ============================================================================
       // STEP 2: CONNECT CLIENT A (THE SENDER)
       // ============================================================================
-      // Create isolated directory for client A's local storage
       const clientAPath = await ctx.tempDir('latency-client-a');
 
-      // Initialize client A with connection to our test server
       clientA = new GoatDB({
-        path: clientAPath, // Local storage path
-        orgId: 'test-org', // Must match server organization
-        mode: 'client', // Client mode (not standalone)
-        peers: [`http://localhost:${testPort}`], // Server endpoints to sync with
-        registry: testRegistry, // Schema registry (must match server)
+        path: clientAPath,
+        orgId: 'test-org',
+        mode: 'client',
+        peers: [`http://localhost:${testPort}`],
+        registry: testRegistry,
       });
 
       // Wait for client to fully initialize and establish server connection
@@ -197,16 +199,14 @@ export default function setupE2ELatency() {
       // ============================================================================
       // STEP 3: CONNECT CLIENT B (THE RECEIVER)
       // ============================================================================
-      // Create isolated directory for client B's local storage
       const clientBPath = await ctx.tempDir('latency-client-b');
 
-      // Initialize client B with identical configuration to client A
       clientB = new GoatDB({
-        path: clientBPath, // Different local storage path
-        orgId: 'test-org', // Same organization as client A
-        mode: 'client', // Client mode (not standalone)
-        peers: [`http://localhost:${testPort}`], // Same server as client A
-        registry: testRegistry, // Same schema registry
+        path: clientBPath,
+        orgId: 'test-org',
+        mode: 'client',
+        peers: [`http://localhost:${testPort}`],
+        registry: testRegistry,
       });
 
       // Wait for client B to fully initialize and establish server connection
@@ -358,21 +358,16 @@ export default function setupE2ELatency() {
       // CLEANUP: ENSURE ALL RESOURCES ARE PROPERLY RELEASED
       // ============================================================================
 
-      // Flush and close client A
       if (clientA) {
         await clientA.flushAll();
+        await clientA.close();
       }
-
-      // Flush and close client B
       if (clientB) {
         await clientB.flushAll();
+        await clientB.close();
       }
-
-      // Shut down server
-      if (server && server['_abortController']) {
-        server['_abortController'].abort();
-        // Brief delay to allow clean server shutdown
-        await sleep(100);
+      if (server) {
+        await server.stop();
       }
     }
   });
@@ -398,9 +393,6 @@ export default function setupE2ELatency() {
    * - 50ms delay between creations to simulate realistic usage
    */
   TEST('e2e-latency', 'measure-latency-under-load', async (ctx: TestSuite) => {
-    // Use different port to avoid conflicts with the primary test
-    const testPort = 9878;
-
     // Initialize resources for cleanup
     let server: Server<typeof LatencyTestSchema> | null = null;
     let clientA: GoatDB | null = null;
@@ -408,24 +400,25 @@ export default function setupE2ELatency() {
 
     try {
       // ============================================================================
-      // SETUP: IDENTICAL TO PRIMARY TEST BUT WITH DIFFERENT PORT
+      // SETUP: IDENTICAL TO PRIMARY TEST WITH DYNAMIC PORT
       // ============================================================================
-      // Server setup
       const serverPath = await ctx.tempDir('latency-load-server');
-      const domain = createTestDomainConfig();
+      const { domain, setPort } = createTestDomainConfig();
 
       server = new Server({
         path: serverPath,
         orgId: 'test-org',
-        port: testPort,
+        port: 0,
         registry: testRegistry,
         buildInfo: await buildInfo,
         domain,
       });
 
       await server.start();
+      assertExists(server.port, 'Server port must be assigned after start()');
+      const testPort = server.port;
+      setPort(testPort);
 
-      // Client A setup
       const clientAPath = await ctx.tempDir('latency-load-client-a');
       clientA = new GoatDB({
         path: clientAPath,
@@ -436,7 +429,6 @@ export default function setupE2ELatency() {
       });
       await clientA.readyPromise();
 
-      // Client B setup
       const clientBPath = await ctx.tempDir('latency-load-client-b');
       clientB = new GoatDB({
         path: clientBPath,
@@ -527,7 +519,7 @@ export default function setupE2ELatency() {
       }
 
       // ============================================================================
-      // RESULTS REPORTING - Only for failures or debug mode  
+      // RESULTS REPORTING - Only for failures or debug mode
       // ============================================================================
 
       // ============================================================================
@@ -565,11 +557,16 @@ export default function setupE2ELatency() {
       // CLEANUP: SAME AS PRIMARY TEST
       // ============================================================================
 
-      if (clientA) await clientA.flushAll();
-      if (clientB) await clientB.flushAll();
-      if (server && server['_abortController']) {
-        server['_abortController'].abort();
-        await sleep(100);
+      if (clientA) {
+        await clientA.flushAll();
+        await clientA.close();
+      }
+      if (clientB) {
+        await clientB.flushAll();
+        await clientB.close();
+      }
+      if (server) {
+        await server.stop();
       }
     }
   });

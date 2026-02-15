@@ -25,18 +25,24 @@ const testRegistry = new DataRegistry();
 testRegistry.registerSchema(MinimalTestSchema);
 
 /**
- * Creates a minimal domain config for testing
+ * Creates a minimal domain config for testing with dynamic port support.
  */
 function createTestDomainConfig() {
+  let actualPort = 0;
   return {
-    resolveOrg: (orgId: string) => `http://localhost/${orgId}`,
-    resolveDomain: (url: string) => {
-      try {
-        const u = new URL(url);
-        return u.hostname === 'localhost' ? 'test-org' : '';
-      } catch {
-        return '';
-      }
+    domain: {
+      resolveOrg: (orgId: string) => `http://localhost:${actualPort}/${orgId}`,
+      resolveDomain: (url: string) => {
+        try {
+          const u = new URL(url);
+          return u.hostname === 'localhost' ? 'test-org' : '';
+        } catch {
+          return '';
+        }
+      },
+    },
+    setPort: (p: number) => {
+      actualPort = p;
     },
   };
 }
@@ -46,10 +52,9 @@ export default function setup(): void {
     'MinimalSync',
     'client creates item and syncs with server',
     async (ctx) => {
-      // Create server with temporary directory and explicit test port
+      // Create server with temporary directory and OS-assigned port
       const serverPath = await ctx.tempDir('sync-server');
-      const testPort = 9876; // Use an explicit port for testing
-      const domain = createTestDomainConfig();
+      const { domain, setPort } = createTestDomainConfig();
 
       // Generate build info
       const buildInfo = await generateBuildInfo(
@@ -60,7 +65,7 @@ export default function setup(): void {
       const server = new Server<Schema>({
         path: serverPath,
         orgId: 'test-org',
-        port: testPort,
+        port: 0,
         registry: testRegistry,
         buildInfo,
         domain,
@@ -70,8 +75,10 @@ export default function setup(): void {
       let client: GoatDB | undefined;
 
       try {
-        // Start the server
+        // Start the server and capture the actual port
         await server.start();
+        assertExists(server.port, 'Server port must be assigned after start()');
+        setPort(server.port);
 
         // Create client with connection to server
         const clientPath = await ctx.tempDir('sync-client');
@@ -79,7 +86,7 @@ export default function setup(): void {
           path: clientPath,
           orgId: 'test-org',
           mode: 'client',
-          peers: [`http://localhost:${testPort}`],
+          peers: [`http://localhost:${server.port}`],
           registry: testRegistry,
         });
 
@@ -136,15 +143,10 @@ export default function setup(): void {
         // Clean up resources
         if (client) {
           await client.flushAll();
+          await client.close();
         }
 
-        // Stop the server by aborting its signal
-        if (server['_abortController']) {
-          server['_abortController'].abort();
-        }
-
-        // Give a moment for the server to shut down
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await server.stop();
       }
     },
   );

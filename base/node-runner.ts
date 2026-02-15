@@ -27,12 +27,19 @@ export async function compileForNodeWithEsbuild(
     target: 'node18',
     write: false,
     sourcemap: 'inline',
-    external: ['nodemailer', 'esbuild', '@luca/esbuild-deno-loader', 'chokidar'],
+    external: [
+      'nodemailer',
+      'esbuild',
+      '@luca/esbuild-deno-loader',
+      'chokidar',
+    ],
     banner: {
-      js: "import { createRequire } from 'node:module';const require = createRequire(import.meta.url);globalThis.require = require;",
+      js:
+        "import { createRequire } from 'node:module';const require = createRequire(import.meta.url);globalThis.require = require;",
     },
     logOverride: {
       'empty-import-meta': 'silent',
+      'direct-eval': 'silent',
     },
   });
 }

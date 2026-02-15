@@ -16,7 +16,10 @@ async function browserBenchmarksServerMain() {
 
     const staticAssets = await buildAssets(
       undefined,
-      [{ in: './benchmarks/benchmarks-entry-browser.ts', out: APP_ENTRY_POINT }],
+      [{
+        in: './benchmarks/benchmarks-entry-browser.ts',
+        out: APP_ENTRY_POINT,
+      }],
       {
         buildDir: './build',
         jsPath: './benchmarks/benchmarks-entry-browser.ts',
@@ -25,25 +28,33 @@ async function browserBenchmarksServerMain() {
       },
     );
 
-    const server = createTestServer({
+    const customConfig: Record<string, unknown> = {
+      benchmarkMode: true,
+      benchmark: getEnvVar('GOATDB_BENCHMARK'),
+    };
+
+    const { server, setPort } = createTestServer({
       path: path.join(
         await (await FileImplGet()).getTempDir(),
         'browser-benchmark-data',
       ),
-      port: 8080,
+      port: 0,
       orgId: 'browser-benchmark-org',
       staticAssets,
       createdBy: 'benchmark',
       appVersion: '0.0.0-benchmark',
       appName: 'GoatDB Browser Benchmarks',
-      customConfig: {
-        benchmarkMode: true,
-        benchmark: getEnvVar('GOATDB_BENCHMARK'),
-      },
+      customConfig,
     });
 
     await server.start();
-    console.log('Browser benchmark server running at https://localhost:8080');
+    setPort(server.port!);
+    // Server reads customConfig by reference (not a copy), so mutating here
+    // propagates the port to the running server's config.
+    customConfig.serverPort = server.port;
+    console.log(
+      `Browser benchmark server running at https://localhost:${server.port}`,
+    );
   } catch (error) {
     console.error('Failed to start debug server:', error);
     exit(1);

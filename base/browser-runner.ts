@@ -9,7 +9,6 @@ import { ProcessManager } from './process-manager.ts';
  * @property benchmark - (Optional) Name of a specific benchmark to run.
  * @property debug - (Optional) If true, enables debug mode for verbose output.
  * @property headless - (Optional) If true, runs browser in headless mode.
- * @property port - (Optional) Port number for the debug server (default: 8080).
  * @property mode - (Optional) Run mode: 'test' for tests, 'benchmark' for benchmarks.
  */
 export interface BrowserRunOptions {
@@ -18,7 +17,6 @@ export interface BrowserRunOptions {
   benchmark?: string;
   debug?: boolean;
   headless?: boolean;
-  port?: number;
   mode?: 'test' | 'benchmark';
 }
 
@@ -30,7 +28,7 @@ async function waitForProcessOutput(
   stdout: ReadableStream<Uint8Array>,
   readyMessage: string,
   timeoutMs: number,
-): Promise<void> {
+): Promise<string> {
   const decoder = new TextDecoder();
   const reader = stdout.getReader();
   let buffer = '';
@@ -54,7 +52,7 @@ async function waitForProcessOutput(
         clearTimeout(timeout);
         // Continue forwarding remaining stdout in background (same reader)
         forwardRemainingStream(reader);
-        return;
+        return buffer;
       }
     }
   } catch (err) {
@@ -105,7 +103,6 @@ function forwardStream(stream: ReadableStream<Uint8Array>): void {
 export async function runBrowserTests(
   options: BrowserRunOptions = {},
 ): Promise<any> {
-  const port = options.port || 8080;
   const isBenchmarkMode = options.mode === 'benchmark';
   console.log(
     `Starting HTTP debug server for browser ${
@@ -147,10 +144,24 @@ export async function runBrowserTests(
   // Forward stderr to console for visibility
   forwardStream(serverProcess.stderr!);
 
-  // Wait for server to emit ready message
+  // Wait for server to emit ready message and extract the port
   console.log('Waiting for server to start...');
-  const READY_MESSAGE = 'Browser test server running at';
-  await waitForProcessOutput(serverProcess.stdout!, READY_MESSAGE, 60_000);
+  const READY_MESSAGE = isBenchmarkMode
+    ? 'Browser benchmark server running at'
+    : 'Browser test server running at';
+  const serverOutput = await waitForProcessOutput(
+    serverProcess.stdout!,
+    READY_MESSAGE,
+    60_000,
+  );
+
+  // Extract port from "https://localhost:PORT"
+  const portMatch = serverOutput.match(/https:\/\/localhost:(\d+)/);
+  if (!portMatch) {
+    throw new Error('Could not parse port from server ready message');
+  }
+  const port = parseInt(portMatch[1], 10);
+  const timeoutMs = isBenchmarkMode ? 10 * kMinuteMs : 2 * kMinuteMs;
 
   try {
     // Dynamic import Playwright (optional dependency)
@@ -167,7 +178,7 @@ export async function runBrowserTests(
     // Minimal browser args - most certificate handling is done via ignoreHTTPSErrors
     const browserArgs = [
       // Essential for OPFS and other secure-context APIs on localhost
-      '--unsafely-treat-insecure-origin-as-secure=https://localhost:8080',
+      `--unsafely-treat-insecure-origin-as-secure=https://localhost:${port}`,
       // Enable required features
       '--enable-features=FileSystemAccessAPI',
       // Test environment optimizations
@@ -193,7 +204,9 @@ export async function runBrowserTests(
     const context = await browser.newContext({
       ignoreHTTPSErrors: true,
       acceptDownloads: false,
-      viewport: (!options.headless || options.debug) ? { width: 1200, height: 800 } : null,
+      viewport: (!options.headless || options.debug)
+        ? { width: 1200, height: 800 }
+        : null,
     });
 
     // Set context timeouts to avoid Playwright-level timeouts
@@ -217,9 +230,7 @@ export async function runBrowserTests(
 
     // Forward browser console output to terminal
     page.on('console', (msg) => {
-      const type = msg.type();
-      const text = msg.text();
-      console.log(text);
+      console.log(msg.text());
     });
 
     // Navigate to HTTPS test server (required for OPFS, Web Workers, Web Locks)
@@ -228,22 +239,9 @@ export async function runBrowserTests(
     await page.goto(testUrl, { waitUntil: 'domcontentloaded' });
 
     // Wait for test bundle to load and tests to start
-    console.log('[DEBUG] About to wait for GoatDBConfig...');
-    try {
-      await page.waitForFunction(() => {
-        return typeof (window as any).GoatDBConfig !== 'undefined';
-      }, { timeout: 10 * kSecondMs });
-      console.log('[DEBUG] GoatDBConfig found!');
-    } catch (e) {
-      console.error(
-        '[DEBUG] Failed to find GoatDBConfig:',
-        (e as Error).message,
-      );
-      throw e;
-    }
-
-    // Benchmarks take longer than tests
-    const timeoutMs = isBenchmarkMode ? 10 * kMinuteMs : 2 * kMinuteMs;
+    await page.waitForFunction(() => {
+      return typeof (window as any).GoatDBConfig !== 'undefined';
+    }, { timeout: 10 * kSecondMs });
 
     await page.waitForFunction(
       () => (window as any).testResults?.completed === true,
@@ -253,39 +251,7 @@ export async function runBrowserTests(
     // Get the test/benchmark results
     const summary = await page.evaluate(() => (window as any).testResults);
 
-    // Handle both test and benchmark result formats
-    const passed = summary.passed ?? summary.summary?.passed ?? 0;
-    const failed = summary.failed ?? summary.summary?.failed ?? 0;
-
-
     try {
-      // Log failed test details (source maps handled automatically by Playwright)
-      if (failed > 0 && summary.results) {
-        console.error('\nFailed tests:');
-        const failures = summary.results.filter((r: any) => !r.passed);
-        
-        for (let i = 0; i < failures.length; i++) {
-          const result = failures[i];
-          console.error(
-            `${i + 1}. ${result.suiteName}/${result.testName} (${
-              Math.round(result.duration)
-            }ms)`,
-          );
-          if (result.error) {
-            console.error(`   ${result.error.name}: ${result.error.message}`);
-            // Playwright provides source-mapped stack traces automatically
-            if (result.error.stack) {
-              const stackLines = result.error.stack.split('\n');
-              for (const line of stackLines) {
-                if (line.trim()) console.error(`   ${line.trim()}`);
-              }
-            }
-          }
-        }
-      }
-
-      const duration = summary.duration ?? summary.metadata?.duration ?? 0;
-
       // Take screenshot in debug mode
       if (options.debug) {
         console.log('Taking screenshot...');
@@ -314,10 +280,12 @@ export async function runBrowserTests(
     }
   } catch (error) {
     if ((error as Error).name === 'TimeoutError') {
+      const label = isBenchmarkMode ? 'benchmarks' : 'tests';
+      const mins = Math.round(timeoutMs / kMinuteMs);
       console.error(
-        'Browser tests timed out. Check the test runner page for details.',
+        `Browser ${label} timed out. Check the test runner page for details.`,
       );
-      throw new Error('Browser tests timed out after 2 minutes');
+      throw new Error(`Browser ${label} timed out after ${mins} minutes`);
     } else if ((error as Error).message?.includes('Cannot resolve module')) {
       console.error('Playwright not installed. Run: npm install playwright');
       console.error('Or install browsers: npx playwright install chromium');

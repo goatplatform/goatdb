@@ -1,7 +1,7 @@
 import { compileForNodeWithEsbuild, nodeRun } from './node-runner.ts';
 import { runBrowserTests } from './browser-runner.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
-import type { TestResult, TestSummary } from '../tests/mod.ts';
+import { TestsRunner, type TestSummary } from '../tests/mod.ts';
 
 /**
  * Worker message types for Deno test execution.
@@ -13,7 +13,12 @@ interface WorkerReadyMessage {
 
 interface WorkerTestStartMessage {
   type: 'testStart';
-  payload: { suiteName: string; testName: string; current: number; total: number };
+  payload: {
+    suiteName: string;
+    testName: string;
+    current: number;
+    total: number;
+  };
 }
 
 interface WorkerTestCompleteMessage {
@@ -48,7 +53,7 @@ const WORKER_TIMEOUT_MS = 5 * 60 * 1000;
 async function runDenoWithWorker(
   suite?: string,
   test?: string,
-): Promise<{ elapsed: number; failed: number; passed: number }> {
+): Promise<{ elapsed: number; summary: TestSummary }> {
   return new Promise((resolve, reject) => {
     const start = performance.now();
     let timeoutId: number | undefined;
@@ -86,7 +91,11 @@ async function runDenoWithWorker(
       }
       pm.finish();
       worker.terminate();
-      reject(new Error(`Worker timeout after ${WORKER_TIMEOUT_MS / 1000 / 60} minutes`));
+      reject(
+        new Error(
+          `Worker timeout after ${WORKER_TIMEOUT_MS / 1000 / 60} minutes`,
+        ),
+      );
     }, WORKER_TIMEOUT_MS) as unknown as number;
 
     // Handle Worker messages
@@ -181,11 +190,7 @@ async function runDenoWithWorker(
           worker.terminate();
 
           const elapsed = (performance.now() - start) / 1000;
-          resolve({
-            elapsed,
-            failed: payload.summary.failed,
-            passed: payload.summary.passed,
-          });
+          resolve({ elapsed, summary: payload.summary });
           break;
         }
       }
@@ -291,13 +296,14 @@ export async function runAcrossPlatforms(
       try {
         const result = await runDenoWithWorker(config.suite, config.test);
         denoElapsed = result.elapsed;
+        TestsRunner.printSummary(result.summary);
 
-        if (result.failed > 0) {
+        if (result.summary.failed > 0) {
           console.log(
-            `=== 🦖 Deno: ${result.passed} passed, ${result.failed} failed ===`,
+            `=== 🦖 Deno: ${result.summary.failed} failed ===`,
           );
         } else {
-          console.log(`=== 🦖 Deno: ${result.passed} passed ===`);
+          console.log(`=== 🦖 Deno: all passed ===`);
         }
       } catch (error) {
         console.error('=== 🦖 Deno Worker execution failed ===');
@@ -404,43 +410,19 @@ export async function runAcrossPlatforms(
       browserElapsed = (browserEnd - browserStart) / 1000;
 
       // Handle both test and benchmark result formats
-      const failed = summary.failed ?? summary.summary?.failed ?? 0;
-      const passed = summary.passed ?? summary.summary?.passed ?? 0;
+      const browserSummary = summary.summary ?? summary;
+      const failed = browserSummary.failed ?? 0;
+      const passed = browserSummary.passed ?? 0;
+
+      TestsRunner.printSummary(browserSummary);
 
       if (failed > 0) {
-        console.error(
-          `=== 🌐 Browser execution failed: ${failed} failures ===`,
+        console.log(
+          `=== 🌐 Browser: ${passed} passed, ${failed} failed ===`,
         );
-        console.error();
-        console.error('Failed tests:');
-        const failures = summary.results
-          ? summary.results.filter((r: any) => !r.passed)
-          : [];
-
-        for (let i = 0; i < failures.length; i++) {
-          const result = failures[i];
-          console.error(
-            `${i + 1}. ${result.suiteName}/${result.testName} (${
-              Math.round(result.duration)
-            }ms)`,
-          );
-          if (result.error) {
-            console.error(`   ${result.error.name}: ${result.error.message}`);
-            // Use pre-decoded stack trace if available, otherwise show original
-            const stack = (result.error as any).decodedStack ||
-              result.error.stack;
-            if (stack) {
-              const stackLines = stack.split('\n');
-              for (const line of stackLines) {
-                if (line.trim()) console.error(`   ${line.trim()}`);
-              }
-            }
-          }
-        }
-        console.error();
       } else {
         console.log(
-          `=== 🌐 Browser execution completed: ${passed} passed ===`,
+          `=== 🌐 Browser: ${passed} passed ===`,
         );
       }
     } catch (error) {

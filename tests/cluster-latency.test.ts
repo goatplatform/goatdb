@@ -26,17 +26,24 @@ const ClusterLatencyTestSchema = {
 const testRegistry = new DataRegistry();
 testRegistry.registerSchema(ClusterLatencyTestSchema);
 
-// Domain configuration for test environment
+// Domain configuration for test environment with mutable port
 function createTestDomainConfig() {
+  let resolvedPort = 0;
   return {
-    resolveOrg: (orgId: string) => `http://localhost/${orgId}`,
-    resolveDomain: (url: string) => {
-      try {
-        const u = new URL(url);
-        return u.hostname === 'localhost' ? 'cluster-test' : '';
-      } catch {
-        return '';
-      }
+    domain: {
+      resolveOrg: (orgId: string) =>
+        `http://localhost:${resolvedPort}/${orgId}`,
+      resolveDomain: (url: string) => {
+        try {
+          const u = new URL(url);
+          return u.hostname === 'localhost' ? 'cluster-test' : '';
+        } catch {
+          return '';
+        }
+      },
+    },
+    setPort: (p: number) => {
+      resolvedPort = p;
     },
   };
 }
@@ -227,50 +234,71 @@ export default function setupClusterLatency() {
         };
 
         // Step 1: Start all servers with dynamic ports
+        // Two-pass approach required: peers must be known at construction time
+        // (GoatDB does not support updating peers after construction).
 
-        // First pass: Start all servers with port 0 to get dynamic ports
+        // First pass: Start all servers with port 0 to discover OS-assigned ports
         const tempServers: Server<any>[] = [];
         const tempPorts: number[] = [];
 
-        for (let i = 0; i < NUM_SERVERS; i++) {
-          const serverPath = await ctx.tempDir(`cluster-server-${i}`);
+        try {
+          for (let i = 0; i < NUM_SERVERS; i++) {
+            const serverPath = await ctx.tempDir(`cluster-server-${i}`);
 
-          // Write the shared root session to this server's settings file
-          const settingsPath = path.join(serverPath, ORG_ID, 'settings.json');
-          const fileImpl = await FileImplGet();
-          await fileImpl.mkdir(path.dirname(settingsPath));
-          await writeTextFile(settingsPath, prettyJSON(encodedSettings));
+            // Write the shared root session to this server's settings file
+            const settingsPath = path.join(
+              serverPath,
+              ORG_ID,
+              'settings.json',
+            );
+            const fileImpl = await FileImplGet();
+            await fileImpl.mkdir(path.dirname(settingsPath));
+            await writeTextFile(settingsPath, prettyJSON(encodedSettings));
 
-          // Start temporary server to get port allocation
-          const tempServer = new Server({
-            path: serverPath,
-            orgId: ORG_ID,
-            port: 0, // Dynamic port allocation
-            peers: [],
-            registry: testRegistry,
-            buildInfo,
-            domain: createTestDomainConfig(),
-            mode: 'server',
-          });
+            const { domain } = createTestDomainConfig();
+            const tempServer = new Server({
+              path: serverPath,
+              orgId: ORG_ID,
+              port: 0,
+              peers: [],
+              registry: testRegistry,
+              buildInfo,
+              domain,
+              mode: 'server',
+            });
 
-          await tempServer.start();
-          const port = tempServer.port;
-          if (!port) {
-            throw new Error(`Server ${i} failed to allocate port`);
+            await tempServer.start();
+            const port = tempServer.port;
+            if (!port) {
+              throw new Error(`Server ${i} failed to allocate port`);
+            }
+
+            tempPorts.push(port);
+            tempServers.push(tempServer);
+            serverUrls.push(`http://localhost:${port}`);
           }
-
-          tempPorts.push(port);
-          tempServers.push(tempServer);
-          serverUrls.push(`http://localhost:${port}`);
+        } catch (e) {
+          // Clean up any temp servers started before the failure
+          for (const ts of tempServers) {
+            try {
+              await ts.stop();
+            } catch {
+              // ignore
+            }
+          }
+          throw e;
         }
 
         // Stop temporary servers
         for (const server of tempServers) {
           await server.stop();
         }
-        await sleep(100); // Brief pause to ensure ports are released
+        // NOTE: Small TOCTOU window — OS could reassign ports between stop
+        // and restart. Acceptable for test environments.
+        await sleep(100);
 
         // Second pass: Start servers with known ports and peer configuration
+        const domainConfigs: ReturnType<typeof createTestDomainConfig>[] = [];
         for (let i = 0; i < NUM_SERVERS; i++) {
           const serverPath = await ctx.tempDir(`cluster-server-${i}`);
           const peerUrls = serverUrls.filter((_, idx) => idx !== i);
@@ -281,18 +309,22 @@ export default function setupClusterLatency() {
           await fileImpl.mkdir(path.dirname(settingsPath));
           await writeTextFile(settingsPath, prettyJSON(encodedSettings));
 
+          const domainConfig = createTestDomainConfig();
+          domainConfigs.push(domainConfig);
+
           const server = new Server({
             path: serverPath,
             orgId: ORG_ID,
-            port: tempPorts[i], // Use the allocated port
-            peers: peerUrls, // Configure peers for server-to-server sync
+            port: tempPorts[i],
+            peers: peerUrls,
             registry: testRegistry,
             buildInfo,
-            domain: createTestDomainConfig(),
+            domain: domainConfig.domain,
             mode: 'server',
           });
 
           await server.start();
+          domainConfig.setPort(server.port!);
           servers.push(server);
         }
 
@@ -410,8 +442,6 @@ export default function setupClusterLatency() {
           totalSuccessful > 0,
           'At least some server-to-server syncs should succeed',
         );
-      } catch (error) {
-        throw error;
       } finally {
         // Cleanup: Ensure all servers are properly shut down
 

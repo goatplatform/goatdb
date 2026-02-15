@@ -24,26 +24,34 @@ async function browserTestsServerMain() {
       },
     );
 
-    const server = createTestServer({
+    const customConfig: Record<string, unknown> = {
+      testMode: true,
+      suite: getEnvVar('GOATDB_SUITE'),
+      test: getEnvVar('GOATDB_TEST'),
+    };
+
+    const { server, setPort } = createTestServer({
       path: path.join(
         await (await FileImplGet()).getTempDir(),
         'browser-test-data',
       ),
-      port: 8080,
+      port: 0,
       orgId: 'browser-test-org',
       staticAssets,
       createdBy: 'test',
       appVersion: '0.0.0-test',
       appName: 'GoatDB Browser Tests',
-      customConfig: {
-        testMode: true,
-        suite: getEnvVar('GOATDB_SUITE'),
-        test: getEnvVar('GOATDB_TEST'),
-      },
+      customConfig,
     });
 
     await server.start();
-    console.log('Browser test server running at https://localhost:8080');
+    setPort(server.port!);
+    // Server reads customConfig by reference (not a copy), so mutating here
+    // propagates the port to the running server's config.
+    customConfig.serverPort = server.port;
+    console.log(
+      `Browser test server running at https://localhost:${server.port}`,
+    );
   } catch (error) {
     console.error('Failed to start debug server:', error);
     exit(1);

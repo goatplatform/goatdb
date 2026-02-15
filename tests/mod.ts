@@ -19,6 +19,7 @@
 import * as path from '../base/path.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
 import { isBrowser } from '../base/common.ts';
+import { getGoatConfig } from '../base/config.ts';
 import { GoatDB } from '../db/db.ts';
 import type { DBInstanceConfig } from '../db/db.ts';
 import type { Schema } from '../cfds/base/schema.ts';
@@ -191,9 +192,10 @@ export class TestSuite {
 
     if (isBrowser()) {
       // Browser: Client mode with server connection using OPFS path for isolation
+      const port = getGoatConfig().serverPort;
       return new GoatDB<S>({
         path: tempPath, // OPFS path from FileImpl abstraction
-        peers: 'https://localhost:8080', // Connect to debug server
+        peers: port !== undefined ? `https://localhost:${port}` : undefined,
         ...config, // User overrides
       });
     } else {
@@ -322,7 +324,12 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
           const suiteId = pm.create(suite.name, 1, rootId);
           const testId = pm.create(testName, 1, suiteId);
           pm.update(testId, 0, 'starting');
-          this.emit('testStart', { suite: suite.name, name: testName, current: currentTest, total: totalTests });
+          this.emit('testStart', {
+            suite: suite.name,
+            name: testName,
+            current: currentTest,
+            total: totalTests,
+          });
 
           const start = performance.now();
           try {
@@ -356,7 +363,13 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
         }
         await suite.cleanup();
       } else {
-        const results = await this.runSuiteWithProgress(suite, pm, currentTest, totalTests, rootId);
+        const results = await this.runSuiteWithProgress(
+          suite,
+          pm,
+          currentTest,
+          totalTests,
+          rootId,
+        );
         allResults.push(...results);
         currentTest += results.length;
         completedSuites++;
@@ -387,7 +400,7 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
     pm: ProgressManager,
     startingTest: number,
     totalTests: number,
-    parentId?: TaskId
+    parentId?: TaskId,
   ): Promise<TestResult[]> {
     const results: TestResult[] = [];
     let currentTest = startingTest;
@@ -402,7 +415,12 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
       // Create test task as child of suite
       const testId = pm.create(name, 1, suiteId);
       pm.update(testId, 0, 'starting');
-      this.emit('testStart', { suite: suite.name, name, current: currentTest, total: totalTests });
+      this.emit('testStart', {
+        suite: suite.name,
+        name,
+        current: currentTest,
+        total: totalTests,
+      });
 
       const start = performance.now();
       try {
@@ -439,7 +457,7 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
 
     return results;
   }
-  
+
   /**
    * Creates a test summary from results.
    * @param results - All test results
@@ -465,7 +483,6 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
    */
   static printSummary(summary: TestSummary) {
     if (summary.totalTests === 0) return;
-
 
     console.log();
     console.log('=== Test Summary ===');
