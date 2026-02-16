@@ -24,6 +24,7 @@ import {
 } from '../cfds/base/schema.ts';
 import {
   Commit,
+  commitContentsIsDelta,
   commitContentsIsDocument,
   type DeltaContents,
 } from './commit.ts';
@@ -234,6 +235,8 @@ export class Repository<
     return this.storage.getCommit(id) !== undefined;
   }
 
+  // SECURITY: Read authorization filter. Gates ALL data access for
+  // untrusted sessions. Tests: security-boundaries.test.ts
   *commits(session?: Session): Generator<Commit> {
     const { authorizer } = this;
     const checkAuth = !this.db.trusted && session &&
@@ -1352,6 +1355,9 @@ export class Repository<
     return this.keyExists(key);
   }
 
+  // SECURITY: Authorization gate for untrusted commits. The trusted check
+  // below is the ONLY place where write authorization is enforced. Removing
+  // it bypasses ALL auth rules. Tests: security-boundaries.test.ts
   async verifyCommits(commits: Iterable<Commit>): Promise<Commit[]> {
     if (this.db.trusted) {
       return Array.from(commits);
@@ -1409,20 +1415,51 @@ export class Repository<
     this._cachedCommitsPerUser.clear();
   }
 
+  // SECURITY: Resolves the namespace for a commit, following the delta base
+  // chain through both batch-local commits and storage. Returns undefined if
+  // the chain is unresolvable. Tests: security-boundaries.test.ts
+  private resolveCommitNs(
+    c: Commit,
+    batchIndex: Map<string, Commit>,
+  ): string | null | undefined {
+    if (c.scheme !== undefined) return c.scheme.ns;
+    const visited = new Set<string>();
+    let cur: Commit | undefined = c;
+    while (cur && commitContentsIsDelta(cur.contents)) {
+      if (visited.has(cur.id)) return undefined;
+      visited.add(cur.id);
+      const baseId = (cur.contents as DeltaContents).base;
+      cur = batchIndex.get(baseId) ?? this.storage.getCommit(baseId);
+    }
+    if (cur && commitContentsIsDocument(cur.contents)) {
+      return cur.contents.record.schema.ns;
+    }
+    return undefined;
+  }
+
   async persistCommits(commits: Iterable<Commit>): Promise<Commit[]> {
     const batchSize = 50;
     const result: Commit[] = [];
     let batch: Commit[] = [];
-    commits = filterIterable(
-      commits,
-      (c) =>
-        this.storage.getCommit(c.id) === undefined &&
-        typeof c.scheme?.ns !== null &&
-        (this.allowedNamespaces === undefined ||
-          c.scheme?.ns === undefined ||
-          this.allowedNamespaces?.includes(c.scheme!.ns!)),
-    );
-    for (const verifiedCommit of await this.verifyCommits(commits)) {
+    const all = Array.from(commits);
+    let filtered: Commit[];
+    if (this.allowedNamespaces !== undefined) {
+      const batchIndex = new Map<string, Commit>();
+      for (const c of all) batchIndex.set(c.id, c);
+      filtered = all.filter((c) => {
+        if (this.storage.getCommit(c.id) !== undefined) return false;
+        const ns = this.resolveCommitNs(c, batchIndex);
+        return ns !== null && ns !== undefined &&
+          this.allowedNamespaces!.includes(ns);
+      });
+    } else {
+      filtered = all.filter(
+        (c) =>
+          this.storage.getCommit(c.id) === undefined &&
+          c.scheme?.ns !== null,
+      );
+    }
+    for (const verifiedCommit of await this.verifyCommits(filtered)) {
       batch.push(verifiedCommit);
       if (batch.length >= batchSize) {
         ArrayUtils.append(result, await this.persistVerifiedCommits(batch));
