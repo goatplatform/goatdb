@@ -29,6 +29,7 @@
   "tasks": {
     "build": "deno run -A system-assets/build-sys-assets.ts",
     "test": "deno run -A tests/run.ts",
+    "test:smoke": "deno run -A tests/run.ts --runtime=deno --suite=SecurityBoundaries",
     "bench": "deno run -A benchmarks/run.ts",
     "docs:api": "deno run -A docs/docs-api-build.ts",
     "docs:clean": "rm -rf docs/node_modules docs/.docusaurus docs/build docs/package-lock.json",

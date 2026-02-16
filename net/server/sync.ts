@@ -51,6 +51,9 @@ export class SyncEndpoint<US extends Schema> implements Endpoint<US> {
     return Promise.resolve(new Response(null, { status: 400 }));
   }
 
+  // SECURITY: All sync requests MUST be authenticated via X-Goat-Sig header
+  // and requireSignedUser. Removing either allows unauthenticated clients to
+  // read/write all data. Tests: security-boundaries.test.ts
   async processBatchSyncRequest(
     services: ServerServices<US>,
     req: GoatRequest,

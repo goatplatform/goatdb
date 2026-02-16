@@ -631,6 +631,8 @@ export class TrustPool {
     return this._sessions.get(id);
   }
 
+  // SECURITY: Commit signature verification. Every commit persisted to an
+  // untrusted repo MUST pass this check. Tests: security-boundaries.test.ts
   async verify(commit: Commit): Promise<boolean> {
     if (!commit.orgId || commit.orgId !== this.orgId) {
       return false;

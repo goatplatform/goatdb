@@ -18,6 +18,9 @@ deno task test --suite=Trusted          # Filter by suite
 deno task test --test="should init"     # Filter by test name
 deno task test --runtime=deno           # deno | node | browser
 
+# Smoke test (security boundaries only, <2s)
+deno task test:smoke
+
 # Build & Check
 deno check mod.ts                       # Type check
 deno fmt                                # Format

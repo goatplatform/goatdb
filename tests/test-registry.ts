@@ -41,6 +41,7 @@ import setupMergeCache from './merge-cache.test.ts';
 import setupMergeRichText from './merge-richtext.test.ts';
 import setupMergeConvergence from './merge-convergence.test.ts';
 import setupMergeSync from './merge-sync.test.ts';
+import setupSecurityBoundaries from './security-boundaries.test.ts';
 
 /**
  * Registers all test suites with the default TestsRunner.
@@ -66,6 +67,7 @@ export async function registerAllTests(): Promise<void> {
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
   setupCommit(); // Core commit/versioning logic
   setupSession(); // Authentication and session management
+  setupSecurityBoundaries(); // Security boundary invariants (auth, sync, signatures)
   setupGoatRequestTest(); // HTTP request processing
   setupCliInitTests(); // CLI scaffolding functionality
   setupMergeLCA(); // Lowest Common Ancestor / merge base
