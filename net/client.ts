@@ -16,8 +16,10 @@ import type { Commit } from '../repo/commit.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { assert } from '../base/error.ts';
 import { getGoatConfig } from '../base/config.ts';
+import { serviceUnavailable } from '../cfds/base/errors.ts';
 
 const COMMIT_SUBMIT_RETRY = 10;
+const MAX_SYNC_FAILURES = 10;
 
 export type ClientStatus = 'idle' | 'sync' | 'offline';
 
@@ -87,7 +89,7 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
   }
 
   get serverUrl(): string {
-    return this.serverUrl;
+    return this.scheduler.url;
   }
 
   get isOnline(): boolean {
@@ -326,17 +328,19 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
   async sync(): Promise<void> {
     this._syncActive = true;
     try {
-      // const syncConfig = this.syncConfig;
+      // Multiple successful cycles needed for probabilistic convergence.
+      // Bail after MAX_SYNC_FAILURES consecutive failures to avoid infinite loops.
       const cycleCount = this.syncCycles;
-      // We need to do a minimum number of successful sync cycles in order to make
-      // sure everything is sync'ed. Also need to make sure we don't have any
-      // local commits that our peer doesn't have (local changes or peer recovery).
       let i = 0;
+      let failures = 0;
       do {
         if (await this.sendSyncMessage()) {
           ++i;
+          failures = 0;
+        } else if (++failures >= MAX_SYNC_FAILURES) {
+          throw serviceUnavailable();
         }
-      } while (!this.closed && i <= cycleCount /*|| this.needsReplication()*/);
+      } while (!this.closed && i <= cycleCount);
     } finally {
       this._syncActive = false;
     }

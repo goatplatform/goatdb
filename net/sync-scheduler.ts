@@ -79,6 +79,7 @@ export class SyncScheduler {
   private _pendingRequests: Map<SyncPriority, PendingSyncRequest[]>;
   private _intervalId: number;
   private _fetchInProgress = false;
+  private _closed = false;
 
   constructor(
     readonly url: string,
@@ -99,10 +100,20 @@ export class SyncScheduler {
   }
 
   close(): void {
+    if (this._closed) {
+      return;
+    }
+    this._closed = true;
     if (this._intervalId >= 0) {
       clearInterval(this._intervalId);
       this._intervalId = -1;
     }
+    for (const queue of this._pendingRequests.values()) {
+      for (const req of queue) {
+        req.reject(serviceUnavailable());
+      }
+    }
+    this._pendingRequests.clear();
   }
 
   send(
@@ -110,6 +121,9 @@ export class SyncScheduler {
     msg: SyncMessage,
     priority: SyncPriority = SyncPriority.normal,
   ): Promise<SyncMessage> {
+    if (this._closed) {
+      return Promise.reject(serviceUnavailable());
+    }
     let resolve!: (resp: SyncMessage) => void;
     let reject!: (err: unknown) => void;
     const result = new Promise<SyncMessage>((res, rej) => {

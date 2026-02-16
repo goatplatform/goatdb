@@ -639,6 +639,7 @@ export class GoatDB<US extends Schema = Schema>
    */
   async sync(path: string): Promise<SyncResult> {
     const repoId = itemPathGetRepoId(itemPathNormalize(path));
+    await this.open(repoId);
     const clients = Array.from(this.clientsForRepo(repoId));
     if (clients.length === 0) return { status: 'success' };
     const results = await Promise.allSettled(clients.map((c) => c.sync()));
