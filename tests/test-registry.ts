@@ -28,6 +28,19 @@ import setupCliCompileTests from './cli-compile.test.ts';
 import setupPathTests from './path.test.ts';
 import setupRuntimeTests from './runtime.test.ts';
 import setupProgressTests from './progress.test.ts';
+import setupMergeAdjList from './merge-adjlist.test.ts';
+import setupMergeBloom from './merge-bloom.test.ts';
+import setupMergeLCA from './merge-lca.test.ts';
+import setupMergeRecord from './merge-record.test.ts';
+import setupMergeCorruption from './merge-corruption.test.ts';
+import setupMergeRebase from './merge-rebase.test.ts';
+import setupMergeEdgeCases from './merge-edge-cases.test.ts';
+import setupMergeLeader from './merge-leader.test.ts';
+import setupMergeConcurrency from './merge-concurrency.test.ts';
+import setupMergeCache from './merge-cache.test.ts';
+import setupMergeRichText from './merge-richtext.test.ts';
+import setupMergeConvergence from './merge-convergence.test.ts';
+import setupMergeSync from './merge-sync.test.ts';
 
 /**
  * Registers all test suites with the default TestsRunner.
@@ -47,21 +60,34 @@ export async function registerAllTests(): Promise<void> {
   setupRuntimeTests(); // Runtime abstraction layer invariants
   setupProgressTests(); // TUI progress tracking - Task state machine, aggregation
   setupHealthCheckEndpointTest(); // Simple HTTP endpoint check
+  setupMergeAdjList(); // Adjacency list data structure
+  setupMergeBloom(); // Bloom filter operations
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
   setupCommit(); // Core commit/versioning logic
   setupSession(); // Authentication and session management
   setupGoatRequestTest(); // HTTP request processing
   setupCliInitTests(); // CLI scaffolding functionality
+  setupMergeLCA(); // Lowest Common Ancestor / merge base
+  setupMergeRecord(); // Record merge and schema upgrade
+  setupMergeCorruption(); // Corruption detection via checksums
+  setupMergeRebase(); // Rebase operations
+  setupMergeEdgeCases(); // Edge cases (compareCommitsDesc bug, etc.)
+  setupMergeLeader(); // Leader election for merge
+  setupMergeConcurrency(); // Concurrent merge guards
+  setupMergeCache(); // Cache invalidation after mutations
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
   setupTrusted(); // Database operations in trusted mode
   setupUntrusted(); // Database operations in untrusted mode
   await setupServerArchitectureTest(); // Server initialization and configuration
   setupStaticAssetsEndpointTest(); // File serving and asset management
+  setupMergeRichText(); // Rich text merge operations
+  setupMergeConvergence(); // CRDT convergence properties
 
   // SYNC INTEGRATION TESTS (1-2s each) - Network operations, client-server
   setupMinimalSync(); // Basic client-server synchronization
+  setupMergeSync(); // Merge behavior during sync
 
   // HEAVY END-TO-END TESTS (10-30s each) - Full system, network latency, multi-node
   setupCliCompileTests(); // CLI compilation (includes E2E compile test)

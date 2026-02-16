@@ -8,6 +8,7 @@ import * as path from '../base/path.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import { sleep } from '../base/time.ts';
+import { createTestDomainConfig } from './merge-test-utils.ts';
 
 // Define a minimal test schema
 const MinimalTestSchema = {
@@ -23,29 +24,6 @@ const MinimalTestSchema = {
 // Create and register the schema with a registry
 const testRegistry = new DataRegistry();
 testRegistry.registerSchema(MinimalTestSchema);
-
-/**
- * Creates a minimal domain config for testing with dynamic port support.
- */
-function createTestDomainConfig() {
-  let actualPort = 0;
-  return {
-    domain: {
-      resolveOrg: (orgId: string) => `http://localhost:${actualPort}/${orgId}`,
-      resolveDomain: (url: string) => {
-        try {
-          const u = new URL(url);
-          return u.hostname === 'localhost' ? 'test-org' : '';
-        } catch {
-          return '';
-        }
-      },
-    },
-    setPort: (p: number) => {
-      actualPort = p;
-    },
-  };
-}
 
 export default function setup(): void {
   TEST(
