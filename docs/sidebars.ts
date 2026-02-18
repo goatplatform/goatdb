@@ -20,6 +20,7 @@ const sidebars: SidebarsConfig = {
     'sessions',
     'authorization-rules',
     'sync',
+    'server-logic',
 
     // ADVANCED TOPICS (Deep dives)
     'conflict-resolution',

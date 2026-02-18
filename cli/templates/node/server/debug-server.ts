@@ -1,4 +1,5 @@
 // Development server with hot reload
+// See https://goatdb.dev/docs/server-logic for custom endpoints and middleware
 import { normalizeNodePlatform, Server } from '@goatdb/goatdb/server';
 import { registerSchemas } from '../common/schema.js';
 import { fileURLToPath } from 'node:url';

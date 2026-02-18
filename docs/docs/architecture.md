@@ -133,7 +133,7 @@ GoatDB's [schema evolution](/docs/schema) leverages its Git-like architecture to
   }}
 />
 
-GoatDB inverts traditional server architecture by treating servers as stateless synchronization nodes rather than authoritative data stores. Clients hold the authoritative data and use cryptographic sessions that work across any server. When servers crash, the peer-to-peer network automatically restores missing data from connected clients, eliminating backup/restore complexity. This removes the need for connection pools, cache invalidation, and server clustering coordination.
+GoatDB inverts traditional server architecture by treating servers as stateless synchronization nodes rather than authoritative data stores. Clients hold the authoritative data and use cryptographic sessions that work across any server. When servers crash, the peer-to-peer network automatically restores missing data from connected clients, eliminating backup/restore complexity. This removes the need for connection pools, cache invalidation, and server clustering coordination. For use cases that require server-side processing — such as webhook receivers or third-party API integrations — GoatDB provides an [endpoint and middleware system](/docs/server-logic) that runs alongside the synchronization layer.
 
 ## Repository System
 
@@ -165,7 +165,7 @@ Traditional databases require lock coordination, retry logic, or manual conflict
 
 ### Self-Healing Distribution
 
-Servers crash without consequence because they function as stateless synchronization nodes rather than authoritative data stores. Clients automatically restore missing data to crashed servers, eliminating the backup/restore complexity that burdens traditional systems.
+Servers crash without consequence because they function as stateless synchronization nodes rather than authoritative data stores. Clients automatically restore missing data to crashed servers, eliminating the backup/restore complexity that burdens traditional systems. When server-side logic is needed, see [Server-Side Logic](/docs/server-logic).
 
 This architectural inversion means expensive servers no longer hold all state while fragile clients coordinate access. Instead, abundant client hardware performs the computational work while simple servers relay changes. The stateless nature of the synchronization protocol ensures reliability without operational intervention.
 

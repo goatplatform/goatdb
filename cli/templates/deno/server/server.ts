@@ -28,7 +28,12 @@ interface Arguments {
  * The build.ts script is responsible for compiling this entry point script
  * into a self contained executable.
  *
- * TODO: Add custom routes and middleware below
+ * Add custom endpoints and middleware before starting the server.
+ * See https://goatdb.dev/docs/server-logic
+ *
+ * Example:
+ *   server.registerEndpoint(new MyWebhookEndpoint());
+ *   server.registerMiddleware(new MyRateLimitMiddleware());
  */
 async function main(): Promise<void> {
   const buildInfo: BuildInfo = kBuildInfo as BuildInfo;
