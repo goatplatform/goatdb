@@ -231,7 +231,7 @@ For maximum performance, GoatDB can drop both cryptographic signing and fsync wh
 - **Network-synced**: Automatic replication to peers
 - **Perfect for backend caching**: Maximum speed with reliability
 
-GoatDB exposes [`sync()`](/docs/api/classes/goatdb#sync) and [`flush()`](/docs/api/classes/goatdb#flush) methods so applications can control synchronization and durability in the rare cases where explicit control is needed.
+GoatDB exposes [`sync()`](/api/GoatDB/classes/GoatDB#sync) and [`flush()`](/api/GoatDB/classes/GoatDB#flush) methods so applications can control synchronization and durability in the rare cases where explicit control is needed.
 
 **SQLite `synchronous = OFF`** risks database corruption on crash, while GoatDB Fast Mode remains crash-proof due to its append-only design.
 :::

@@ -5,12 +5,10 @@ export async function buildDocs(): Promise<void> {
   await cli('rm', '-rf', 'build/docs');
   await cli('mkdir', '-p', 'build/docs');
 
-  // Build Docusaurus using Deno's npm: specifier
-  const buildProcess = new Deno.Command('deno', {
+  // Build Docusaurus via npx (Deno's npm: specifier has ESM compat issues)
+  const buildProcess = new Deno.Command('npx', {
     args: [
-      'run',
-      '-A',
-      'npm:@docusaurus/core',
+      'docusaurus',
       'build',
       '--out-dir',
       '../build/docs',
@@ -34,11 +32,9 @@ async function serveDocs(): Promise<void> {
   console.log('🚀 Starting Docusaurus development server...');
 
   // Start the dev server process
-  const serveProcess = new Deno.Command('deno', {
+  const serveProcess = new Deno.Command('npx', {
     args: [
-      'run',
-      '-A',
-      'npm:@docusaurus/core',
+      'docusaurus',
       'start',
     ],
     cwd: 'docs', // Run from docs directory where docusaurus.config.ts is located

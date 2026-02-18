@@ -3,15 +3,14 @@
   "version": "0.1.0",
   "exports": {
     "./docs-api-build": "./docs-api-build.ts",
-    "./docs-build": "./docs-build.ts",
-    "./mdx-generator": "./mdx-generator.ts",
-    "./type-formatter": "./type-formatter.ts"
+    "./docs-build": "./docs-build.ts"
   },
   "compilerOptions": {
     "lib": ["dom", "dom.iterable", "dom.asynciterable", "deno.ns"]
   },
   "imports": {
-    "typedoc": "npm:typedoc@^0.28.8"
+    "typedoc": "npm:typedoc@^0.28.8",
+    "typedoc-plugin-markdown": "npm:typedoc-plugin-markdown@^4.10.0"
   },
   "tasks": {
     "api": "deno run -A docs-api-build.ts",

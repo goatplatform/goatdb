@@ -47,6 +47,18 @@ const config: Config = {
         anonymizeIP: true,
       },
     ],
+    // API Reference — separate docs plugin instance
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'api',
+        path: 'api-docs',
+        routeBasePath: 'api',
+        sidebarPath: './sidebarsApi.ts',
+        remarkPlugins: [remarkMath],
+        rehypePlugins: [rehypeKatex],
+      },
+    ],
     // Disable webpack-dev-server compression to fix ERR_CONTENT_DECODING_FAILED
     function customWebpackPlugin() {
       return {
@@ -104,7 +116,9 @@ const config: Config = {
           label: 'Docs',
         },
         {
-          to: '/docs/api',
+          type: 'doc',
+          docId: 'index',
+          docsPluginId: 'api',
           position: 'left',
           label: 'API',
         },
@@ -141,7 +155,7 @@ const config: Config = {
             },
             {
               label: 'API Reference',
-              to: '/docs/api',
+              to: '/api',
             },
           ],
         },

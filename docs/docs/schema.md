@@ -11,7 +11,7 @@ Schemas in GoatDB solve three critical problems for distributed applications: **
 
 ## Quick Start
 
-Import the [DataRegistry](/docs/api/classes/dataregistry) and define your schema:
+Import the [DataRegistry](/api/GoatDB/classes/DataRegistry) and define your schema:
 
 ```typescript
 import { DataRegistry } from '@goatdb/goatdb';
@@ -54,7 +54,7 @@ task.set('completed', 'yes'); // ❌ TypeScript error
 
 ### Schemas Are Conflict Resolution Strategies
 
-When two users edit the same [document](/docs/concepts#item) simultaneously, GoatDB automatically resolves conflicts based on your schema's [field types](/docs/api/types/fielddef):
+When two users edit the same [document](/docs/concepts#item) simultaneously, GoatDB automatically resolves conflicts based on your schema's [field types](/api/GoatDB/type-aliases/FieldDef):
 
 ```typescript
 // User A adds a tag while User B adds a different tag
@@ -128,7 +128,7 @@ Registration serves three purposes:
 
 ### Basic Structure
 
-Each [schema](/docs/api/types/schema) requires a namespace, version, and [field definitions](/docs/api/types/schemafieldsdef):
+Each [schema](/api/GoatDB/type-aliases/Schema) requires a namespace, version, and [field definitions](/api/GoatDB/type-aliases/SchemaFieldsDef):
 
 ```typescript
 export const kSchemaMessage = {
@@ -156,7 +156,7 @@ type MessageType = typeof kSchemaMessage;
 
 ### Field Configuration
 
-Each [field definition](/docs/api/types/fielddef) accepts these options:
+Each [field definition](/api/GoatDB/type-aliases/FieldDef) accepts these options:
 
 ```typescript
 {
@@ -204,7 +204,7 @@ const kSchemaProject = {
 
 ## Conflict Resolution Deep Dive
 
-Understanding how different [field types](/docs/api/types/schemadatatype) resolve conflicts is crucial for designing robust schemas.
+Understanding how different [field types](/api/GoatDB/type-aliases/SchemaDataType) resolve conflicts is crucial for designing robust schemas.
 
 ### Primitive Types (string, number, boolean, date)
 
@@ -638,7 +638,7 @@ const document = {
 - **References**: `ref` nodes for internal links and external references
 - **Media**: `img` nodes with `src`, `object` nodes for embedded content
 
-**Working with RichText**: Uses standard GoatDB [item API](/docs/api/classes/manageditem):
+**Working with RichText**: Uses standard GoatDB [item API](/api/GoatDB/classes/ManagedItem):
 
 ```typescript
 import { initRichText, plaintextToTree } from '@goatdb/goatdb/cfds/richtext/tree';
@@ -669,4 +669,4 @@ doc.set('content', richTextFromPlain);
 
 **Conflict Resolution**: Tree-based intelligent merging  
 **Use Cases**: Documents, comments, collaborative content  
-**API**: Uses standard [item.set()](/docs/api/classes/manageditem#set) and [item.get()](/docs/api/classes/manageditem#get) - no special RichText methods
+**API**: Uses standard [item.set()](/api/GoatDB/classes/ManagedItem#set) and [item.get()](/api/GoatDB/classes/ManagedItem#get) - no special RichText methods

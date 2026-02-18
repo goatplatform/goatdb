@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "mod.ts",
+    "server.ts",
+    "server-build.ts",
+    "react/hooks.ts"
+  ]
+}

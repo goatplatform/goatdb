@@ -1,0 +1,21 @@
+{
+  "entryPoints": ["mod.ts", "server.ts", "server-build.ts", "react/hooks.ts"],
+  "tsconfig": "./tsconfig.docs.json",
+  "plugin": ["typedoc-plugin-markdown"],
+  "out": "docs/api-docs",
+  "cleanOutputDir": true,
+  "skipErrorChecking": true,
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "excludeExternals": true,
+  "readme": "none",
+  "fileExtension": ".md",
+  "entryFileName": "index",
+  "hideBreadcrumbs": true,
+  "hidePageHeader": true,
+  "parametersFormat": "table",
+  "interfacePropertiesFormat": "table",
+  "classPropertiesFormat": "table",
+  "typeAliasPropertiesFormat": "table",
+  "useHTMLEncodedBrackets": true
+}

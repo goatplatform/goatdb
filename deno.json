@@ -32,9 +32,9 @@
     "test:smoke": "deno run -A tests/run.ts --runtime=deno --suite=SecurityBoundaries",
     "bench": "deno run -A benchmarks/run.ts",
     "docs:api": "deno run -A docs/docs-api-build.ts",
-    "docs:clean": "rm -rf docs/node_modules docs/.docusaurus docs/build docs/package-lock.json",
-    "docs:serve": "deno run -A docs/docs-build.ts serve",
-    "docs:build": "deno run -A docs/docs-build.ts build"
+    "docs:clean": "rm -rf docs/node_modules docs/.docusaurus docs/build docs/package-lock.json docs/api-docs",
+    "docs:serve": "deno run -A docs/docs-api-build.ts && deno run -A docs/docs-build.ts serve",
+    "docs:build": "deno run -A docs/docs-api-build.ts && deno run -A docs/docs-build.ts build"
   },
   "imports": {
     "@goatdb/orderstamp": "jsr:@goatdb/orderstamp@^1.1.1",
@@ -50,8 +50,7 @@
     "react": "npm:react@^19.1.0",
     "source-map": "npm:source-map@^0.7.4",
     "sql.js": "npm:sql.js@^1.11.0",
-    "yargs": "npm:yargs@^17.7.2",
-    "typedoc": "npm:typedoc@^0.28.8"
+    "yargs": "npm:yargs@^17.7.2"
   },
   "nodeModulesDir": "auto"
 }
