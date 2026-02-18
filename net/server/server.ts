@@ -36,6 +36,7 @@ import { generateSelfSignedCertificate } from './crypto-utils.ts';
  * Information about a user attempting to log in for the first time.
  * Used by the autoCreateUser function to determine if a new account should be
  * created.
+ * @group Server
  */
 export type AutoCreateUserInfo = {
   /**
@@ -45,6 +46,7 @@ export type AutoCreateUserInfo = {
   email?: string;
 };
 
+/** @group Server */
 export type DomainConfig = {
   /**
    * Given an organization id, this function is responsible for resolving it
@@ -72,6 +74,7 @@ export type DomainConfig = {
 
 /**
  * A server represents a logical DB with some additional configuration options.
+ * @group Server
  */
 export interface ServerOptions<US extends Schema> extends DBInstanceConfig {
   /**
@@ -114,9 +117,9 @@ export interface ServerOptions<US extends Schema> extends DBInstanceConfig {
   denoJson?: string;
   /**
    * Configuration for the email service. Can use either SMTP or AWS SES via
-   * {@link https://nodemailer.com/|NodeMailer}.
+   * [NodeMailer](https://nodemailer.com/).
    *
-   * Example SMTP configuration (see {@link https://nodemailer.com/smtp/}):
+   * Example SMTP configuration (see [NodeMailer SMTP docs](https://nodemailer.com/smtp/)):
    * ```ts
    * {
    *   host: "smtp.gmail.com",
@@ -131,7 +134,7 @@ export interface ServerOptions<US extends Schema> extends DBInstanceConfig {
    * }
    * ```
    *
-   * Example Amazon SES configuration (see {@link https://nodemailer.com/ses/}):
+   * Example Amazon SES configuration (see [NodeMailer SES docs](https://nodemailer.com/ses/)):
    * ```ts
    * import { SendRawEmailCommand, SES } from "npm:@aws-sdk/client-ses";
    *
@@ -205,6 +208,7 @@ export interface ServerOptions<US extends Schema> extends DBInstanceConfig {
  * organization specific services and DB instance is created inside the root
  * data dir so all organization data is contained in a single DB/directory on
  * disk.
+ * @group Server
  */
 export interface ServerServices<US extends Schema> extends ServerOptions<US> {
   readonly orgId: string;
@@ -222,6 +226,7 @@ export interface ServerServices<US extends Schema> extends ServerOptions<US> {
  *
  * In order to fulfill their job, Endpoints can consume Services offered by the
  * server. See `BaseService` below.
+ * @group Server
  */
 export interface Endpoint<US extends Schema> {
   filter(
@@ -243,6 +248,7 @@ export interface Endpoint<US extends Schema> {
  *
  * Note that all registered middlewares get a chance to run for each request.
  * Execution order follows registration order, just like endpoints.
+ * @group Server
  */
 export interface Middleware<US extends Schema> {
   shouldProcess?: (
@@ -320,6 +326,7 @@ export interface Middleware<US extends Schema> {
  * - Handle errors
  *
  * All registered middlewares run for each request in registration order.
+ * @group Server
  */
 export class Server<US extends Schema> {
   private readonly _endpoints: Endpoint<US>[];
@@ -513,7 +520,7 @@ export class Server<US extends Schema> {
    * Processes an incoming HTTP request through the server's middleware and
    * endpoint pipeline.
    *
-   * @param req - The incoming HTTP request
+   * @param goatReq - The incoming HTTP request
    * @param info - Additional request information
    * @returns Promise resolving to the HTTP response
    */

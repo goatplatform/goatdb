@@ -185,6 +185,7 @@ export function resolveWritingDirection(
 }
 
 const kEmailRegex = /^[\w-+\.]+@([\w-]+\.)+[\w-]{2,4}$/;
+/** @group Utilities */
 export function normalizeEmail(email: string): string;
 export function normalizeEmail(email: undefined): undefined;
 export function normalizeEmail(email: string | undefined): string | undefined;

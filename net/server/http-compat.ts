@@ -173,6 +173,8 @@ function isWebRequest(req: unknown): req is Request {
  * GoatRequest. This can be either the web standard Headers class or our
  * NodeHeadersPolyfill implementation for Node.js environments where the
  * web standard Headers is not available.
+ *
+ * @group HTTP
  */
 export type GoatHeaders = Headers | NodeHeadersPolyfill;
 
@@ -313,6 +315,7 @@ export type MinimalNodeServerResponse = {
  *
  * It provides a web-standard interface with properties like url, method,
  * headers, and body, along with helper methods for common operations.
+ * @group HTTP
  */
 export class GoatRequest {
   /** The original request object from the runtime */
@@ -449,6 +452,7 @@ export type HttpRemoteAddr = { hostname: string };
 /**
  * Define a minimal local ServeHandlerInfo type for compatibility
  * Always uses the unified HttpRemoteAddr abstraction.
+ * @group HTTP
  */
 export type ServeHandlerInfo = {
   remoteAddr: HttpRemoteAddr;
@@ -756,7 +760,7 @@ export class NodeHttpServer implements MinimalHttpServer {
   }
 }
 
-// Union type for all supported MinimalHttpServer implementations
+/** @group HTTP */
 export interface HttpServerOptions {
   /** HTTPS configuration */
   https?: {
@@ -765,6 +769,7 @@ export interface HttpServerOptions {
   };
 }
 
+/** @group HTTP */
 export type HttpServerInstance = DenoHttpServer | NodeHttpServer;
 
 /**
@@ -773,6 +778,7 @@ export type HttpServerInstance = DenoHttpServer | NodeHttpServer;
  *
  * Uses the RuntimeAdapter registry to determine the current runtime.
  * Browser environments do not support HTTP server creation and will throw.
+ * @group HTTP
  */
 export function createHttpServer(
   options: HttpServerOptions = {},

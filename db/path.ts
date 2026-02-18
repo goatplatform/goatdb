@@ -25,6 +25,7 @@ export type ItemPathPart = (typeof kItemPathParts)[number];
  * @param item The key of the item within the repository.
  * @param embed An optional embedded item within the main item.
  * @returns A full GoatDB path.
+ * @group Paths
  */
 export function itemPath<T extends RepoType>(
   type: T,
@@ -61,6 +62,7 @@ export function itemPathGetPart<T extends string>(
  * @param part The desired part to extract.
  * @returns The requested part or undefined if it doesn't exist in the given
  *          path.
+ * @group Paths
  */
 export function itemPathGetPart<T extends string>(
   path: string | undefined,
@@ -100,6 +102,7 @@ export function itemPathGetPart<T extends string>(
  *
  * @param path The full DB path.
  * @returns Path to the repository of the given path.
+ * @group Paths
  */
 export function itemPathGetRepoId(path: string): string {
   path = itemPathNormalize(path);
@@ -115,6 +118,7 @@ export function itemPathGetRepoId(path: string): string {
  * and no trailing separator.
  * @param path The path to normalize.
  * @returns A normalized path.
+ * @group Paths
  */
 export function itemPathNormalize(path: string): string {
   // Avoid unnecessary allocations if passed a valid path
@@ -147,6 +151,7 @@ export function itemPathNormalize(path: string): string {
  * @param prefix Path prefix.
  * @param suffix Path suffix.
  * @returns A single path.
+ * @group Paths
  */
 export function itemPathJoin(prefix: string, suffix: string): string {
   if (prefix.endsWith('/')) {
@@ -168,6 +173,7 @@ const kValidItemPathChars = 'abcdefghijklmnopqrstuvwxyz0123456789-_';
  *
  * @param path The path to validate.
  * @returns True if the path is valid, false otherwise.
+ * @group Paths
  */
 export function itemPathIsValid(path: string): boolean {
   if (path.length === 0) {

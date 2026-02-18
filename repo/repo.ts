@@ -104,6 +104,7 @@ export interface RepositoryConfig<T extends RepoStorage<T> = MemRepoStorage> {
   storage?: T;
 }
 
+/** @group Database */
 export class Repository<
   ST extends RepoStorage<ST> = MemRepoStorage,
 > extends Emitter<RepositoryEvent> {
@@ -339,7 +340,7 @@ export class Repository<
    * This method determines, to a high probability, whether the given commit is
    * a leaf commit or not, even when the full graph isn't available.
    *
-   * It works by inspecting the bloom filters of the newest 2log[4](N) commits,
+   * It works by inspecting the bloom filters of the newest `2*log4(N)` commits,
    * and checking for the presence of the candidate commit. If present in all
    * filters, the commit guaranteed not to be a leaf.
    *
@@ -1428,7 +1429,7 @@ export class Repository<
     while (cur && commitContentsIsDelta(cur.contents)) {
       if (visited.has(cur.id)) return undefined;
       visited.add(cur.id);
-      const baseId = (cur.contents as DeltaContents).base;
+      const baseId: string = (cur.contents as DeltaContents).base;
       cur = batchIndex.get(baseId) ?? this.storage.getCommit(baseId);
     }
     if (cur && commitContentsIsDocument(cur.contents)) {

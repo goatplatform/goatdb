@@ -35,6 +35,7 @@ function incrementBuildNumber(version: VersionNumber): VersionNumber {
 
 /**
  * Options for live reload behavior.
+ * @group Debug Server
  */
 export type LiveReloadOptions = {
   /**
@@ -81,6 +82,7 @@ export type LiveReloadOptions = {
 /**
  * Options for the debug server, combining server options with live reload
  * and app configuration.
+ * @group Debug Server
  */
 export type DebugServerOptions<US extends Schema> =
   & Omit<ServerOptions<US>, 'staticAssets' | 'buildInfo' | 'domain'>
@@ -142,6 +144,7 @@ function getCwd(): string {
  *
  * @param options Options for running the debug server.
  * @returns Never returns - runs until the process is terminated.
+ * @group Debug Server
  */
 export async function startDebugServer<US extends Schema>(
   options: DebugServerOptions<US>,

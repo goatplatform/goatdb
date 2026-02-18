@@ -31,8 +31,8 @@ export type NodeMailerConfig =
 export type EmailConfig = NodeMailerConfig & {
   /**
    * The e-mail address of the sender. All e-mail addresses can be plain
-   * 'sender@server.com' or formatted 'Sender Name <sender@server.com>', see
-   * {@link https://nodemailer.com/message/|here} for details.
+   * `sender@server.com` or formatted `Sender Name <sender@server.com>`, see
+   * [here](https://nodemailer.com/message/) for details.
    */
   from: string;
 

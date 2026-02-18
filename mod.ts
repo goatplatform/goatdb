@@ -1,81 +1,11 @@
 /**
- * GoatDB: An Embedded, Distributed, Document Database
+ * Embedded, distributed document database with real-time sync and automatic
+ * conflict resolution. Provides the core GoatDB class, schema definitions,
+ * queries, and item management.
  *
- * GoatDB is a real-time, version-controlled database for Deno, React, and
- * low-friction deployments. It excels at real-time collaboration and
- * embedded caching applications while prioritizing speed and developer
- * experience.
- *
- * Key Features:
- * - No Dedicated Infra: Run the entire DB client-side, with incremental queries
- * - Resilience & Offline-First: Clients keep working if server goes down
- * - Edge-Native: Most processing happens in the client
- * - Real-Time Collaboration: Built-in sync keeps state synchronized
- * - Distributed Version Control: Leverages concepts from DVCS with bloom
- *                                filter-based synchronization
- * - Automatic Conflict Resolution: Uses ephemeral CRDTs for efficient
- *                                  real-time conflict resolution
- * - Application-Level Sharding: Natural scalability for multi-user applications
- *
- * Check out https://goatdb.dev for additional docs.
+ * See https://goatdb.dev for guides and tutorials.
  *
  * @module GoatDB
- *
- * @example
- * ```typescript
- * import { GoatDB, DataRegistry } from '@goatdb/goatdb';
- *
- * // Define a schema for tasks
- * const taskSchema = {
- *   ns: 'task',
- *   version: 1,
- *   fields: {
- *     text: {
- *       type: 'string',
- *       required: true,
- *     },
- *     done: {
- *       type: 'boolean',
- *       default: () => false,
- *     }
- *   }
- * } as const;
- *
- * // Register the schema
- * DataRegistry.default.registerSchema(taskSchema);
- *
- * // Initialize GoatDB with optional peers for replication
- * const db = new GoatDB({
- *   path: '/home/my-app',
- *   peers: ['http://10.0.0.1']
- * });
- *
- * // Create a new task
- * await db.create('/data/user123', taskSchema, {
- *   text: 'Learn GoatDB'
- * });
- *
- * // Query tasks
- * const query = db.query({
- *   source: '/data/user123',
- *   schema: taskSchema,
- *   // Find incomplete tasks
- *   predicate: ({ item }) => !item.get('done'),
- *   // Sort by text alphabetically
- *   sortBy: ({ left, right }) =>
- *     left.get('text').localeCompare(right.get('text')),
- *   // Optional context passed to predicate and sort functions
- *   ctx: { showCompleted: false }
- * });
- *
- * // Get live results that update automatically
- * const tasks = query.results();
- *
- * // Listen for changes
- * query.onResultsChanged(() => {
- *   console.log('Tasks updated:', query.results());
- * });
- * ```
  */
 import { GoatDB } from './db/db.ts';
 import { Query } from './repo/query.ts';

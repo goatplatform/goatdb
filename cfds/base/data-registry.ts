@@ -14,12 +14,14 @@ import {
 
 /**
  * Denotes the type of the requested operation.
+ * @group Security
  */
 export type AuthOp = 'read' | 'write';
 
 /**
  * Information passed to authentication rules to determine if an operation
  * is allowed.
+ * @group Security
  */
 export type AuthRuleInfo = {
   /** The database instance */
@@ -40,12 +42,14 @@ export type AuthRuleInfo = {
  *
  * @param info Information about the operation being authorized
  * @returns Whether the operation is allowed
+ * @group Security
  */
 export type AuthRule = (info: AuthRuleInfo) => boolean;
 
 /**
  * An array of authentication rules for the full DB. The DB scans these rules
  * and will use the first one that matches the repository's path.
+ * @group Security
  */
 export type AuthConfig = {
   rulePath: RegExp | string;
@@ -59,6 +63,7 @@ export type AuthConfig = {
  *
  * Typically, apps use the `DataRegistry.default` instance, but are free to
  * create multiple registries each with different schemas registered.
+ * @group Schema
  */
 export class DataRegistry {
   private readonly _schemas: Map<string, Schema[]>;

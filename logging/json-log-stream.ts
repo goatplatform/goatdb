@@ -15,6 +15,7 @@ import { kMinuteMs } from '../base/date.ts';
 /**
  * A LogStream implementation that writes log entries to a JSON file.
  * Supports optional throttling to reduce the number of entries written.
+ * @group Logging
  */
 export class JSONLogStream implements LogStream {
   /** Promise resolving to the underlying JSON log file */

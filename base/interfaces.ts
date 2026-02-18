@@ -1,7 +1,9 @@
+/** @group Utilities */
 export interface ReadonlyJSONObject {
   readonly [key: string]: JSONValue;
 }
 
+/** @group Utilities */
 export interface JSONObject extends ReadonlyJSONObject {
   [key: string]: JSONValue;
 }

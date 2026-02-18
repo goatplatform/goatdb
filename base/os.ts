@@ -21,6 +21,7 @@ export type OperatingSystem =
 
 /**
  * Normalizes a Node.js `os.platform()` string to a GoatDB OperatingSystem.
+ * @group OS
  */
 export function normalizeNodePlatform(platform: string): OperatingSystem {
   if (platform === 'win32') return 'windows';

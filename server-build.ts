@@ -7,14 +7,12 @@
  * @module GoatDB/Server/Build
  */
 
-// Debug server (development)
 export {
   type DebugServerOptions,
   type LiveReloadOptions,
   startDebugServer,
 } from './cli/debug-server.ts';
 
-// Build/compile tools
 export {
   compile,
   type CompileOptions,
@@ -25,5 +23,4 @@ export {
   type TargetOS,
 } from './cli/compile.ts';
 
-// App configuration
 export type { AppConfig } from './cli/app-config.ts';

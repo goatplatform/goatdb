@@ -14,7 +14,6 @@
  * ```
  */
 
-// Server class and types
 export { Server } from './net/server/server.ts';
 export type {
   AutoCreateUserInfo,
@@ -25,7 +24,6 @@ export type {
   ServerServices,
 } from './net/server/server.ts';
 
-// HTTP compatibility layer
 export { createHttpServer } from './net/server/http-compat.ts';
 export type {
   GoatHeaders,
@@ -35,7 +33,6 @@ export type {
   ServeHandlerInfo,
 } from './net/server/http-compat.ts';
 
-// Static assets
 export {
   staticAssetsFromJS,
   staticAssetsToJS,
@@ -46,8 +43,6 @@ export type {
   StaticAssets,
 } from './system-assets/system-assets.ts';
 
-// Build info
 export type { BuildInfo } from './base/build-info.ts';
 
-// OS utilities
 export { normalizeNodePlatform } from './base/os.ts';

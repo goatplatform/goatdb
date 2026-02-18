@@ -15,6 +15,7 @@ import { assert } from '../base/error.ts';
  *
  * @template S The schema type for this item
  * @template US User schema type for the database
+ * @group Items
  */
 export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
   extends Emitter<'change' | 'LoadingFinished'> {

@@ -54,9 +54,10 @@ import { getGoatConfig } from '../base/config.ts';
 /**
  * The result of a sync operation with all peers for a repository.
  *
- * - { status: 'success' } if all peers succeeded
- * - { status: 'failed' } if all peers failed
- * - { status: 'partial', failedPeers: string[] } if some peers failed
+ * - `{ status: 'success' }` if all peers succeeded
+ * - `{ status: 'failed' }` if all peers failed
+ * - `{ status: 'partial', failedPeers: string[] }` if some peers failed
+ * @group Database
  */
 export type SyncResult =
   | { status: 'success' }
@@ -69,9 +70,11 @@ export type SyncResult =
  * - 'client': The database operates as a client, syncing with server peers
  * - 'server': The database operates as a server, accepting sync requests from
  *   clients
+ * @group Database
  */
 export type DBMode = 'client' | 'server';
 
+/** @group Database */
 export interface DBInstanceConfig {
   /**
    * Absolute path to the directory that'll store the DB's data.
@@ -124,11 +127,13 @@ export interface DBInstanceConfig {
 /**
  * Options for opening a repository. These match the options exposed by the
  * repository itself, except some fields that are automatically filled.
+ * @group Database
  */
 export type OpenOptions = Omit<RepositoryConfig, 'storage' | 'authorizer'>;
 
 /**
  * Emitted by GoatDB whenever the current user changes.
+ * @group Database
  */
 export type EventUserChanged = 'UserChanged';
 
@@ -143,6 +148,7 @@ export type EventUserChanged = 'UserChanged';
  * - Schema validation
  *
  * @template US The user schema type, defaults to the base Schema type
+ * @group Database
  */
 export class GoatDB<US extends Schema = Schema>
   extends Emitter<EventUserChanged> {
@@ -410,7 +416,7 @@ export class GoatDB<US extends Schema = Schema>
   /**
    * Access an item at the given path. An item's path is typically at the
    * following format:
-   * /<data type>/<repo id>/<item key>
+   * `/<data type>/<repo id>/<item key>`
    *
    * NOTE: If the item's repository haven't been opened yet, it'll be opened in
    * the background. While open is progressing, the returned item will
@@ -623,9 +629,9 @@ export class GoatDB<US extends Schema = Schema>
    *
    * @param path Path to the desired repository.
    * @returns {Promise<SyncResult>} An object with a status field:
-   *   - { status: 'success' } if all peers succeeded
-   *   - { status: 'failed' } if all peers failed
-   *   - { status: 'partial', failedPeers: string[] } if some peers failed
+   *   - `{ status: 'success' }` if all peers succeeded
+   *   - `{ status: 'failed' }` if all peers failed
+   *   - `{ status: 'partial', failedPeers: string[] }` if some peers failed
    *
    * @example
    * const result = await db.sync('/my-repo');
@@ -691,7 +697,7 @@ export class GoatDB<US extends Schema = Schema>
    * Note: Prefer to use the higher level APIs of this class rather than the
    * repository instance directly.
    *
-   * @param path A full path or path components.
+   * @param pathComps A full path or path components.
    * @returns    The repository instance or undefined.
    */
   repository(...pathComps: string[]): Repository | undefined {

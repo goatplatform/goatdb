@@ -8,6 +8,7 @@ import type { LogEntry, LogStream } from './log.ts';
 /**
  * A LogStream implementation that writes log entries to the console.
  * Different severity levels are mapped to different console methods.
+ * @group Logging
  */
 export class ConsoleLogStream implements LogStream {
   /** The minimum severity level to log */

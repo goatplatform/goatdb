@@ -17,6 +17,7 @@ import type { ReadonlyJSONObject, ReadonlyJSONValue } from './interfaces.ts';
  *
  * @param length - The length of the ID to generate (default: 24)
  * @returns A random string of the specified length
+ * @group Utilities
  */
 export function uniqueId(length = 24): string {
   // Alphanumeric characters
@@ -52,6 +53,7 @@ export function uniqueId(length = 24): string {
  * //   "foo": "bar",
  * //   "baz": 42
  * // }
+ * @group Utilities
  */
 export function prettyJSON(o: ReadonlyJSONValue): string {
   // deno-lint-ignore no-explicit-any

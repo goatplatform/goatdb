@@ -4,6 +4,7 @@ export type EmitterEvent = 'suspended' | 'resumed';
 
 export type EmitterCallback = () => void;
 
+/** @group Events */
 export class Emitter<T extends string> {
   readonly alwaysActive: boolean;
   private readonly _callbacks: Map<string, EmitterCallback[]>;

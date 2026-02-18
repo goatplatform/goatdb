@@ -93,7 +93,7 @@ export function useItem<S extends Schema>(
  * local and remote updates.
  *
  * @param opts      Options object for configuring this hook.
- * @param pathComps A full item path or separate path components.
+ * @param pathCompsOrOpts A full item path or separate path components.
  *
  * @returns A {@link ManagedItem} instance or undefined if the item doesn't
  *          exist or it's repository hadn't finished loading yet. In the latter
@@ -381,7 +381,7 @@ export interface UseQueryOpts<
  * {@link Coroutine} without blocking the main thread. During and after this
  * initial scan, the query caches its results to disk, allowing subsequent runs
  * to resume execution from the cached state.
- * For additional details, refer to the {@link https://goatdb.dev/query|query mechanism documentation}.
+ * For additional details, refer to the [query mechanism documentation](https://goatdb.dev/docs/query).
  *
  * @param config Configuration of the desired query.
  * @returns A live {@link Query} instance.

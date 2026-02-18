@@ -1,5 +1,6 @@
 /**
  * A configuration of a Single Page Application built on top GoatDB.
+ * @group Configuration
  */
 export type AppConfig = {
   /**

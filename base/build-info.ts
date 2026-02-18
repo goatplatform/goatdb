@@ -21,6 +21,7 @@ export interface BuilderInfo extends JSONObject {
 /**
  * This interface encodes details about the build process used when compiling
  * the app bundle. Used for internal configuration and later inspection.
+ * @group Build
  */
 export interface BuildInfo extends JSONObject {
   /**

@@ -486,6 +486,7 @@ export function sessionIdFromSignature(sig: string): string {
  * modifications that are valid. Each commit's signature is checked against its
  * session's public key, and then the modifications themselves are checked to
  * ensure the creator only made changes within their scope of permissions.
+ * @group Security
  */
 export class TrustPool {
   readonly roots: Session[];

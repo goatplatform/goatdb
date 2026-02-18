@@ -25,6 +25,7 @@ export type LogEntry =
   | MetricLogEntry
   | ClientEventEntry;
 
+/** @group Logging */
 export interface LogStream {
   appendEntry(e: NormalizedLogEntry<LogEntry>): void | Promise<void>;
 }

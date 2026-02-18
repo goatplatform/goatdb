@@ -55,6 +55,7 @@ import type { ValueType } from './types/index.ts';
 
 /**
  * A mapping between a schema type and its native variable type.
+ * @group Schema
  */
 export type FieldValue<T extends ValueType> = T extends 'string' ? string
   : T extends 'number' ? number
@@ -67,6 +68,7 @@ export type FieldValue<T extends ValueType> = T extends 'string' ? string
 
 /**
  * A definition of a single field in a schema.
+ * @group Schema
  */
 export type FieldDef<T extends ValueType> = {
   /**
@@ -106,6 +108,7 @@ export type FieldDef<T extends ValueType> = {
 
 /**
  * Mapping between field name and its definition.
+ * @group Schema
  */
 export type SchemaFieldsDef = Record<string, FieldDef<ValueType>>;
 
@@ -113,6 +116,7 @@ export type SchemaFieldsDef = Record<string, FieldDef<ValueType>>;
  * A Schema defines the structure of a Document. Schemas are also versioned,
  * allowing for live, gradual migrations of data for some users, while others
  * continue to work with the old version in parallel.
+ * @group Schema
  */
 export type Schema = {
   /**
@@ -165,6 +169,7 @@ const kBuiltinFields: Record<string, FieldDef<ValueType>> = {
  * all items.
  *
  * @template T The schema type
+ * @group Schema
  */
 export type SchemaField<T extends Schema> =
   | keyof T['fields']
@@ -174,6 +179,7 @@ export type SchemaField<T extends Schema> =
  * Given a schema, extracts the names of all required fields.
  * Note: For practical purposes, fields with a default function are treated
  * as required from the type system.
+ * @group Schema
  */
 export type SchemaRequiredFields<
   T extends Schema,
@@ -186,6 +192,7 @@ export type SchemaRequiredFields<
 
 /**
  * Given a schema, extracts the names of all optional fields.
+ * @group Schema
  */
 export type SchemaOptionalFields<
   T extends Schema,
@@ -195,6 +202,7 @@ export type SchemaOptionalFields<
 /**
  * Given a type (FieldValue) and a required + default function, this generates
  * the correct type or union with undefined.
+ * @group Schema
  */
 export type SchemaValueWithOptional<
   T,
@@ -204,6 +212,7 @@ export type SchemaValueWithOptional<
 
 /**
  * Given a schema, extracts the type of its data.
+ * @group Schema
  */
 export type SchemaDataType<
   T extends Schema,
@@ -221,6 +230,7 @@ export type SchemaDataType<
  * isn't known yet. It's also used to simplify the internal diff/patch logic.
  *
  * Null items can't be persisted, and aren't synchronized across the network.
+ * @group Schema
  */
 export const kNullSchema: Schema = {
   ns: null,
@@ -228,11 +238,13 @@ export const kNullSchema: Schema = {
   fields: {},
   upgrade: () => notReached('Attempting to upgrade the null schema'),
 } as const;
+/** @group Schema */
 export type SchemaNullType = typeof kNullSchema;
 
 /**
  * All connections to the DB are represented as Session items, and are used
  * to verify the authenticity of commits.
+ * @group Schema
  */
 export const kSchemaSession = {
   ns: 'sessions',
@@ -257,10 +269,12 @@ export const kSchemaSession = {
     },
   },
 } as const;
+/** @group Schema */
 export type SchemaTypeSession = typeof kSchemaSession;
 
 /**
  * Internally collected user statistics.
+ * @group Schema
  */
 export const kSchemaUserStats = {
   ns: 'user-stats',
@@ -274,6 +288,7 @@ export const kSchemaUserStats = {
     },
   },
 } as const;
+/** @group Schema */
 export type SchemaTypeUserStats = typeof kSchemaUserStats;
 
 const gCachedSchemaFields = new WeakMap<
@@ -285,6 +300,7 @@ const gCachedSchemaFields = new WeakMap<
  * Given a schema, this function returns its field definitions as an iterable.
  * @param s A schema.
  * @returns An iterable of field name and its definition.
+ * @group Schema
  */
 export function SchemaGetFields(
   s: Schema,
@@ -303,6 +319,7 @@ const gCachedSchemaRequiredFields = new WeakMap<Schema, string[]>();
  * Given a schema, this functions returns an iterable of its required fields.
  * @param s A schema.
  * @returns An iterable of required field names.
+ * @group Schema
  */
 export function SchemaGetRequiredFields(s: Schema): readonly string[] {
   let r = gCachedSchemaRequiredFields.get(s);
@@ -324,6 +341,7 @@ export function SchemaGetRequiredFields(s: Schema): readonly string[] {
  * @param s
  * @param field
  * @returns
+ * @group Schema
  */
 export function SchemaGetFieldDef<
   S extends Schema,
@@ -341,6 +359,7 @@ export function SchemaGetFieldDef<
  * @param s1 First schema.
  * @param s2 Second schema.
  * @returns true if the schemas are the same, false otherwise.
+ * @group Schema
  */
 export function SchemaEquals(s1: Schema, s2: Schema): boolean {
   return s1.ns === s2.ns && s1.version === s2.version;

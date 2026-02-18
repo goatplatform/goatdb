@@ -113,11 +113,12 @@ export type QuerySource<IS extends Schema = Schema, OS extends IS = IS> =
 
 /**
  * The configuration for a query, specifying the database, source, predicate,
- * sort descriptor, schema, id, context, and limit.
+ * sort order, schema, id, context, and limit.
  *
  * @template IS The input schema type for the query
  * @template OS The output schema type for the query
  * @template CTX The context type for additional query data
+ * @group Querying
  */
 export type QueryConfig<
   IS extends Schema,
@@ -203,6 +204,7 @@ export type QueryEvent = EventDocumentChanged | 'LoadingFinished' | 'Closed';
  * await usersByEmail.loadingFinished();
  * const user = usersByEmail.find('email', 'user@example.com');
  * ```
+ * @group Querying
  */
 export class Query<
   IS extends Schema,
@@ -254,7 +256,7 @@ export class Query<
    * @param config.id Optional unique identifier for the query
    * @param config.source The data source to query (repository or path)
    * @param config.predicate Optional predicate function to filter items
-   * @param config.sortDescriptor Optional function to determine sort order
+   * @param config.sortBy Optional function to determine sort order
    * @param config.ctx Optional context data passed to predicate/sort functions
    * @param config.schema Optional schema type for the query
    * @param config.limit Optional maximum number of results (0 for unlimited)

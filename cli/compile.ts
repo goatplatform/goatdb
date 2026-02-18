@@ -25,6 +25,7 @@ function npxCmd(): string {
  *   conversion is handled by {@link targetFromOSArch})
  * - 'linux': Linux operating system
  * - 'windows': Windows operating system
+ * @group Compilation
  */
 export type TargetOS = 'mac' | 'linux' | 'windows';
 /**
@@ -32,6 +33,7 @@ export type TargetOS = 'mac' | 'linux' | 'windows';
  *
  * - 'x64': 64-bit x86 architecture (Intel/AMD)
  * - 'arm64': 64-bit ARM architecture (Apple Silicon, ARM-based servers)
+ * @group Compilation
  */
 export type CPUArch = 'x64' | 'arm64';
 
@@ -41,12 +43,14 @@ export type CPUArch = 'x64' | 'arm64';
  * Format is "{os}-{arch}" such as "mac-arm64" or "linux-x64".
  *
  * This type is used to specify the complete target platform for compilation.
+ * @group Compilation
  */
 export type OSArchTarget = `${TargetOS}-${CPUArch}`;
 
 /**
  * Code signing options for the compiled executable.
  * Used for macOS notarization and Windows code signing.
+ * @group Compilation
  */
 export type SigningOptions = {
   /** macOS: Developer ID Application certificate name */
@@ -82,6 +86,7 @@ export type SigningOptions = {
   };
 };
 
+/** @group Compilation */
 export type ExecutableOptions = {
   /**
    * Path to main server entry file.
@@ -112,6 +117,7 @@ export type ExecutableOptions = {
  * Options for compiling a GoatDB application into a standalone executable.
  *
  * This combines executable build options with application configuration.
+ * @group Compilation
  *
  * @example
  * ```typescript
@@ -141,6 +147,7 @@ export type CompileOptions =
  *
  * @param options Configuration options for the compilation process
  * @returns A Promise that resolves when compilation is complete
+ * @group Compilation
  *
  * @example
  * ```typescript

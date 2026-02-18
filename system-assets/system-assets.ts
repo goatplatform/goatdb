@@ -5,6 +5,7 @@ import kEncodedSystemAssets from './assets.json' with {
   type: 'json',
 };
 
+/** @group Static Assets */
 export type ContentType =
   | 'image/svg+xml'
   | 'image/png'
@@ -16,13 +17,16 @@ export type ContentType =
   | 'text/css'
   | 'application/wasm';
 
+/** @group Static Assets */
 export interface Asset {
   data: Uint8Array;
   contentType: ContentType;
 }
 
+/** @group Static Assets */
 export type StaticAssets = Record<string, Asset>;
 
+/** @group Static Assets */
 export function staticAssetsToJS(assets: StaticAssets): ReadonlyJSONObject {
   const result: JSONObject = {};
   for (const [path, asset] of Object.entries(assets)) {
@@ -34,6 +38,7 @@ export function staticAssetsToJS(assets: StaticAssets): ReadonlyJSONObject {
   return result;
 }
 
+/** @group Static Assets */
 export function staticAssetsFromJS(
   encodedAssets: ReadonlyJSONObject,
 ): StaticAssets {

@@ -41,6 +41,7 @@ import { SchemaGetFieldDef } from './schema.ts';
 import type { Readwrite } from '../../base/types.ts';
 import { DataRegistry } from './data-registry.ts';
 
+/** @group Items */
 export interface ReadonlyItem<S extends Schema> {
   readonly isNull: boolean;
   readonly schema: S;
@@ -84,6 +85,7 @@ const checksumSerOptions: ChecksumEncoderOpts = {
  * Typically you never need to create instances of this class directly. Instead,
  * use `GoatDB.item()` in order to get a LiveItem instance that's much easier
  * to work with.
+ * @group Items
  */
 export class Item<S extends Schema = Schema>
   implements ReadonlyItem<S>, Encodable {
