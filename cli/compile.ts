@@ -14,6 +14,9 @@ import type { OperatingSystem } from '../base/os.ts';
 import { cli } from '../base/development.ts';
 import { pathExists } from '../base/json-log/file-impl.ts';
 
+/** Minimum supported Node.js major version. Update here when raising the engine floor. */
+export const kMinNodeMajor = 24;
+
 function npxCmd(): string {
   return getRuntime().getOS() === 'windows' ? 'npx.cmd' : 'npx';
 }
@@ -513,9 +516,9 @@ async function bundleServerForSEA(
   output: string,
 ): Promise<void> {
   const esbuild = await getEsbuild();
-  // Fallback should track the minimum supported Node.js major version
+  // Defensive fallback — version is always present in a running Node.js process.
   const nodeMajor = getRuntime().getSystemInfo().version?.split('.')[0] ||
-    '20';
+    String(kMinNodeMajor);
   const result = await esbuild.build({
     entryPoints: [path.resolve(entry)],
     plugins: [adapterStubPlugin(['deno', 'browser'])],

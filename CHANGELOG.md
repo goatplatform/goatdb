@@ -36,7 +36,7 @@ All notable changes to this project will be documented in this file.
   normalized to forward slashes
 - FileImpl interface extended with `exists`, `copyFile`, and `readDir` methods
 - CLI init templates externalized to `cli/templates/` directory
-- Node.js engine minimum bumped from 18 to 20 (required for SEA support)
+- Node.js engine minimum bumped to 24 (required for SEA support)
 - esbuild bumped from 0.24 to 0.25.4
 - Browser `getOS()` uses 3-tier detection (User-Agent Client Hints,
   navigator.platform, User-Agent string) and returns `'unknown'` when platform

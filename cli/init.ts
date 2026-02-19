@@ -11,8 +11,11 @@ import {
   getCWD,
   mkdir,
   pathExists,
+  readTextFile,
+  writeTextFile,
 } from '../base/json-log/file-impl.ts';
 import { cli } from '../base/development.ts';
+import { kMinNodeMajor } from './compile.ts';
 
 /**
  * Returns the path to the templates directory.
@@ -63,6 +66,25 @@ async function installDenoDependency(
   if (result.exitCode !== 0) {
     throw new Error(`Failed to install dependency ${spec}`);
   }
+}
+
+/**
+ * Copies the Node.js template package.json and patches engine/type versions
+ * to match the canonical kMinNodeMajor constant.
+ */
+async function copyNodePackageJson(
+  templateDir: string,
+  projectDir: string,
+): Promise<void> {
+  const destPath = path.join(projectDir, 'package.json');
+  if (await pathExists(destPath)) return;
+  const raw = await readTextFile(path.join(templateDir, 'node/package.json'));
+  if (!raw) throw new Error('Template not found: node/package.json');
+  const pkg = JSON.parse(raw);
+  pkg.engines = { node: `>=${kMinNodeMajor}.0.0` };
+  pkg.devDependencies ??= {};
+  pkg.devDependencies['@types/node'] = `^${kMinNodeMajor}.0.0`;
+  await writeTextFile(destPath, JSON.stringify(pkg, null, 2) + '\n');
 }
 
 /**
@@ -182,12 +204,7 @@ export async function bootstrapProject(
       await installDenoDependency('npm:@types/react@19.0.8', projectDir);
     }
   } else if (isNode()) {
-    await copyTemplateFile(
-      templateDir,
-      'node/package.json',
-      'package.json',
-      projectDir,
-    );
+    await copyNodePackageJson(templateDir, projectDir);
     await copyTemplateFile(
       templateDir,
       'node/tsconfig.json',

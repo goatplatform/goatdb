@@ -12,10 +12,10 @@
     "@goatdb/goatdb": "npm:@jsr/goatdb__goatdb@latest"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^24.0.0",
     "typescript": "^5.0.0"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=24.0.0"
   }
 }
