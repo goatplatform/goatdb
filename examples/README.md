@@ -75,5 +75,5 @@ performance.
 
 ## Requirements
 
-- Node.js 16+
+- Node.js 24+
 - `"type": "module"` in package.json

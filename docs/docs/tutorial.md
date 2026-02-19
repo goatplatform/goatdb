@@ -264,8 +264,16 @@ export function App() {
 
 Start the development server with:
 
+**Deno:**
+
 ```bash
 deno task debug
+```
+
+**Node.js:**
+
+```bash
+npm run dev
 ```
 
 This starts an interactive development server at http://localhost:8080 that
@@ -287,9 +295,20 @@ build steps like Tailwind CSS or type generation.
 
 Run the build command to create a self-contained executable:
 
+**Deno:**
+
 ```bash
 deno task build
 ```
+
+**Node.js:**
+
+```bash
+npm run build
+```
+
+> **Node.js SEA builds** require `postject`. See the
+> [installation guide](/docs/install#building-standalone-executables) for setup instructions.
 
 ### Configuring the Build
 
@@ -305,10 +324,14 @@ await compile({
 
 ### Cross-Compilation Support
 
-The build process supports cross-compilation for different environments:
+Deno supports cross-compilation for different environments:
 
 - Operating Systems: macOS, Linux, Windows
 - Architectures: x64 (Intel/AMD), arm64 (Apple Silicon/ARM)
+
+Node.js uses [Single Executable Applications (SEA)](https://nodejs.org/api/single-executable-applications.html)
+for compilation. SEA does not support cross-compilation — you must build on the
+same platform you intend to deploy to.
 
 The entire build pipeline is implemented as a TypeScript API, making it easy to
 integrate into existing build systems or CI/CD pipelines. You can

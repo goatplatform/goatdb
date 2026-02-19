@@ -45,7 +45,7 @@ The [Conflict Resolution](/docs/conflict-resolution) layer automatically merges 
 
 Supporting these capabilities, the [Networking Layer](/docs/sync) keeps all peers synchronized through efficient peer-to-peer communication. Compact signatures minimize bandwidth usage while handling network failures gracefully, allowing any peer to crash and recover without data loss.
 
-At the foundation, the Runtime Abstraction makes everything work identically across browsers, servers, and mobile apps. This layer handles platform differences in storage and networking so your application code works everywhere without changes.
+At the foundation, the Runtime Abstraction makes everything work identically across Deno, Node.js, and browsers. This layer handles platform differences in storage and networking so your application code works everywhere without changes.
 
 ## Architectural Benefits in Practice
 

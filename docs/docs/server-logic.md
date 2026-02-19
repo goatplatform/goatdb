@@ -143,6 +143,8 @@ class LoggingMiddleware implements Middleware<typeof kUserSchema> {
 A `shouldProcess` middleware can short-circuit requests. Return a `Response` to block the request, or `undefined` to let it through:
 
 ```typescript
+import { getEnvVar } from '@goatdb/goatdb';
+
 class ApiKeyMiddleware implements Middleware<typeof kUserSchema> {
   async shouldProcess(
     _services: ServerServices<typeof kUserSchema>,
@@ -150,7 +152,7 @@ class ApiKeyMiddleware implements Middleware<typeof kUserSchema> {
     _info: ServeHandlerInfo,
   ): Promise<Response | undefined> {
     if (new URL(req.url).pathname.startsWith('/api/')) {
-      const apiKey = Deno.env.get('API_KEY');
+      const apiKey = getEnvVar('API_KEY');
       if (!apiKey || req.headers.get('x-api-key') !== apiKey) {
         return new Response('Unauthorized', { status: 401 });
       }

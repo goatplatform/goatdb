@@ -8,9 +8,9 @@ slug: /install
 
 ## GoatDB Installation
 
-GoatDB can be installed in both Deno and Node.js environments. Deno is our
-preferred runtime (with benefits like compiling to a self-contained executable),
-while Node.js support is currently **experimental**.
+GoatDB runs on both Deno and Node.js as fully supported, first-class runtimes.
+Deno is recommended for its cross-compilation support (compile once, deploy
+anywhere), but Node.js is equally capable for production use.
 
 ### Deno Installation (Recommended)
 
@@ -34,14 +34,6 @@ while Node.js support is currently **experimental**.
 ### Node.js Installation
 
 Install using one of the following package managers:
-
-:::warning
-
-Node.js support is currently a work in progress and is not yet ready for
-production. Progress is tracked under this
-[GitHub issue](https://github.com/goatplatform/goatdb/issues/27).
-
-:::
 
 :::tip[Building Standalone Executables]
 

@@ -158,6 +158,15 @@ In contrast, centralized queries require all data to be processed in a single
 location, often resulting in bottlenecks, increased latency, and reduced fault
 tolerance.
 
+## Does GoatDB support Node.js?
+
+Yes. Node.js is a fully supported, first-class runtime alongside Deno. GoatDB
+provides a complete Node.js adapter including HTTP server (`node:http`/`node:https`),
+file I/O, crypto, workers, and Single Executable Application (SEA) compilation.
+Node.js 24+ is required. See the [installation guide](/docs/install) for setup
+instructions and the [examples](https://github.com/goatplatform/goatdb/tree/main/examples)
+for working Node.js projects.
+
 ## What licensing options does GoatDB offer?
 
 GoatDB is released under the Apache License 2.0, a permissive open-source
