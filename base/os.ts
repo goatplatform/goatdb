@@ -73,23 +73,34 @@ export function isWindows(): boolean {
 }
 
 /**
- * Retrieves the value of an environment variable in a cross-platform way.
+ * Retrieves the value of an environment variable in a cross-runtime way.
  *
- * @param key The environment variable name (e.g., "GOATDB_SUITE")
- * @returns The value of the environment variable, or undefined if not found.
+ * **Deno / Node.js**: reads directly from the process environment.
+ *
+ * **Browser**: browsers have no native environment variables. GoatDB proxies
+ * `GOATDB_*` variables through the `GoatDBConfig` global that the server
+ * injects into the JS bundle. The `GOATDB_` prefix is stripped and the
+ * remainder is lowercased to form the lookup key
+ * (e.g. `GOATDB_SUITE` → `GoatDBConfig.suite`).
+ * Keys that do not start with `GOATDB_` always return `undefined` in the
+ * browser — call this function from server-side code (Deno or Node.js) for
+ * non-`GOATDB_*` keys.
+ *
+ * @param key The environment variable name (e.g., `"GOATDB_SUITE"`).
+ * @returns The value of the variable, or `undefined` if not set.
+ * @group OS
  */
 export function getEnvVar(key: string): string | undefined {
   if (isDeno()) {
-    // Deno: Use Deno.env.get if available
-    return Deno.env.get?.(key);
+    return Deno.env.get(key);
   } else if (isNode()) {
-    // Node.js: Use process.env
     return globalThis.process.env?.[key];
   } else if (isBrowser()) {
-    // Browser: Look for GoatDBConfig global object
+    // Browsers have no environment variables. GOATDB_* vars are proxied
+    // through the GoatDBConfig global injected by the server (prefix stripped).
+    if (!key.startsWith('GOATDB_')) return undefined;
     const config = (globalThis as any).GoatDBConfig;
-    // Remove "GOATDB_" prefix and lowercase the key for browser config
-    return config?.[key.toLowerCase().replace('goatdb_', '')];
+    return config?.[key.slice(7).toLowerCase()];
   }
   notReached('Platform not supported');
 }

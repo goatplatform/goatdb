@@ -32,6 +32,7 @@ import { prettyJSON, uniqueId } from './base/common.ts';
 import { ConsoleLogStream } from './logging/console-stream.ts';
 import type { LogStream } from './logging/log.ts';
 import { JSONLogStream } from './logging/json-log-stream.ts';
+import { getEnvVar } from './base/os.ts';
 import { normalizeEmail } from './base/string.ts';
 import { Emitter } from './base/emitter.ts';
 import { TrustPool } from './db/session.ts';
@@ -59,6 +60,7 @@ export {
   ConsoleLogStream,
   DataRegistry,
   Emitter,
+  getEnvVar,
   GoatDB,
   Item,
   itemPath,
