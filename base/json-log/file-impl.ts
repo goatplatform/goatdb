@@ -54,12 +54,25 @@ export async function FileImplGet(): Promise<FileImpl<unknown>> {
 export async function readFile(path: string): Promise<Uint8Array> {
   const impl = await FileImplGet();
   const handle = await impl.open(path, false);
-  const fileLen = await impl.seek(handle, 0, 'end');
-  await impl.seek(handle, 0, 'start');
-  const buf = new Uint8Array(fileLen);
-  await impl.read(handle, buf);
-  await impl.close(handle);
-  return buf;
+  try {
+    const fileLen = await impl.seek(handle, 0, 'end');
+    await impl.seek(handle, 0, 'start');
+    const buf = new Uint8Array(fileLen);
+    let offset = 0;
+    while (offset < fileLen) {
+      const n = await impl.read(handle, buf.subarray(offset));
+      if (n === null) break;
+      if (n === 0) {
+        throw new Error(
+          `FileImpl.readFile: read() returned 0 at offset ${offset}/${fileLen} — implementation bug`,
+        );
+      }
+      offset += n;
+    }
+    return buf;
+  } finally {
+    await impl.close(handle);
+  }
 }
 
 /**
@@ -95,9 +108,12 @@ export async function readTextFile(path: string): Promise<string | undefined> {
 export async function writeFile(path: string, buf: Uint8Array): Promise<void> {
   const impl = await FileImplGet();
   const handle = await impl.open(path, true);
-  await impl.write(handle, buf);
-  await impl.truncate(handle, buf.length);
-  await impl.close(handle);
+  try {
+    await impl.write(handle, buf);
+    await impl.truncate(handle, buf.length);
+  } finally {
+    await impl.close(handle);
+  }
 }
 
 /**

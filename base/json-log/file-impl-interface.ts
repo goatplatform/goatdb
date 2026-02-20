@@ -51,6 +51,9 @@ export interface FileImpl<T> {
 
   /**
    * Reads data from the file into the provided buffer.
+   * Implementations MAY return fewer bytes than `buf.length` (partial read).
+   * Callers that need the full buffer must loop until the desired count is
+   * reached or `null` is returned.
    * @param handle The file handle
    * @param buf The buffer to read into
    * @returns A promise that resolves to the number of bytes read, or null at EOF
@@ -65,7 +68,9 @@ export interface FileImpl<T> {
   truncate(handle: T, len: number): Promise<void>;
 
   /**
-   * Writes data from the provided buffer to the file.
+   * Writes all bytes from `buf` to the file at `handle`.
+   * Implementations MUST guarantee a full write — partial writes are not
+   * permitted. Returns void; callers cannot detect short writes.
    * @param handle The file handle
    * @param buf The buffer containing data to write
    */
