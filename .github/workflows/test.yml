@@ -7,7 +7,12 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -24,18 +29,44 @@ jobs:
       - name: Install postject
         run: npm install -g postject@1.0.0-alpha.6
 
+      - name: Run Deno tests
+        run: deno task test --runtime=deno
+        env:
+          CI: true
+
+      - name: Run Node.js tests
+        run: deno task test --runtime=node
+        env:
+          CI: true
+
+  test-browser:
+    name: Browser Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('deno.lock') }}
+          key: playwright-${{ hashFiles('deno.json') }}
           restore-keys: |
-            ${{ runner.os }}-playwright-
+            playwright-
 
       - name: Install Playwright browsers and system dependencies
         run: deno run -A npm:playwright@^1.48.0 install --with-deps chromium
 
-      - name: Run Tests
-        run: deno task test
+      - name: Run browser tests
+        run: deno task test --runtime=browser
         env:
           CI: true
