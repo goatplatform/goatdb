@@ -19,5 +19,4 @@ docs/api.json
 .claude/agents
 
 # Node.js SEA development artifacts
-package.json
 package-lock.json

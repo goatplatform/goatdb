@@ -1,0 +1,19 @@
+{
+  "name": "@goatdb/goatdb",
+  "version": "0.0.0-dev",
+  "type": "module",
+  "exports": {
+    ".": "./mod.ts",
+    "./react": "./react/hooks.ts",
+    "./server": "./server.ts",
+    "./server/build": "./server-build.ts",
+    "./init": "./cli/init.ts",
+    "./link": "./cli/link.ts"
+  },
+  "dependencies": {
+    "@goatdb/orderstamp": "npm:@jsr/goatdb__orderstamp@^1.1.1",
+    "@std/data-structures": "npm:@jsr/std__data-structures@^1.0.8",
+    "@std/encoding": "npm:@jsr/std__encoding@^1.0.10",
+    "@std/path": "npm:@jsr/std__path@^1.0.9"
+  }
+}
