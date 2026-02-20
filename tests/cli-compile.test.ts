@@ -16,13 +16,20 @@ import {
 } from './asserts.ts';
 import * as path from '../base/path.ts';
 import { isBrowser, isNode } from '../base/common.ts';
-import { pathExists, readTextFile, writeTextFile } from '../base/json-log/file-impl.ts';
-import { bundleServerForSEA, denoTarget, targetFromOSArch } from '../cli/compile.ts';
+import {
+  pathExists,
+  readTextFile,
+  writeTextFile,
+} from '../base/json-log/file-impl.ts';
+import {
+  bundleServerForSEA,
+  denoTarget,
+  targetFromOSArch,
+} from '../cli/compile.ts';
 import { stopBackgroundCompiler } from '../build.ts';
 import { goatEntryPoints } from '../cli/link.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 import { cli } from '../base/development.ts';
-import { getEnvVar } from '../base/os.ts';
 
 export default function setupCliCompileTests() {
   TEST(
@@ -173,14 +180,7 @@ export default function setupCliCompileTests() {
         return;
       }
 
-      // Skip in CI for Node.js - postject is not available
       const runtime = getRuntime();
-      if (runtime.id === 'node' && getEnvVar('CI')) {
-        console.log(
-          'Skipping Node.js E2E compile test in CI (postject not available)',
-        );
-        return;
-      }
 
       // This is a heavy E2E test - mark it as such
       console.log('Running E2E compile test (this may take a while)...');
