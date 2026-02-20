@@ -456,7 +456,7 @@ export type HttpRemoteAddr = { hostname: string };
  */
 export type ServeHandlerInfo = {
   remoteAddr: HttpRemoteAddr;
-  /** Resolves when the response is fully sent. Natively supported in Deno; pre-resolved stub in Node.js. */
+  /** Resolves when the response is fully sent. Natively supported in Deno; resolved on `finish`/`close` event in Node.js. */
   completed: Promise<void>;
 };
 
@@ -605,10 +605,19 @@ export class NodeHttpServer implements MinimalHttpServer {
     try {
       const goatReq = new GoatRequest(req);
       const hostname = req.socket?.remoteAddress ?? '';
+      let completedResolve!: () => void;
+      const completed = new Promise<void>((resolve) => {
+        completedResolve = resolve;
+      });
+      if (res.once) {
+        res.once('finish', completedResolve);
+        res.once('close', completedResolve);
+      } else {
+        completedResolve();
+      }
       const info: ServeHandlerInfo = {
         remoteAddr: { hostname },
-        // Node.js stub — no native equivalent to Deno's info.completed
-        completed: Promise.resolve(),
+        completed,
       };
       const response = await handler(goatReq, info);
       res.statusCode = response.status;
