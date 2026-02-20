@@ -21,6 +21,9 @@ jobs:
         with:
           node-version: '24.x'
 
+      - name: Install postject
+        run: npm install -g postject@1.0.0-alpha.6
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
