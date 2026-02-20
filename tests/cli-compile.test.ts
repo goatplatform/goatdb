@@ -15,11 +15,11 @@ import {
   assertTrue,
 } from './asserts.ts';
 import * as path from '../base/path.ts';
-import { isBrowser } from '../base/common.ts';
-import { pathExists } from '../base/json-log/file-impl.ts';
-import { denoTarget, targetFromOSArch } from '../cli/compile.ts';
+import { isBrowser, isNode } from '../base/common.ts';
+import { pathExists, readTextFile, writeTextFile } from '../base/json-log/file-impl.ts';
+import { bundleServerForSEA, denoTarget, targetFromOSArch } from '../cli/compile.ts';
+import { stopBackgroundCompiler } from '../build.ts';
 import { goatEntryPoints } from '../cli/link.ts';
-import { readTextFile } from '../base/json-log/file-impl.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 import { cli } from '../base/development.ts';
 import { getEnvVar } from '../base/os.ts';
@@ -115,6 +115,42 @@ export default function setupCliCompileTests() {
           `goatEntryPoints should have entry for deno.json export "${exportKey}"`,
         );
       }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'bundleServerForSEA produces valid CJS',
+    async (ctx) => {
+      if (!isNode()) return;
+
+      const dir = await ctx.tempDir('bundle-sea');
+      const entryPath = path.join(dir, 'entry.ts');
+      await writeTextFile(
+        entryPath,
+        'export function main(): number { return 42; }',
+      );
+      const outPath = path.join(dir, 'bundle.cjs');
+
+      // bundleServerForSEA uses esbuild's background service; stop it after the
+      // test so the process can exit cleanly.
+      try {
+        await bundleServerForSEA(entryPath, outPath);
+      } finally {
+        await stopBackgroundCompiler();
+      }
+
+      const content = await readTextFile(outPath);
+      assertExists(content, 'output file should be readable');
+      const text = content!;
+      assertTrue(text.length > 0, 'output file must not be empty');
+      // esbuild's bundle mode (bundle: true) wraps all exports into a CJS module
+      // via `module.exports = __toCommonJS(entry_exports)`. This pattern is absent
+      // from ESM output and confirms the bundle is CJS, not ESM.
+      assertTrue(
+        text.includes('module.exports'),
+        'CJS output must assign module.exports',
+      );
     },
   );
 
