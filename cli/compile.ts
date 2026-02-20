@@ -510,8 +510,10 @@ async function compileNodeSEA(options: CompileOptions): Promise<string> {
 
 /**
  * Bundles the server entry point to CJS format for SEA embedding.
+ *
+ * @internal — exported for testing only; not part of the public API.
  */
-async function bundleServerForSEA(
+export async function bundleServerForSEA(
   entry: string,
   output: string,
 ): Promise<void> {
