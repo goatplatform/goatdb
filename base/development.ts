@@ -1,4 +1,5 @@
 import { isDeno, isNode } from './common.ts';
+import { isWindows } from './os.ts';
 
 // Minimal type for objects with a toString method (used in Node.js streams)
 type Stringable = { toString(): string };
@@ -125,8 +126,13 @@ export async function cli(
     const { spawn } = childProcessModule;
     return new Promise((resolve) => {
       let result = '';
+      const onWindows = isWindows();
       const spawnOptions: Record<string, unknown> = {};
       if (options.cwd) spawnOptions.cwd = options.cwd;
+      // On Windows, .cmd batch scripts (npm.cmd, deno.cmd) can't be found by
+      // name without shell: true. Only safe because all cli() call sites pass
+      // hardcoded commands — never user-supplied input.
+      if (onWindows) spawnOptions.shell = true;
 
       const proc = spawn(cmd, cmdArgs, spawnOptions);
       let settled = false;
@@ -145,18 +151,34 @@ export async function cli(
       if (options.timeout) {
         timer = setTimeout(() => {
           timedOut = true;
-          try {
-            proc.kill('SIGTERM');
-          } catch (_) {
-            // Process already exited
-          }
-          killTimer = setTimeout(() => {
+          // Windows has no POSIX signals, so we skip the SIGTERM grace period
+          // and go straight to forced kill via taskkill.
+          if (onWindows) {
+            // With shell:true, proc is cmd.exe; taskkill /t kills the entire
+            // process tree so the real child doesn't become orphaned.
             try {
-              proc.kill('SIGKILL');
+              if (proc.pid) {
+                spawn('taskkill', ['/pid', String(proc.pid), '/t', '/f']);
+              }
+            } catch (_) {
+              // spawn() itself rarely throws; taskkill failures (e.g. process
+              // already exited) are silently ignored — proc.on('close') fires
+              // regardless and settle() handles the timeout result.
+            }
+          } else {
+            try {
+              proc.kill('SIGTERM');
             } catch (_) {
               // Process already exited
             }
-          }, 2_000);
+            killTimer = setTimeout(() => {
+              try {
+                proc.kill('SIGKILL');
+              } catch (_) {
+                // Process already exited
+              }
+            }, 2_000);
+          }
         }, options.timeout);
       }
 
