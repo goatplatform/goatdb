@@ -19,6 +19,8 @@ import setupSession from './session.test.ts';
 import setupCommit from './commit.test.ts';
 import setupServerArchitectureTest from './server-architecture.test.ts';
 import setupStaticAssetsEndpointTest from './static-assets-endpoint.test.ts';
+import setupFileImplTests from './file-impl.test.ts';
+import setupNodeHttpServerTests from './node-http-server.test.ts';
 import setupHealthCheckEndpointTest from './health-check-endpoint.test.ts';
 import setupMinimalSync from './minimal-client-server-sync.test.ts';
 import setupE2ELatency from './e2e-latency.test.ts';
@@ -78,11 +80,13 @@ export async function registerAllTests(): Promise<void> {
   setupMergeLeader(); // Leader election for merge
   setupMergeConcurrency(); // Concurrent merge guards
   setupMergeCache(); // Cache invalidation after mutations
+  setupFileImplTests(); // FileImpl abstraction (Deno + Node.js)
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
   setupTrusted(); // Database operations in trusted mode
   setupUntrusted(); // Database operations in untrusted mode
   await setupServerArchitectureTest(); // Server initialization and configuration
+  setupNodeHttpServerTests(); // Node.js HTTP server integration
   setupStaticAssetsEndpointTest(); // File serving and asset management
   setupMergeRichText(); // Rich text merge operations
   setupMergeConvergence(); // CRDT convergence properties
