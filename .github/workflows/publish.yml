@@ -37,7 +37,7 @@ jobs:
           "
 
       - name: Install npm dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build npm artifact
         run: npm run build:npm
