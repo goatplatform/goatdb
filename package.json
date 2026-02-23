@@ -4,12 +4,12 @@
   "type": "module",
   "files": ["dist"],
   "exports": {
-    ".": { "import": "./dist/mod.mjs", "types": "./dist/mod.d.ts" },
-    "./react": { "import": "./dist/react/hooks.mjs", "types": "./dist/react/hooks.d.ts" },
-    "./server": { "import": "./dist/server.mjs", "types": "./dist/server.d.ts" },
-    "./server/build": { "import": "./dist/server-build.mjs", "types": "./dist/server-build.d.ts" },
-    "./init": { "import": "./dist/cli/init.mjs", "types": "./dist/cli/init.d.ts" },
-    "./link": { "import": "./dist/cli/link.mjs", "types": "./dist/cli/link.d.ts" }
+    ".": "./mod.ts",
+    "./react": "./react/hooks.ts",
+    "./server": "./server.ts",
+    "./server/build": "./server-build.ts",
+    "./init": "./cli/init.ts",
+    "./link": "./cli/link.ts"
   },
   "scripts": {
     "build:npm": "tsup"

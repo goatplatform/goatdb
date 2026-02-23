@@ -26,13 +26,22 @@ jobs:
       - name: Install latest npm (required for OIDC Trusted Publishing)
         run: npm install -g npm@latest
 
-      # Extract version from deno.json and write it into package.json
-      - name: Sync version from deno.json → package.json
+      # Extract version from deno.json; rewrite package.json version + exports for npm publish.
+      # In the repo, exports point to .ts source (for local dev/tests). Here we switch to dist/.
+      - name: Sync version and exports from deno.json → package.json
         run: |
           VERSION=$(deno eval "import cfg from './deno.json' with {type:'json'}; console.log(cfg.version)")
           deno eval "
             import pkg from './package.json' with {type:'json'};
             pkg.version = '$VERSION';
+            pkg.exports = {
+              '.':              { import: './dist/mod.mjs',          types: './dist/mod.d.ts' },
+              './react':        { import: './dist/react/hooks.mjs',  types: './dist/react/hooks.d.ts' },
+              './server':       { import: './dist/server.mjs',       types: './dist/server.d.ts' },
+              './server/build': { import: './dist/server-build.mjs', types: './dist/server-build.d.ts' },
+              './init':         { import: './dist/cli/init.mjs',     types: './dist/cli/init.d.ts' },
+              './link':         { import: './dist/cli/link.mjs',     types: './dist/cli/link.d.ts' },
+            };
             await Deno.writeTextFile('./package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
