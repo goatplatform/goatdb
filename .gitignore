@@ -20,3 +20,6 @@ docs/api.json
 
 # Node.js SEA development artifacts
 package-lock.json
+
+# npm build artifacts
+dist/

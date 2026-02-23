@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.AsyncIterable"],
+    "declaration": true,
+    "declarationDir": "./dist",
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "exclude": ["node_modules", "dist", "docs"]
+}

@@ -2,18 +2,25 @@
   "name": "@goatdb/goatdb",
   "version": "0.0.0-dev",
   "type": "module",
+  "files": ["dist"],
   "exports": {
-    ".": "./mod.ts",
-    "./react": "./react/hooks.ts",
-    "./server": "./server.ts",
-    "./server/build": "./server-build.ts",
-    "./init": "./cli/init.ts",
-    "./link": "./cli/link.ts"
+    ".": { "import": "./dist/mod.mjs", "types": "./dist/mod.d.ts" },
+    "./react": { "import": "./dist/react/hooks.mjs", "types": "./dist/react/hooks.d.ts" },
+    "./server": { "import": "./dist/server.mjs", "types": "./dist/server.d.ts" },
+    "./server/build": { "import": "./dist/server-build.mjs", "types": "./dist/server-build.d.ts" },
+    "./init": { "import": "./dist/cli/init.mjs", "types": "./dist/cli/init.d.ts" },
+    "./link": { "import": "./dist/cli/link.mjs", "types": "./dist/cli/link.d.ts" }
+  },
+  "scripts": {
+    "build:npm": "tsup"
   },
   "dependencies": {
     "@goatdb/orderstamp": "npm:@jsr/goatdb__orderstamp@^1.1.1",
     "@std/data-structures": "npm:@jsr/std__data-structures@^1.0.8",
     "@std/encoding": "npm:@jsr/std__encoding@^1.0.10",
     "@std/path": "npm:@jsr/std__path@^1.0.9"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0"
   }
 }

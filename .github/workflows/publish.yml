@@ -1,0 +1,61 @@
+name: Publish
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # GitHub Release creation
+      id-token: write       # OIDC for JSR + npm Trusted Publisher
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install latest npm (required for OIDC Trusted Publishing)
+        run: npm install -g npm@latest
+
+      # Extract version from deno.json and write it into package.json
+      - name: Sync version from deno.json → package.json
+        run: |
+          VERSION=$(deno eval "import cfg from './deno.json' with {type:'json'}; console.log(cfg.version)")
+          deno eval "
+            import pkg from './package.json' with {type:'json'};
+            pkg.version = '$VERSION';
+            await Deno.writeTextFile('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Install npm dependencies
+        run: npm install
+
+      - name: Build npm artifact
+        run: npm run build:npm
+
+      - name: Publish to JSR
+        run: npx jsr publish
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          gh release create "$GITHUB_REF_NAME" \
+            --title "v$VERSION" \
+            --notes-file CHANGELOG.md \
+            --verify-tag
