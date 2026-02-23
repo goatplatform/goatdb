@@ -28,10 +28,12 @@ jobs:
 
       # Extract version from deno.json; rewrite package.json version + exports for npm publish.
       # In the repo, exports point to .ts source (for local dev/tests). Here we switch to dist/.
+      # --node-modules-dir=none prevents Deno from populating node_modules/ during the eval,
+      # which would otherwise seed vitest into the tree and break npm 11's peer-dep resolution.
       - name: Sync version and exports from deno.json → package.json
         run: |
-          VERSION=$(deno eval "import cfg from './deno.json' with {type:'json'}; console.log(cfg.version)")
-          deno eval "
+          VERSION=$(deno eval --node-modules-dir=none "import cfg from './deno.json' with {type:'json'}; console.log(cfg.version)")
+          deno eval --node-modules-dir=none "
             import pkg from './package.json' with {type:'json'};
             pkg.version = '$VERSION';
             pkg.exports = {
@@ -46,7 +48,7 @@ jobs:
           "
 
       - name: Install npm dependencies
-        run: npm install
+        run: rm -rf node_modules && npm install
 
       - name: Build npm artifact
         run: npm run build:npm
