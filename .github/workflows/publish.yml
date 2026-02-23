@@ -23,8 +23,8 @@ jobs:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Install latest npm (required for OIDC Trusted Publishing)
-        run: npm install -g npm@latest
+      - name: Install npm 11.5.1 (minimum for OIDC Trusted Publishing)
+        run: npm install -g npm@11.5.1
 
       # Extract version from deno.json; rewrite package.json version + exports for npm publish.
       # In the repo, exports point to .ts source (for local dev/tests). Here we switch to dist/.
@@ -46,7 +46,7 @@ jobs:
           "
 
       - name: Install npm dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install
 
       - name: Build npm artifact
         run: npm run build:npm
