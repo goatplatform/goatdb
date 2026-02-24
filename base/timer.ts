@@ -7,7 +7,7 @@ const MAX_TIMER_PROCESSING_MS = 30;
 const gScheduledTimers = new SortedQueue<BaseTimer>(
   (t1: BaseTimer, t2: BaseTimer) => t1.compare(t2),
 );
-let gTimerTicker: number | undefined;
+let gTimerTicker: ReturnType<typeof setInterval> | undefined;
 let gTimerId = 0;
 
 function startTimerTickerIfNeeded(): void {
@@ -434,7 +434,7 @@ export class MicroTaskTimer implements Timer {
 }
 
 let gScheduledNextEventLoopCycleTimers: NextEventLoopCycleTimer[] = [];
-let gScheduledTimeoutHandler: number | undefined;
+let gScheduledTimeoutHandler: ReturnType<typeof setTimeout> | undefined;
 
 function processPendingNextEventLoopTimers(): void {
   const scheduledTimers = gScheduledNextEventLoopCycleTimers;

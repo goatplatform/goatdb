@@ -77,7 +77,7 @@ export enum SyncPriority {
 export class SyncScheduler {
   private readonly _syncFreqAvg: MovingAverage;
   private _pendingRequests: Map<SyncPriority, PendingSyncRequest[]>;
-  private _intervalId: number;
+  private _intervalId: ReturnType<typeof setInterval> | undefined;
   private _fetchInProgress = false;
   private _closed = false;
 
@@ -104,9 +104,9 @@ export class SyncScheduler {
       return;
     }
     this._closed = true;
-    if (this._intervalId >= 0) {
+    if (this._intervalId !== undefined) {
       clearInterval(this._intervalId);
-      this._intervalId = -1;
+      this._intervalId = undefined;
     }
     for (const queue of this._pendingRequests.values()) {
       for (const req of queue) {

@@ -88,12 +88,12 @@ export async function cli(
 
   if (isDeno()) {
     const ac = options.timeout ? new AbortController() : undefined;
-    let timer: number | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (ac && options.timeout) {
       timer = setTimeout(
         () => ac.abort(),
         options.timeout,
-      ) as unknown as number;
+      );
     }
     const process = new Deno.Command(cmd, {
       args: cmdArgs,

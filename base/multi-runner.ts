@@ -56,7 +56,7 @@ async function runDenoWithWorker(
 ): Promise<{ elapsed: number; summary: TestSummary }> {
   return new Promise((resolve, reject) => {
     const start = performance.now();
-    let timeoutId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     // Create Worker
     const worker = new Worker(
@@ -69,7 +69,7 @@ async function runDenoWithWorker(
     let rootId: TaskId | undefined;
     const suiteTaskIds = new Map<string, TaskId>();
     const testTaskIds = new Map<string, TaskId>();
-    let animationInterval: number | undefined;
+    let animationInterval: ReturnType<typeof setInterval> | undefined;
     let totalTests = 0;
     let completedTests = 0;
     let failedCount = 0;
