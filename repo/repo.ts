@@ -1825,7 +1825,7 @@ export class MemRepoStorage implements RepoStorage<MemRepoStorage> {
     //   this._cachedCommitsByKeyDescArr.set(key, res);
     // }
     // return res;
-    return this._commitsByKey.get(key) || [];
+    return (this._commitsByKey.get(key) ?? []) as Iterable<Commit>;
     // const keyMap = this._commitsByRecordKey.get(key);
     // if (!keyMap) {
     //   return [];

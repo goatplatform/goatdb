@@ -225,7 +225,7 @@ export async function bootstrapProject(
 // Handle main execution for both Deno and Node.js (ESM-compatible)
 async function checkIsMainModule(): Promise<boolean> {
   if (typeof (import.meta as { main?: boolean }).main === 'boolean') {
-    return (import.meta as { main: boolean }).main;
+    return (import.meta as unknown as { main: boolean }).main;
   }
   // Node.js ESM: compare resolved filesystem paths (cross-platform)
   if (isNode() && process.argv[1]) {
