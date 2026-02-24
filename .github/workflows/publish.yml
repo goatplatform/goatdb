@@ -55,7 +55,7 @@ jobs:
           "
 
       - name: Publish to JSR
-        run: npx jsr publish
+        run: npx jsr publish --allow-dirty
 
       - name: Publish to npm
         run: npm publish --access public

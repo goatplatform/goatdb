@@ -4,6 +4,19 @@
     "lib": ["dom", "dom.iterable", "dom.asynciterable", "deno.ns"]
   },
   "lock": false,
+  "publish": {
+    "exclude": [
+      "package.json",
+      "tsup.config.ts",
+      "tsconfig.node.json",
+      ".npmrc",
+      ".github/",
+      "tests/",
+      "benchmarks/",
+      "docs/",
+      "examples/"
+    ]
+  },
   "fmt": {
     "useTabs": false,
     "lineWidth": 80,
