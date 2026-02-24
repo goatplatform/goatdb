@@ -269,7 +269,7 @@ export class NodeHeadersPolyfill extends Map<string, string> {
    * @param v - The value to set
    * @returns This Headers object for method chaining
    */
-  override set(k: string, v: string) {
+  override set(k: string, v: string): this {
     super.set(k, v);
     return this;
   }
@@ -441,7 +441,7 @@ export class GoatRequest {
    * Gets the original request object from the runtime
    * @returns The native request object
    */
-  get raw() {
+  get raw(): Request | NodeHttp1Request | NodeHttp2Request | MinimalNodeIncomingMessage {
     return this._native;
   }
 }
