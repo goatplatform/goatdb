@@ -196,7 +196,7 @@ const config: Config = {
       ],
       copyright: `Copyright © ${
         new Date().getFullYear()
-      } GoatDB · Apache 2.0 License`,
+      } GoatDB · MIT License`,
     },
     prism: {
       theme: prismThemes.github,

@@ -123,7 +123,7 @@ Once signed, the CLA covers all your future contributions to GoatDB. Corporate c
 
 ## License
 
-All contributions are licensed under the Apache 2.0 license. The CLA you sign grants GoatDB the rights needed for long-term project sustainability, including the ability to relicense if needed for future project health, while you retain copyright ownership.
+All contributions are licensed under the MIT license. The CLA you sign grants GoatDB the rights needed for long-term project sustainability, including the ability to relicense if needed for future project health, while you retain copyright ownership.
 
 ---
 

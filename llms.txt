@@ -42,5 +42,5 @@ Additional Resources:
 - Discussions: https://github.com/goatplatform/goatdb/discussions
 - Discord: https://discord.gg/SAt3cbUqxr
 
-License: Apache 2.0
+License: MIT
 

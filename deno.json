@@ -30,7 +30,7 @@
   },
   "name": "@goatdb/goatdb",
   "version": "0.5.0",
-  "license": "AGPL/ELV2",
+  "license": "MIT",
   "exports": {
     ".": "./mod.ts",
     "./react": "./react/hooks.ts",

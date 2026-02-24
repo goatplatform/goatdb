@@ -80,7 +80,7 @@ function OpenSource() {
         <div className={styles.openSourceContent}>
           <h2>Open Source</h2>
           <p className={styles.openSourceDescription}>
-            Apache 2.0 licensed. Built in public. Used in production.
+            MIT licensed. Built in public. Used in production.
             <br />
             Help us build the future of local-first software.
           </p>

@@ -80,5 +80,5 @@ deno run -A jsr:@goatdb/goatdb/link link ./path/to/goatdb
 ## License
 
 GoatDB is licensed under the
-<a href="https://github.com/goatplatform/goatdb/blob/main/LICENSE">Apache 2.0
+<a href="https://github.com/goatplatform/goatdb/blob/main/LICENSE">MIT
 License</a>.

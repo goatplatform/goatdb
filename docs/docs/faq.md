@@ -169,14 +169,13 @@ for working Node.js projects.
 
 ## What licensing options does GoatDB offer?
 
-GoatDB is released under the Apache License 2.0, a permissive open-source
-license that provides:
+GoatDB is released under the MIT License, a permissive open-source license
+that provides:
 
 - Freedom to use the software for any purpose
 - Freedom to modify and distribute the software
-- Patent rights from contributors to users
 - No requirement to release your source code when making changes
 
-The Apache 2.0 license is business-friendly while still maintaining open-source
-principles, making GoatDB suitable for both commercial and open-source projects
-without imposing restrictive conditions on users.
+The MIT license is maximally business-friendly and widely understood, making
+GoatDB suitable for both commercial and open-source projects without imposing
+any restrictive conditions on users.
