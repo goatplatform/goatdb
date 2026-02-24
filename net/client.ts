@@ -55,7 +55,7 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
     readonly syncConfig: SyncConfig,
     readonly scheduler: SyncScheduler,
     readonly orgId: string,
-    readonly registry = DataRegistry.default,
+    readonly registry: DataRegistry = DataRegistry.default,
   ) {
     super();
     this._timer = new EaseInExpoTimer(
