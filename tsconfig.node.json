@@ -7,7 +7,9 @@
     "declaration": true,
     "declarationDir": "./dist",
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "emitDeclarationOnly": true
   },
   "exclude": ["node_modules", "dist", "docs"]
 }

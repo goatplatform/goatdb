@@ -16,6 +16,6 @@ export default defineConfig({
   platform: 'node',
   clean: true,
   tsconfig: 'tsconfig.node.json',
-  // Keep all @goatdb/*, @std/* deps external (they're in package.json)
-  external: [/^@goatdb\//, /^@std\//],
+  // Keep all @goatdb/*, @std/*, react, nodemailer external (resolved by consumer)
+  external: [/^@goatdb\//, /^@std\//, 'react', /^nodemailer/],
 });
