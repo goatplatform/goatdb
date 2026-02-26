@@ -58,7 +58,13 @@ jobs:
         run: npx jsr publish --allow-dirty
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: |
+          VERSION=$(deno eval --node-modules-dir=none "import cfg from './deno.json' with {type:'json'}; console.log(cfg.version)")
+          if [[ "$VERSION" == *"-"* ]]; then
+            npm publish --access public --tag next
+          else
+            npm publish --access public
+          fi
 
       - name: Create GitHub Release
         env:
