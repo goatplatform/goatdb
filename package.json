@@ -11,6 +11,10 @@
     "./init": "./cli/init.ts",
     "./link": "./cli/link.ts"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/goatplatform/goatdb"
+  },
   "scripts": {
     "build:npm": "tsup"
   },
