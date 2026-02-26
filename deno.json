@@ -29,7 +29,7 @@
     ]
   },
   "name": "@goatdb/goatdb",
-  "version": "0.5.1-rc.0",
+  "version": "0.5.0",
   "license": "MIT",
   "exports": {
     ".": "./mod.ts",
