@@ -16,7 +16,6 @@
 
 <p align="center">
 <a href="https://github.com/goatplatform/goatdb/actions/workflows/test.yml"><img src="https://github.com/goatplatform/goatdb/actions/workflows/test.yml/badge.svg" alt="Tests" /></a>
-<a href="https://cla-assistant.io/goatplatform/goatdb"><img src="https://cla-assistant.io/readme/badge/goatplatform/goatdb" alt="CLA assistant" /></a>
 </p>
 
 [GoatDB](https://goatdb.dev/) is an embedded, distributed document database that
