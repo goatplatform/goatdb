@@ -25,6 +25,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
+      - name: Install docs dependencies
+        run: npm install
+        working-directory: docs
       - name: Build docs
         run: deno task docs:build
       - uses: actions/configure-pages@v5
