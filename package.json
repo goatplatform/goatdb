@@ -11,6 +11,7 @@
     "./init": "./cli/init.ts",
     "./link": "./cli/link.ts"
   },
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/goatplatform/goatdb"
