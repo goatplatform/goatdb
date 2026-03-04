@@ -102,7 +102,6 @@ const config: Config = {
     // Replace with your project's social card
     image: 'img/goatdb_logo_dark_500.png',
     navbar: {
-      title: 'GoatDB',
       logo: {
         alt: 'GoatDB Logo',
         src: 'img/goatdb_logo_dark_500.png',
