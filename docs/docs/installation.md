@@ -20,30 +20,27 @@ anywhere), but Node.js is equally capable for production use.
    deno add jsr:@goatdb/goatdb
    ```
 
-2. **Initialize the React Scaffold** (optional, for SPAs only):
+2. **Scaffold a new project** (optional, for new apps):
 
    ```bash
-   deno run -A jsr:@goatdb/goatdb/init
+   deno run -A jsr:@goatdb/goatdb init
    ```
-   > **Note**: The initialization step is only required for Single Page
-   > Applications (SPAs). This command installs React dependencies and creates a
-   > project scaffold with both client-side and server-side code structures.
-   > Skip this step if you're not building a SPA or already have your React
-   > setup configured.
+
+   This creates a complete project — React client, GoatDB server, shared schema,
+   and dev tooling — then installs all dependencies. Skip this step if you're
+   adding GoatDB to an existing project.
+
+   See the [CLI & Build Tools](./cli) for the generated file structure, all options, and Node.js usage.
 
 ### Node.js Installation
+
+Requires **Node.js 24 or later**.
 
 Install using one of the following package managers:
 
 :::tip[Building Standalone Executables]
 
-To compile Node.js applications to standalone executables using SEA (Single Executable Applications), ensure **postject** is available:
-
-```bash
-npm install -g postject
-```
-
-GoatDB uses postject automatically via `npx` during compilation. See [Node.js SEA docs](https://nodejs.org/api/single-executable-applications.html).
+To compile Node.js applications to standalone executables using SEA (Single Executable Applications), GoatDB uses [postject](https://github.com/nicolo-ribaudo/postject), which is installed automatically as an optional dependency. No manual setup required. See [Node.js SEA docs](https://nodejs.org/api/single-executable-applications.html).
 
 :::
 
@@ -64,3 +61,12 @@ yarn dlx jsr add @goatdb/goatdb
 ```bash
 pnpm dlx jsr add @goatdb/goatdb
 ```
+
+**Scaffold a new project** (optional, for new apps):
+
+```bash
+npx -y @goatdb/goatdb init
+npx -y @goatdb/goatdb init ./my-app   # optional target directory
+```
+
+See the [CLI & Build Tools](./cli) for details and generated file structure.

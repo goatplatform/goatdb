@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and GoatDB adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - Unreleased
+
+### Breaking Changes
+
+- **`./init` sub-path export removed.** `deno run -A jsr:@goatdb/goatdb/init` no
+  longer works.
+
+  **Migration:**
+  ```bash
+  # Before
+  deno run -A jsr:@goatdb/goatdb/init
+
+  # After (Deno)
+  deno run -A jsr:@goatdb/goatdb init
+
+  # After (Node.js)
+  npx -y @goatdb/goatdb init
+  ```
+
+### Changed
+
+- npm build output uses `.js` extension instead of `.mjs`
+- `@types/node` bumped from ^22 to ^24
+- `postject` bundled as optional dependency — no more global install required
+- esbuild target updated from `node18` to `node24`
+
 ## [0.4.0] - 2026-02-20
 
 ### Breaking Changes
@@ -65,8 +91,8 @@ and GoatDB adheres to
 - Node.js is now production-ready; experimental warning removed
 - esbuild bumped from 0.24 to 0.25.4
 - Browser `getOS()` uses 3-tier detection (User-Agent Client Hints,
-  `navigator.platform`, User-Agent string) and returns `'unknown'` when
-  platform cannot be detected
+  `navigator.platform`, User-Agent string) and returns `'unknown'` when platform
+  cannot be detected
 - Default server port for HTTPS changed to 8443 (HTTP remains 8080)
 - `ManagedItem.commit()` now ensures all changes are fully committed before
   returning
@@ -81,13 +107,12 @@ and GoatDB adheres to
 - Expired sessions are now blocked from accessing protected routes
 - First sync awaited when opening a repository for the first time
 - Query scan now correctly awaited in browser environments
-- Resource leak in OPFS `copyFile()` — file handles now properly closed on
-  error
-- Template `DomainConfig` used incorrect method names (`resolveOrg` instead
-  of `mapToOrg`)
+- Resource leak in OPFS `copyFile()` — file handles now properly closed on error
+- Template `DomainConfig` used incorrect method names (`resolveOrg` instead of
+  `mapToOrg`)
 - Template HTML referenced raw `index.tsx` instead of built `/app.js`
-- Sync engine: recursive `serverUrl` expansion, infinite loop, dangling
-  promise, and sync-before-open bugs
+- Sync engine: recursive `serverUrl` expansion, infinite loop, dangling promise,
+  and sync-before-open bugs
 - `FileImpl`: partial-read loop and resource cleanup on error
 - No longer crashes when the cache file is missing
 - Now throws an error when commit contents are missing instead of failing
@@ -242,6 +267,7 @@ and GoatDB adheres to
 
 - Initial release
 
+[0.5.0]: https://github.com/goatplatform/goatdb/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/goatplatform/goatdb/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/goatplatform/goatdb/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/goatplatform/goatdb/compare/v0.2.2...v0.3.0

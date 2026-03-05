@@ -22,7 +22,7 @@ Before starting, make sure you have:
 
 ## Define the Task Schema
 
-Edit the file `common/registry.ts` to define our [schemas](/docs/schema) and
+Edit the file `common/schema.ts` to define our [schemas](/docs/schema) and
 [authorization](/docs/authorization) rules:
 
 ```typescript
@@ -307,8 +307,8 @@ deno task build
 npm run build
 ```
 
-> **Node.js SEA builds** require `postject`. See the
-> [installation guide](/docs/install#building-standalone-executables) for setup instructions.
+> **Node.js SEA builds** use `postject` (installed automatically with GoatDB). See the
+> [CLI & Build Tools](./cli#building-standalone-executables) for details.
 
 ### Configuring the Build
 
