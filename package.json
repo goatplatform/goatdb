@@ -8,13 +8,15 @@
     "./react": "./react/hooks.ts",
     "./server": "./server.ts",
     "./server/build": "./server-build.ts",
-    "./init": "./cli/init.ts",
     "./link": "./cli/link.ts"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/goatplatform/goatdb"
+  },
+  "bin": {
+    "goatdb": "./dist/cli/init.js"
   },
   "scripts": {
     "build:npm": "tsup"
@@ -25,6 +27,9 @@
     "@std/encoding": "npm:@jsr/std__encoding@^1.0.10",
     "@std/path": "npm:@jsr/std__path@^1.0.9"
   },
+  "optionalDependencies": {
+    "postject": "1.0.0-alpha.6"
+  },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
     "nodemailer": "^6.10.0"
@@ -34,7 +39,7 @@
     "nodemailer": { "optional": true }
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^24.0.0",
     "@types/nodemailer": "^6.4.17",
     "@types/react": "^19.0.0",
     "tsup": "^8.0.0",

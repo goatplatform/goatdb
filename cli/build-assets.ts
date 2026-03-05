@@ -108,7 +108,12 @@ export async function buildAssets(
       write: false,
       sourcemap: 'linked',
       outdir: 'output',
-      define: { '__BUNDLE_TARGET__': '"browser"' },
+      define: {
+        '__BUNDLE_TARGET__': '"browser"',
+        // Prevent CLI entry-point code (if (import.meta.main) {...}) from
+        // being bundled into the browser client bundle.
+        'import.meta.main': 'false',
+      },
       logOverride: {
         'empty-import-meta': 'silent',
       },

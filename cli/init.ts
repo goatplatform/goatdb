@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+// Shebang preserved by tsup in dist/cli/init.js for npx/bin execution.
 /**
  * This is a CLI used to initialize a new GoatDB project scaffold.
  * Check out https://goatdb.dev for additional docs.
@@ -6,6 +8,7 @@
  */
 import * as path from '../base/path.ts';
 import { isDeno, isNode } from '../base/common.ts';
+import { exit } from '../base/process.ts';
 import {
   copyFile,
   getCWD,
@@ -98,12 +101,9 @@ export interface BootstrapOptions {
 }
 
 export async function bootstrapProject(
-  options?: BootstrapOptions | string,
+  options?: BootstrapOptions,
 ): Promise<void> {
-  // Support legacy string argument for backwards compatibility
-  const opts: BootstrapOptions = typeof options === 'string'
-    ? { targetDir: options }
-    : options || {};
+  const opts: BootstrapOptions = options || {};
 
   const projectDir = opts.targetDir || await getCWD();
   const runtime = isDeno() ? 'deno' : 'node';
@@ -222,39 +222,44 @@ export async function bootstrapProject(
   }
 }
 
-// Handle main execution for both Deno and Node.js (ESM-compatible)
-async function checkIsMainModule(): Promise<boolean> {
-  if (typeof (import.meta as { main?: boolean }).main === 'boolean') {
-    return (import.meta as unknown as { main: boolean }).main;
+export async function runCLI(args: string[]): Promise<void> {
+  const usage = isDeno()
+    ? 'Usage:\n  deno run -A jsr:@goatdb/goatdb init [dir]\n\nCommands:\n  init [dir]  Scaffold a new GoatDB project in [dir] (defaults to CWD)'
+    : 'Usage:\n  npx -y @goatdb/goatdb init [dir]\n\nCommands:\n  init [dir]  Scaffold a new GoatDB project in [dir] (defaults to CWD)';
+  if (args.length === 0 || args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
+    console.log(usage);
+    await exit(0);
+  } else if (args[0] !== 'init') {
+    console.error(usage);
+    await exit(1);
   }
-  // Node.js ESM: compare resolved filesystem paths (cross-platform)
-  if (isNode() && process.argv[1]) {
-    const { fileURLToPath } = await import('node:url');
-    const { resolve } = await import('node:path');
-    return fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+  try {
+    await bootstrapProject({ targetDir: args[1] });
+  } catch (error) {
+    console.error('Error during project initialization:', error);
+    await exit(1);
   }
-  return false;
 }
 
-if (await checkIsMainModule()) {
-  (async () => {
-    try {
-      // Get optional target directory from CLI arguments
-      let targetDir: string | undefined;
-      if (isDeno()) {
-        targetDir = Deno.args[0];
-      } else if (isNode()) {
-        targetDir = process.argv[2]; // [0]=node, [1]=script, [2]=first arg
-      }
-
-      await bootstrapProject(targetDir);
-    } catch (error) {
-      console.error('Error during project initialization:', error);
-      if (isDeno()) {
-        Deno.exit(1);
-      } else {
-        process.exit(1);
-      }
+// Node.js bin entry (Deno enters via mod.ts)
+if (isNode() && process.argv[1]) {
+  Promise.all([
+    import('node:url'),
+    import('node:path'),
+    import('node:fs'),
+  ]).then(([{ fileURLToPath }, { resolve }, { realpathSync }]) => {
+    let thisFile: string = realpathSync(fileURLToPath(import.meta.url));
+    let resolved: string = realpathSync(resolve(process.argv[1]!));
+    // NTFS is case-insensitive; normalize before comparing on Windows
+    if (process.platform === 'win32') {
+      thisFile = thisFile.toLowerCase();
+      resolved = resolved.toLowerCase();
     }
-  })();
+    if (thisFile === resolved) {
+      return runCLI(process.argv.slice(2));
+    }
+  }).catch(async (err) => {
+    console.error(err);
+    await exit(1);
+  });
 }

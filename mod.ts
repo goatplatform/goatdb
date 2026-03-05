@@ -78,3 +78,13 @@ export {
   TrustPool,
   uniqueId,
 };
+
+// Deno CLI entry: `deno run -A jsr:@goatdb/goatdb init` (Node.js enters via cli/init.ts bin)
+if (import.meta.main) {
+  import('./cli/init.ts')
+    .then(({ runCLI }) => runCLI(Deno.args))
+    .catch((err) => {
+      console.error(err);
+      Deno.exit(1);
+    });
+}

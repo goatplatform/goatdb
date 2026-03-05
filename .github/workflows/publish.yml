@@ -2,14 +2,14 @@ name: Publish
 
 on:
   push:
-    tags: ["v*"]
+    tags: ['v*']
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write       # GitHub Release creation
-      id-token: write       # OIDC for JSR + npm Trusted Publisher
+      contents: write # GitHub Release creation
+      id-token: write # OIDC for JSR + npm Trusted Publisher
 
     steps:
       - uses: actions/checkout@v4
@@ -44,12 +44,11 @@ jobs:
             import pkg from './package.json' with {type:'json'};
             pkg.version = '$VERSION';
             pkg.exports = {
-              '.':              { import: './dist/mod.mjs',          types: './dist/mod.d.ts' },
-              './react':        { import: './dist/react/hooks.mjs',  types: './dist/react/hooks.d.ts' },
-              './server':       { import: './dist/server.mjs',       types: './dist/server.d.ts' },
-              './server/build': { import: './dist/server-build.mjs', types: './dist/server-build.d.ts' },
-              './init':         { import: './dist/cli/init.mjs',     types: './dist/cli/init.d.ts' },
-              './link':         { import: './dist/cli/link.mjs',     types: './dist/cli/link.d.ts' },
+              '.':              { import: './dist/mod.js',          types: './dist/mod.d.ts' },
+              './react':        { import: './dist/react/hooks.js',  types: './dist/react/hooks.d.ts' },
+              './server':       { import: './dist/server.js',       types: './dist/server.d.ts' },
+              './server/build': { import: './dist/server-build.js', types: './dist/server-build.d.ts' },
+              './link':         { import: './dist/cli/link.js',     types: './dist/cli/link.d.ts' },
             };
             await Deno.writeTextFile('./package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
