@@ -17,15 +17,13 @@
 <p align="center">
 <a href="https://github.com/goatplatform/goatdb/actions/workflows/test.yml"><img src="https://github.com/goatplatform/goatdb/actions/workflows/test.yml/badge.svg" alt="Tests" /></a>
 <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+<a href="https://jsr.io/@goatdb/goatdb"><img src="https://jsr.io/badges/@goatdb/goatdb" alt="JSR" /></a>
+<a href="https://www.npmjs.com/package/@goatdb/goatdb"><img src="https://img.shields.io/npm/v/@goatdb/goatdb" alt="npm" /></a>
 </p>
 
-[GoatDB](https://goatdb.dev/) is an embedded, distributed document database that
-prioritizes speed and developer experience. Build real-time collaborative apps
-that work offline.
+[GoatDB](https://goatdb.dev/) is an embedded, distributed document database that prioritizes speed and developer experience. Build real-time collaborative apps that work offline.
 
-Inspired by distributed version control systems, GoatDB brings Git-like features
-to databases: cryptographically signed commits, three-way merges, and automatic
-conflict resolution. TypeScript-first with React hooks included.
+Inspired by distributed version control systems, GoatDB brings Git-like features to databases: cryptographically signed commits, three-way merges, and automatic conflict resolution. TypeScript-first with React hooks included.
 
 **What makes GoatDB different?**
 
@@ -34,48 +32,60 @@ conflict resolution. TypeScript-first with React hooks included.
 - **Smart conflict resolution:** Git-style three-way merge for live data
 - **Self-healing:** Clients can restore crashed servers from the commit graph
 
-GoatDB is under active development. Star ⭐️ our project if you like the
-approach!
+GoatDB is under active development. Star ⭐️ our project if you like the approach!
 
 > [!WARNING]
-> Please keep in mind that GoatDB is still under active development and
-> therefore full backward compatibility is not guaranteed before reaching
-> v1.0.0. For more details, see the
-> <a href="https://goatdb.dev/docs/faq/">FAQ</a>.
+> Please keep in mind that GoatDB is still under active development and therefore full backward compatibility is not guaranteed before reaching v1.0.0. For more details, see the <a href="https://goatdb.dev/docs/faq/">FAQ</a>.
 
 ## Quick Start
 
-Install in Deno (recommended):
+**Deno** (recommended):
 
 ```bash
 deno add jsr:@goatdb/goatdb
+deno run -A jsr:@goatdb/goatdb init   # scaffold a new project
+```
+
+**Node.js** (24+):
+
+```bash
+npx jsr add @goatdb/goatdb
+npx -y @goatdb/goatdb init            # scaffold a new project
 ```
 
 ### Basic Usage
 
 ```ts
-import { GoatDB } from '@goatdb/goatdb';
-const db = new GoatDB({ path: './data', peers: ['http://10.0.0.1'] });
-const item = db.create('/todos', { text: 'Hello, GoatDB!', done: false });
+import { DataRegistry, GoatDB } from '@goatdb/goatdb';
+
+const kSchemaTask = {
+  ns: 'task',
+  version: 1,
+  fields: {
+    text: { type: 'string', required: true },
+    done: { type: 'boolean', default: () => false },
+  },
+} as const;
+DataRegistry.default.registerSchema(kSchemaTask);
+
+const db = new GoatDB({ path: './data' });
+await db.readyPromise();
+
+const item = db.create('/data/todos', kSchemaTask, {
+  text: 'Hello, GoatDB!',
+});
 item.set('done', true);
 ```
 
 ## React Integration
 
-GoatDB includes React hooks for real-time, offline-capable UIs. See the
-[React documentation](https://goatdb.dev/docs/react/).
+GoatDB includes React hooks for real-time, offline-capable UIs. See the [React documentation](https://goatdb.dev/docs/react/).
 
-See the <a href="https://goatdb.dev/docs/tutorial/">tutorial</a> for more
-examples.
+See the <a href="https://goatdb.dev/docs/tutorial/">tutorial</a> for more examples.
 
 ## Contributing
 
-We welcome contributions! Fork, make changes, and submit a PR. For local
-development:
-
-```bash
-deno run -A jsr:@goatdb/goatdb/link link ./path/to/goatdb
-```
+We welcome contributions! See the [contributing guide](https://goatdb.dev/docs/contributing/) for setup instructions and guidelines.
 
 ## License
 
