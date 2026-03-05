@@ -17,10 +17,6 @@ import { pathExists } from '../base/json-log/file-impl.ts';
 /** Minimum supported Node.js major version. Update here when raising the engine floor. */
 export const kMinNodeMajor = 24;
 
-function npxCmd(): string {
-  return getRuntime().getOS() === 'windows' ? 'npx.cmd' : 'npx';
-}
-
 /**
  * Represents the target operating system for compilation.
  *
@@ -348,7 +344,7 @@ interface SEAConfig {
  * platform-specific (compiled C++). Unlike Deno's Rust-based cross-compiler,
  * Node.js SEA requires building on the target platform.
  *
- * @requires postject - Install with `npm install postject` (local or global)
+ * postject is installed automatically as an optional dependency of `@goatdb/goatdb`.
  */
 async function compileNodeSEA(options: CompileOptions): Promise<string> {
   const resolvedEntry = path.resolve(options.serverEntry);
@@ -385,23 +381,18 @@ async function compileNodeSEA(options: CompileOptions): Promise<string> {
     );
   }
 
-  const buildDir = path.resolve(options.buildDir!);
-
-  // Verify postject is available before starting expensive operations
-  const postjectCheck = await cli(
-    npxCmd(),
-    '--no',
-    'postject',
-    '--help',
-    { timeout: 30_000 },
-  );
-  if (postjectCheck.exitCode !== 0) {
+  // Fail-fast: verify postject is resolvable before expensive bundling
+  try {
+    await import('postject');
+  } catch {
     throw new Error(
-      'postject is required for Node.js SEA builds but could not be found.\n' +
-        'Install with: npm install postject\n' +
-        `Details: ${postjectCheck.result}`,
+      'postject is required for Node.js SEA builds but could not be resolved.\n' +
+        'Try re-running `npm install` in your project (postject is an optional dependency of @goatdb/goatdb).\n' +
+        'If that fails, install manually: npm install postject',
     );
   }
+
+  const buildDir = path.resolve(options.buildDir!);
 
   const compileStart = performance.now();
   // Clean and create build directory
@@ -472,7 +463,7 @@ async function compileNodeSEA(options: CompileOptions): Promise<string> {
     }
 
     // Inject SEA blob using postject
-    await injectBlob(outputFile, seaBlobPath, osName);
+    await injectBlob(outputFile, await fs.readFile(seaBlobPath), osName);
     success = true;
   } finally {
     try {
@@ -530,7 +521,12 @@ export async function bundleServerForSEA(
     format: 'cjs',
     outfile: output,
     minify: true,
-    define: { '__BUNDLE_TARGET__': '"node"' },
+    define: {
+      '__BUNDLE_TARGET__': '"node"',
+      // Prevent CLI entry-point code (if (import.meta.main) {...}) from
+      // being bundled into the server SEA binary.
+      'import.meta.main': 'false',
+    },
     // External packages:
     // - node:* - Node.js built-ins
     // - Build-time dependencies that shouldn't be in runtime bundle
@@ -552,15 +548,16 @@ export async function bundleServerForSEA(
 }
 
 /**
- * Injects the SEA blob into the executable using postject.
+ * Injects the SEA blob into the executable using postject's JS API.
  * Handles platform-specific signing requirements.
  */
 async function injectBlob(
   execPath: string,
-  blobPath: string,
+  blobData: Uint8Array,
   osName: OperatingSystem,
 ): Promise<void> {
   const sentinelFuse = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2';
+  const { inject } = await import('postject');
 
   if (osName === 'darwin') {
     // macOS: Remove existing signature before injection
@@ -575,22 +572,10 @@ async function injectBlob(
     }
 
     // Inject with macOS-specific segment
-    const injectResult = await cli(
-      npxCmd(),
-      '--no',
-      'postject',
-      execPath,
-      'NODE_SEA_BLOB',
-      blobPath,
-      '--sentinel-fuse',
+    await inject(execPath, 'NODE_SEA_BLOB', blobData, {
       sentinelFuse,
-      '--macho-segment-name',
-      'NODE_SEA',
-      { timeout: 120_000 },
-    );
-    if (injectResult.exitCode !== 0) {
-      throw new Error(`postject failed: ${injectResult.result}`);
-    }
+      machoSegmentName: 'NODE_SEA',
+    });
 
     // Ad-hoc sign after injection
     console.log('Ad-hoc signing macOS executable...');
@@ -603,21 +588,8 @@ async function injectBlob(
       );
     }
   } else {
-    // Linux/Windows: Standard postject
-    const injectResult = await cli(
-      npxCmd(),
-      '--no',
-      'postject',
-      execPath,
-      'NODE_SEA_BLOB',
-      blobPath,
-      '--sentinel-fuse',
-      sentinelFuse,
-      { timeout: 120_000 },
-    );
-    if (injectResult.exitCode !== 0) {
-      throw new Error(`postject failed: ${injectResult.result}`);
-    }
+    // Linux/Windows: Standard injection
+    await inject(execPath, 'NODE_SEA_BLOB', blobData, { sentinelFuse });
   }
 }
 

@@ -6,7 +6,7 @@ export default defineConfig({
     'react/hooks': 'react/hooks.ts',
     server: 'server.ts',
     'server-build': 'server-build.ts',
-    'cli/init': 'cli/init.ts',
+    'cli/init': 'cli/init.ts', // package.json "bin" entry, not in "exports"
     'cli/link': 'cli/link.ts',
   },
   format: ['esm'],
@@ -16,6 +16,6 @@ export default defineConfig({
   platform: 'node',
   clean: true,
   tsconfig: 'tsconfig.node.json',
-  // Keep all @goatdb/*, @std/*, react, nodemailer external (resolved by consumer)
-  external: [/^@goatdb\//, /^@std\//, 'react', /^nodemailer/],
+  // Keep all @goatdb/*, @std/*, react, nodemailer external (resolved by consumer); postject resolved at runtime from optionalDependencies
+  external: [/^@goatdb\//, /^@std\//, 'react', /^nodemailer/, 'postject'],
 });

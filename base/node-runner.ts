@@ -24,7 +24,7 @@ export async function compileForNodeWithEsbuild(
     bundle: true,
     platform: 'node',
     format: 'esm',
-    target: 'node18',
+    target: 'node24',
     write: false,
     sourcemap: 'inline',
     external: [
@@ -32,6 +32,7 @@ export async function compileForNodeWithEsbuild(
       'esbuild',
       '@luca/esbuild-deno-loader',
       'chokidar',
+      'postject',
     ],
     banner: {
       js:

@@ -26,9 +26,6 @@ jobs:
         with:
           node-version: '24.x'
 
-      - name: Install postject
-        run: npm install -g postject@1.0.0-alpha.6
-
       - name: Run Deno tests
         run: deno task test --runtime=deno
         env:
