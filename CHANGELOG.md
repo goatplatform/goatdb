@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and GoatDB adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - Unreleased
+## [0.5.1] - 2026-03-05
 
 ### Breaking Changes
 
@@ -31,6 +31,9 @@ and GoatDB adheres to
 - `@types/node` bumped from ^22 to ^24
 - `postject` bundled as optional dependency — no more global install required
 - esbuild target updated from `node18` to `node24`
+- `goatdb` CLI binary now available via npm (`npx -y @goatdb/goatdb init`)
+
+## [0.5.0] - 2026-02-26
 
 ## [0.4.0] - 2026-02-20
 
@@ -267,8 +270,8 @@ and GoatDB adheres to
 
 - Initial release
 
-[0.5.0]: https://github.com/goatplatform/goatdb/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/goatplatform/goatdb/compare/v0.3.1...v0.4.0
+[0.5.1]: https://github.com/goatplatform/goatdb/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/goatplatform/goatdb/compare/v0.3.1...v0.5.0
 [0.3.1]: https://github.com/goatplatform/goatdb/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/goatplatform/goatdb/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/goatplatform/goatdb/compare/v0.2.1...v0.2.2
