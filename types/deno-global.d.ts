@@ -35,14 +35,22 @@ declare namespace Deno {
   function readDir(path: string): AsyncIterable<any>;
   function readFile(path: string, options?: any): Promise<Uint8Array>;
   function readTextFile(path: string, options?: any): Promise<string>;
-  function writeTextFile(path: string, data: string, options?: any): Promise<void>;
+  function writeTextFile(
+    path: string,
+    data: string,
+    options?: any,
+  ): Promise<void>;
   function writeFileSync(path: string, data: Uint8Array, options?: any): void;
   function copyFile(from: string, to: string): Promise<void>;
   function remove(path: string, options?: any): Promise<void>;
   function mkdir(path: string, options?: any): Promise<void>;
   function makeTempDir(options?: any): Promise<string>;
   function open(path: string, options?: any): Promise<any>;
-  function symlink(oldpath: string, newpath: string, options?: any): Promise<void>;
+  function symlink(
+    oldpath: string,
+    newpath: string,
+    options?: any,
+  ): Promise<void>;
   function watchFs(paths: string | string[], options?: any): any;
   function addSignalListener(signal: string, handler: () => void): void;
   function serve(...args: any[]): any;

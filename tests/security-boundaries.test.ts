@@ -8,12 +8,8 @@ import { TEST } from './mod.ts';
 import { GoatDB } from '../db/db.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { Server } from '../net/server/server.ts';
-import {
-  generateSession,
-  signCommit,
-  verifyCommit,
-} from '../db/session.ts';
-import { assertEquals, assertTrue, assertExists } from './asserts.ts';
+import { generateSession, signCommit, verifyCommit } from '../db/session.ts';
+import { assertEquals, assertExists, assertTrue } from './asserts.ts';
 import {
   createRawCommit,
   createTestDomainConfig,

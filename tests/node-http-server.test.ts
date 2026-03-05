@@ -9,7 +9,11 @@
 import { TEST } from './mod.ts';
 import { assertEquals, assertExists, assertTrue } from './asserts.ts';
 import { isNode } from '../base/common.ts';
-import { GoatRequest, NodeHttpServer, type ServeHandlerInfo } from '../net/server/http-compat.ts';
+import {
+  GoatRequest,
+  NodeHttpServer,
+  type ServeHandlerInfo,
+} from '../net/server/http-compat.ts';
 
 export default function setupNodeHttpServerTests() {
   TEST('NodeHttpServer', 'GET request returns response body', async () => {
@@ -103,16 +107,23 @@ export default function setupNodeHttpServerTests() {
     const ac = new AbortController();
     try {
       await server.start(
-        async (_req: GoatRequest, _info: ServeHandlerInfo) => new Response('alive'),
+        async (_req: GoatRequest, _info: ServeHandlerInfo) =>
+          new Response('alive'),
         0,
         ac.signal,
       );
-      assertTrue(server.port !== undefined && server.port > 0, 'server should have a valid port before abort');
+      assertTrue(
+        server.port !== undefined && server.port > 0,
+        'server should have a valid port before abort',
+      );
       ac.abort();
       // ac.abort() fires the 'abort' listener synchronously, calling stop().
       // Node.js sets server.address() to null as soon as server.close() is called,
       // so server.port is undefined immediately — no await needed.
-      assertTrue(server.port === undefined, 'server.port must be undefined after abort');
+      assertTrue(
+        server.port === undefined,
+        'server.port must be undefined after abort',
+      );
     } finally {
       server.stop(); // idempotent safety cleanup
     }
@@ -123,7 +134,8 @@ export default function setupNodeHttpServerTests() {
     const server = new NodeHttpServer();
     try {
       await server.start(
-        async (_req: GoatRequest, _info: ServeHandlerInfo) => new Response('ok'),
+        async (_req: GoatRequest, _info: ServeHandlerInfo) =>
+          new Response('ok'),
         0,
       );
       const addr = server.address;

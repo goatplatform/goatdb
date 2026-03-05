@@ -441,7 +441,11 @@ export class GoatRequest {
    * Gets the original request object from the runtime
    * @returns The native request object
    */
-  get raw(): Request | NodeHttp1Request | NodeHttp2Request | MinimalNodeIncomingMessage {
+  get raw():
+    | Request
+    | NodeHttp1Request
+    | NodeHttp2Request
+    | MinimalNodeIncomingMessage {
     return this._native;
   }
 }

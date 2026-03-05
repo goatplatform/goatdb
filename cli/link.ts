@@ -136,7 +136,6 @@ export const goatEntryPoints = {
   '/react': 'react/hooks.ts',
   '/server': 'server.ts',
   '/server/build': 'server-build.ts',
-  '/init': 'cli/init.ts',
   '/link': 'cli/link.ts',
 } as const;
 
@@ -585,13 +584,17 @@ export async function unlinkGoatDB(cwd?: string): Promise<void> {
   await fileImpl.remove(goatLinkJsonPath);
 }
 
-// Deno-only entry point (Deno.args not available on Node.js)
 if (import.meta.main) {
+  linkMain().catch((err) => {
+    console.error(err);
+    Deno.exit(1);
+  });
+}
+
+async function linkMain(): Promise<void> {
   const cmd = Deno.args[0];
   if (cmd === undefined) {
-    console.error(
-      'Usage: unlink or link <local-goatdb-path>',
-    );
+    console.error('Usage: unlink or link <local-goatdb-path>');
     await exit(1);
   }
   if (cmd === 'unlink') {

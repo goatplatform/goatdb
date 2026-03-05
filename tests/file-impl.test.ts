@@ -102,10 +102,18 @@ export default function setupFileImplTests() {
     // readFile() uses its internal partial-read loop; this verifies both the
     // write path and that readFile() reassembles the full buffer correctly.
     const buf = await readFile(filePath);
-    assertEquals(buf.length, large.length, '64KB read-back should return full buffer');
+    assertEquals(
+      buf.length,
+      large.length,
+      '64KB read-back should return full buffer',
+    );
     assertEquals(buf[0], 0, 'first byte should match');
     assertEquals(buf[255], 255, 'byte at index 255 should match');
-    assertEquals(buf[large.length - 1], (large.length - 1) & 0xff, 'last byte should match');
+    assertEquals(
+      buf[large.length - 1],
+      (large.length - 1) & 0xff,
+      'last byte should match',
+    );
   });
 
   TEST('FileImpl', 'flush does not throw', async (ctx) => {
@@ -200,7 +208,11 @@ export default function setupFileImplTests() {
     await impl.copyFile(srcPath, dstPath);
 
     const buf = await readFile(dstPath);
-    assertEquals(buf.length, data.length, 'copied file size should match source');
+    assertEquals(
+      buf.length,
+      data.length,
+      'copied file size should match source',
+    );
     assertEquals(
       new TextDecoder().decode(buf),
       'copy me',
