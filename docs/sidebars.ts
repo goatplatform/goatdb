@@ -6,6 +6,7 @@ const sidebars: SidebarsConfig = {
     // GETTING STARTED (Progressive onboarding)
     'installation',
     'tutorial',
+    'cli',
 
     // CORE CONCEPTS (Foundation knowledge)
     'concepts',
