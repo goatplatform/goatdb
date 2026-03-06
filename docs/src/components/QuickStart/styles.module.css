@@ -5,7 +5,7 @@
 
 .quickstartHeader {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
 }
 
 .quickstartHeader h2 {
@@ -19,11 +19,59 @@
   margin: 0;
 }
 
-.codeTabs {
-  margin-top: 2rem;
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 720px;
+  margin: 0 auto;
 }
 
-/* Make code blocks more prominent */
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stepMeta {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.stepNumber {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--ifm-color-primary);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.15rem;
+}
+
+[data-theme='dark'] .stepNumber {
+  color: #000;
+}
+
+.stepTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+}
+
+.stepDescription {
+  font-size: 0.95rem;
+  color: var(--ifm-color-emphasis-700);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Code blocks */
 .quickstart pre {
   font-size: 0.875rem;
   border-radius: var(--ifm-code-border-radius);
@@ -31,7 +79,6 @@
   margin: 0;
 }
 
-/* Dark mode adjustments */
 [data-theme='dark'] .quickstart pre {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
