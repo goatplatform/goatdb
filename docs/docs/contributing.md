@@ -78,29 +78,13 @@ Run `deno task test && deno task bench` before submitting to ensure no regressio
 
 ## Code Standards
 
-**Formatting**: `deno fmt` (2 spaces, single quotes, 80 chars)
-**Naming**: `camelCase` for variables, `PascalCase` for classes  
-**Imports**: Use explicit `.ts` extensions
-**Cross-platform**: Code must work identically on all target runtimes
-
-## Contributor License Agreement
-
-Before your first contribution can be merged, you'll need to sign our Contributor License Agreement (CLA). This one-time process takes just a minute:
-
-1. **Open a Pull Request** with your contribution
-2. **CLA Assistant will comment** with a link to sign the agreement
-3. **Click the link and sign** using your GitHub account
-4. **Your PR status updates automatically** once signed
-
-The CLA ensures GoatDB can maintain long-term project sustainability while protecting both contributors and users. You retain copyright of your work while granting GoatDB the rights needed to distribute and improve the project.
-
-:::tip[One-Time Process]
-Once signed, the CLA covers all your future contributions to GoatDB. Corporate contributors should use our [Corporate CLA](https://cla-assistant.io/goatplatform/goatdb).
-:::
+- **Formatting** — `deno fmt` (2-space indent, single quotes, 80-char line width)
+- **Naming** — `camelCase` for variables/functions, `PascalCase` for classes, `_prefix` for private fields
+- **Imports** — explicit `.ts` extensions required
+- **Cross-platform** — code must work identically across Deno, Node.js, and browsers
 
 ## Pull Request Checklist
 
-- **CLA signed** (automated check will verify)
 - **Descriptive title** explaining your change's impact
 - **All tests pass**: `deno task test` across all platforms
 - **Performance maintained**: `deno task bench` shows no regressions
@@ -123,7 +107,7 @@ Once signed, the CLA covers all your future contributions to GoatDB. Corporate c
 
 ## License
 
-All contributions are licensed under the MIT license. The CLA you sign grants GoatDB the rights needed for long-term project sustainability, including the ability to relicense if needed for future project health, while you retain copyright ownership.
+All contributions are licensed under the [MIT license](https://github.com/goatplatform/goatdb/blob/main/LICENSE).
 
 ---
 
