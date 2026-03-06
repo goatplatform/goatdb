@@ -100,7 +100,7 @@ const config: Config = {
 
   themeConfig: {
     // Replace with your project's social card
-    image: 'img/goatdb_logo_dark_500.png',
+    image: 'img/social-preview.png',
     navbar: {
       logo: {
         alt: 'GoatDB Logo',
