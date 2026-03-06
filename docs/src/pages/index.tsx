@@ -106,7 +106,7 @@ function OpenSource() {
             </Link>
             <Link
               className="button button--outline button--secondary button--lg"
-              to="https://github.com/goatplatform/goatdb/blob/main/CONTRIBUTING.md"
+              to="/docs/contributing"
             >
               Contribute
             </Link>
