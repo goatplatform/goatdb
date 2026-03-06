@@ -41,9 +41,24 @@
   margin-top: 1.5rem;
 }
 
-.useCases {
+/* Problem Statement Section */
+.problemStatement {
   padding: 3rem 0;
   background-color: var(--ifm-color-emphasis-100);
+}
+
+.problemStatementText {
+  font-size: 1.15rem;
+  color: var(--ifm-color-emphasis-800);
+  line-height: 1.75;
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.useCases {
+  padding: 3rem 0;
+  background-color: var(--ifm-background-surface-color);
 }
 
 .useCases h2 {
@@ -54,7 +69,7 @@
 
 .useCaseGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 2rem;
   margin-bottom: 2rem;
 }
@@ -98,12 +113,29 @@
   margin: 0;
 }
 
-.tradeoffNote {
+/* Honest Tradeoff Section */
+.honestTradeoff {
+  padding: 3rem 0;
+  background-color: var(--ifm-color-emphasis-100);
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.honestTradeoffContent {
   text-align: center;
-  margin-top: 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.honestTradeoff h2 {
+  font-size: 1.75rem;
+  margin-bottom: 1rem;
+}
+
+.honestTradeoffContent p {
   font-size: 1rem;
   color: var(--ifm-color-emphasis-700);
   line-height: 1.6;
+  margin-bottom: 1rem;
 }
 
 /* Open Source Section */

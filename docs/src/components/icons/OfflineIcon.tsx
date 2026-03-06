@@ -8,33 +8,33 @@ export default function OfflineIcon({ className }: { className?: string }) {
       fill='none'
       xmlns='http://www.w3.org/2000/svg'
     >
-      <circle
-        cx='24'
-        cy='24'
-        r='8'
-        stroke='currentColor'
-        strokeWidth='2'
-        fill='none'
-      />
+      <circle cx='24' cy='36' r='3' fill='currentColor' />
       <path
-        d='M10 10 L38 38'
+        d='M17 32 A8 8 0 0 1 31 32'
         stroke='currentColor'
         strokeWidth='2'
         strokeLinecap='round'
       />
       <path
-        d='M14 24 C14 24 16 20 24 20 C32 20 34 24 34 24'
+        d='M12 29 A14 14 0 0 1 36 29'
         stroke='currentColor'
         strokeWidth='2'
         strokeLinecap='round'
-        strokeDasharray='2 2'
       />
       <path
-        d='M18 30 C18 30 20 28 24 28 C28 28 30 30 30 30'
+        d='M7 26 A20 20 0 0 1 41 26'
         stroke='currentColor'
         strokeWidth='2'
         strokeLinecap='round'
-        strokeDasharray='2 2'
+      />
+      <line
+        x1='10'
+        y1='10'
+        x2='38'
+        y2='38'
+        stroke='currentColor'
+        strokeWidth='2'
+        strokeLinecap='round'
       />
     </svg>
   );

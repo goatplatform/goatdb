@@ -1,36 +1,26 @@
 .features {
-  display: flex;
-  align-items: center;
   padding: 3rem 0;
   width: 100%;
 }
 
-.featuresHeader {
+.differentiatorGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
+
+.differentiator {
   text-align: center;
-  margin-bottom: 2rem;
+  padding: 2rem 1.5rem;
+  background: var(--ifm-color-emphasis-100);
+  border-radius: 8px;
 }
 
-.featuresHeader h2 {
-  font-size: 2rem;
-  margin-bottom: 0.5rem;
-}
-
-.featuresHeader p {
-  font-size: 1.1rem;
-  color: var(--ifm-color-emphasis-700);
-}
-
-.feature {
-  text-align: center;
-  padding: 1.5rem 1rem;
-  height: 100%;
-}
-
-.featureIcon {
+.differentiatorIcon {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: 1rem;
   height: 3rem;
 }
 
@@ -38,13 +28,22 @@
   width: 3rem;
   height: 3rem;
   color: var(--ifm-color-primary);
-  transition: color 0.3s ease;
 }
 
-[data-theme='dark'] .icon {
-  color: var(--ifm-color-primary);
+.differentiator h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
 }
 
+.differentiator p {
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Keep blink for CollaborativeIcon inline style reference */
 @keyframes blink {
   0%, 50% {
     opacity: 1;
@@ -54,114 +53,13 @@
   }
 }
 
-.feature h3 {
-  font-size: 1.1rem;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-}
-
-.feature p {
-  color: var(--ifm-color-emphasis-700);
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
-/* Architecture Section */
-.architectureSection {
-  margin: 3rem 0 4rem;
-  padding: 3rem;
-  background: var(--ifm-color-emphasis-100);
-  border-radius: 12px;
-  text-align: center;
-}
-
-.architectureSection h3 {
-  font-size: 2rem;
-  margin-bottom: 1rem;
-  color: var(--ifm-color-primary);
-}
-
-.architectureDescription {
-  font-size: 1.1rem;
-  line-height: 1.6;
-  margin: 0 auto 3rem;
-  max-width: 800px;
-  color: var(--ifm-color-emphasis-800);
-}
-
-.architectureFeatures {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 2rem;
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-.architectureFeature {
-  text-align: center;
-  padding: 1.5rem;
-}
-
-.architectureIconWrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 1rem;
-  height: 3rem;
-}
-
-.architectureIcon {
-  width: 3rem;
-  height: 3rem;
-  color: var(--ifm-color-primary);
-  transition: color 0.3s ease;
-}
-
-[data-theme='dark'] .architectureIcon {
-  color: var(--ifm-color-primary);
-}
-
-.architectureFeature h4 {
-  font-size: 1.1rem;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-  color: var(--ifm-heading-color);
-}
-
-.architectureFeature p {
-  font-size: 0.9rem;
-  color: var(--ifm-color-emphasis-700);
-  margin: 0;
-}
-
-/* Responsive adjustments */
 @media screen and (max-width: 996px) {
   .features {
     padding: 2rem 0;
   }
 
-  .feature {
-    padding: 1rem 0.5rem;
-  }
-
-  .featuresHeader h2 {
-    font-size: 1.75rem;
-  }
-
-  .featuresHeader p {
-    font-size: 1rem;
-  }
-
-  .architectureSection {
-    padding: 2rem 1rem;
-  }
-
-  .architectureFeatures {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1rem;
-  }
-
-  .architectureFeature {
-    padding: 1rem 0.5rem;
+  .differentiatorGrid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
   }
 }
