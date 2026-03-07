@@ -73,13 +73,21 @@ function HonestTradeoff() {
     <section className={styles.honestTradeoff}>
       <div className="container">
         <div className={styles.honestTradeoffContent}>
-          <h2>Not for everything</h2>
+          <h2>Pay once at startup. Zero IO after.</h2>
           <p>
-            GoatDB trades raw query performance for developer experience and
-            resilience. If you need sub-100ms queries on millions of rows, use
-            PostgreSQL.
+            GoatDB loads your dataset into memory when a repository opens —
+            then eliminates IO from every subsequent operation. Reads complete
+            in 1–2μs with no network hop, no disk wait, no server in the loop.
+            A remote PostgreSQL query costs 1–5ms in the same datacenter,
+            10–50ms from the browser. GoatDB removes that cost from your hot
+            path entirely.
           </p>
-          <Link to="/docs/benchmarks">See benchmarks →</Link>
+          <p>
+            The tradeoff is startup time: opening a large repository takes a
+            few hundred milliseconds. After that, your app runs at memory
+            speed. Sync and persistence happen fully in the background.
+          </p>
+          <Link to="/docs/benchmarks">See the benchmarks →</Link>
         </div>
       </div>
     </section>
