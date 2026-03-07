@@ -22,23 +22,22 @@ const differentiators: DifferentiatorItem[] = [
     ),
   },
   {
-    title: 'Git-Style Conflict Resolution',
+    title: 'No Conflict Dialogs. Ever.',
     Icon: ConflictResolutionIcon,
     description: (
       <>
-        Three-way merge with ephemeral CRDTs. Multiple users edit
-        simultaneously without conflicts — like Git, but for live data.
+        Multiple users edit the same data at the same time. Changes merge
+        automatically — no manual conflict resolution, no data loss.
       </>
     ),
   },
   {
-    title: 'Single Binary, Ultra-Cheap Deploy',
+    title: 'Self-Healing, Simple to Deploy',
     Icon: DeployIcon,
     description: (
       <>
-        Deno compiles everything into one binary. Each customer gets their own
-        instance on a $5/month VM. Clients restore crashed servers
-        automatically.
+        Compiles to a single binary on every runtime. If your server crashes,
+        clients carry the full history and restore it automatically.
       </>
     ),
   },

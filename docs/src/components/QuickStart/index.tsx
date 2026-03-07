@@ -64,7 +64,7 @@ const STEPS: Step[] = [
     num: 3,
     title: 'It just syncs',
     description:
-      'Offline edits, concurrent users, multiple devices — changes merge automatically using Git-style three-way merge. Sets and maps combine additions from all peers. No conflict dialogs. Ever.',
+      'No conflict dialogs. Ever. Offline edits, concurrent users, multiple devices — everything merges automatically. You never write conflict-resolution code.',
   },
   {
     num: 4,

@@ -164,7 +164,7 @@ export default function Home(): JSX.Element {
   return (
     <Layout
       title="GoatDB - Real-time database for apps and AI agents"
-      description="A p2p database for collaborative apps and distributed AI agents. Cryptographically signed commits, self-healing architecture, works offline. Single binary with Deno."
+      description="A p2p database for collaborative apps and distributed AI agents. Cryptographically signed commits, self-healing architecture, works offline. Runs on any JavaScript runtime."
     >
       <HomepageHeader />
       <main>
