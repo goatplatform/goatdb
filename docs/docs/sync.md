@@ -132,6 +132,27 @@ rate at a minimum of `0.001`, we ensure that a gap larger than three commits is
 extremely unlikely—occurring roughly once every 32 years (assuming one sync
 iteration per second).
 
+### Merge Deferral on Incomplete Graphs
+
+When a gap does occur despite ancestor pointers, the system responds
+defensively. The [merge-base (LCA) algorithm](/docs/conflict-resolution#merge-base-selection)
+expands its search through ancestor links as well as parent links, ranking
+every common-ancestor candidate by depth (closeness to the two leaves). It
+always prefers the closest candidate.
+
+If the closest candidate exists in the intersection of both ancestry sets but
+is not yet available locally, the merge is **deferred**: the leaf is left
+unmerged and retried on the next merge attempt after sync delivers the missing
+commit. This prevents the system from falling back to a farther ancestor, which
+would produce a wider diff and potentially revert intermediate changes.
+
+This design also provides resilience against bad actors. If a peer injects a
+branch but withholds K+1 consecutive ancestor commits, the LCA search finds no
+usable candidate — the branch is deferred indefinitely. The system never
+reverts good data to accommodate an incomplete branch. Legitimate users whose
+commits are temporarily missing due to bloom-filter false positives will have
+their gaps bridged by ancestor pointers within one or two sync iterations.
+
 ## Real-World Performance
 
 GoatDB's synchronization prioritizes consistency over speed. In typical deployments, expect **700-1000ms application-perceived latency** between peers.

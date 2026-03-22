@@ -50,6 +50,27 @@ When creating a new commit, a peer follows the procedure below:
 3. Sign the result with the peer's private key.
 4. Write the new commit to the replicated graph.
 
+## Ancestor Pointers
+
+In addition to its direct parents, each commit stores references to K ancestors
+further up the commit history. These ancestor pointers serve two purposes:
+
+1. **Bridging sync gaps.** The [bloom-filter sync protocol](/docs/sync)
+   may temporarily miss consecutive commits, creating gaps in the local graph.
+   Ancestor pointers let the system see past these gaps. A commit that appears
+   in another commit's ancestor list is recognized as part of the graph and is
+   not treated as a leaf — even if its direct parent link is missing locally.
+
+2. **Merge base discovery.** When resolving conflicts, the
+   [LCA algorithm](/docs/conflict-resolution#merge-base-selection) walks both
+   parent and ancestor links to find a common base commit. If a parent is
+   missing, the search can jump through ancestor pointers instead of stalling.
+
+The probability of missing K consecutive commits during sync is approximately
+FPR^K, where FPR is the bloom filter's false-positive rate. With GoatDB's
+minimum FPR cap of 0.001, gaps larger than three commits are extremely
+unlikely. See the [synchronization page](/docs/sync) for the full analysis.
+
 ## Delta Compression
 
 Like any other compression strategy, delta compression usually reduces the size
