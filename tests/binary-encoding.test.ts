@@ -1104,17 +1104,18 @@ export default function setup() {
       { schema: TestSchema as Schema, data: { name: 'too-many-anc' } },
       DataRegistry.default,
     );
-    const commit = Commit.create(
-      {
-        session: 'sess-256',
-        orgId: 'org',
-        key: 'k-256',
-        contents: item,
-        parents: [],
-        ancestors,
-      },
-      DataRegistry.default,
+    assertThrows(() =>
+      Commit.create(
+        {
+          session: 'sess-256',
+          orgId: 'org',
+          key: 'k-256',
+          contents: item,
+          parents: [],
+          ancestors,
+        },
+        DataRegistry.default,
+      )
     );
-    assertThrows(() => commit.toBytes());
   });
 }
