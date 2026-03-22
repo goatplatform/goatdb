@@ -134,10 +134,12 @@ db.create('/data/repo/item', kMySchema, data);
 - **Always run `deno task build` after changing `binary-commit.ts`**
 - **Zero-copy rule**: no `buf.subarray()` and no intermediate object allocations
   on encode/decode hot paths; use manual UTF-8 codec (no
-  TextEncoder/TextDecoder) in `BinaryCommitWriter` and `decodeStr`. When
-  strictly necessary to break this rule, add an inline comment explaining the
-  tradeoff (e.g. `decodeStr` ASCII fast path: one subarray view allocation
-  replaces N per-char string concatenation allocations)
+  TextEncoder/TextDecoder) in `BinaryCommitWriter` and `decodeStr`, except: a
+  shared `TextDecoder` is permitted as a fallback in `decodeStr` for non-ASCII
+  or long (>512 byte) strings — the ASCII fast path avoids it. When strictly
+  necessary to break this rule, add an inline comment explaining the tradeoff
+  (e.g. `decodeStr` ASCII fast path: one subarray view allocation replaces N
+  per-char string concatenation allocations)
 - `BinaryCommit._bytes` may reference a shared scan-buffer from
   `fromBinaryScanResult` — this is intentional; do not slice it in `toBytes()`
 - Header is 36 bytes fixed; string fields follow with u16/u8 length prefixes;
