@@ -450,7 +450,7 @@ export class FieldCommit extends Commit {
       this._session = config.session;
       this.orgId = config.orgId;
       this._key = config.key;
-      this._parents = Array.from(parents);
+      this._parents = parents;
       assert(
         this._parents.length <= 255,
         `Parent count (${this._parents.length}) exceeds u8 limit of 255`,
