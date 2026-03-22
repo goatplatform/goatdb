@@ -43,6 +43,8 @@
     "test": "deno run -A tests/run.ts",
     "test:smoke": "deno run -A tests/run.ts --runtime=deno --suite=SecurityBoundaries",
     "bench": "deno run -A benchmarks/run.ts",
+    "bench:json": "deno run -A benchmarks/run.ts --output-json --output-dir=benchmarks/results",
+    "bench:update-docs": "deno run -A benchmarks/update-docs.ts --input-dir=benchmarks/results",
     "docs:api": "deno run -A docs/docs-api-build.ts",
     "docs:clean": "rm -rf docs/node_modules docs/.docusaurus docs/build docs/package-lock.json docs/api-docs",
     "docs:serve": "deno run -A docs/docs-api-build.ts && deno run -A docs/docs-build.ts serve",

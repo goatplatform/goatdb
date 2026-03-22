@@ -247,6 +247,7 @@ export interface RunConfig {
   denoInspectBrk?: boolean;
   nodeInspectBrk?: boolean;
   mode?: 'test' | 'benchmark';
+  onBrowserResult?: (summary: unknown) => Promise<void>;
 }
 
 /**
@@ -408,6 +409,8 @@ export async function runAcrossPlatforms(
 
       const browserEnd = performance.now();
       browserElapsed = (browserEnd - browserStart) / 1000;
+
+      if (config.onBrowserResult) await config.onBrowserResult(summary);
 
       // Handle both test and benchmark result formats
       const browserSummary = summary.summary ?? summary;
