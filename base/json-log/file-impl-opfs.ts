@@ -1,6 +1,7 @@
 import * as path from '../path.ts';
 import type { DirEntry, FileImpl } from './file-impl-interface.ts';
 import { retry, TryAgain } from '../time.ts';
+import { log } from '../../logging/log.ts';
 
 interface FileSystemSyncAccessHandle {
   close(): void;
@@ -55,6 +56,13 @@ type SyncHandle = {
   createSyncAccessHandle: () => Promise<FileSystemSyncAccessHandle>;
 };
 
+export async function clearOPFS(): Promise<void> {
+  const root = await navigator.storage.getDirectory();
+  for await (const [name] of root.entries()) {
+    await root.removeEntry(name, { recursive: true });
+  }
+}
+
 export const FileImplOPFS: FileImpl<OPFSFile> = {
   async open(filePath, write) {
     const dir = await getDir(path.dirname(filePath));
@@ -77,7 +85,11 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
           firstError.message.includes('another open Access Handle') ||
           firstError.message.includes('Writable stream'))
       ) {
-        console.warn(`[OPFS] Handle locked for ${filePath}, retrying...`);
+        log({
+          severity: 'WARNING',
+          error: 'StorageError',
+          message: '[OPFS] Handle locked for ' + filePath + ', retrying...',
+        });
 
         file = await retry(
           async () => {
@@ -97,8 +109,8 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
               throw e;
             }
           },
-          100, // 100ms total timeout - balance between speed and reliability
-          10, // 10ms max delay between retries
+          500, // 500ms total timeout - OPFS lock release can lag under load
+          50, // 50ms max delay between retries
         );
       } else {
         // Not a locking error, propagate immediately
