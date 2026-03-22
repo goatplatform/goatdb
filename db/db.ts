@@ -709,6 +709,15 @@ export class GoatDB<US extends Schema = Schema>
    * consecutive write failures for a file, ALL buffered commits for that file
    * are dropped and a `WriteFailure` event is emitted. Callers can listen to
    * `WriteFailure` to react (e.g. alert the user or trigger a sync).
+   *
+   * Write-retry semantics:
+   * - Data is removed from the queue before the write attempt to prevent
+   *   double-writes if a concurrent flush fires.
+   * - On failure, data is prepended back to the queue (preserving order).
+   * - If new batches arrived between failure and re-queue, they merge into a
+   *   single queue entry that inherits the pre-existing fail count.
+   * - After MAX_WRITE_FAILURES consecutive failures the data is dropped and
+   *   `WriteFailure` is emitted — callers MUST handle this event.
    */
   private async _drainPendingAppends(
     file: JSONLogFile,
