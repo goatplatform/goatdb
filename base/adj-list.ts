@@ -8,6 +8,7 @@ export interface Edge {
   fieldName: string;
 }
 
+// Called during commit persist/load, not the decode hot path.
 function hashEdge(edge: Edge): string {
   return `${edge.vertex}/${edge.fieldName}`;
 }
@@ -16,6 +17,10 @@ function eqEdges(e1: Edge, e2: Edge): boolean {
   return e1.vertex === e2.vertex && e1.fieldName === e2.fieldName;
 }
 
+// AdjacencyList memory model:
+// - Grows monotonically; edges are never pruned during a Repository lifetime.
+// - Memory is proportional to total persisted commits.
+// - hasInEdges(id) (leaf check hot path) is O(1) Map lookup, no allocation.
 export class AdjacencyList {
   private _inEdges: Dictionary<string, HashSet<Edge>>;
   private _outEdges: Dictionary<string, HashSet<Edge>>;
@@ -29,9 +34,16 @@ export class AdjacencyList {
     return this._inEdges.size === 0 && this._outEdges.size === 0;
   }
 
-  hasInEdges(vertKey: string): boolean {
-    const set = this._inEdges.get(vertKey);
-    return set !== undefined && set.size > 0;
+  hasInEdges(vertKey: string, fieldName?: string): boolean {
+    if (fieldName === undefined) {
+      const set = this._inEdges.get(vertKey);
+      return set !== undefined && set.size > 0;
+    }
+    // O(degree) scan — only used on non-hot paths (e.g. subGraphForCommit)
+    for (const _ of this.inEdges(vertKey, fieldName)) {
+      return true;
+    }
+    return false;
   }
 
   addEdge(src: string, dst: string, fieldName: string): boolean {
@@ -50,12 +62,9 @@ export class AdjacencyList {
       this._inEdges.set(dst, inSet);
     }
     // Sanity check. Both sides must be in sync
+    const inSuccess = inSet.add({ vertex: src, fieldName });
     assert(
-      success ===
-        inSet.add({
-          vertex: src,
-          fieldName,
-        }),
+      success === inSuccess,
       `addEdge failed. src: ${src}, dest: ${dst}, fieldName: ${fieldName}`,
     );
     return success;
@@ -66,16 +75,15 @@ export class AdjacencyList {
     const inSet = this._inEdges.get(dst);
     const success = Boolean(outSet?.delete({ vertex: dst, fieldName }));
     // Sanity check. Both sides must be in sync
+    const inSuccess = Boolean(inSet?.delete({ vertex: src, fieldName }));
     assert(
-      success ===
-        Boolean(
-          inSet?.delete({
-            vertex: src,
-            fieldName,
-          }),
-        ),
+      success === inSuccess,
       `deleteEdge failed. src: ${src}, dest: ${dst}, fieldName: ${fieldName}`,
     );
+    if (success) {
+      if (outSet && outSet.size === 0) this._outEdges.delete(src);
+      if (inSet && inSet.size === 0) this._inEdges.delete(dst);
+    }
     return success;
   }
 
