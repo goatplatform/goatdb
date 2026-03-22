@@ -561,6 +561,9 @@ export class Repository<
         break;
       }
     }
+    // Release retained string references from scratch arrays
+    _scratchKeys1.length = 0;
+    _scratchKeys2.length = 0;
 
     // Single-pass intersection: find closest available candidate
     let minTotalDepth = Infinity;
@@ -1764,7 +1767,9 @@ function compareCommitsDesc(c1: Commit, c2: Commit): number {
 // decreased. Returning true on depth refinement ensures the BFS re-expands
 // children at the corrected (shorter) depth, yielding globally minimal depths.
 function setMinDepth(
-  map: Map<string, number>, id: string, depth: number,
+  map: Map<string, number>,
+  id: string,
+  depth: number,
 ): boolean {
   const existing = map.get(id);
   if (existing === undefined || depth < existing) {
