@@ -7,9 +7,11 @@ import { GoatDB } from '../db/db.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
 import { sleep } from '../base/time.ts';
+import { log } from '../logging/log.ts';
 import type { DBInstanceConfig } from '../db/db.ts';
 import * as path from '../base/path.ts';
 import type { Schema } from '../cfds/base/schema.ts';
+import type { SystemInfo } from '../base/system-info.ts';
 
 /**
  * Result structure for both tests and benchmarks
@@ -55,6 +57,7 @@ export interface RunSummary {
     runtime: 'deno' | 'node' | 'browser';
     timestamp: string;
     duration: number;
+    systemInfo?: SystemInfo;
   };
 
   /**
@@ -132,13 +135,16 @@ export interface BenchmarkStatistics {
   max: number;
   p95: number;
   p99: number;
-  std: number;
   stddev: number;
   throughput: number;
   successRate: number;
   samples: number;
   warmupIterations: number;
   measuredIterations: number;
+  median?: number;
+  cv?: number;
+  trimmedMean?: number;
+  outlierCount?: number;
 }
 
 /**
@@ -222,7 +228,14 @@ export class Suite {
     }
 
     if (this._tempDir) {
-      await (await FileImplGet()).remove(this._tempDir);
+      const removed = await (await FileImplGet()).remove(this._tempDir);
+      if (!removed) {
+        log({
+          severity: 'WARNING',
+          error: 'StorageError',
+          message: `Failed to remove temp dir: ${this._tempDir}`,
+        });
+      }
       this._tempDir = undefined;
     }
   }
@@ -303,6 +316,17 @@ export class Suite {
     this._dbs.set(testId, db as unknown as GoatDB<Schema>);
     return db;
   }
+
+  async getOrCreateDB<S extends Schema = Schema>(
+    testId: string,
+    config: Partial<DBInstanceConfig> = {},
+  ): Promise<GoatDB<S>> {
+    const existing = this._dbs.get(testId);
+    if (existing) {
+      return existing as unknown as GoatDB<S>;
+    }
+    return this.createDB<S>(testId, config);
+  }
 }
 
 /**
@@ -349,24 +373,53 @@ export function calculateStatistics(
   // Calculate the mean (average) duration
   const mean = samples.reduce((a, b) => a + b, 0) / n;
 
-  // Calculate the variance and standard deviation
-  const variance = samples.reduce((sum, x) => sum + Math.pow(x - mean, 2), 0) /
-    n;
+  // Calculate the variance and standard deviation (Bessel's correction: n-1)
+  const variance = samples.reduce(
+    (sum, x) => sum + Math.pow(x - mean, 2),
+    0,
+  ) / (n > 1 ? n - 1 : n);
   const stddev = Math.sqrt(variance);
 
   // Calculate percentiles (p95 and p99)
-  // Use Math.floor to get the index, fallback to the last sample if out of
-  // bounds
   const p95 = sorted[Math.floor(n * 0.95)] || sorted[n - 1];
   const p99 = sorted[Math.floor(n * 0.99)] || sorted[n - 1];
 
-  // Throughput is calculated as operations per second (1000 ms / mean duration)
-  // If mean is zero, throughput is zero to avoid division by zero
+  // Throughput: operations per second
   const throughput = mean > 0 ? 1000 / mean : 0;
 
-  // Success rate is the ratio of successful samples to total attempts
-  // (including failures)
+  // Success rate
   const successRate = n / (n + failures);
+
+  // Median
+  const median = n % 2 === 1
+    ? sorted[Math.floor(n / 2)]
+    : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+
+  // Coefficient of variation
+  const cv = mean > 0 ? stddev / mean : 0;
+
+  // IQR outlier detection and trimmed mean (only when n >= 4)
+  let trimmedMean = mean;
+  let outlierCount = 0;
+  if (n >= 4) {
+    const q1 = sorted[Math.floor(n * 0.25)];
+    const q3 = sorted[Math.floor(n * 0.75)];
+    const iqr = q3 - q1;
+    const lowerFence = q1 - 1.5 * iqr;
+    const upperFence = q3 + 1.5 * iqr;
+    let inlierSum = 0;
+    let inlierCount = 0;
+    for (let i = 0; i < n; i++) {
+      if (sorted[i] >= lowerFence && sorted[i] <= upperFence) {
+        inlierSum += sorted[i];
+        inlierCount++;
+      }
+    }
+    outlierCount = n - inlierCount;
+    if (inlierCount > 0) {
+      trimmedMean = inlierSum / inlierCount;
+    }
+  }
 
   return {
     mean,
@@ -374,13 +427,16 @@ export function calculateStatistics(
     max: sorted[n - 1],
     p95,
     p99,
-    std: stddev,
     stddev,
     throughput,
     successRate,
     samples: n,
     warmupIterations: config.warmup || 0,
     measuredIterations: n,
+    median,
+    cv,
+    trimmedMean,
+    outlierCount,
   };
 }
 
@@ -390,10 +446,9 @@ export function calculateStatistics(
 export function getDefaultBenchmarkConfig(name: string): BenchmarkConfig {
   // I/O heavy operations - no warmup, fewer iterations
   if (
-    name.includes('100k') || name.includes('Open database') ||
-    name.includes('Open repository')
+    name.includes('100k') || name.includes('Open database')
   ) {
-    return { warmup: 0, iterations: 3 };
+    return { warmup: 1, iterations: 7 };
   }
 
   // Sync operations - expect some failures, more iterations for variance

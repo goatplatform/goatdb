@@ -1,7 +1,6 @@
 import { BloomFilter } from '../base/bloom.ts';
 import { uniqueId } from '../base/common.ts';
 import type { CoreValue, Encodable, Encoder } from '../base/core-types/base.ts';
-import { JSONCyclicalDecoder } from '../base/core-types/encoding/json.ts';
 import type {
   ConstructorDecoderConfig,
   Decodable,
@@ -16,8 +15,37 @@ import type { VersionNumber } from '../base/version-number.ts';
 import type { DataRegistry } from '../cfds/base/data-registry.ts';
 import { Commit } from '../repo/commit.ts';
 import { getGoatConfig } from '../base/config.ts';
+import { log } from '../logging/log.ts';
 
 export const K_DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+// To calculate the desired False-Positive-Rate (fpr), we use the following
+// approximation: 2log[fpr](numberOfEntries) = expectedSyncCycles
+// This appears to hold well in practice, while producing compact enough
+// filters.
+//
+// 2log[fpr](N) = C =>
+// log[fpr](N) = 0.5 * C =>
+// fpr ^ 0.5C = N =>
+// fpr = sqr[0.5C](N) =>
+// fpr = N ^ (1 / 0.5C)
+//
+// Note that the resulting FPR is a ratio rather than a fraction, so the
+// final value is 1 / fpr.
+//
+// Cap FPR at 0.001 (0.1%): slightly larger filters (~10 bits/entry) but
+// virtually eliminates false-positive-driven resync rounds. A high FPR
+// (e.g. 0.5) would cause ~50% of sync checks to falsely report "already
+// have this commit", requiring many extra round-trips to converge.
+function computeSyncFPR(
+  numberOfEntries: number,
+  expectedSyncCycles: number,
+): number {
+  return Math.min(
+    0.001,
+    1 / Math.pow(numberOfEntries, 1 / (0.5 * expectedSyncCycles)),
+  );
+}
 
 /**
  * An initial configuration needed to instantiate a new SyncMessage instance.
@@ -172,7 +200,7 @@ export class SyncMessage implements Encodable, Decodable {
       'c',
       (this.values as Commit[]).map((c) => c.toJS()),
     );
-    if (this.accessDenied) {
+    if (this.accessDenied.length > 0) {
       encoder.set('ad', this.accessDenied);
     }
   }
@@ -187,9 +215,7 @@ export class SyncMessage implements Encodable, Decodable {
     }
     const filterDecoder = decoder.getDecoder('f');
     this._filter.deserialize(filterDecoder);
-    if (filterDecoder instanceof JSONCyclicalDecoder) {
-      filterDecoder.finalize();
-    }
+    filterDecoder.finalize?.();
     this._size = decoder.get<number>('s')!;
     this._accessDenied = decoder.get('ad', []);
     const values: Commit[] = [];
@@ -203,7 +229,13 @@ export class SyncMessage implements Encodable, Decodable {
             this.registry,
           ),
         );
-      } catch (e: unknown) {}
+      } catch (e: unknown) {
+        log({
+          severity: 'WARNING',
+          error: 'SerializeError',
+          message: `SyncMessage: failed to decode commit at index ${i}: ${e}`,
+        });
+      }
     }
     this._values = values;
   }
@@ -217,9 +249,7 @@ export class SyncMessage implements Encodable, Decodable {
     const filter = new BloomFilter({ size: 1, fpr: 0.5 });
     const filterDecoder = decoder.getDecoder('f');
     filter.deserialize(filterDecoder);
-    if (filterDecoder instanceof JSONCyclicalDecoder) {
-      filterDecoder.finalize();
-    }
+    filterDecoder.finalize?.();
     const size = decoder.get<number>('s')!;
     const accessDenied = decoder.get('ad', []);
     const values: Commit[] | undefined = !decoder.has('c')
@@ -258,42 +288,20 @@ export class SyncMessage implements Encodable, Decodable {
     orgId: string,
     registry: DataRegistry,
     includeMissing = true,
-    lowAccuracy = false,
   ): SyncMessage {
     const numberOfEntries = Math.max(1, localSize, peerSize);
-    // To calculate the desired False-Positive-Rate (fpr), we use the following
-    // approximation: 2log[fpr](numberOfEntries) = expectedSyncCycles
-    // This appears to hold well in practice, while producing compact enough
-    // filters.
-    //
-    // 2log[fpr](N) = C =>
-    // log[fpr](N) = 0.5 * C =>
-    // fpr ^ 0.5C = N =>
-    // fpr = sqr[0.5C](N) =>
-    // fpr = N ^ (1 / 0.5C)
-    //
-    // Note that the resulting FPR is a ratio rather than a fraction, so the
-    // final value is 1 / fpr.
-    //
-    // Finally, a bloom filter with fpr >= 0.5 isn't very useful (more than 50%
-    // false positives), so we cap the computed value at 0.5.
-    const fpr = lowAccuracy ? 0.5 : Math.min(
-      0.5,
-      1 / Math.pow(numberOfEntries, 1 / (0.5 * expectedSyncCycles)),
-    );
+    const fpr = computeSyncFPR(numberOfEntries, expectedSyncCycles);
     const localFilter = new BloomFilter({
       size: numberOfEntries,
       fpr,
     });
     const missingPeerValues: Commit[] = [];
-    if (peerFilter && includeMissing) {
-      localSize = 0;
-      for (const [id, v] of values) {
-        localFilter.add(id);
-        ++localSize;
-        if (!peerFilter.has(id)) {
-          missingPeerValues.push(v);
-        }
+    localSize = 0;
+    for (const [id, v] of values) {
+      localFilter.add(id);
+      ++localSize;
+      if (peerFilter && includeMissing && !peerFilter.has(id)) {
+        missingPeerValues.push(v);
       }
     }
     return new this(
@@ -316,44 +324,22 @@ export class SyncMessage implements Encodable, Decodable {
     orgId: string,
     registry: DataRegistry,
     includeMissing = true,
-    lowAccuracy = false,
   ): Promise<SyncMessage> {
     const numberOfEntries = Math.max(1, localSize, peerSize);
-    // To calculate the desired False-Positive-Rate (fpr), we use the following
-    // approximation: 2log[fpr](numberOfEntries) = expectedSyncCycles
-    // This appears to hold well in practice, while producing compact enough
-    // filters.
-    //
-    // 2log[fpr](N) = C =>
-    // log[fpr](N) = 0.5 * C =>
-    // fpr ^ 0.5C = N =>
-    // fpr = sqr[0.5C](N) =>
-    // fpr = N ^ (1 / 0.5C)
-    //
-    // Note that the resulting FPR is a ratio rather than a fraction, so the
-    // final value is 1 / fpr.
-    //
-    // Finally, a bloom filter with fpr >= 0.5 isn't very useful (more than 50%
-    // false positives), so we cap the computed value at 0.5.
-    const fpr = lowAccuracy ? 0.5 : Math.min(
-      0.5,
-      1 / Math.pow(numberOfEntries, 1 / (0.5 * expectedSyncCycles)),
-    );
+    const fpr = computeSyncFPR(numberOfEntries, expectedSyncCycles);
     const localFilter = new BloomFilter({
       size: numberOfEntries,
       fpr,
     });
     const missingPeerValues: Commit[] = [];
-    if (peerFilter && includeMissing) {
-      localSize = 0;
-      await CoroutineScheduler.sharedScheduler().forEach(values, ([id, v]) => {
-        localFilter.add(id);
-        ++localSize;
-        if (!peerFilter.has(id)) {
-          missingPeerValues.push(v);
-        }
-      });
-    }
+    localSize = 0;
+    await CoroutineScheduler.sharedScheduler().forEach(values, ([id, v]) => {
+      localFilter.add(id);
+      ++localSize;
+      if (peerFilter && includeMissing && !peerFilter.has(id)) {
+        missingPeerValues.push(v);
+      }
+    });
     return new this(
       {
         filter: localFilter,
