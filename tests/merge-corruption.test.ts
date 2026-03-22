@@ -4,7 +4,7 @@ import { kMergeTestRegistry, kMergeTestSchemaV1 } from './merge-test-utils.ts';
 import { Commit } from '../repo/commit.ts';
 import { Item } from '../cfds/base/item.ts';
 import { Edit } from '../cfds/base/edit.ts';
-import { BloomFilter } from '../base/bloom.ts';
+
 function makeItem(title: string): Item {
   return new Item(
     {
@@ -62,14 +62,13 @@ export default function setup() {
 
         // Create base document commit
         const baseItem = makeItem('base');
-        const baseCommit = new Commit({
+        const baseCommit = Commit.create({
           session: 'sess',
           orgId: 'test-org',
           key: 'k1',
           contents: baseItem,
           parents: [],
-          ancestorsFilter: BloomFilter.empty,
-          ancestorsCount: 0,
+          ancestors: [],
         });
 
         // Create a delta commit with WRONG srcChecksum
@@ -79,14 +78,13 @@ export default function setup() {
           srcChecksum: 'wrong-src-checksum', // Deliberately wrong
           dstChecksum: dstItem.checksum,
         });
-        const deltaCommit = new Commit({
+        const deltaCommit = Commit.create({
           session: 'sess',
           orgId: 'test-org',
           key: 'k1',
           contents: { base: baseCommit.id, edit },
           parents: [baseCommit.id],
-          ancestorsFilter: BloomFilter.empty,
-          ancestorsCount: 1,
+          ancestors: [],
         });
 
         await repo.persistVerifiedCommits([baseCommit, deltaCommit]);
@@ -115,14 +113,13 @@ export default function setup() {
 
         // Create base document commit
         const baseItem = makeItem('base');
-        const baseCommit = new Commit({
+        const baseCommit = Commit.create({
           session: 'sess',
           orgId: 'test-org',
           key: 'k1',
           contents: baseItem,
           parents: [],
-          ancestorsFilter: BloomFilter.empty,
-          ancestorsCount: 0,
+          ancestors: [],
         });
 
         // Create a delta commit with correct src but WRONG dstChecksum
@@ -132,14 +129,13 @@ export default function setup() {
           srcChecksum: baseItem.checksum,
           dstChecksum: 'wrong-dst-checksum', // Deliberately wrong
         });
-        const deltaCommit = new Commit({
+        const deltaCommit = Commit.create({
           session: 'sess',
           orgId: 'test-org',
           key: 'k1',
           contents: { base: baseCommit.id, edit },
           parents: [baseCommit.id],
-          ancestorsFilter: BloomFilter.empty,
-          ancestorsCount: 1,
+          ancestors: [],
         });
 
         await repo.persistVerifiedCommits([baseCommit, deltaCommit]);

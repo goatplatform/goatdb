@@ -17,9 +17,11 @@ import setupOrderstamp from './orderstamp-expose.test.ts';
 import setupGoatRequestTest from './goat-request.test.ts';
 import setupSession from './session.test.ts';
 import setupCommit from './commit.test.ts';
+import setupBinaryEncoding from './binary-encoding.test.ts';
 import setupServerArchitectureTest from './server-architecture.test.ts';
 import setupStaticAssetsEndpointTest from './static-assets-endpoint.test.ts';
 import setupFileImplTests from './file-impl.test.ts';
+import setupJsonLogFormats from './json-log-formats.test.ts';
 import setupNodeHttpServerTests from './node-http-server.test.ts';
 import setupHealthCheckEndpointTest from './health-check-endpoint.test.ts';
 import setupMinimalSync from './minimal-client-server-sync.test.ts';
@@ -32,6 +34,8 @@ import setupRuntimeTests from './runtime.test.ts';
 import setupProgressTests from './progress.test.ts';
 import setupMergeAdjList from './merge-adjlist.test.ts';
 import setupMergeBloom from './merge-bloom.test.ts';
+import setupBloomFPR from './bloom-fpr.test.ts';
+import setupAncestorLeafDetection from './ancestor-leaf-detection.test.ts';
 import setupMergeLCA from './merge-lca.test.ts';
 import setupMergeRecord from './merge-record.test.ts';
 import setupMergeCorruption from './merge-corruption.test.ts';
@@ -40,10 +44,15 @@ import setupMergeEdgeCases from './merge-edge-cases.test.ts';
 import setupMergeLeader from './merge-leader.test.ts';
 import setupMergeConcurrency from './merge-concurrency.test.ts';
 import setupMergeCache from './merge-cache.test.ts';
+import setupAncestors from './ancestors.test.ts';
+import setupSyncMessageMissing from './sync-message-missing.test.ts';
+import setupSyncConvergence from './sync-convergence.test.ts';
 import setupMergeRichText from './merge-richtext.test.ts';
 import setupMergeConvergence from './merge-convergence.test.ts';
 import setupMergeSync from './merge-sync.test.ts';
 import setupSecurityBoundaries from './security-boundaries.test.ts';
+import setupLiveQuery from './live-query.test.ts';
+import setupWriteFailure from './write-failure.test.ts';
 
 /**
  * Registers all test suites with the default TestsRunner.
@@ -65,8 +74,11 @@ export async function registerAllTests(): Promise<void> {
   setupHealthCheckEndpointTest(); // Simple HTTP endpoint check
   setupMergeAdjList(); // Adjacency list data structure
   setupMergeBloom(); // Bloom filter operations
+  setupBloomFPR(); // Bloom filter false-positive rate verification
+  setupAncestorLeafDetection(); // Ancestor edges and leaf detection via AdjacencyList
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
+  setupBinaryEncoding(); // Binary commit format encoding roundtrip
   setupCommit(); // Core commit/versioning logic
   setupSession(); // Authentication and session management
   setupSecurityBoundaries(); // Security boundary invariants (auth, sync, signatures)
@@ -80,9 +92,15 @@ export async function registerAllTests(): Promise<void> {
   setupMergeLeader(); // Leader election for merge
   setupMergeConcurrency(); // Concurrent merge guards
   setupMergeCache(); // Cache invalidation after mutations
+  setupAncestors(); // Commit ancestor field behavior
+  setupSyncMessageMissing(); // SyncMessage missing-commit detection
+  setupSyncConvergence(); // Multi-round sync convergence simulation
   setupFileImplTests(); // FileImpl abstraction (Deno + Node.js)
+  setupJsonLogFormats(); // JSONLog storage format (GOAT binary + JSONL)
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
+  setupLiveQuery(); // Live query membership updates on ManagedItem edits
+  setupWriteFailure(); // WriteFailure event after 3 consecutive I/O failures
   setupTrusted(); // Database operations in trusted mode
   setupUntrusted(); // Database operations in untrusted mode
   await setupServerArchitectureTest(); // Server initialization and configuration

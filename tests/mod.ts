@@ -308,8 +308,11 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
     let currentTest = 0;
     let completedSuites = 0;
 
-    // Create root task for overall progress
-    const rootId = pm.create('Running Tests', suiteCount);
+    // Create root task for overall progress (null = indeterminate when 0 suites match)
+    const rootId = pm.create(
+      'Running Tests',
+      suiteCount > 0 ? suiteCount : null,
+    );
     pm.update(rootId, 0);
 
     for (const [name, suite] of this._suites.entries()) {

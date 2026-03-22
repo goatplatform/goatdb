@@ -21,16 +21,20 @@ import {
 } from '../logging/log.ts';
 import { ConsoleLogStream } from '../logging/console-stream.ts';
 import type { NormalizedLogEntry } from '../logging/entry.ts';
+import { clearOPFS } from '../base/json-log/file-impl-opfs.ts';
 
 // All browser-compatible existing tests (no Server class usage)
 import setupOrderstamp from './orderstamp-expose.test.ts';
 import setupItemPath from './item-path.ts';
+import setupBinaryEncoding from './binary-encoding.test.ts';
+import setupJsonLogFormats from './json-log-formats.test.ts';
 import setupCommit from './commit.test.ts';
 import setupSession from './session.test.ts';
 import setupTrusted from './db-trusted.test.ts';
 import setupGoatRequest from './goat-request.test.ts';
 import setupStaticAssetsEndpoint from './static-assets-endpoint.test.ts';
 import setupHealthCheckEndpoint from './health-check-endpoint.test.ts';
+import setupLiveQuery from './live-query.test.ts';
 import { getEnvVar } from '../base/os.ts';
 import { notReached } from '../base/error.ts';
 
@@ -54,6 +58,9 @@ class TestConsoleLogStream implements LogStream {
  * Browser test entry point - all browser-compatible existing tests.
  */
 async function main(): Promise<void> {
+  // Wipe OPFS to prevent stale data from previous runs contaminating results
+  await clearOPFS();
+
   // Install custom log stream to filter out metrics in browser tests
   if (isBrowser()) {
     setGlobalLoggerStreams([new TestConsoleLogStream()]);
@@ -68,11 +75,14 @@ async function main(): Promise<void> {
   setupHealthCheckEndpoint(); // Simple HTTP endpoint check
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
+  setupBinaryEncoding(); // Binary commit format encoding roundtrip
+  setupJsonLogFormats(); // GOAT binary/JSONL storage format roundtrip and edge cases
   setupCommit(); // Core commit/versioning logic
   setupSession(); // Authentication and session management
   setupGoatRequest(); // HTTP request processing
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
+  setupLiveQuery(); // Live query membership updates on ManagedItem edits
   setupTrusted(); // Database operations in trusted mode - CRITICAL for browser
   setupStaticAssetsEndpoint(); // File serving and asset management
 

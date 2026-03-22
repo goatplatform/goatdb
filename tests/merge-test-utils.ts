@@ -3,11 +3,11 @@
  */
 import { Commit } from '../repo/commit.ts';
 import { Item } from '../cfds/base/item.ts';
-import { BloomFilter } from '../base/bloom.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import { JSONCyclicalDecoder } from '../base/core-types/encoding/json.ts';
 import { uniqueId } from '../base/common.ts';
+import type { Repository } from '../repo/repo.ts';
 
 // --- Schemas ---
 
@@ -100,7 +100,7 @@ export interface RawCommitOpts {
 
 /**
  * Constructs a frozen Commit with specified fields.
- * Uses BloomFilter.empty for ancestors (adequate for test graphs).
+ * Uses empty ancestors array (adequate for test graphs).
  */
 export function createRawCommit(opts: RawCommitOpts): Commit {
   const item = new Item(
@@ -110,17 +110,13 @@ export function createRawCommit(opts: RawCommitOpts): Commit {
     },
     kMergeTestRegistry,
   );
-  return new Commit({
+  return Commit.create({
     session: opts.session ?? 'test-session',
     orgId: opts.orgId ?? 'test-org',
     key: opts.key,
     contents: item,
     parents: opts.parents ?? [],
-    ancestorsFilter: BloomFilter.empty,
-    // NOTE: In production, ancestorsCount is the total transitive ancestor count.
-    // We use parent count here for simplicity; this is adequate for small test graphs
-    // where commitsForKey.length dominates in commitIsHighProbabilityLeaf.
-    ancestorsCount: opts.parents?.length ?? 0,
+    ancestors: [],
     timestamp: opts.timestamp,
     mergeBase: opts.mergeBase,
     mergeLeader: opts.mergeLeader,
@@ -149,4 +145,36 @@ export function createRemoteCommit(opts: RawCommitOpts): Commit {
   );
   decoder.finalize();
   return remote;
+}
+
+/**
+ * Returns a promise that resolves when the given key has a merge commit
+ * (multi-parent head). Resolves immediately if the merge already happened.
+ */
+export function waitForMerge(
+  repo: Repository,
+  key: string,
+  timeout = 5000,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const head = repo.headForKey(key);
+    if (head && head.parents.length > 1) {
+      resolve();
+      return;
+    }
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Merge timeout after ${timeout}ms for key: ${key}`));
+    }, timeout);
+    const cleanup = repo.attach('DocumentChanged', (changedKey: string) => {
+      if (changedKey === key) {
+        const h = repo.headForKey(key);
+        if (h && h.parents.length > 1) {
+          clearTimeout(timer);
+          cleanup();
+          resolve();
+        }
+      }
+    });
+  });
 }
