@@ -93,6 +93,7 @@ export interface RawCommitOpts {
   schema: Schema;
   data: Record<string, any>;
   parents?: string[];
+  ancestors?: string[];
   timestamp?: number;
   mergeBase?: string;
   mergeLeader?: string;
@@ -100,7 +101,7 @@ export interface RawCommitOpts {
 
 /**
  * Constructs a frozen Commit with specified fields.
- * Uses empty ancestors array (adequate for test graphs).
+ * Ancestors default to empty but can be overridden via opts.
  */
 export function createRawCommit(opts: RawCommitOpts): Commit {
   const item = new Item(
@@ -116,7 +117,7 @@ export function createRawCommit(opts: RawCommitOpts): Commit {
     key: opts.key,
     contents: item,
     parents: opts.parents ?? [],
-    ancestors: [],
+    ancestors: opts.ancestors ?? [],
     timestamp: opts.timestamp,
     mergeBase: opts.mergeBase,
     mergeLeader: opts.mergeLeader,
