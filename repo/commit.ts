@@ -408,7 +408,7 @@ export class FieldCommit extends Commit {
   private _id!: string;
   private _session!: string;
   private _key!: string;
-  private _parents: string[] | undefined;
+  private _parents: string[] = [];
   private _ancestors: string[] = [];
   private _timestamp!: number;
   private _contents?: CommitContents;
@@ -451,7 +451,15 @@ export class FieldCommit extends Commit {
       this.orgId = config.orgId;
       this._key = config.key;
       this._parents = Array.from(parents);
+      assert(
+        this._parents.length <= 255,
+        `Parent count (${this._parents.length}) exceeds u8 limit of 255`,
+      );
       this._ancestors = config.ancestors ?? [];
+      assert(
+        this._ancestors.length <= 255,
+        `Ancestor count (${this._ancestors.length}) exceeds u8 limit of 255`,
+      );
       let ts = config.timestamp;
       if (ts instanceof Date) {
         ts = ts.getTime();
@@ -482,7 +490,7 @@ export class FieldCommit extends Commit {
     return this._session;
   }
   get parents(): string[] {
-    return this._parents || [];
+    return this._parents;
   }
   get ancestors(): string[] {
     return this._ancestors;
@@ -573,7 +581,7 @@ export class FieldCommit extends Commit {
     this._session = decoder.get<string>('s')!;
     assert(this._session !== undefined, 'commit: missing required field "s"');
     this._timestamp = decoder.get<number>('ts') ?? Date.now();
-    this._parents = decoder.get<string[]>('p');
+    this._parents = decoder.get<string[]>('p') || [];
     this._ancestors = decoder.get<string[]>('a') || []; // Replaces old bloom fields 'af'/'ac'
     if (decoder.has('af')) {
       log({
