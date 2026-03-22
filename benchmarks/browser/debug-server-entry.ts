@@ -31,6 +31,7 @@ async function browserBenchmarksServerMain() {
     const customConfig: Record<string, unknown> = {
       benchmarkMode: true,
       benchmark: getEnvVar('GOATDB_BENCHMARK'),
+      system_hardware: getEnvVar('GOATDB_SYSTEM_HARDWARE'),
     };
 
     const { server, setPort } = createTestServer({
