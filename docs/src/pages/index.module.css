@@ -6,17 +6,45 @@
 }
 
 .heroTitle {
-  font-size: 3rem;
-  font-weight: 700;
   margin: 0 0 1rem 0;
+  line-height: 0;
+  font-size: 0;
+}
+
+.heroLogo,
+.heroLogoDark {
+  max-width: 420px;
+  width: 100%;
+  height: auto;
+}
+
+.heroLogoDark {
+  display: none;
+}
+
+[data-theme='dark'] .heroLogo {
+  display: none;
+}
+
+[data-theme='dark'] .heroLogoDark {
+  display: inline;
 }
 
 .heroSubtitle {
-  font-size: 1.25rem;
-  color: var(--ifm-color-emphasis-700);
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--ifm-color-emphasis-800);
+  margin: 0 auto 0.5rem;
+  max-width: 600px;
+  line-height: 1.4;
+}
+
+.heroSpecs {
+  font-size: 1rem;
+  color: var(--ifm-color-emphasis-600);
   margin: 0 auto 2rem;
   max-width: 600px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 @media screen and (max-width: 996px) {
@@ -24,12 +52,13 @@
     padding: 1.5rem;
   }
 
-  .heroTitle {
-    font-size: 2.5rem;
+  .heroLogo,
+  .heroLogoDark {
+    max-width: 340px;
   }
 
   .heroSubtitle {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
   }
 }
 
@@ -41,76 +70,298 @@
   margin-top: 1.5rem;
 }
 
-/* Problem Statement Section */
-.problemStatement {
-  padding: 3rem 0;
+/* The Split Section */
+.theSplit {
+  padding: 3.5rem 0;
   background-color: var(--ifm-color-emphasis-100);
-}
-
-.problemStatementText {
-  font-size: 1.15rem;
-  color: var(--ifm-color-emphasis-800);
-  line-height: 1.75;
-  max-width: 760px;
-  margin: 0 auto;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
   text-align: center;
 }
 
-.useCases {
-  padding: 3rem 0;
-  background-color: var(--ifm-background-surface-color);
-}
-
-.useCases h2 {
-  text-align: center;
-  font-size: 2rem;
+.theSplit h2 {
+  font-size: 1.75rem;
   margin-bottom: 2rem;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.useCaseGrid {
+.splitCards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  max-width: 800px;
+  margin: 0 auto 2rem;
+  text-align: left;
 }
 
-.useCase {
-  text-align: center;
-  padding: 1.5rem;
+.splitCard {
   background: var(--ifm-background-surface-color);
-  border-radius: 8px;
   border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 0;
+  padding: 1.5rem;
 }
 
-.useCaseIconWrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 1rem;
-  height: 3rem;
+.splitCardTitle {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ifm-color-emphasis-800);
+  margin: 0 0 0.25rem;
 }
 
-.useCaseIcon {
-  width: 3rem;
-  height: 3rem;
-  color: var(--ifm-color-primary);
-  transition: color 0.3s ease;
+.splitCardSubtitle {
+  font-size: 0.8rem;
+  color: var(--ifm-color-emphasis-500);
+  margin: 0 0 0.75rem;
+  font-family: monospace;
 }
 
-[data-theme='dark'] .useCaseIcon {
-  color: var(--ifm-color-primary);
-}
-
-.useCase h3 {
-  font-size: 1.25rem;
-  margin-bottom: 0.75rem;
-  font-weight: 600;
-}
-
-.useCase p {
-  color: var(--ifm-color-emphasis-700);
-  line-height: 1.5;
+.splitCard p:last-child {
   margin: 0;
+  font-size: 0.95rem;
+  color: var(--ifm-color-emphasis-700);
+  line-height: 1.65;
+}
+
+.bridgeText {
+  max-width: 680px;
+  margin: 0 auto;
+  font-size: 1.05rem;
+  color: var(--ifm-color-emphasis-700);
+  line-height: 1.75;
+  font-style: italic;
+}
+
+/* Third Category Section */
+.thirdCategory {
+  padding: 3.5rem 0;
+  background: var(--ifm-background-surface-color);
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.thirdCategoryContent {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.thirdCategoryText h2 {
+  font-size: 1.75rem;
+  margin-bottom: 1rem;
+}
+
+.thirdCategoryText p {
+  font-size: 1rem;
+  color: var(--ifm-color-emphasis-700);
+  line-height: 1.7;
+  margin-bottom: 0.75rem;
+}
+
+.thirdCategoryText p:last-child {
+  margin-bottom: 0;
+}
+
+/* Topology Panels */
+.topologyPanels {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+.topologyPanel {
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 0;
+  padding: 0.75rem 1rem 0.6rem;
+  background: var(--ifm-color-emphasis-100);
+  box-shadow: 0 0 0 1px var(--ifm-color-emphasis-200);
+}
+
+[data-theme='dark'] .topologyPanel {
+  background: var(--ifm-background-surface-color);
+}
+
+.topologyPanelHighlight {
+  border-color: var(--ifm-color-primary);
+  background: var(--topology-highlight-bg);
+  box-shadow: 0 0 0 1px var(--topology-highlight-shadow);
+}
+
+[data-theme='dark'] .topologyPanelHighlight {
+  background: var(--topology-highlight-bg);
+  border-color: var(--ifm-color-primary-light);
+  box-shadow: 0 0 0 1px var(--topology-highlight-shadow);
+}
+
+.topologyHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.topologyTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ifm-color-emphasis-800);
+}
+
+.topologyTitlePrimary {
+  color: var(--ifm-color-primary);
+}
+
+.topologySubtitle {
+  font-size: 0.72rem;
+  color: var(--ifm-color-emphasis-700);
+  font-family: monospace;
+}
+
+.topologyScene svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.topologyLabel {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--ifm-color-emphasis-700);
+  font-style: italic;
+  margin-top: 0.3rem;
+}
+
+/* Topology SVG shared element styles */
+.svgDevice {
+  fill: none;
+  stroke: var(--ifm-color-primary);
+  stroke-width: 2;
+}
+.svgDeviceDim {
+  fill: none;
+  stroke: var(--ifm-color-primary-light);
+  stroke-width: 2;
+  opacity: 0.55;
+}
+.svgDeviceDimmer {
+  fill: none;
+  stroke: var(--ifm-color-primary-lightest);
+  stroke-width: 2;
+  opacity: 0.45;
+}
+.svgServer {
+  fill: var(--ifm-color-primary);
+  fill-opacity: 0.15;
+  stroke: var(--ifm-color-primary);
+  stroke-width: 2;
+}
+.svgServerDim {
+  fill: var(--ifm-color-primary-lightest);
+  fill-opacity: 0.25;
+  stroke: var(--ifm-color-primary-light);
+  stroke-width: 2;
+}
+.svgRack {
+  fill: var(--ifm-color-primary);
+  fill-opacity: 0.5;
+  stroke: none;
+}
+.svgRackDim {
+  fill: var(--ifm-color-primary-light);
+  fill-opacity: 0.5;
+  stroke: none;
+}
+.svgDb {
+  fill: var(--ifm-color-primary);
+  fill-opacity: 0.2;
+  stroke: var(--ifm-color-primary);
+  stroke-width: 1.5;
+}
+.svgDbDim {
+  fill: var(--ifm-color-primary-light);
+  fill-opacity: 0.3;
+  stroke: var(--ifm-color-primary-light);
+  stroke-width: 1.5;
+  opacity: 0.8;
+}
+.svgDbDimmer {
+  fill: none;
+  stroke: var(--ifm-color-primary-lightest);
+  stroke-width: 1.5;
+  opacity: 0.45;
+}
+.svgArrow {
+  stroke: var(--ifm-color-primary-light);
+  stroke-width: 2;
+  fill: none;
+  opacity: 0.75;
+}
+.svgSync {
+  stroke: var(--ifm-color-primary);
+  stroke-width: 2;
+  stroke-dasharray: 4 2;
+  fill: none;
+  opacity: 0.8;
+}
+.svgSyncDirect {
+  stroke: var(--ifm-color-primary);
+  stroke-width: 2.5;
+  fill: none;
+  opacity: 1;
+}
+.svgBlock {
+  fill: var(--ifm-color-emphasis-400);
+  fill-opacity: 0.25;
+  stroke: var(--ifm-color-emphasis-500);
+  stroke-width: 1.5;
+}
+
+/* Browser Native Section */
+.browserNative {
+  padding: 3.5rem 0;
+  background-color: var(--ifm-color-emphasis-100);
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.browserNativeContent {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.browserNativeText h2 {
+  font-size: 1.75rem;
+  margin-bottom: 1rem;
+}
+
+.browserNativeText p {
+  font-size: 1rem;
+  color: var(--ifm-color-emphasis-700);
+  line-height: 1.7;
+  margin-bottom: 0.75rem;
+}
+
+.browserNativeText p:last-child {
+  margin-bottom: 0;
+}
+
+.browserNative .topologyPanel {
+  background: var(--ifm-background-surface-color);
+}
+
+@media screen and (max-width: 768px) {
+  .browserNativeContent {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
 }
 
 /* Honest Tradeoff Section */
@@ -196,9 +447,17 @@
     max-width: 280px;
   }
 
-  .useCaseGrid {
+  .splitCards {
     grid-template-columns: 1fr;
-    gap: 1.5rem;
+  }
+
+  .thirdCategoryContent {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .topologyPanels {
+    max-width: 100%;
   }
 
   .openSourceButtons {

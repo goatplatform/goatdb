@@ -25,24 +25,21 @@ than what the changes were.
 
 **<code>commitIsCorrupted(c: Commit&lt;&gt;): boolean</code>**
 
-### commitIsHighProbabilityLeaf()
+### commitIsLeaf()
 
-**<code>commitIsHighProbabilityLeaf(candidate: string | Commit&lt;&gt;): boolean</code>**
+**<code>commitIsLeaf(candidate: string | Commit&lt;&gt;): boolean</code>**
 
-This method determines, to a high probability, whether the given commit is
-a leaf commit or not, even when the full graph isn't available.
-
-It works by inspecting the bloom filters of the newest 2log\[4\]\(N\) commits,
-and checking for the presence of the candidate commit. If present in all
-filters, the commit guaranteed not to be a leaf.
+Returns true if the given commit is a leaf in the commit graph, meaning no
+other commit references it as a parent or ancestor (no in-edges in the
+adjacency list).
 
 ### commits()
 
-**<code>commits(session: Session): Generator&lt;Commit&lt;&gt;&gt;</code>**
+**<code>commits(): Generator&lt;Commit&lt;&gt;&gt;</code>**
 
 ### commitsForKey()
 
-**<code>commitsForKey(key: string, session: Session): Generator&lt;Commit&lt;&gt;&gt;</code>**
+**<code>commitsForKey(key: string): Generator&lt;Commit&lt;&gt;&gt;</code>**
 
 ### create()
 
@@ -78,7 +75,7 @@ belong to disconnected histories).
 
 ### getCommit()
 
-**<code>getCommit(id: string, session: Session): Commit&lt;&gt;</code>**
+**<code>getCommit(id: string): Commit&lt;&gt;</code>**
 
 ### graphForKey()
 
@@ -113,11 +110,11 @@ readonly operation and does not attempt to merge any leaves.
 
 ### keys()
 
-**<code>keys(session: Session): Iterable&lt;string&gt;</code>**
+**<code>keys(): Iterable&lt;string&gt;</code>**
 
 ### leavesForKey()
 
-**<code>leavesForKey(key: string, session: Session): readonly Commit&lt;&gt;[]</code>**
+**<code>leavesForKey(key: string): readonly Commit&lt;&gt;[]</code>**
 
 ### mergeIfNeeded()
 
@@ -125,11 +122,11 @@ readonly operation and does not attempt to merge any leaves.
 
 ### numberOfCommits()
 
-**<code>numberOfCommits(session: Session): number</code>**
+**<code>numberOfCommits(): number</code>**
 
 ### paths()
 
-**<code>paths(session: Session): Iterable&lt;string&gt;</code>**
+**<code>paths(): Iterable&lt;string&gt;</code>**
 
 ### persistCommits()
 

@@ -207,7 +207,7 @@ export default function KeyGeneration() {
                 Private Key
               </text>
               <text x='80' y='45' className='text-body' textAnchor='middle'>
-                ECDSA P-384
+                Ed25519
               </text>
               <text x='80' y='65' className='text-body' textAnchor='middle'>
                 Stored locally
@@ -336,7 +336,7 @@ export default function KeyGeneration() {
                 Key Generation:
               </tspan>
               <tspan dx='5'>
-                ECDSA P-384 keypair • Private key never leaves device
+                Ed25519 keypair • Private key never leaves device
               </tspan>
             </text>
             <text x='45' y='45' className='text-body'>

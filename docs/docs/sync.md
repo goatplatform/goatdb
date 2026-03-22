@@ -132,16 +132,6 @@ rate at a minimum of `0.001`, we ensure that a gap larger than three commits is
 extremely unlikely—occurring roughly once every 32 years (assuming one sync
 iteration per second).
 
-:::note
-
-The partition handling mechanism described above is currently a work in
-progress and has not yet been fully implemented in the codebase. The current
-implementation uses a combination of older heuristics (including strict commit
-ordering and explicit parent references) which are being phased out in favor
-of this more robust probabilistic approach.
-
-:::
-
 ## Real-World Performance
 
 GoatDB's synchronization prioritizes consistency over speed. In typical deployments, expect **700-1000ms application-perceived latency** between peers.

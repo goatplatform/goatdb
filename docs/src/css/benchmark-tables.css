@@ -1,23 +1,5 @@
 /* Benchmark table styling for performance comparisons */
 
-/* Winner/Best performance highlighting */
-.benchmark-table .winner {
-  background-color: #e8f5e8;
-  color: #2e7d2e;
-  font-weight: 600;
-  border-radius: 4px;
-  padding: 3px 6px;
-  border: 1px solid #4caf50;
-}
-
-/* Dark theme adjustments */
-[data-theme='dark'] .benchmark-table .winner {
-  background-color: rgba(76, 175, 80, 0.15);
-  color: #81c784;
-  border: 1px solid #4caf50;
-}
-
-/* Table styling improvements */
 .benchmark-table {
   font-size: 0.9em;
 }
@@ -39,4 +21,60 @@
   font-family: var(--ifm-font-family-base);
   font-size: 0.9em;
   white-space: normal;
+}
+
+/* Meaningfully faster (>1.3x ms / >1.5x us) */
+.benchmark-table .bench-excels {
+  background-color: #e8f5e8;
+  color: #2e7d2e;
+  font-weight: 600;
+  border-radius: 0;
+  padding: 3px 6px;
+  border: 1px solid #4caf50;
+}
+
+/* Meaningfully slower (>1.3x ms / >1.5x us) */
+.benchmark-table .bench-tradeoff {
+  background-color: #fff8e1;
+  color: #7a5800;
+  border-radius: 0;
+  padding: 3px 6px;
+  border: 1px solid #ffc107;
+}
+
+/* Dark theme */
+[data-theme='dark'] .benchmark-table .bench-excels {
+  background-color: rgba(76, 175, 80, 0.15);
+  color: #81c784;
+  border: 1px solid #4caf50;
+}
+
+[data-theme='dark'] .benchmark-table .bench-tradeoff {
+  background-color: rgba(255, 193, 7, 0.15);
+  color: #ffd54f;
+  border: 1px solid #ffc107;
+}
+
+/* Statistical tie (variance makes winner uncertain) */
+.benchmark-table .bench-tie {
+  color: var(--ifm-color-emphasis-700);
+  background-color: var(--ifm-color-emphasis-100);
+  border-radius: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--ifm-color-emphasis-300);
+}
+
+.bench-cv {
+  font-size: 0.75em;
+  opacity: 0.6;
+  font-weight: 400;
+  margin-left: 2px;
+}
+
+/* Table legend */
+.bench-legend {
+  font-size: 0.8em;
+  color: var(--ifm-color-emphasis-600);
+  margin-top: 0.4rem;
+  margin-bottom: 1.5rem;
 }

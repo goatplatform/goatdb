@@ -5,15 +5,26 @@
 
 .differentiatorGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 2rem;
 }
 
 .differentiator {
+  display: block;
   text-align: center;
   padding: 2rem 1.5rem;
   background: var(--ifm-color-emphasis-100);
-  border-radius: 8px;
+  border-radius: 0;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.differentiator:hover {
+  color: inherit;
+  text-decoration: none;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
 }
 
 .differentiatorIcon {

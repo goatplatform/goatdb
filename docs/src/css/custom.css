@@ -9,7 +9,12 @@
 
 /* You can override the default Infima variables here. */
 :root {
+  --ifm-global-radius: 0;
+  --ifm-button-border-radius: 0;
+  --ifm-code-border-radius: 0;
   --ifm-color-primary: #7c4dff;
+  --topology-highlight-bg: rgba(124, 77, 255, 0.10);
+  --topology-highlight-shadow: rgba(124, 77, 255, 0.20);
   --ifm-color-primary-dark: #651fff;
   --ifm-color-primary-darker: #6200ea;
   --ifm-color-primary-darkest: #4a00b4;
@@ -23,6 +28,8 @@
 /* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
   --ifm-color-primary: #c6f578;
+  --topology-highlight-bg: rgba(198, 245, 120, 0.10);
+  --topology-highlight-shadow: rgba(198, 245, 120, 0.20);
   --ifm-color-primary-dark: #b4e85c;
   --ifm-color-primary-darker: #a2db40;
   --ifm-color-primary-darkest: #8bc832;
