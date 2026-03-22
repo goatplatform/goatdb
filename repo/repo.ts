@@ -363,16 +363,18 @@ export class Repository<
    */
   commitIsLeaf(candidate: Commit | string): boolean {
     const id = typeof candidate === 'string' ? candidate : candidate.id;
-    return !this._adjList.hasInEdges(id);
+    // Only graph-structural edges ('parent', 'ancestor') determine leaf status.
+    // Other logical edge types must not suppress leaf detection.
+    return !this._adjList.hasInEdges(id, 'parent')
+        && !this._adjList.hasInEdges(id, 'ancestor');
   }
 
   leavesForKey(key: string): readonly Commit[] {
     let leaves = this._cachedLeavesForKey.get(key);
     if (!leaves) {
-      const adjList = this._adjList;
       leaves = [];
       for (const c of this.commitsForKey(key)) {
-        if (!adjList.hasInEdges(c.id) && this.hasItemForCommit(c)) {
+        if (this.commitIsLeaf(c) && this.hasItemForCommit(c)) {
           leaves.push(c);
         }
       }
@@ -418,15 +420,16 @@ export class Repository<
    *
    * @param commits An iterable of commits.
    *
-   * @returns A tuple of 3 values:
+   * @returns A tuple of 4 values:
    *          1. The commits to include in the merge. Commits with broken
-   *             ancestry path are skipped from the merge if a common base can't
-   *             be found.
+   *             ancestry path or deferred merges are excluded.
    *
    *          2. The base commit (LCA) to use for the merge, or undefined if
    *             one can't be found.
    *
    *          3. The scheme to use for the merge.
+   *
+   *          4. Whether a root commit was encountered during traversal.
    */
   findMergeBase(
     commits: Commit[],
@@ -452,9 +455,9 @@ export class Repository<
       if (!this.hasItemForCommit(c)) {
         continue;
       }
-      const [newBase, foundRoot] = this._findLCAMergeBase(result, c);
+      const [newBase, foundRoot, defer] = this._findLCAMergeBase(result, c);
       reachedRoot = reachedRoot || foundRoot;
-      if (!newBase) {
+      if (defer || !newBase) {
         continue;
       }
       result = newBase;
@@ -473,87 +476,84 @@ export class Repository<
    * merge for c1 and c2. This is a simple iterative LCA implementation based on
    * the assumption of a DAG (if it's not, something is terribly broken).
    *
-   * NOTE: This method ignores any broken branches and treats them as the end
-   *       of the chain. This has a few effects:
-   *
-   *       1. A band actor can't bring the entire system to a freeze by not
-   *          sending part of the graph.
-   *
-   *       2. The system is much more responsive by not waiting for the full
-   *          graph to be available.
-   *
-   *       3. A slow party may have some of its edits reverted if not acting
-   *          fast enough during concurrent editing.
+   * The BFS expands through both `commit.parents` and `commit.ancestors`,
+   * tracking depth to rank candidates. When the closest LCA candidate exists
+   * in the intersection but is missing from the local graph, the method
+   * signals defer (third return value) rather than falling back to a farther
+   * ancestor that would produce a wider, destructive diff.
    *
    * @param c1 First commit.
    * @param c2 Second commit.
    *
-   * @returns The base for a 3-way merge between c1 and c2, or undefined if no
-   *          such base can be found.
+   * @returns A tuple [base, reachedRoot, deferMerge]:
+   *          - base: the LCA commit, or undefined if none found
+   *          - reachedRoot: true if a root commit was encountered
+   *          - deferMerge: true if a closer candidate exists but is missing
    */
   private _findLCAMergeBase(
     c1: Commit,
     c2: Commit,
-  ): [Commit | undefined, boolean] {
+  ): [Commit | undefined, boolean, boolean] {
     if (!c1.parents.length || !c2.parents.length) {
-      return [undefined, true];
+      return [undefined, true, false];
     }
     if (c1.key !== c2.key) {
-      return [undefined, false];
+      return [undefined, false, false];
     }
     if (c1.parents.includes(c2.id)) {
-      return [c2, false];
+      return [c2, false, false];
     }
     if (c2.parents.includes(c1.id)) {
-      return [c1, false];
+      return [c1, false, false];
     }
-    const parents1 = new Set<string>(c1.parents);
-    const parents2 = new Set<string>(c2.parents);
+
+    const depths1 = new Map<string, number>();
+    const depths2 = new Map<string, number>();
+    for (const p of c1.parents) depths1.set(p, 1);
+    for (const p of c2.parents) depths2.set(p, 1);
+    // Ancestors skip intermediate commits, so depth +2 approximates real
+    // graph distance (see computeAncestors — 2 hops: grandparents + greats).
+    for (const a of c1.ancestors) setMinDepth(depths1, a, 2);
+    for (const a of c2.ancestors) setMinDepth(depths2, a, 2);
 
     let reachedRoot = false;
     while (true) {
-      const bases = SetUtils.intersection(parents1, parents2);
-      if (bases.size > 0) {
-        const prioritizedBases = Array.from(bases)
-          .filter((id) => this.hasCommit(id))
-          .map((id) => this.getCommit(id))
-          .sort(compareCommitsDesc);
-        for (const base of prioritizedBases) {
-          if (this.hasItemForCommit(base)) {
-            return [base, reachedRoot];
-          }
-        }
-      }
       let updated = false;
-      // Snapshot: Set is mutated during iteration
-      for (const parentId of Array.from(parents1)) {
+      let len1 = 0;
+      for (const k of depths1.keys()) _scratchKeys1[len1++] = k;
+      for (let i = 0; i < len1; i++) {
+        const parentId = _scratchKeys1[i];
         if (this.hasCommit(parentId)) {
           const parent = this.getCommit(parentId);
           if (parent.parents.length === 0) {
             reachedRoot = true;
             continue;
           }
+          const d = depths1.get(parentId)!;
           for (const p of parent.parents) {
-            if (!parents1.has(p)) {
-              parents1.add(p);
-              updated = true;
-            }
+            if (setMinDepth(depths1, p, d + 1)) updated = true;
+          }
+          for (const a of parent.ancestors) {
+            if (setMinDepth(depths1, a, d + 2)) updated = true;
           }
         }
       }
-      // Snapshot: Set is mutated during iteration
-      for (const parentId of Array.from(parents2)) {
+      let len2 = 0;
+      for (const k of depths2.keys()) _scratchKeys2[len2++] = k;
+      for (let i = 0; i < len2; i++) {
+        const parentId = _scratchKeys2[i];
         if (this.hasCommit(parentId)) {
           const parent = this.getCommit(parentId);
           if (parent.parents.length === 0) {
             reachedRoot = true;
             continue;
           }
+          const d = depths2.get(parentId)!;
           for (const p of parent.parents) {
-            if (!parents2.has(p)) {
-              parents2.add(p);
-              updated = true;
-            }
+            if (setMinDepth(depths2, p, d + 1)) updated = true;
+          }
+          for (const a of parent.ancestors) {
+            if (setMinDepth(depths2, a, d + 2)) updated = true;
           }
         }
       }
@@ -561,7 +561,49 @@ export class Repository<
         break;
       }
     }
-    return [undefined, reachedRoot];
+
+    // Single-pass intersection: find closest available candidate
+    let minTotalDepth = Infinity;
+    let bestCommit: Commit | undefined;
+    let hasCandidate = false;
+    for (const [id, d1] of depths1) {
+      const d2 = depths2.get(id);
+      if (d2 === undefined) continue;
+      const total = d1 + d2;
+      if (total > minTotalDepth) continue;
+      hasCandidate = true;
+      if (!this.hasCommit(id) || !this.hasItemForCommit(this.getCommit(id))) {
+        if (total < minTotalDepth) {
+          // New closer depth but candidate unavailable — reset best
+          minTotalDepth = total;
+          bestCommit = undefined;
+        }
+        continue;
+      }
+      const c = this.getCommit(id);
+      if (total < minTotalDepth) {
+        minTotalDepth = total;
+        bestCommit = c;
+      } else if (bestCommit !== undefined) {
+        // Same depth — tiebreak: newest timestamp, then highest id
+        if (c.timestamp > bestCommit.timestamp ||
+          (c.timestamp === bestCommit.timestamp &&
+            compareStrings(c.id, bestCommit.id) > 0)) {
+          bestCommit = c;
+        }
+      } else {
+        bestCommit = c;
+      }
+    }
+
+    if (!hasCandidate) {
+      return [undefined, reachedRoot, false];
+    }
+    if (bestCommit !== undefined) {
+      return [bestCommit, reachedRoot, false];
+    }
+    // Closest candidates exist but all are missing — defer merge
+    return [undefined, reachedRoot, true];
   }
 
   hasItemForCommit(c: Commit | string): boolean {
@@ -1499,7 +1541,7 @@ export class Repository<
     }
 
     for (const c of result) {
-      if (!this._adjList.hasInEdges(c.id)) {
+      if (this.commitIsLeaf(c)) {
         await this._runUpdatesOnNewLeafCommit(c);
       }
     }
@@ -1703,6 +1745,11 @@ export class Repository<
   }
 }
 
+// Scratch arrays for BFS key snapshots — avoids Array.from() allocations.
+// Grows to high-water mark and stays. Safe: _findLCAMergeBase is not reentrant.
+const _scratchKeys1: string[] = [];
+const _scratchKeys2: string[] = [];
+
 function compareCommitsDesc(c1: Commit, c2: Commit): number {
   if (c2.timestamp > c1.timestamp) {
     return 1;
@@ -1711,6 +1758,20 @@ function compareCommitsDesc(c1: Commit, c2: Commit): number {
     return -1;
   }
   return compareStrings(c2.id, c1.id);
+}
+
+// Returns true when the map was modified: either first insertion or depth
+// decreased. Returning true on depth refinement ensures the BFS re-expands
+// children at the corrected (shorter) depth, yielding globally minimal depths.
+function setMinDepth(
+  map: Map<string, number>, id: string, depth: number,
+): boolean {
+  const existing = map.get(id);
+  if (existing === undefined || depth < existing) {
+    map.set(id, depth);
+    return true;
+  }
+  return false;
 }
 
 function compareCommitsAsc(c1: Commit, c2: Commit): number {

@@ -20,14 +20,17 @@ function eqEdges(e1: Edge, e2: Edge): boolean {
 // AdjacencyList memory model:
 // - Grows monotonically; edges are never pruned during a Repository lifetime.
 // - Memory is proportional to total persisted commits.
-// - hasInEdges(id) (leaf check hot path) is O(1) Map lookup, no allocation.
+// - hasInEdges(id) and hasInEdges(id, field) are both O(1) Map lookups;
+//   the field variant uses a secondary index keyed by (fieldName, vertKey).
 export class AdjacencyList {
   private _inEdges: Dictionary<string, HashSet<Edge>>;
   private _outEdges: Dictionary<string, HashSet<Edge>>;
+  private _inFieldCounts: Map<string, Map<string, number>>;
 
   constructor() {
     this._inEdges = new Map();
     this._outEdges = new Map();
+    this._inFieldCounts = new Map();
   }
 
   get isEmpty(): boolean {
@@ -39,11 +42,8 @@ export class AdjacencyList {
       const set = this._inEdges.get(vertKey);
       return set !== undefined && set.size > 0;
     }
-    // O(degree) scan — only used on non-hot paths (e.g. subGraphForCommit)
-    for (const _ of this.inEdges(vertKey, fieldName)) {
-      return true;
-    }
-    return false;
+    // O(1) secondary-index lookup
+    return (this._inFieldCounts.get(fieldName)?.get(vertKey) ?? 0) > 0;
   }
 
   addEdge(src: string, dst: string, fieldName: string): boolean {
@@ -67,6 +67,14 @@ export class AdjacencyList {
       success === inSuccess,
       `addEdge failed. src: ${src}, dest: ${dst}, fieldName: ${fieldName}`,
     );
+    if (success) {
+      let fieldMap = this._inFieldCounts.get(fieldName);
+      if (fieldMap === undefined) {
+        fieldMap = new Map();
+        this._inFieldCounts.set(fieldName, fieldMap);
+      }
+      fieldMap.set(dst, (fieldMap.get(dst) ?? 0) + 1);
+    }
     return success;
   }
 
@@ -83,6 +91,16 @@ export class AdjacencyList {
     if (success) {
       if (outSet && outSet.size === 0) this._outEdges.delete(src);
       if (inSet && inSet.size === 0) this._inEdges.delete(dst);
+      const fieldMap = this._inFieldCounts.get(fieldName);
+      if (fieldMap !== undefined) {
+        const count = (fieldMap.get(dst) ?? 0) - 1;
+        if (count <= 0) {
+          fieldMap.delete(dst);
+          if (fieldMap.size === 0) this._inFieldCounts.delete(fieldName);
+        } else {
+          fieldMap.set(dst, count);
+        }
+      }
     }
     return success;
   }
