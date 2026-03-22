@@ -52,7 +52,13 @@ export type {
   BuildInfo,
   LogStream,
 };
-export type { DBInstanceConfig } from './db/db.ts';
+export type {
+  DBInstanceConfig,
+  EventItemChanged,
+  EventWriteFailure,
+  StorageFormat,
+  WriteFailureDetail,
+} from './db/db.ts';
 export type { QueryConfig } from './repo/query.ts';
 export type { ReadonlyItem } from './cfds/base/item.ts';
 export type { JSONObject, ReadonlyJSONObject } from './base/interfaces.ts';
