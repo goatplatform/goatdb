@@ -252,7 +252,10 @@ export function decodeStr(
     // One view (no copy); apply treats TypedArray as array-like.
     // The len <= 512 guard above also keeps us safely under V8/SpiderMonkey
     // Function.prototype.apply argument-count limits (~65536).
-    return String.fromCharCode.apply(null, buf.subarray(offset, end) as unknown as number[]);
+    return String.fromCharCode.apply(
+      null,
+      buf.subarray(offset, end) as unknown as number[],
+    );
   }
   // Non-ASCII short string: one subarray view for TextDecoder
   return _gTextDecoder.decode(buf.subarray(offset, end));
@@ -467,8 +470,8 @@ export function binaryReadStringField(
 
 // Reused for commits with no parents/ancestors to avoid allocation on the hot path.
 // Both the inner arrays and the outer object are frozen to catch accidental mutation.
-const EMPTY_PARENTS_RESULT: { parents: string[]; ancestors: string[] } =
-  Object.freeze({
+const EMPTY_PARENTS_RESULT: { parents: string[]; ancestors: string[] } = Object
+  .freeze({
     parents: Object.freeze([] as string[]) as unknown as string[],
     ancestors: Object.freeze([] as string[]) as unknown as string[],
   }) as unknown as { parents: string[]; ancestors: string[] };
@@ -525,7 +528,8 @@ export const CONDITIONAL_FIELD_ORDER: Array<[string, number]> = [
 ];
 
 export const COND_MASK = CONDITIONAL_FIELD_ORDER.reduce(
-  (m: number, entry: [string, number]) => m | entry[1], 0,
+  (m: number, entry: [string, number]) => m | entry[1],
+  0,
 );
 
 // Returns absolute buffer offset after parents + ancestors section.
@@ -572,4 +576,3 @@ export function binaryContentsRange(
   );
   return [start, end];
 }
-

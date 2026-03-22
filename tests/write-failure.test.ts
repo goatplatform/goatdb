@@ -45,14 +45,21 @@ export default function setup(): void {
         item.set('value', 'world');
         await db.flush(repoPath);
 
-        assertEquals(failureEvents.length, 1, 'WriteFailure fired exactly once');
+        assertEquals(
+          failureEvents.length,
+          1,
+          'WriteFailure fired exactly once',
+        );
         const detail = failureEvents[0] as {
           droppedCommits: number;
           repoPath: string;
           commitIds: string[];
           error: unknown;
         };
-        assertTrue(detail.droppedCommits >= 1, 'at least one commit was dropped');
+        assertTrue(
+          detail.droppedCommits >= 1,
+          'at least one commit was dropped',
+        );
         assertExists(detail.commitIds);
         assertTrue(detail.commitIds.length >= 1, 'commitIds is non-empty');
         assertEquals(detail.repoPath, repoPath);
@@ -137,7 +144,11 @@ export default function setup(): void {
         await item2.commit();
         await db.flush(repoPath);
 
-        assertEquals(item2.get('value'), 'survivor', 'new item should be readable');
+        assertEquals(
+          item2.get('value'),
+          'survivor',
+          'new item should be readable',
+        );
       } finally {
         await db.flushAll();
         await db.close();

@@ -602,7 +602,9 @@ export default function setupJsonLogFormats() {
           }
           if (format === 'jsonl') {
             assertTrue(
-              captured.some((e) => e.message?.includes('skipped malformed line')),
+              captured.some((e) =>
+                e.message?.includes('skipped malformed line')
+              ),
               'jsonl should warn about unparseable garbage bytes',
             );
           }
@@ -680,7 +682,9 @@ export default function setupJsonLogFormats() {
           }
           if (format === 'jsonl') {
             assertTrue(
-              captured.some((e) => e.message?.includes('skipped malformed line')),
+              captured.some((e) =>
+                e.message?.includes('skipped malformed line')
+              ),
               'jsonl should warn about the partial line at EOF',
             );
           }
@@ -744,7 +748,9 @@ export default function setupJsonLogFormats() {
           }
           if (format === 'jsonl') {
             assertTrue(
-              captured.some((e) => e.message?.includes('skipped malformed line')),
+              captured.some((e) =>
+                e.message?.includes('skipped malformed line')
+              ),
               'jsonl should warn about unparseable garbage bytes',
             );
           }
@@ -1251,7 +1257,10 @@ export default function setupJsonLogFormats() {
         try {
           await db2.readyPromise();
           const item = db2.item('/data/fallback/item-1');
-          assertTrue(item !== undefined, 'item should exist after format fallback');
+          assertTrue(
+            item !== undefined,
+            'item should exist after format fallback',
+          );
           assertTrue(
             captured.some((e) => e.message?.includes('goat file not found')),
             'should warn about goat file not found and falling back to jsonl',

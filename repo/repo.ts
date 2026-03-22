@@ -365,8 +365,8 @@ export class Repository<
     const id = typeof candidate === 'string' ? candidate : candidate.id;
     // Only graph-structural edges ('parent', 'ancestor') determine leaf status.
     // Other logical edge types must not suppress leaf detection.
-    return !this._adjList.hasInEdges(id, 'parent')
-        && !this._adjList.hasInEdges(id, 'ancestor');
+    return !this._adjList.hasInEdges(id, 'parent') &&
+      !this._adjList.hasInEdges(id, 'ancestor');
   }
 
   leavesForKey(key: string): readonly Commit[] {
@@ -589,9 +589,11 @@ export class Repository<
         bestCommit = c;
       } else if (bestCommit !== undefined) {
         // Same depth — tiebreak: newest timestamp, then highest id
-        if (c.timestamp > bestCommit.timestamp ||
+        if (
+          c.timestamp > bestCommit.timestamp ||
           (c.timestamp === bestCommit.timestamp &&
-            compareStrings(c.id, bestCommit.id) > 0)) {
+            compareStrings(c.id, bestCommit.id) > 0)
+        ) {
           bestCommit = c;
         }
       } else {
@@ -1749,7 +1751,7 @@ export class Repository<
 }
 
 // Scratch arrays for BFS key snapshots — avoids Array.from() allocations.
-// Grows to high-water mark and stays. Safe: _findLCAMergeBase is not reentrant.
+// Cleared after each call to release references. Safe: _findLCAMergeBase is not reentrant.
 const _scratchKeys1: string[] = [];
 const _scratchKeys2: string[] = [];
 

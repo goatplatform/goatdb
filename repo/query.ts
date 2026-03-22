@@ -866,7 +866,7 @@ export class Query<
           // removed by live state changes before this commit landed.
           if (!this._loadingFinished) {
             const val = repo.valueForKey<IS>(key);
-            if (val) { this.addPathToResults(path, val[0]); }
+            if (val) this.addPathToResults(path, val[0]);
           }
         }
       }
@@ -901,7 +901,7 @@ export class Query<
           if (head) {
             this._headIdForKey.set(path, head.id);
             const val = repo.valueForKey<IS>(key);
-            if (val) { this.addPathToResults(path, val[0]); }
+            if (val) this.addPathToResults(path, val[0]);
           }
         }
         ++skipped;

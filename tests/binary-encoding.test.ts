@@ -446,7 +446,11 @@ export default function setup() {
       const bytes = commit.toBytes();
       // FLAG_DELTA_BASE (bit 5) must NOT be set for document commits
       const flags = bytes[2] | (bytes[3] << 8);
-      assertEquals(flags & (1 << 5), 0, 'FLAG_DELTA_BASE must not be set for documents');
+      assertEquals(
+        flags & (1 << 5),
+        0,
+        'FLAG_DELTA_BASE must not be set for documents',
+      );
       const [decoded] = Commit.fromBinaryBytesArr(
         'org',
         [bytes],
@@ -893,48 +897,55 @@ export default function setup() {
     });
   });
 
-  TEST('BinaryEncoding', 'binaryCheckVersion accepts FLAG_DELTA_BASE (bit 5)', () => {
-    // Bit 5 is now FLAG_DELTA_BASE -- binaryCheckVersion must not reject it.
-    const item = new Item(
-      { schema: TestSchema as Schema, data: { name: 'bit5' } },
-      DataRegistry.default,
-    );
-    const baseCommit = Commit.create(
-      {
-        session: 'sess-bit5-base',
-        orgId: 'org',
-        key: 'k-bit5',
-        contents: item,
-        parents: [],
-        ancestors: [],
-      },
-      DataRegistry.default,
-    );
-    const item2 = item.clone();
-    item2.set('name', 'bit5-changed');
-    const changes = item2.diff(item);
-    const edit = new Edit({
-      changes,
-      srcChecksum: item.checksum,
-      dstChecksum: item2.checksum,
-      scheme: TestSchema,
-    });
-    const deltaCommit = Commit.create(
-      {
-        session: 'sess-bit5-delta',
-        orgId: 'org',
-        key: 'k-bit5',
-        contents: { base: baseCommit.id, edit },
-        parents: [baseCommit.id],
-        ancestors: [],
-      },
-      DataRegistry.default,
-    );
-    const bytes = deltaCommit.toBytes();
-    assertTrue((bytes[2] & (1 << 5)) !== 0, 'FLAG_DELTA_BASE must be set for delta commit');
-    // binaryCheckVersion must not throw when bit 5 is set
-    binaryCheckVersion(bytes);
-  });
+  TEST(
+    'BinaryEncoding',
+    'binaryCheckVersion accepts FLAG_DELTA_BASE (bit 5)',
+    () => {
+      // Bit 5 is now FLAG_DELTA_BASE -- binaryCheckVersion must not reject it.
+      const item = new Item(
+        { schema: TestSchema as Schema, data: { name: 'bit5' } },
+        DataRegistry.default,
+      );
+      const baseCommit = Commit.create(
+        {
+          session: 'sess-bit5-base',
+          orgId: 'org',
+          key: 'k-bit5',
+          contents: item,
+          parents: [],
+          ancestors: [],
+        },
+        DataRegistry.default,
+      );
+      const item2 = item.clone();
+      item2.set('name', 'bit5-changed');
+      const changes = item2.diff(item);
+      const edit = new Edit({
+        changes,
+        srcChecksum: item.checksum,
+        dstChecksum: item2.checksum,
+        scheme: TestSchema,
+      });
+      const deltaCommit = Commit.create(
+        {
+          session: 'sess-bit5-delta',
+          orgId: 'org',
+          key: 'k-bit5',
+          contents: { base: baseCommit.id, edit },
+          parents: [baseCommit.id],
+          ancestors: [],
+        },
+        DataRegistry.default,
+      );
+      const bytes = deltaCommit.toBytes();
+      assertTrue(
+        (bytes[2] & (1 << 5)) !== 0,
+        'FLAG_DELTA_BASE must be set for delta commit',
+      );
+      // binaryCheckVersion must not throw when bit 5 is set
+      binaryCheckVersion(bytes);
+    },
+  );
 
   TEST('BinaryEncoding', 'conditional fields roundtrip', () => {
     const item = new Item(

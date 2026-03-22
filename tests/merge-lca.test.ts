@@ -220,23 +220,33 @@ export default function setup() {
       // Chain: root -> A -> B -> C, branch at A -> D
       // Persist all except B. C.ancestors includes A.
       const root = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'root' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'root' },
       });
       const a = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'a' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'a' },
         parents: [root.id],
       });
       const b = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'b' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'b' },
         parents: [a.id],
       });
       const c = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'c' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'c' },
         parents: [b.id],
         ancestors: [a.id],
       });
       const d = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'd' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'd' },
         parents: [a.id],
       });
 
@@ -265,28 +275,40 @@ export default function setup() {
       // Persist all except B. Both D and E have B and A in ancestors.
       // Intersection = {B, A}. B is closer but missing -> defer.
       const root = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'root' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'root' },
       });
       const a = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'a' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'a' },
         parents: [root.id],
       });
       const b = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'b' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'b' },
         parents: [a.id],
       });
       const c = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'c' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'c' },
         parents: [b.id],
         ancestors: [b.id, a.id],
       });
       const d = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'd' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'd' },
         parents: [c.id],
         ancestors: [b.id, a.id],
       });
       const e = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'e' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'e' },
         parents: [b.id],
         ancestors: [b.id, a.id],
       });
@@ -297,7 +319,8 @@ export default function setup() {
       // E is excluded from merge (deferred) because closest candidate B is missing.
       // D remains as the initial result commit.
       assertEquals(
-        commits.length, 1,
+        commits.length,
+        1,
         'deferred leaf should be excluded from merge',
       );
     } finally {
@@ -317,23 +340,33 @@ export default function setup() {
 
       // Same graph as above but persist B too
       const root = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'root' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'root' },
       });
       const a = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'a' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'a' },
         parents: [root.id],
       });
       const b = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'b' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'b' },
         parents: [a.id],
       });
       const d = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'd' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'd' },
         parents: [b.id],
         ancestors: [b.id, a.id],
       });
       const e = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'e' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'e' },
         parents: [b.id],
         ancestors: [b.id, a.id],
       });
@@ -360,23 +393,33 @@ export default function setup() {
 
       // Two leaves that share ancestors A and B, but neither is persisted
       const root = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'root' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'root' },
       });
       const a = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'a' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'a' },
         parents: [root.id],
       });
       const b = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'b' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'b' },
         parents: [a.id],
       });
       const d = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'd' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'd' },
         parents: [b.id],
         ancestors: [b.id, a.id],
       });
       const e = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'e' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'e' },
         parents: [b.id],
         ancestors: [b.id, a.id],
       });
@@ -385,7 +428,8 @@ export default function setup() {
       await repo.persistVerifiedCommits([d, e]);
       const [commits] = repo.findMergeBase([d, e]);
       assertEquals(
-        commits.length, 1,
+        commits.length,
+        1,
         'all candidates missing should defer merge',
       );
     } finally {
@@ -405,23 +449,32 @@ export default function setup() {
 
       // Two completely separate chains with no shared ancestry
       const rootA = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'rootA' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'rootA' },
       });
       const leafA = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'leafA' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'leafA' },
         parents: [rootA.id],
       });
       const rootB = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'rootB' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'rootB' },
       });
       const leafB = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'leafB' },
+        key: 'k1',
+        schema: S,
+        data: { title: 'leafB' },
         parents: [rootB.id],
       });
 
       await repo.persistVerifiedCommits([rootA, leafA, rootB, leafB]);
       const [commits, base, _scheme, reachedRoot] = repo.findMergeBase([
-        leafA, leafB,
+        leafA,
+        leafB,
       ]);
       assertTrue(reachedRoot, 'should reach root for disconnected graphs');
       // No shared ancestry: leafB excluded, no defer (genuine disconnection)
@@ -448,27 +501,47 @@ export default function setup() {
       // Before the setMinDepth fix, a refined depth could leave children
       // with stale high depths, breaking the ranking for deeper graphs.
       const root = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'root' }, timestamp: 1000,
+        key: 'k1',
+        schema: S,
+        data: { title: 'root' },
+        timestamp: 1000,
       });
       const a = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'a' },
-        parents: [root.id], timestamp: 2000,
+        key: 'k1',
+        schema: S,
+        data: { title: 'a' },
+        parents: [root.id],
+        timestamp: 2000,
       });
       const b = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'b' },
-        parents: [a.id], timestamp: 3000,
+        key: 'k1',
+        schema: S,
+        data: { title: 'b' },
+        parents: [a.id],
+        timestamp: 3000,
       });
       const c = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'c' },
-        parents: [a.id], timestamp: 3000,
+        key: 'k1',
+        schema: S,
+        data: { title: 'c' },
+        parents: [a.id],
+        timestamp: 3000,
       });
       const leaf1 = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'leaf1' },
-        parents: [b.id], ancestors: [root.id], timestamp: 4000,
+        key: 'k1',
+        schema: S,
+        data: { title: 'leaf1' },
+        parents: [b.id],
+        ancestors: [root.id],
+        timestamp: 4000,
       });
       const leaf2 = createRawCommit({
-        key: 'k1', schema: S, data: { title: 'leaf2' },
-        parents: [c.id], ancestors: [root.id], timestamp: 4000,
+        key: 'k1',
+        schema: S,
+        data: { title: 'leaf2' },
+        parents: [c.id],
+        ancestors: [root.id],
+        timestamp: 4000,
       });
 
       await repo.persistVerifiedCommits([root, a, b, c, leaf1, leaf2]);
