@@ -37,6 +37,12 @@ export const K_DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 // virtually eliminates false-positive-driven resync rounds. A high FPR
 // (e.g. 0.5) would cause ~50% of sync checks to falsely report "already
 // have this commit", requiring many extra round-trips to converge.
+//
+// BREAKING: Reduced from 0.5 to 0.001. The old 0.5 cap caused
+// false-positive merge cycles -- the primary motivation for this change.
+// A version gate would reintroduce the bug for old clients. Peers that
+// haven't upgraded still compute FPR=0.5 locally, causing extra
+// round-trips on their side, but sync converges regardless.
 function computeSyncFPR(
   numberOfEntries: number,
   expectedSyncCycles: number,
