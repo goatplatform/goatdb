@@ -1012,6 +1012,7 @@ function compareCommitsByValue(c1: Commit, c2: Commit): boolean {
     c1.session === c2.session &&
     coreValueEquals(c1.timestamp, c2.timestamp) &&
     coreValueEquals(c1.parents, c2.parents) &&
+    coreValueEquals(c1.ancestors, c2.ancestors) &&
     coreValueEquals(c1.contents, c2.contents)
   );
 }
