@@ -226,7 +226,10 @@ export async function runCLI(args: readonly string[]): Promise<void> {
   const usage = isDeno()
     ? 'Usage:\n  deno run -A jsr:@goatdb/goatdb init [dir]\n\nCommands:\n  init [dir]  Scaffold a new GoatDB project in [dir] (defaults to CWD)'
     : 'Usage:\n  npx -y @goatdb/goatdb init [dir]\n\nCommands:\n  init [dir]  Scaffold a new GoatDB project in [dir] (defaults to CWD)';
-  if (args.length === 0 || args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
+  if (
+    args.length === 0 || args[0] === 'help' || args[0] === '--help' ||
+    args[0] === '-h'
+  ) {
     console.log(usage);
     await exit(0);
   } else if (args[0] !== 'init') {

@@ -105,8 +105,6 @@ export class SyncEndpoint<US extends Schema> implements Endpoint<US> {
       async () => (await services.db.open(path)).numberOfCommits(userSession),
       services.db.clientsForRepo(path),
       true,
-      false,
-      // path.startsWith('/sys/'),
     );
   }
 
@@ -118,7 +116,6 @@ export class SyncEndpoint<US extends Schema> implements Endpoint<US> {
     getLocalCount: () => Promise<number>,
     replicas: Iterable<RepoClient> | undefined,
     includeMissing: boolean,
-    lowAccuracy: boolean,
   ): Promise<ReadonlyJSONObject> {
     const decoder = JSONCyclicalDecoder.get(msgJSON);
     const msg = new SyncMessage(
@@ -155,7 +152,6 @@ export class SyncEndpoint<US extends Schema> implements Endpoint<US> {
       services.db.registry,
       // Don't return new commits to old clients
       includeMissing && msg.buildVersion >= getGoatConfig().version,
-      lowAccuracy,
     );
 
     const encodedResp = JSONCyclicalEncoder.serialize(syncResp);

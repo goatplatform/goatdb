@@ -4,10 +4,16 @@ import type { Repository } from '../repo/repo.ts';
 import { itemPathGetPart, itemPathGetRepoId, itemPathIsValid } from './path.ts';
 import { Item } from '../cfds/base/item.ts';
 import { Emitter } from '../base/emitter.ts';
-import { type MutationPack, mutationPackAppend } from './mutations.ts';
+import {
+  type Mutation,
+  type MutationPack,
+  mutationPackAppend,
+} from './mutations.ts';
 import { SimpleTimer, type Timer } from '../base/timer.ts';
 import type { GoatDB } from './db.ts';
 import { assert } from '../base/error.ts';
+import { log } from '../logging/log.ts';
+import { ScratchPool } from '../base/scratch-pool.ts';
 
 /**
  * A high-level interface for reading, writing, and synchronizing a single item
@@ -23,19 +29,29 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
   private _head?: Commit;
   private _item!: Item<S>;
   private _commitPromise?: Promise<void>;
-  private _detachHandler?: () => void;
   private _age: number = 0;
   private _commitInProgress: boolean = false;
   private _ready: boolean = false;
   private _readyPromiseResolve?: () => void;
   private _readyPromise?: Promise<void>;
+  // deno-lint-ignore no-explicit-any
+  private readonly _scratchPool = new ScratchPool<Mutation<any>>(
+    () => ['', true, undefined],
+  );
 
   constructor(readonly db: GoatDB<US>, readonly path: string) {
     super();
     assert(itemPathIsValid(path), `Invalid item path: ${path}`);
     this.path = path;
     this._commitDelayTimer = new SimpleTimer(300, false, () => {
-      this.commit();
+      this.commit().catch((e) => {
+        log({
+          severity: 'WARNING',
+          error: 'StorageError',
+          message: `Auto-commit failed for ${this.path}`,
+          trace: String(e),
+        });
+      });
     });
     this._readyPromise = new Promise<void>((resolve) => {
       this._readyPromiseResolve = resolve;
@@ -47,6 +63,15 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     } else {
       this.loadInitialDoc(repo);
     }
+  }
+
+  /**
+   * @internal
+   * Returns the current in-memory item state, which may be ahead of the last
+   * committed state when edits are pending.
+   */
+  get currentItem(): Item<S> {
+    return this._item;
   }
 
   /**
@@ -69,7 +94,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    * If the item is already ready, the promise resolves immediately.
    */
   readyPromise(): Promise<void> {
-    return this._readyPromise!;
+    return this._readyPromise ?? Promise.resolve();
   }
 
   /**
@@ -104,7 +129,16 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
       this._item = this._item.clone();
     }
     if (this._item.upgradeSchema(s)) {
-      this.onChange(['__schema', true, null]);
+      const sc = this._scratchPool.rent();
+      try {
+        sc[0] = '__schema';
+        sc[2] = null;
+        this.onChange(sc);
+      } finally {
+        sc[0] = '';
+        sc[2] = undefined;
+        this._scratchPool.release();
+      }
       this._commitDelayTimer.schedule();
     }
   }
@@ -133,8 +167,18 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
   set isDeleted(flag: boolean) {
     const oldValue = this.isDeleted;
     if (oldValue !== flag) {
+      if (this._item.isLocked) this._item = this._item.clone();
       this._item.isDeleted = flag;
-      this.onChange(['isDeleted', true, oldValue]);
+      const sc = this._scratchPool.rent();
+      try {
+        sc[0] = 'isDeleted';
+        sc[2] = oldValue;
+        this.onChange(sc);
+      } finally {
+        sc[0] = '';
+        sc[2] = undefined;
+        this._scratchPool.release();
+      }
     }
   }
 
@@ -174,6 +218,9 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
   /**
    * Sets the value for the given key in this item.
    *
+   * Changes are coalesced and committed after ~300ms. Call `commit()` for
+   * immediate persistence.
+   *
    * @param key The key to set the value for
    * @param value The value to associate with the key
    */
@@ -182,8 +229,18 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     value: SchemaDataType<S>[T],
   ): void {
     const oldValue = this.has(key) ? this.get(key) : undefined;
+    if (this._item.isLocked) this._item = this._item.clone();
     this._item.set(key, value);
-    this.onChange([key, true, oldValue]);
+    const sc = this._scratchPool.rent();
+    try {
+      sc[0] = key;
+      sc[2] = oldValue;
+      this.onChange(sc);
+    } finally {
+      sc[0] = '';
+      sc[2] = undefined;
+      this._scratchPool.release();
+    }
   }
 
   /**
@@ -207,8 +264,18 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    */
   delete<T extends keyof SchemaDataType<S>>(key: string & T): boolean {
     const oldValue = this.has(key) ? this.get(key) : undefined;
+    if (this._item.isLocked) this._item = this._item.clone();
     if (this._item.delete(key)) {
-      this.onChange([key, true, oldValue]);
+      const sc = this._scratchPool.rent();
+      try {
+        sc[0] = key;
+        sc[2] = oldValue;
+        this.onChange(sc);
+      } finally {
+        sc[0] = '';
+        sc[2] = undefined;
+        this._scratchPool.release();
+      }
       return true;
     }
     return false;
@@ -225,6 +292,9 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    * 5. If a commit is already in progress, waits for it to complete before retrying
    * 6. Executes the commit
    *
+   * `commit()` writes to the local log. Call `db.flushAll()` for full disk
+   * durability.
+   *
    * @returns A promise that resolves when the commit is complete
    */
   commit(): Promise<void> {
@@ -237,6 +307,12 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
       );
     } else {
       if (!valid) {
+        log({
+          severity: 'WARNING',
+          error: 'ValidationError',
+          message:
+            `[GoatDB] Skipping commit for invalid item at ${this.path}: ${error}`,
+        });
         return Promise.resolve();
       }
     }
@@ -286,7 +362,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
       if (head) {
         this._head = repo.getCommit(head);
       }
-      this.onChange(mutations);
+      this.onChange(mutations, true);
     }
   }
 
@@ -302,40 +378,16 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
 
   /**
    * @internal
-   * Activates the managed item by attaching a document change listener to the
-   * repository. When the document changes, it will trigger a rebase of the item
-   * to sync with the latest version. This method is idempotent - calling it
-   * multiple times will only attach one listener.
+   * Deactivates the managed item by canceling any pending commits.
+   * This method is idempotent - calling it multiple times has no additional
+   * effect.
    *
    * Note: This is an internal method used by GoatDB and should not be called
    * directly by users.
    */
-  activate(): void {
-    const repo = this.repository;
-    if (!this._detachHandler && repo) {
-      this._detachHandler = repo.attach('DocumentChanged', (key: string) => {
-        if (itemPathGetPart(this.path, 'item') === key) {
-          this.rebase();
-        }
-      });
-    }
-  }
-
-  /**
-   * @internal
-   * Deactivates the managed item by removing the document change listener and
-   * canceling any pending commits. This method is idempotent - calling it
-   * multiple times has no additional effect.
-   *
-   * Note: This is an internal method used by GoatDB and should not be called
-   * directly by users.
-   */
-  deactivate(): void {
-    if (this._detachHandler) {
-      this._detachHandler();
-      this._detachHandler = undefined;
-    }
+  deactivate(): Promise<void> | undefined {
     this._commitDelayTimer.unschedule();
+    return this._commitPromise;
   }
 
   /**
@@ -346,25 +398,30 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    */
   private onChange(
     mutations: MutationPack<keyof SchemaDataType<S> & string>,
+    isRebase = false,
   ): void {
     ++this._age;
     this.emit('change', mutations);
+    this.db.emit('ItemChanged', this.path, isRebase);
     this._commitDelayTimer.schedule();
   }
 
   private async _commitImpl(): Promise<void> {
     assert(!this._commitInProgress);
     this._commitInProgress = true;
-    this._commitDelayTimer.unschedule();
-    const currentDoc = this._item.clone();
-    const key = itemPathGetPart(this.path, 'item')!;
-    const repo = await this.db.open(itemPathGetRepoId(this.path));
-    const newHead = await repo.setValueForKey(key, currentDoc, this._head);
-    if (newHead) {
-      this._head = newHead;
-      this.rebase();
+    try {
+      this._commitDelayTimer.unschedule();
+      const currentDoc = this._item.clone();
+      const key = itemPathGetPart(this.path, 'item')!;
+      const repo = await this.db.open(itemPathGetRepoId(this.path));
+      const newHead = await repo.setValueForKey(key, currentDoc, this._head);
+      if (newHead) {
+        this._head = newHead;
+        this.rebase();
+      }
+    } finally {
+      this._commitInProgress = false;
     }
-    this._commitInProgress = false;
   }
 
   /**
@@ -417,6 +474,8 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     // Mark as ready and notify waiters
     this._ready = true;
     this._readyPromiseResolve?.();
+    this._readyPromise = undefined;
+    this._readyPromiseResolve = undefined;
     this.emit('LoadingFinished');
   }
 }

@@ -131,7 +131,7 @@ export default function RepositoryStructure() {
               className='file-box'
             />
             <text x='20' y='30' className='text-icon-small'>📄</text>
-            <text x='45' y='30' className='text-heading'>users.jsonl</text>
+            <text x='45' y='30' className='text-heading'>users.goat</text>
 
             {/* Existing commits */}
             <g transform='translate(20, 50)'>
@@ -220,13 +220,13 @@ export default function RepositoryStructure() {
 
           <g transform='translate(590, 70)'>
             <text x='0' y='0' className='text-body' fontWeight='600'>
-              JSON Lines
+              Binary Format
             </text>
-            <text x='0' y='20' className='text-small'>• Human readable</text>
+            <text x='0' y='20' className='text-small'>• Compact storage</text>
             <text x='0' y='40' className='text-small'>
-              • One commit per line
+              • Length-prefixed
             </text>
-            <text x='0' y='60' className='text-small'>• Easy debugging</text>
+            <text x='0' y='60' className='text-small'>• Fast I/O</text>
           </g>
 
           {/* Caption */}
@@ -246,11 +246,11 @@ export default function RepositoryStructure() {
                 Append-Only Storage:
               </tspan>
               <tspan dx='5'>
-                One .jsonl file per repository • Sequential I/O
+                One .goat file per repository • Sequential I/O
               </tspan>
             </text>
             <text x='45' y='45' className='text-body'>
-              Optimized for SSDs • Atomic commits • Human-readable format
+              Optimized for SSDs • Atomic commits • JSONL format for debugging
             </text>
           </g>
         </g>

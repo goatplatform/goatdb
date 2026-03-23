@@ -13,7 +13,6 @@
  */
 import { kStaticAssetsSystem } from '../../system-assets/system-assets.ts';
 import { assert } from '../error.ts';
-import type { ReadonlyJSONObject } from '../interfaces.ts';
 import type {
   WorkerFileReq,
   WorkerFileReqAppend,
@@ -25,11 +24,14 @@ import type {
   WorkerFileResp,
   WorkerFileRespForReq,
   WorkerFileRespScan,
+  WorkerLogRelay,
   WorkerReadTextFileReq,
   WorkerRemoveReq,
   WorkerWriteTextFileReq,
 } from './json-log-worker-req.ts';
 import { getRuntime } from '../runtime/index.ts';
+import { log } from '../../logging/log.ts';
+import type { LogEntry } from '../../logging/log.ts';
 
 let gWorker: Worker | NodeWorker | undefined;
 
@@ -41,7 +43,7 @@ type NodeWorker =
 type NodeWorkerOnMessage = {
   on: (
     event: 'message',
-    handler: (event: MessageEvent<string>) => void,
+    handler: (event: WorkerFileResp) => void,
   ) => void;
 };
 type NodeWorkerOnError = {
@@ -78,7 +80,9 @@ export async function startJSONLogWorkerIfNeeded(): Promise<
         console.error(error);
       });
     } else {
-      (gWorker as Worker).onmessage = handleResponse;
+      (gWorker as Worker).onmessage = (
+        event: MessageEvent<WorkerFileResp>,
+      ) => handleResponse(event.data);
       (gWorker as Worker).onmessageerror = (event) => {
         console.error(event);
       };
@@ -103,7 +107,7 @@ const gPendingResolveFuncs = new Map<
 let gReqId = 0;
 
 // Track all pending operations per file
-const gPendingFileOperations = new Map<JSONLogFile, Set<Promise<any>>>();
+const gPendingFileOperations = new Map<JSONLogFile, Set<Promise<unknown>>>();
 
 function trackFileOperation<T>(
   file: JSONLogFile,
@@ -148,8 +152,15 @@ async function sendRequest<T extends WorkerFileReq>(
   return promise as Promise<WorkerFileRespForReq<T>>;
 }
 
-function handleResponse(event: MessageEvent<string> | string): void {
-  const resp = JSON.parse(typeof event === 'string' ? event : event.data);
+function handleResponse(resp: WorkerFileResp): void {
+  const relayedLogs = (resp as Record<string, unknown>).logs as
+    | WorkerLogRelay[]
+    | undefined;
+  if (relayedLogs) {
+    for (const entry of relayedLogs) {
+      log(entry as LogEntry);
+    }
+  }
   const entry = gPendingResolveFuncs.get(resp.id);
   assert(entry !== undefined, 'Received unknown response from worker');
   gPendingResolveFuncs.delete(resp.id);
@@ -241,15 +252,19 @@ export async function JSONLogFileStartCursor(
 }
 
 /**
- * A result of a JSON log file scan operation.
+ * A result of a log file scan operation.
  *
- * @param results The array of results from the scan operation
  * @param done Whether the scan is complete
+ * @param values JSONL path: individual UTF-8 JSON line buffers
+ * @param buffer Binary (.goat) path: single contiguous buffer
+ * @param offsets Binary (.goat) path: Uint32Array of [offset, length] pairs
  */
-export type JSONLogFileScanResult = [
-  results: readonly ReadonlyJSONObject[],
-  done: boolean,
-];
+export type JSONLogFileScanResult = {
+  done: boolean;
+  values?: readonly Uint8Array[];
+  buffer?: Uint8Array;
+  offsets?: Uint32Array;
+};
 const gPendingScanPromise = new Map<
   JSONLogFileCursor,
   Promise<WorkerFileRespScan>
@@ -267,7 +282,7 @@ const gCursorToFile = new Map<JSONLogFileCursor, JSONLogFile>();
  */
 export async function JSONLogFileScan(
   cursor: JSONLogFileCursor,
-): Promise<[results: readonly ReadonlyJSONObject[], done: boolean]> {
+): Promise<JSONLogFileScanResult> {
   const file = gCursorToFile.get(cursor);
   if (!file) throw new Error('Cursor not found');
 
@@ -281,14 +296,22 @@ export async function JSONLogFileScan(
   }
 
   const resp = await promise;
-  if (!resp.done) {
+  if (resp.done) {
+    gPendingScanPromise.delete(cursor);
+    gCursorToFile.delete(cursor);
+  } else {
     const nextPromise = sendRequest<WorkerFileReqScan>({
       type: 'scan',
       cursor,
     });
     gPendingScanPromise.set(cursor, trackFileOperation(file, nextPromise));
   }
-  return [resp.values, resp.done];
+  return {
+    done: resp.done,
+    values: resp.values,
+    buffer: resp.buffer,
+    offsets: resp.offsets,
+  };
 }
 
 /**
@@ -312,12 +335,14 @@ export async function JSONLogFileFlush(file: JSONLogFile): Promise<void> {
  */
 export async function JSONLogFileAppend(
   file: JSONLogFile,
-  entries: readonly ReadonlyJSONObject[],
+  entries: readonly Uint8Array[],
+  ids?: readonly string[],
 ): Promise<void> {
   const promise = sendRequest<WorkerFileReqAppend>({
     type: 'append',
     file,
     values: entries,
+    ids,
   });
   await trackFileOperation(file, promise);
 }

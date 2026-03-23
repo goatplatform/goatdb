@@ -8,6 +8,7 @@ export interface Edge {
   fieldName: string;
 }
 
+// Called during commit persist/load, not the decode hot path.
 function hashEdge(edge: Edge): string {
   return `${edge.vertex}/${edge.fieldName}`;
 }
@@ -16,22 +17,33 @@ function eqEdges(e1: Edge, e2: Edge): boolean {
   return e1.vertex === e2.vertex && e1.fieldName === e2.fieldName;
 }
 
+// AdjacencyList memory model:
+// - Grows monotonically; edges are never pruned during a Repository lifetime.
+// - Memory is proportional to total persisted commits.
+// - hasInEdges(id) and hasInEdges(id, field) are both O(1) Map lookups;
+//   the field variant uses a secondary index keyed by (fieldName, vertKey).
 export class AdjacencyList {
   private _inEdges: Dictionary<string, HashSet<Edge>>;
   private _outEdges: Dictionary<string, HashSet<Edge>>;
+  private _inFieldCounts: Map<string, Map<string, number>>;
 
   constructor() {
     this._inEdges = new Map();
     this._outEdges = new Map();
+    this._inFieldCounts = new Map();
   }
 
   get isEmpty(): boolean {
     return this._inEdges.size === 0 && this._outEdges.size === 0;
   }
 
-  hasInEdges(vertKey: string): boolean {
-    const set = this._inEdges.get(vertKey);
-    return set !== undefined && set.size > 0;
+  hasInEdges(vertKey: string, fieldName?: string): boolean {
+    if (fieldName === undefined) {
+      const set = this._inEdges.get(vertKey);
+      return set !== undefined && set.size > 0;
+    }
+    // O(1) secondary-index lookup
+    return (this._inFieldCounts.get(fieldName)?.get(vertKey) ?? 0) > 0;
   }
 
   addEdge(src: string, dst: string, fieldName: string): boolean {
@@ -50,14 +62,19 @@ export class AdjacencyList {
       this._inEdges.set(dst, inSet);
     }
     // Sanity check. Both sides must be in sync
+    const inSuccess = inSet.add({ vertex: src, fieldName });
     assert(
-      success ===
-        inSet.add({
-          vertex: src,
-          fieldName,
-        }),
+      success === inSuccess,
       `addEdge failed. src: ${src}, dest: ${dst}, fieldName: ${fieldName}`,
     );
+    if (success) {
+      let fieldMap = this._inFieldCounts.get(fieldName);
+      if (fieldMap === undefined) {
+        fieldMap = new Map();
+        this._inFieldCounts.set(fieldName, fieldMap);
+      }
+      fieldMap.set(dst, (fieldMap.get(dst) ?? 0) + 1);
+    }
     return success;
   }
 
@@ -66,16 +83,25 @@ export class AdjacencyList {
     const inSet = this._inEdges.get(dst);
     const success = Boolean(outSet?.delete({ vertex: dst, fieldName }));
     // Sanity check. Both sides must be in sync
+    const inSuccess = Boolean(inSet?.delete({ vertex: src, fieldName }));
     assert(
-      success ===
-        Boolean(
-          inSet?.delete({
-            vertex: src,
-            fieldName,
-          }),
-        ),
+      success === inSuccess,
       `deleteEdge failed. src: ${src}, dest: ${dst}, fieldName: ${fieldName}`,
     );
+    if (success) {
+      if (outSet && outSet.size === 0) this._outEdges.delete(src);
+      if (inSet && inSet.size === 0) this._inEdges.delete(dst);
+      const fieldMap = this._inFieldCounts.get(fieldName);
+      if (fieldMap !== undefined) {
+        const count = (fieldMap.get(dst) ?? 0) - 1;
+        if (count <= 0) {
+          fieldMap.delete(dst);
+          if (fieldMap.size === 0) this._inFieldCounts.delete(fieldName);
+        } else {
+          fieldMap.set(dst, count);
+        }
+      }
+    }
     return success;
   }
 

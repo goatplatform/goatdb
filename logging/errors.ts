@@ -67,7 +67,9 @@ export type OperationalError =
   | 'DuplicateFailed'
   | 'SessionError'
   | 'EmailSendFailed'
-  | 'MissingConfiguration';
+  | 'MissingConfiguration'
+  | 'StorageError'
+  | 'ValidationError';
 
 /**
  * Interface for log entries that represent operational errors. Extends

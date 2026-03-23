@@ -23,6 +23,7 @@ export interface Decoder<
   get<T extends V>(key: K, defaultValue?: T): T | typeof defaultValue;
   has(key: K): boolean;
   getDecoder(key: K, offset?: number): Decoder<K, V>;
+  finalize?(): void;
 }
 
 export function isDecoder<

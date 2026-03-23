@@ -1,4 +1,4 @@
-import { Commit } from '../repo/commit.ts';
+import { Commit, FieldCommit } from '../repo/commit.ts';
 import { Item } from '../cfds/base/item.ts';
 import { Edit } from '../cfds/base/edit.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
@@ -9,7 +9,6 @@ import { JSONCyclicalDecoder } from '../base/core-types/encoding/json.ts';
 import { FieldChange } from '../cfds/change/field-change.ts';
 import type { ValueType } from '../cfds/base/types/index.ts';
 import { tuple4Break } from '../base/tuple.ts';
-import { BloomFilter } from '../base/bloom.ts';
 
 // Minimal test schema
 const TestSchema: Schema = {
@@ -43,14 +42,13 @@ function makeTestEdit(srcChecksum: string, dstChecksum: string) {
 export default function setup() {
   TEST('Commit', 'constructs document commit', () => {
     const item = makeTestItem('bar');
-    const commit = new Commit({
+    const commit = Commit.create({
       session: 'sess',
       orgId: 'org',
       key: 'key',
       contents: item,
       parents: [],
-      ancestorsFilter: undefined as any, // skipped
-      ancestorsCount: 0, // skipped
+      ancestors: [],
     });
     assertEquals(commit.record?.get('foo'), 'bar');
     assertEquals(commit.key, 'key');
@@ -67,14 +65,13 @@ export default function setup() {
   TEST('Commit', 'constructs delta commit', () => {
     const item = makeTestItem('bar');
     const edit = makeTestEdit(item.checksum, 'dst');
-    const commit = new Commit({
+    const commit = Commit.create({
       session: 'sess',
       orgId: 'org',
       key: 'key',
       contents: { base: 'baseid', edit },
       parents: [],
-      ancestorsFilter: undefined as any, // skipped
-      ancestorsCount: 0, // skipped
+      ancestors: [],
     });
     assertEquals((commit.contents as any).base, 'baseid');
     assertEquals((commit.contents as any).edit.dstChecksum, 'dst');
@@ -84,14 +81,13 @@ export default function setup() {
 
   TEST('Commit', 'serialize/deserialize roundtrip (document)', () => {
     const item = makeTestItem('bar');
-    const commit = new Commit({
+    const commit = Commit.create({
       session: 'sess',
       orgId: 'org',
       key: 'key',
       contents: item,
       parents: [],
-      ancestorsFilter: undefined as any, // skipped
-      ancestorsCount: 0, // skipped
+      ancestors: [],
     });
     const js = commit.toJS();
     const decoder = JSONCyclicalDecoder.get(js);
@@ -108,14 +104,13 @@ export default function setup() {
   TEST('Commit', 'serialize/deserialize roundtrip (delta)', () => {
     const item = makeTestItem('bar');
     const edit = makeTestEdit(item.checksum, 'dst');
-    const commit = new Commit({
+    const commit = Commit.create({
       session: 'sess',
       orgId: 'org',
       key: 'key',
       contents: { base: 'baseid', edit },
       parents: [],
-      ancestorsFilter: undefined as any, // skipped
-      ancestorsCount: 0, // skipped
+      ancestors: [],
     });
     const js = commit.toJS();
     const decoder = JSONCyclicalDecoder.get(js);
@@ -128,19 +123,18 @@ export default function setup() {
 
   TEST('Commit', 'lazy deserialization of contents', () => {
     const item = makeTestItem('bar');
-    const commit = new Commit({
+    const commit = Commit.create({
       session: 'sess',
       orgId: 'org',
       key: 'key',
       contents: item,
       parents: [],
-      ancestorsFilter: undefined as any, // skipped
-      ancestorsCount: 0, // skipped
+      ancestors: [],
     });
     const js = commit.toJS();
     // Simulate lazy: only _contentsStr is set
     const decoder = JSONCyclicalDecoder.get(js);
-    const c2 = new Commit({ decoder, orgId: 'org' }, DataRegistry.default);
+    const c2 = new FieldCommit({ decoder, orgId: 'org' }, DataRegistry.default);
     // Instead of accessing private fields, test via public API:
     // Accessing .contents triggers deserialization
     assertEquals(c2.record?.get('foo'), 'bar');
@@ -152,14 +146,13 @@ export default function setup() {
     'handles signature, mergeBase, mergeLeader, revert fields',
     () => {
       const item = makeTestItem('bar');
-      const commit = new Commit({
+      const commit = Commit.create({
         session: 'sess',
         orgId: 'org',
         key: 'key',
         contents: item,
         parents: [],
-        ancestorsFilter: BloomFilter.empty,
-        ancestorsCount: 0, // skipped
+        ancestors: [],
         signature: 'sig',
         mergeBase: 'mb',
         mergeLeader: 'ml',
@@ -174,14 +167,13 @@ export default function setup() {
 
   TEST('Commit', 'frozen commit cannot be deserialized again', () => {
     const item = makeTestItem('bar');
-    const commit = new Commit({
+    const commit = Commit.create({
       session: 'sess',
       orgId: 'org',
       key: 'key',
       contents: item,
       parents: [],
-      ancestorsFilter: undefined as any, // skipped
-      ancestorsCount: 0, // skipped
+      ancestors: [],
     });
     const js = commit.toJS();
     const decoder = JSONCyclicalDecoder.get(js);
@@ -195,14 +187,13 @@ export default function setup() {
 
   TEST('Commit', 'fromJSArr returns array of frozen commits', () => {
     const item = makeTestItem('bar');
-    const commit = new Commit({
+    const commit = Commit.create({
       session: 'sess',
       orgId: 'org',
       key: 'key',
       contents: item,
       parents: [],
-      ancestorsFilter: undefined as any, // skipped
-      ancestorsCount: 0, // skipped
+      ancestors: [],
     });
     const js = commit.toJS();
     const arr = Commit.fromJSArr('org', [js], DataRegistry.default);
@@ -213,14 +204,13 @@ export default function setup() {
 
   TEST('Commit', 'throws on missing commit contents', () => {
     const item = makeTestItem('bar');
-    const commit = new Commit({
+    const commit = Commit.create({
       session: 'sess',
       orgId: 'org',
       key: 'key',
       contents: item,
       parents: [],
-      ancestorsFilter: undefined as any, // skipped
-      ancestorsCount: 0, // skipped
+      ancestors: [],
     });
     const js = commit.toJS();
     // Remove 'c' field from js
@@ -228,7 +218,7 @@ export default function setup() {
     delete (js2 as any).c;
     const decoder = JSONCyclicalDecoder.get(js2);
     assertThrows(() => {
-      new Commit({ decoder, orgId: 'org' }, DataRegistry.default).contents;
+      new FieldCommit({ decoder, orgId: 'org' }, DataRegistry.default).contents;
     });
     decoder.finalize();
   });

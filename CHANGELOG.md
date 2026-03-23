@@ -6,6 +6,65 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and GoatDB adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Breaking Changes
+
+- **Binary `.goat` storage format**: Commits are now stored in a compact binary
+  format (magic byte `0x47 'G'`, little-endian commit fields, big-endian 4-byte
+  length framing). Both `.jsonl` and the new binary format are first-class
+  citizens; the format is selected via `DBInstanceConfig.storageFormat`. Manual
+  migration required for any tooling that reads `.goat` files directly.
+
+- **Bloom-filter ancestors replaced with explicit string arrays**: The `'af'`
+  (ancestor filter) and `'ac'` (ancestor count) commit fields are no longer
+  written or read. Existing commits that used Bloom-filter ancestry load with
+  `ancestors=[]`; ancestor edges are rebuilt as new merge commits are written.
+  No data loss occurs, but one extra merge cycle may run per affected key on
+  first upgrade.
+
+- **Strict `.goat` binary format**: Non-binary records in `.goat` files are now
+  rejected with an error log (previously silently loaded). Any `.goat` file with
+  mixed JSON/binary content requires manual migration.
+
+- **`leavesForKey()` session parameter removed**: The optional `session`
+  parameter has been removed from `Repository.leavesForKey()`.
+
+- **`commitIsHighProbabilityLeaf()` renamed to `commitIsLeaf()`**: Reflects the
+  switch from probabilistic Bloom-filter ancestry to exact ancestor tracking.
+
+- **Ed25519 signing replaces ECDSA P-384**: Session keys now use Ed25519.
+  Existing ECDSA-signed commits cannot be verified; a fresh trust pool is
+  required.
+
+- **`liveUpdates` defaults to `true`**: Queries now push live (uncommitted)
+  updates on `set()` by default. Set `liveUpdates: false` to restore commit-only
+  update behavior.
+
+- **Query cache IDs changed (MD5 -> Murmur3)**: `generateQueryId` now uses
+  Murmur3 instead of MD5. Persisted query caches from prior versions will miss
+  on upgrade and be lazily rebuilt -- no data loss, but expect a one-time
+  re-scan on first open.
+
+### Added
+
+- `GoatDB.insert()` — bulk API for batch item creation without ancestor
+  computation overhead for new keys
+- `liveUpdates` option on queries — live push updates from the repo
+- `WriteFailure` event on `GoatDB` — surfaced when a commit fails to persist
+- Binary commit codec (`base/core-types/encoding/binary-commit.ts`) bundled into
+  the storage worker for zero-copy encode/decode
+
+### Changed
+
+- Sync Bloom filter FPR cap lowered from `0.5` to `0.001` for normal-accuracy
+  sync, reducing unnecessary resync rounds during peer-to-peer commit exchange
+  (low-accuracy path retains `0.5`)
+- Auth concurrency captured once at `Repository` construction, preventing a
+  potential race between pool sizing and batch slicing in `verifyCommits`
+- Homepage redesigned with new hero, logo, and quick-start component
+- Benchmark suite overhauled; documentation updated
+
 ## [0.5.1] - 2026-03-05
 
 ### Breaking Changes
@@ -270,6 +329,7 @@ and GoatDB adheres to
 
 - Initial release
 
+[Unreleased]: https://github.com/goatplatform/goatdb/compare/v0.5.1...HEAD
 [0.5.1]: https://github.com/goatplatform/goatdb/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/goatplatform/goatdb/compare/v0.3.1...v0.5.0
 [0.3.1]: https://github.com/goatplatform/goatdb/compare/v0.3.0...v0.3.1

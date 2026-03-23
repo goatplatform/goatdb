@@ -8,8 +8,7 @@ import rehypeKatex from 'rehype-katex';
 
 const config: Config = {
   title: 'GoatDB',
-  tagline:
-    'Embedded database with real-time sync and automatic conflict resolution',
+  tagline: 'Databases split into fast or shared. AI agents need both.',
   favicon: 'img/favicon.png',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
@@ -104,8 +103,8 @@ const config: Config = {
     navbar: {
       logo: {
         alt: 'GoatDB Logo',
-        src: 'img/goatdb_logo_dark_500.png',
-        srcDark: 'img/goatdb_logo_light_500.png',
+        src: 'img/goatdb_logo_dark.svg',
+        srcDark: 'img/goatdb_logo_light.svg',
       },
       items: [
         {

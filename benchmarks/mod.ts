@@ -3,16 +3,52 @@ import {
   type BenchmarkStatistics,
   calculateStatistics,
   getDefaultBenchmarkConfig,
-  getRuntime,
+  getRuntimeId,
   type RunResult,
   type RunSummary,
   Suite,
 } from '../shared/runner.ts';
 import { getSystemInfo } from '../base/system-info.ts';
+import { getEnvVar } from '../base/os.ts';
 import { ProgressBar } from '../shared/progress.ts';
 import { writeTextFile } from '../base/json-log/file-impl.ts';
 import { Emitter } from '../base/emitter.ts';
 import * as path from '@std/path';
+
+/** Canonical operation ordering for comparison tables. */
+export const OPERATION_ORDER = [
+  // Database Lifecycle
+  'Create instance',
+  'Open database (empty)',
+  'Open database (100k items)',
+
+  // Single Item CRUD Operations (OLTP)
+  'Create item',
+  'Read item',
+  'Update item',
+
+  // Bulk Operations (Mixed OLTP/OLAP)
+  'Bulk create 100 items',
+  'Bulk read 100 items',
+  'Write 100k items',
+  'Read 100k items (cold)',
+  'Read 100k items (warm)',
+
+  // Query Operations (OLAP)
+  'Filter query cold (100 items)',
+  'Filter query warm (100 items)',
+  'Filter query cold (100k \u2192 1k results)',
+  'Filter query warm (100k \u2192 1k results)',
+  'Filter query cold (100k \u2192 10k results)',
+  'Filter query warm (100k \u2192 10k results)',
+  'Filter + sort query cold (100 items)',
+  'Filter + sort query warm (100 items)',
+  'Live query update (100 items)',
+  'Live query update (1k items)',
+  'Live query update (10k items)',
+  'Count operation',
+  'Keys operation',
+] as const;
 
 /**
  * Cleanup function type
@@ -66,7 +102,7 @@ export class BenchmarkRunner extends Emitter<BenchmarkEvent> {
   async run(filter?: string, outputJson = false): Promise<RunSummary> {
     const results: RunResult[] = [];
     const startTime = performance.now();
-    const runtime = getRuntime();
+    const runtime = getRuntimeId();
 
     // Count total benchmarks
     let totalBenchmarks = 0;
@@ -198,10 +234,6 @@ export class BenchmarkRunner extends Emitter<BenchmarkEvent> {
       const iterations = config.iterations || 10;
 
       for (let i = 0; i < iterations; i++) {
-        const avgSoFar = samples.length > 0
-          ? (samples.reduce((a, b) => a + b, 0) / samples.length).toFixed(1)
-          : '0';
-
         // Create new suite for each iteration if not preserving data
         const suite = preserveData
           ? persistentSuite!
@@ -248,10 +280,10 @@ export class BenchmarkRunner extends Emitter<BenchmarkEvent> {
 
       // Collect result
       const result = {
-        type: 'benchmark',
+        type: 'benchmark' as const,
         suite: suiteName,
         name,
-        status: passed ? 'passed' : 'failed',
+        status: (passed ? 'passed' : 'failed') as 'passed' | 'failed',
         duration: stats.mean,
         timestamp: new Date().toISOString(),
         statistics: stats,
@@ -282,13 +314,13 @@ export class BenchmarkRunner extends Emitter<BenchmarkEvent> {
     // Output results in a clean table format
     console.log('\n' + await formatSummary(summary));
 
+    // Attach system info to summary
+    summary.metadata.systemInfo = await getSystemInfo();
+
     // Save JSON if requested
     if (outputJson) {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const jsonPath = path.join(
-        '/tmp',
-        `goatdb-bench-results-${timestamp}.json`,
-      );
+      const outputDir = getEnvVar('GOATDB_BENCH_OUTPUT_DIR') || '/tmp';
+      const jsonPath = path.join(outputDir, `goatdb-bench-${runtime}.json`);
       await writeTextFile(jsonPath, JSON.stringify(summary, null, 2));
       console.log(`📄 Results saved to: ${jsonPath}`);
     }
@@ -371,61 +403,11 @@ function createSummary(
  */
 function formatDuration(ms: number): string {
   if (ms < 1.0) {
-    return `${(ms * 1000).toFixed(1)}μs`;
+    if (ms * 1000 < 0.05) return '<0.1\u00B5s';
+    return `${(ms * 1000).toFixed(1)}\u00B5s`;
   } else {
     return `${ms.toFixed(1)}ms`;
   }
-}
-
-/**
- * Format individual results in a clean table
- */
-function formatResults(results: RunResult[]): string {
-  if (results.length === 0) return '';
-
-  const lines: string[] = [];
-
-  // Group results by suite
-  const suites = new Map<string, RunResult[]>();
-  for (const result of results) {
-    if (!suites.has(result.suite)) {
-      suites.set(result.suite, []);
-    }
-    suites.get(result.suite)!.push(result);
-  }
-
-  lines.push('Benchmark Results');
-  lines.push('=================');
-
-  // Process each suite
-  for (const [suiteName, suiteResults] of suites) {
-    lines.push('');
-    lines.push(suiteName);
-    lines.push('-'.repeat(suiteName.length));
-
-    // Find max name length for alignment
-    let maxNameLen = 0;
-    for (const result of suiteResults) {
-      maxNameLen = Math.max(maxNameLen, result.name.length);
-    }
-
-    // Output each benchmark in the suite
-    for (const result of suiteResults) {
-      const icon = result.status === 'passed' ? '✅' : '❌';
-      const stats = result.statistics;
-      if (stats) {
-        const name = result.name.padEnd(maxNameLen);
-        const mean = formatDuration(stats.mean).padStart(9);
-        const p95 = formatDuration(stats.p95).padStart(9);
-        const p99 = formatDuration(stats.p99).padStart(9);
-        const samples = stats.samples.toString().padStart(6);
-
-        lines.push(`  ${icon} ${name}  ${mean} ${p95} ${p99} ${samples}`);
-      }
-    }
-  }
-
-  return lines.join('\n');
 }
 
 /**
@@ -473,66 +455,19 @@ async function formatSummary(summary: RunSummary): Promise<string> {
 function createComparisonTable(summary: RunSummary): string[] {
   const lines: string[] = [];
 
-  // Normalize operation names for comparison
-  const normalizeOperation = (name: string): string => {
-    const mapping: Record<string, string> = {
-      'Open repository (empty)': 'Open database (empty)',
-      'Open repository (100k items)': 'Open database (100k items)',
-      'Create table': 'Open database (empty)',
-      'Read item by path': 'Read item by ID',
-      'Create single item': 'Create item',
-      'Read 100k items': 'Read 100k items',
-      'Bulk create 100 items': 'Bulk create 100 items',
-      'Bulk read 100 items': 'Bulk read 100 items',
-      'Repository operations: count': 'Count operation',
-      'Repository operations: keys': 'Keys operation',
-    };
-    return mapping[name] || name;
-  };
-
-  // Group results by normalized operation
+  // Group results by operation name
   const operationResults = new Map<string, RunResult[]>();
   for (const result of summary.results) {
-    const normalizedName = normalizeOperation(result.name);
-    if (!operationResults.has(normalizedName)) {
-      operationResults.set(normalizedName, []);
+    if (!operationResults.has(result.name)) {
+      operationResults.set(result.name, []);
     }
-    operationResults.get(normalizedName)!.push(result);
+    operationResults.get(result.name)!.push(result);
   }
 
   // Sort operations in logical order for clear performance story
   const operations = Array.from(operationResults.keys()).sort((a, b) => {
-    // Define logical order categories
-    const order = [
-      // 1. Database Lifecycle
-      'Create instance',
-      'Create table',
-      'Open database (empty)',
-      'Open database (100k items)',
-
-      // 2. Single Item CRUD Operations (OLTP)
-      'Create item',
-      'Create single item',
-      'Read item by ID',
-      'Read item by path',
-      'Update item',
-
-      // 3. Bulk Operations (Mixed OLTP/OLAP)
-      'Bulk create 100 items',
-      'Bulk read 100 items',
-      'Read 100k items',
-
-      // 4. Query Operations (OLAP)
-      'Simple query',
-      'Complex query with sort',
-      'Count operation',
-      'Keys operation',
-      'Repository operations: count',
-      'Repository operations: keys',
-    ];
-
-    const indexA = order.indexOf(a);
-    const indexB = order.indexOf(b);
+    const indexA = OPERATION_ORDER.indexOf(a as typeof OPERATION_ORDER[number]);
+    const indexB = OPERATION_ORDER.indexOf(b as typeof OPERATION_ORDER[number]);
 
     // If both operations are in the defined order, sort by position
     if (indexA !== -1 && indexB !== -1) {
@@ -547,39 +482,62 @@ function createComparisonTable(summary: RunSummary): string[] {
     return a.localeCompare(b);
   });
 
-  // Table 1: ACID Compliant Comparison
-  const acidSuites = ['GoatDB', 'GoatDB Trusted', 'SQLite'];
-  const availableAcidSuites = acidSuites.filter((suite) =>
+  // Table 1: Default Configuration Performance (headline)
+  const defaultSuites = ['GoatDB', 'SQLite'];
+  const availableDefaultSuites = defaultSuites.filter((suite) =>
     summary.summary.suites[suite]
   );
 
-  if (availableAcidSuites.length > 0) {
-    lines.push('Durable Mode Performance Comparison');
+  if (availableDefaultSuites.length > 0) {
+    lines.push('Default Configuration Performance');
     lines.push('');
     lines.push(
       ...createComparisonTableForSuites(
         operations,
         operationResults,
-        availableAcidSuites,
+        availableDefaultSuites,
       ),
     );
     lines.push('');
   }
 
-  // Table 2: Performance Optimized Comparison
-  const fastSuites = ['GoatDB Fast', 'SQLite Fast-Unsafe'];
-  const availableFastSuites = fastSuites.filter((suite) =>
+  // Table 2: Durable Mode Comparison
+  const durableSuites = [
+    'GoatDB (Durable)',
+    'GoatDB',
+    'SQLite',
+    'SQLite Fast-Unsafe',
+  ];
+  const availableDurableSuites = durableSuites.filter((suite) =>
     summary.summary.suites[suite]
   );
 
-  if (availableFastSuites.length > 0) {
-    lines.push('Performance Optimized Comparison');
+  if (availableDurableSuites.length > 0) {
+    lines.push('Durable Mode Comparison');
     lines.push('');
     lines.push(
       ...createComparisonTableForSuites(
         operations,
         operationResults,
-        availableFastSuites,
+        availableDurableSuites,
+      ),
+    );
+  }
+
+  // Table 3: Storage Format Comparison
+  const storageSuites = ['GoatDB', 'GoatDB JSONL'];
+  const availableStorageSuites = storageSuites.filter((suite) =>
+    summary.summary.suites[suite]
+  );
+  if (availableStorageSuites.length > 0) {
+    lines.push('');
+    lines.push('Storage Format Comparison');
+    lines.push('');
+    lines.push(
+      ...createComparisonTableForSuites(
+        operations,
+        operationResults,
+        availableStorageSuites,
       ),
     );
   }
@@ -597,7 +555,7 @@ function createComparisonTableForSuites(
 ): string[] {
   const lines: string[] = [];
   const maxOpLen = Math.max(12, ...operations.map((op) => op.length));
-  const colWidth = 18; // Increased to accommodate "SQLite-Fast-Unsafe"
+  const colWidth = 24;
 
   // Create header
   let header = 'Operation'.padEnd(maxOpLen);
@@ -620,40 +578,47 @@ function createComparisonTableForSuites(
   // Add data rows
   for (const operation of operations) {
     const results = operationResults.get(operation) || [];
-    const operationResults_filtered = results.filter((r) =>
-      suites.includes(r.suite)
-    );
+    const filtered = results.filter((r) => suites.includes(r.suite));
 
-    if (operationResults_filtered.length === 0) continue;
+    if (filtered.length === 0) continue;
 
     let row = operation.padEnd(maxOpLen);
 
     // Find winner and loser within this group
-    const validResults = operationResults_filtered.filter((r) => r.statistics);
+    const validResults = filtered.filter((r) => r.statistics);
     const times = validResults.map((r) => r.statistics!.mean);
     const minTime = Math.min(...times);
     const maxTime = Math.max(...times);
 
     for (const suite of suites) {
-      const result = operationResults_filtered.find((r) => r.suite === suite);
-      const value = result?.statistics
+      const result = filtered.find((r) => r.suite === suite);
+      const baseValue = result?.statistics
         ? formatDuration(result.statistics.mean)
         : '-';
-      let coloredValue = value;
+      let displayValue = baseValue;
 
-      // Add color highlighting
+      // Add color highlighting and speedup ratio
       if (result?.statistics && times.length > 1) {
         const time = result.statistics.mean;
         if (time === minTime) {
-          coloredValue = `\x1b[32m${value}\x1b[0m`;
-        } else if (time === maxTime) {
-          coloredValue = `\x1b[31m${value}\x1b[0m`;
+          displayValue = `\x1b[32m${baseValue}\x1b[0m`;
+        } else {
+          const ratio = (time / minTime).toFixed(1);
+          const withRatio = `${baseValue} (${ratio}x)`;
+          if (time === maxTime) {
+            displayValue = `\x1b[31m${withRatio}\x1b[0m`;
+          } else {
+            displayValue = withRatio;
+          }
+          const padding = colWidth - withRatio.length;
+          row += ' │ ' + ' '.repeat(Math.max(0, padding)) + displayValue;
+          continue;
         }
       }
 
       // Proper padding
-      const padding = colWidth - value.length;
-      row += ' │ ' + ' '.repeat(Math.max(0, padding)) + coloredValue;
+      const padding = colWidth - baseValue.length;
+      row += ' │ ' + ' '.repeat(Math.max(0, padding)) + displayValue;
     }
     lines.push(row);
   }
@@ -678,19 +643,27 @@ function createDetailedTables(summary: RunSummary): string[] {
 
     // Table header
     const maxOpLen = Math.max(12, ...suiteResults.map((r) => r.name.length));
-    const header = 'Operation'.padEnd(maxOpLen) + ' │ ' +
-      'Average'.padStart(10) + ' │ ' +
-      'p95'.padStart(10) + ' │ ' +
-      'p99'.padStart(10) + ' │ ' +
-      'Samples'.padStart(8);
+    const header = 'Operation'.padEnd(maxOpLen) + ' | ' +
+      'Average'.padStart(10) + ' | ' +
+      'Median'.padStart(10) + ' | ' +
+      'Stddev'.padStart(10) + ' | ' +
+      'CV'.padStart(6) + ' | ' +
+      'p95'.padStart(10) + ' | ' +
+      'p99'.padStart(10) + ' | ' +
+      'Samples'.padStart(8) + ' | ' +
+      'Throughput'.padStart(14);
 
     lines.push(header);
     lines.push(
-      '─'.repeat(maxOpLen) + '─┼─' +
-        '─'.repeat(10) + '─┼─' +
-        '─'.repeat(10) + '─┼─' +
-        '─'.repeat(10) + '─┼─' +
-        '─'.repeat(8),
+      '-'.repeat(maxOpLen) + '-+-' +
+        '-'.repeat(10) + '-+-' +
+        '-'.repeat(10) + '-+-' +
+        '-'.repeat(10) + '-+-' +
+        '-'.repeat(6) + '-+-' +
+        '-'.repeat(10) + '-+-' +
+        '-'.repeat(10) + '-+-' +
+        '-'.repeat(8) + '-+-' +
+        '-'.repeat(14),
     );
 
     // Data rows
@@ -698,11 +671,27 @@ function createDetailedTables(summary: RunSummary): string[] {
       const stats = result.statistics;
       if (!stats) continue;
 
-      const row = result.name.padEnd(maxOpLen) + ' │ ' +
-        formatDuration(stats.mean).padStart(10) + ' │ ' +
-        formatDuration(stats.p95).padStart(10) + ' │ ' +
-        formatDuration(stats.p99).padStart(10) + ' │ ' +
-        stats.samples.toString().padStart(8);
+      const medianStr = stats.median !== undefined
+        ? formatDuration(stats.median)
+        : '-';
+      const cvStr = stats.cv !== undefined
+        ? `${(stats.cv * 100).toFixed(0)}%`
+        : '-';
+      const p95 = stats.samples < 20 ? '-' : formatDuration(stats.p95);
+      const p99 = stats.samples < 100 ? '-' : formatDuration(stats.p99);
+      const throughput = stats.throughput >= 10
+        ? `${Math.round(stats.throughput)} ops/s`
+        : '-';
+
+      const row = result.name.padEnd(maxOpLen) + ' | ' +
+        formatDuration(stats.mean).padStart(10) + ' | ' +
+        medianStr.padStart(10) + ' | ' +
+        formatDuration(stats.stddev).padStart(10) + ' | ' +
+        cvStr.padStart(6) + ' | ' +
+        p95.padStart(10) + ' | ' +
+        p99.padStart(10) + ' | ' +
+        stats.samples.toString().padStart(8) + ' | ' +
+        throughput.padStart(14);
 
       lines.push(row);
     }

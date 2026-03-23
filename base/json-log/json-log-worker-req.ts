@@ -1,5 +1,3 @@
-import type { ReadonlyJSONObject } from '../interfaces.ts';
-
 /**
  * A request to open a JSON log file.
  *
@@ -64,14 +62,20 @@ export type WorkerFileReqFlush = {
  * A request to append entries to a JSON log file.
  *
  * @param file The file handle to append to
- * @param values Array of JSON objects to append to the file
+ * @param values Array of encoded entries to append to the file
  * @param id Request ID used to match requests with responses
  */
 export type WorkerFileReqAppend = {
   type: 'append';
   id: number;
   file: number;
-  values: readonly ReadonlyJSONObject[];
+  values: readonly Uint8Array[];
+  /**
+   * Optional pre-extracted IDs corresponding 1:1 to `values`. When provided,
+   * the worker skips decoding each entry just to read its `id` field for
+   * deduplication — a significant speedup for large appends.
+   */
+  ids?: readonly string[];
 };
 
 /**
@@ -174,8 +178,12 @@ export type WorkerFileRespScan = {
   type: 'scan';
   id: number;
   cursor: number;
-  values: readonly ReadonlyJSONObject[];
   done: boolean;
+  // JSONL format: individual buffers
+  values?: readonly Uint8Array[];
+  // Binary (.goat) format: single contiguous buffer + offset/length pairs
+  buffer?: Uint8Array;
+  offsets?: Uint32Array;
 };
 
 /**
@@ -238,13 +246,27 @@ export type WorkerRemoveResp = {
 };
 
 /**
+ * A log entry relayed from the worker to the main thread. Kept minimal to
+ * avoid importing from logging/ and to keep the structured-clone payload small.
+ */
+export type WorkerLogRelay = {
+  severity: string;
+  error?: string;
+  message?: string;
+};
+
+/**
  * A type representing an error that occurred during an operation on a JSON log
  * file.
  *
  * @param id Request ID used to match requests with responses
  * @param error The type of error that occurred
  */
-export type WorkerErrorType = 'UnknownCommand' | 'FileClosed';
+export type WorkerErrorType =
+  | 'UnknownCommand'
+  | 'FileClosed'
+  | 'AppendFailed'
+  | 'InternalError';
 
 export type WorkerErrorResp = {
   type: 'error';

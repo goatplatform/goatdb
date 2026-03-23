@@ -1,6 +1,6 @@
 .quickstart {
   padding: 3rem 0;
-  background-color: var(--ifm-color-emphasis-100);
+  background-color: var(--ifm-background-surface-color);
 }
 
 .quickstartHeader {
@@ -43,7 +43,7 @@
   flex-shrink: 0;
   width: 2rem;
   height: 2rem;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--ifm-color-primary);
   color: #fff;
   font-size: 0.875rem;
@@ -74,7 +74,7 @@
 /* Code blocks */
 .quickstart pre {
   font-size: 0.875rem;
-  border-radius: var(--ifm-code-border-radius);
+  border-radius: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   margin: 0;
 }

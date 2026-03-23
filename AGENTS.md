@@ -9,6 +9,10 @@ Essential invariants and commands for AI agents working on GoatDB.
 - **Browser Tests**: Playwright/Chromium
 - **Package**: JSR @goatdb/goatdb
 
+## Logging
+
+GoatDB uses custom `logging/` infra. ALWAYS use it. NEVER direct console logs.
+
 ## Commands
 
 ```bash
@@ -32,7 +36,7 @@ deno task build                         # Rebuild system assets
 ```
 db/db.ts           → GoatDB class (main entry)
 db/managed-item.ts → ManagedItem (document interface)
-db/session.ts      → ECDSA P-384 authentication
+db/session.ts      → Ed25519 authentication
 repo/              → Commit graphs, version history
 net/server/        → HTTP server, sync protocol
 server-build.ts    → Build-time exports (compile, startDebugServer, AppConfig)
@@ -104,7 +108,7 @@ db.create('/data/repo/item', kMySchema, data);
 
 ## Security Invariants
 
-- ECDSA P-384 keys: private keys never leave device
+- Ed25519 keys: private keys never leave device
 - Sessions expire after 30 days (auto key rotation)
 - All commits cryptographically signed
 - Authorization rules run on every operation
@@ -118,6 +122,30 @@ db.create('/data/repo/item', kMySchema, data);
 | Validation error         | Schema not registered    | Register before use            |
 | Test hangs               | DB not closed            | Use try/finally with `close()` |
 | Path assertion           | Wrong format             | Use `/type/repo/item`          |
+
+## Binary Format Invariants
+
+- Storage format: `.goat` files (magic byte `0x47 'G'`, little-endian for commit
+  payload fields; big-endian (network order) for `.goat` file framing (4-byte
+  length prefix), version 1)
+- Codec lives in `base/core-types/encoding/binary-commit.ts` — **bundled into
+  the worker**
+- Source must be **ASCII-only** (no Unicode literals, em dashes, arrows, etc.)
+- **Always run `deno task build` after changing `binary-commit.ts`**
+- **Zero-copy rule**: no `buf.subarray()` and no intermediate object allocations
+  on encode/decode hot paths; use manual UTF-8 codec (no
+  TextEncoder/TextDecoder) in `BinaryCommitWriter` and `decodeStr`, except: a
+  shared `TextDecoder` is permitted as a fallback in `decodeStr` for non-ASCII
+  or long (>512 byte) strings — the ASCII fast path avoids it. When strictly
+  necessary to break this rule, add an inline comment explaining the tradeoff
+  (e.g. `decodeStr` ASCII fast path: one subarray view allocation replaces N
+  per-char string concatenation allocations)
+- `BinaryCommit._bytes` may reference a shared scan-buffer from
+  `fromBinaryScanResult` — this is intentional; do not slice it in `toBytes()`
+- Header is 36 bytes fixed; string fields follow with u16/u8 length prefixes;
+  JSON contents bytes are at `contentsOffset` (no length prefix, extends to end)
+- **Strict format**: `.goat` files must contain only binary records; non-binary
+  records are rejected with an error log and skipped
 
 ## CI
 

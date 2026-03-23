@@ -1,6 +1,7 @@
 import { cli } from './development.ts';
 import { isBrowser, isDeno, isNode } from './common.ts';
-import { normalizeNodePlatform } from './os.ts';
+import { getEnvVar, getOS, normalizeNodePlatform } from './os.ts';
+import { log } from '../logging/log.ts';
 
 export type SystemInfo = {
   hardware: {
@@ -16,11 +17,63 @@ export type SystemInfo = {
 };
 
 export async function getSystemInfo(): Promise<SystemInfo> {
+  const hardwareOverride = getEnvVar('GOATDB_SYSTEM_HARDWARE');
+  if (hardwareOverride) {
+    try {
+      return {
+        hardware: JSON.parse(hardwareOverride),
+        runtime: getRuntimeInfo(),
+      };
+    } catch {
+      log({
+        severity: 'WARNING',
+        error: 'SchemaValidationError',
+        message: '[GoatDB] Invalid JSON in GOATDB_SYSTEM_HARDWARE, ignoring',
+      });
+    }
+  }
   if (isBrowser()) {
-    return getBrowserSystemInfo();
+    return await getBrowserSystemInfo();
   } else {
     return await getServerSystemInfo();
   }
+}
+
+function getRuntimeInfo(): SystemInfo['runtime'] {
+  if (isBrowser()) {
+    const ua = navigator.userAgent;
+    let version = null;
+    if (ua.includes('Chrome/')) {
+      const match = ua.match(/Chrome\/(\d+\.\d+)/);
+      version = match ? `Chrome ${match[1]}` : null;
+    } else if (ua.includes('Firefox/')) {
+      const match = ua.match(/Firefox\/(\d+\.\d+)/);
+      version = match ? `Firefox ${match[1]}` : null;
+    } else if (ua.includes('Safari/') && !ua.includes('Chrome')) {
+      const match = ua.match(/Version\/(\d+\.\d+)/);
+      version = match ? `Safari ${match[1]}` : null;
+    }
+    return {
+      platform: ua,
+      runtime: 'browser',
+      version: version || ua.split(' ').pop() || null,
+    };
+  } else if (isDeno()) {
+    return {
+      platform: `${Deno.build.os} ${Deno.build.arch}`,
+      runtime: 'deno',
+      version: Deno.version.deno,
+    };
+  } else if (isNode()) {
+    const os = require('node:os');
+    const process = require('node:process');
+    return {
+      platform: `${normalizeNodePlatform(os.platform())} ${os.arch()}`,
+      runtime: 'node',
+      version: process.version,
+    };
+  }
+  return { platform: null, runtime: null, version: null };
 }
 
 async function getServerSystemInfo(): Promise<SystemInfo> {
@@ -30,22 +83,6 @@ async function getServerSystemInfo(): Promise<SystemInfo> {
     getDiskInfo(),
   ]);
 
-  let platform = 'unknown';
-  let runtime = 'unknown';
-  let version = null;
-
-  if (isDeno()) {
-    platform = `${Deno.build.os} ${Deno.build.arch}`;
-    runtime = 'deno';
-    version = Deno.version.deno;
-  } else if (isNode()) {
-    const os = require('node:os');
-    const process = require('node:process');
-    platform = `${normalizeNodePlatform(os.platform())} ${os.arch()}`;
-    runtime = 'node';
-    version = process.version;
-  }
-
   return {
     hardware: {
       cpu: cpuResult.status === 'fulfilled' ? cpuResult.value : null,
@@ -54,30 +91,43 @@ async function getServerSystemInfo(): Promise<SystemInfo> {
         ? diskResult.value
         : 'Generic SSD',
     },
-    runtime: {
-      platform,
-      runtime,
-      version,
-    },
+    runtime: getRuntimeInfo(),
   };
 }
 
-function getBrowserSystemInfo(): SystemInfo {
-  // Extract CPU info from user agent or use core count
-  let cpuInfo = navigator.hardwareConcurrency
-    ? `${navigator.hardwareConcurrency} cores`
-    : null;
-
-  // Try to get more CPU details from user agent
+async function getBrowserSystemInfo(): Promise<SystemInfo> {
+  const cores = navigator.hardwareConcurrency;
   const ua = navigator.userAgent;
-  if (ua.includes('Intel')) {
-    cpuInfo = navigator.hardwareConcurrency
-      ? `Intel CPU (${navigator.hardwareConcurrency} cores)`
-      : 'Intel CPU';
-  } else if (ua.includes('Apple') && ua.includes('Mac')) {
-    cpuInfo = navigator.hardwareConcurrency
-      ? `Apple Silicon (${navigator.hardwareConcurrency} cores)`
-      : 'Apple Silicon';
+  let cpuInfo: string | null = cores ? `${cores} cores` : null;
+
+  // Try Client Hints first (Chrome/Edge) for accurate arch on Apple Silicon
+  try {
+    const uaData = (navigator as any).userAgentData;
+    if (uaData?.getHighEntropyValues) {
+      const hints = await uaData.getHighEntropyValues(['architecture']);
+      const arch: string = hints.architecture ?? '';
+      if (arch === 'arm' && ua.includes('Mac')) {
+        cpuInfo = cores ? `Apple Silicon (${cores} cores)` : 'Apple Silicon';
+      } else if (arch === 'x86') {
+        cpuInfo = cores ? `Intel CPU (${cores} cores)` : 'Intel CPU';
+      } else if (arch) {
+        cpuInfo = cores ? `${arch} CPU (${cores} cores)` : `${arch} CPU`;
+      }
+    } else {
+      // Fallback: check Apple/Mac before Intel to avoid UA Reduction misdetect
+      if (ua.includes('Apple') && ua.includes('Mac')) {
+        cpuInfo = cores ? `Apple Silicon (${cores} cores)` : 'Apple Silicon';
+      } else if (ua.includes('Intel')) {
+        cpuInfo = cores ? `Intel CPU (${cores} cores)` : 'Intel CPU';
+      }
+    }
+  } catch {
+    // Restrictive permissions policy — fall back to UA string
+    if (ua.includes('Apple') && ua.includes('Mac')) {
+      cpuInfo = cores ? `Apple Silicon (${cores} cores)` : 'Apple Silicon';
+    } else if (ua.includes('Intel')) {
+      cpuInfo = cores ? `Intel CPU (${cores} cores)` : 'Intel CPU';
+    }
   }
 
   // Try to get memory info (limited browser support)
@@ -97,36 +147,21 @@ function getBrowserSystemInfo(): SystemInfo {
     }
   }
 
-  // Extract browser version more precisely
-  let version = null;
-  if (ua.includes('Chrome/')) {
-    const match = ua.match(/Chrome\/(\d+\.\d+)/);
-    version = match ? `Chrome ${match[1]}` : null;
-  } else if (ua.includes('Firefox/')) {
-    const match = ua.match(/Firefox\/(\d+\.\d+)/);
-    version = match ? `Firefox ${match[1]}` : null;
-  } else if (ua.includes('Safari/') && !ua.includes('Chrome')) {
-    const match = ua.match(/Version\/(\d+\.\d+)/);
-    version = match ? `Safari ${match[1]}` : null;
-  }
-
   return {
     hardware: {
       cpu: cpuInfo,
       memory: memoryInfo,
       storage: 'OPFS',
     },
-    runtime: {
-      platform: navigator.userAgent,
-      runtime: 'browser',
-      version: version || navigator.userAgent.split(' ').pop() || null,
-    },
+    runtime: getRuntimeInfo(),
   };
 }
 
 async function getCPUInfo(): Promise<string | null> {
   try {
-    if (Deno.build?.os === 'darwin') {
+    if (isNode()) {
+      return require('node:os').cpus()[0]?.model ?? null;
+    } else if (Deno.build?.os === 'darwin') {
       const { result, exitCode } = await cli(
         'sysctl',
         '-n',
@@ -146,7 +181,10 @@ async function getCPUInfo(): Promise<string | null> {
 
 async function getMemoryInfo(): Promise<string | null> {
   try {
-    if (Deno.build?.os === 'darwin') {
+    if (isNode()) {
+      const bytes = require('node:os').totalmem();
+      return `${Math.round(bytes / 1024 ** 3)}GB`;
+    } else if (Deno.build?.os === 'darwin') {
       const { result, exitCode } = await cli('sysctl', '-n', 'hw.memsize');
       if (exitCode === 0) {
         const bytes = parseInt(result.trim());
@@ -170,7 +208,8 @@ async function getMemoryInfo(): Promise<string | null> {
 
 async function getDiskInfo(): Promise<string | null> {
   try {
-    if (Deno.build?.os === 'darwin') {
+    const os = getOS();
+    if (os === 'darwin') {
       // Try NVMe first
       const { result: nvmeResult, exitCode: nvmeCode } = await cli(
         'system_profiler',
@@ -190,7 +229,7 @@ async function getDiskInfo(): Promise<string | null> {
         const match = result.match(/Model:\s*(.+)/m);
         if (match) return `SSD - ${match[1].trim()}`;
       }
-    } else if (Deno.build?.os === 'linux') {
+    } else if (os === 'linux') {
       // Try NVMe first
       const { result: nvmeResult, exitCode: nvmeCode } = await cli(
         'nvme',

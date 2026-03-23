@@ -3,9 +3,8 @@ import { Item } from '../cfds/base/item.ts';
 import type { Commit } from './commit.ts';
 import { Emitter } from '../base/emitter.ts';
 import { NextEventLoopCycleTimer } from '../base/timer.ts';
-import { md51 } from '../external/md5.ts';
+import { murmur3 } from '../base/hash.ts';
 import type { Schema } from '../cfds/base/schema.ts';
-import { BloomFilter } from '../base/bloom.ts';
 import type { GoatDB } from '../db/db.ts';
 import type { ReadonlyJSONValue } from '../base/interfaces.ts';
 import { isBrowser } from '../base/common.ts';
@@ -19,8 +18,6 @@ import type { ManagedItem } from '../db/managed-item.ts';
 import type { SchemaDataType } from '../mod.ts';
 import { bsearch_idx } from '../base/algorithms.ts';
 import { coreValueCompare } from '../base/core-types/comparable.ts';
-
-const BLOOM_FPR = 0.01;
 
 /**
  * A tuple representing a query result entry, containing a path and an item.
@@ -146,6 +143,14 @@ export type QueryConfig<
   ctx?: CTX;
   /** Optional maximum number of results to return */
   limit?: number;
+  /**
+   * When true (default), query membership and sort order update immediately
+   * when a ManagedItem is edited via `set()`, without waiting for the 300ms
+   * commit delay. Set to false to revert to commit-only update behavior.
+   * Rebase events are always ignored since they do not change the document's
+   * logical value.
+   */
+  liveUpdates?: boolean;
 };
 
 /**
@@ -206,6 +211,13 @@ export type QueryEvent = EventDocumentChanged | 'LoadingFinished' | 'Closed';
  * ```
  * @group Querying
  */
+
+// Safety net: if a Query is GC'd without close(), tear down its live listener
+// to prevent a GoatDB.ItemChanged listener leak. Not a substitute for close().
+const LIVE_QUERY_CLEANUP = new FinalizationRegistry<() => void>((cleanup) =>
+  cleanup()
+);
+
 export class Query<
   IS extends Schema,
   OS extends IS,
@@ -233,19 +245,19 @@ export class Query<
   private readonly _sortField?: keyof SchemaDataType<OS> & string;
   private readonly sortDescriptor: SortDescriptor<OS, CTX> | undefined;
   private readonly sortDescending: boolean;
-  private readonly _headIdForKey: Map<string, string>; // Key -> Commit ID
-  private readonly _includedPaths: string[];
+  private readonly _headIdForKey: Map<string, string>; // Path -> Commit ID
+  private readonly _includedPaths: Set<string>;
   private _loadingFinished = false;
   private _scanTimeMs = 0;
-  private _bloomFilter: BloomFilter;
-  private _bloomFilterSize: number;
-  private _bloomFilterCount = 0;
-  private _bloomFilterDeleteCount = 0;
   private _age = 0;
   private _sourceListenerCleanup?: () => void;
+  private _liveListenerCleanup?: () => void;
+  private _liveUpdates: boolean;
+  private _resultsGeneration: number = 0;
+  private _repoPrefix: string | undefined;
   private _closed = false;
   private _cachedResults: ManagedItem<OS>[] | undefined;
-  private _cachedResultsAge = 0;
+  private _cachedResultsAge = -1;
   private _loading: boolean = true;
 
   /**
@@ -271,6 +283,7 @@ export class Query<
     ctx,
     schema,
     limit,
+    liveUpdates,
   }: QueryConfig<IS, OS, CTX>) {
     super();
     this.db = db;
@@ -305,15 +318,9 @@ export class Query<
     this.predicate = predicate;
     this.sortDescriptor = sortBy;
     this.sortDescending = sortDescending ?? false;
+    this._liveUpdates = liveUpdates ?? true;
     this._headIdForKey = new Map();
-    // this._includedKeys = new Set();
-    this._includedPaths = [];
-    this._bloomFilterSize = 1024;
-    this._bloomFilter = new BloomFilter({
-      size: this._bloomFilterSize,
-      fpr: BLOOM_FPR,
-      maxHashes: 2,
-    });
+    this._includedPaths = new Set();
   }
 
   /**
@@ -336,7 +343,9 @@ export class Query<
    * @returns The number of items in the query results.
    */
   get count(): number {
-    return this._includedPaths.length;
+    return this.limit > 0
+      ? Math.min(this._includedPaths.size, this.limit)
+      : this._includedPaths.size;
   }
 
   /**
@@ -375,16 +384,14 @@ export class Query<
   }
 
   /**
-   * Checks if a given path is included in the query results.
+   * Returns true if `path` matches this query's predicate, regardless of
+   * the `limit` setting. Use `results()` to get the bounded result set.
    *
    * @param path The path to check.
    * @returns true if the path is included in the query results, false otherwise.
    */
   has(path: string): boolean {
-    if (!this._bloomFilter.has(path)) {
-      return false;
-    }
-    return this._includedPaths.includes(path);
+    return this._includedPaths.has(path);
   }
 
   /**
@@ -408,34 +415,52 @@ export class Query<
    * @returns An array of managed items that match the query criteria.
    */
   results(): readonly ManagedItem<OS>[] {
-    if (!this._cachedResults || this._cachedResultsAge !== this.age) {
-      this._cachedResults = [];
-      this._cachedResultsAge = this.age;
+    if (
+      !this._cachedResults || this._cachedResultsAge !== this._resultsGeneration
+    ) {
+      this._cachedResultsAge = this._resultsGeneration;
+      const arr = new Array<ManagedItem<OS>>(this._includedPaths.size);
+      let i = 0;
       for (const path of this._includedPaths) {
-        this._cachedResults.push(this.db.item<OS>(path));
+        arr[i++] = this.db.item<OS>(path);
       }
+      this._cachedResults = arr;
       if (this.sortDescriptor) {
-        this._cachedResults.sort((left, right) => {
-          if (!this._sortInfo) {
-            this._sortInfo = {
-              left,
-              right,
-              ctx: this.context,
-            };
-          } else {
-            this._sortInfo.left = left;
-            this._sortInfo.right = right;
-            this._sortInfo.ctx = this.context;
-          }
-          return this.sortDescriptor!(this._sortInfo);
-        });
+        if (!this._liveUpdates && this._sortField) {
+          // In deferred mode with a field-based sort, use committed values so
+          // sort order is consistent with valueForPath()/entries().
+          const sign = this.sortDescending ? -1 : 1;
+          const field = this._sortField;
+          this._cachedResults.sort((left, right) => {
+            const lHead = this._headIdForKey.get(left.path);
+            const rHead = this._headIdForKey.get(right.path);
+            const lVal = lHead
+              ? this.repo.itemForCommit(lHead)?.get(field)
+              : left.get(field);
+            const rVal = rHead
+              ? this.repo.itemForCommit(rHead)?.get(field)
+              : right.get(field);
+            return coreValueCompare(lVal, rVal) * sign;
+          });
+        } else {
+          this._cachedResults.sort((left, right) => {
+            if (!this._sortInfo) {
+              this._sortInfo = {
+                left,
+                right,
+                ctx: this.context,
+              };
+            } else {
+              this._sortInfo.left = left;
+              this._sortInfo.right = right;
+              this._sortInfo.ctx = this.context;
+            }
+            return this.sortDescriptor!(this._sortInfo);
+          });
+        }
       }
-      if (this.limit > 0) {
-        const delta = this._cachedResults.length - this.limit;
-        this._cachedResults = this._cachedResults.splice(
-          this._cachedResults.length - delta - 1,
-          delta,
-        );
+      if (this.limit > 0 && this._cachedResults.length > this.limit) {
+        this._cachedResults = this._cachedResults.slice(0, this.limit);
       }
       Object.freeze(this._cachedResults);
     }
@@ -446,11 +471,14 @@ export class Query<
    * Gets the item value for a given path key. The value is retrieved from the
    * repository's committed head or temporary records.
    *
-   * @param key The path key to look up in the repository
+   * @param path The path key to look up in the repository
    * @returns The item value if found, undefined otherwise
    */
-  valueForPath(key: string): Item<OS> | undefined {
-    const head = this._headIdForKey.get(key);
+  valueForPath(path: string): Item<OS> | undefined {
+    if (this._liveUpdates && this.db.itemLoaded(path)) {
+      return this.db.item<OS>(path).currentItem;
+    }
+    const head = this._headIdForKey.get(path);
     return head !== undefined ? this.repo.itemForCommit(head) : undefined;
   }
 
@@ -476,9 +504,7 @@ export class Query<
    * @returns A cleanup function that removes the event listener when called
    */
   onResultsChanged(handler: () => void): () => void {
-    this.attach('DocumentChanged', () => {
-      handler();
-    });
+    this.attach('DocumentChanged', handler);
     return () => {
       this.detach('DocumentChanged', handler);
     };
@@ -564,14 +590,29 @@ export class Query<
       }
       this.scanRepo();
       if (!this._sourceListenerCleanup) {
+        // Repo emits the plain item key; a chained Query emits the full path.
+        const isChainedQuery = this.source instanceof Query;
         this._sourceListenerCleanup = (
           (typeof this.source === 'string'
             ? this.repo
             : this.source) as Emitter<EventDocumentChanged>
-        ).attach(
-          'DocumentChanged',
-          (key: string) => this.onNewCommit(this.repo.headForKey(key)!),
+        ).attach('DocumentChanged', (keyOrPath: string) => {
+          const key = isChainedQuery
+            ? itemPathGetPart(keyOrPath, 'item')!
+            : keyOrPath;
+          const commit = this.repo.headForKey(key);
+          if (commit) {
+            this.onNewCommit(commit);
+          }
+        });
+      }
+      if (this._liveUpdates && !this._liveListenerCleanup) {
+        this._liveListenerCleanup = this.db.attach(
+          'ItemChanged',
+          (path: string, isRebase: boolean) =>
+            this.onItemChanged(path, isRebase),
         );
+        LIVE_QUERY_CLEANUP.register(this, this._liveListenerCleanup);
       }
     }
   }
@@ -585,9 +626,14 @@ export class Query<
    *
    * Once closed, a query cannot be reopened. Create a new query instance
    * instead.
+   *
+   * Callers MUST call close() when a query is no longer needed to release
+   * its event listeners. A FinalizationRegistry safety net exists for the
+   * live-updates listener, but GC timing is non-deterministic.
    */
   close(): void {
     if (!this._closed) {
+      this._closed = true;
       this.emit('Closed');
       this.repo.db.queryPersistence?.unregister(
         this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
@@ -595,6 +641,11 @@ export class Query<
       if (this._sourceListenerCleanup) {
         this._sourceListenerCleanup();
         this._sourceListenerCleanup = undefined;
+      }
+      if (this._liveListenerCleanup) {
+        LIVE_QUERY_CLEANUP.unregister(this);
+        this._liveListenerCleanup();
+        this._liveListenerCleanup = undefined;
       }
     }
   }
@@ -604,25 +655,41 @@ export class Query<
       this.repo.db.queryPersistence?.unregister(
         this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
       );
-      this._sourceListenerCleanup!();
-      this._sourceListenerCleanup = undefined;
+      // After initial load completes, keep source and live listeners alive
+      // so the query stays consistent even when no external listeners are
+      // attached (e.g. after loadingFinished() resolves its once-listener).
+      // Listeners are permanently torn down by close().
+      if (!this._loadingFinished) {
+        this._sourceListenerCleanup?.();
+        this._sourceListenerCleanup = undefined;
+        if (this._liveListenerCleanup) {
+          this._liveListenerCleanup();
+          this._liveListenerCleanup = undefined;
+        }
+      }
     }
     super.suspend();
   }
 
-  private addPathToResults(path: string, currentDoc: Item<IS>): void {
+  // forceEmit: emit DocumentChanged even when the item was already included.
+  // Used from handleDocChange with liveUpdates:false so that chained derived
+  // queries hear about committed value-changes in items that stay in this query.
+  // With liveUpdates:true the emit is skipped (onItemChanged already fired).
+  private addPathToResults(
+    path: string,
+    currentDoc: Item<IS>,
+    forceEmit = false,
+  ): void {
     // Insert to the results set
-    if (!this.has(path)) {
-      this._includedPaths.push(path);
-      // Rebuild bloom filter if it became too big, to maintain its FPR
-      if (++this._bloomFilterCount >= this._bloomFilterSize) {
-        this._rebuildBloomFilter();
-      } else {
-        this._bloomFilter.add(path);
-      }
+    const isNew = !this._includedPaths.has(path);
+    if (isNew) {
+      this._includedPaths.add(path);
     }
-    // Report this change downstream
-    this.emit('DocumentChanged', path, currentDoc);
+    // Emit when membership changes, sort order may differ, or when the caller
+    // needs downstream chained queries to be notified (forceEmit).
+    if (isNew || this.sortDescriptor || forceEmit) {
+      this.emit('DocumentChanged', path, currentDoc);
+    }
   }
 
   private handleDocChange(
@@ -632,44 +699,65 @@ export class Query<
     head?: Commit,
   ): void {
     this._age = Math.max(this._age, head?.age || 0);
-    if (!prevDoc?.isEqual(currentDoc)) {
-      if (head) {
-        this._headIdForKey.set(path, head.id);
-      } else {
-        this._headIdForKey.delete(path);
-      }
+    // Always track committed head, regardless of whether the effective doc changed
+    if (head) {
+      this._headIdForKey.set(path, head.id);
+    } else {
+      this._headIdForKey.delete(path);
+    }
+    // When live updates are enabled and the item is already loaded, evaluate
+    // the predicate against live (possibly uncommitted) state so that edits
+    // made before the query was created are visible during the initial scan.
+    const effectiveDoc = (this._liveUpdates && this.db.itemLoaded(path))
+      ? this.db.item<IS>(path).currentItem as Item<IS>
+      : currentDoc;
+    if (!prevDoc?.isEqual(effectiveDoc)) {
       if (!this._predicateInfo) {
-        this._predicateInfo = { path, item: currentDoc, ctx: this.context };
+        this._predicateInfo = { path, item: effectiveDoc, ctx: this.context };
       } else {
         this._predicateInfo.path = path;
-        this._predicateInfo.item = currentDoc;
+        this._predicateInfo.item = effectiveDoc;
         this._predicateInfo.ctx = this.context;
       }
       if (
-        (!this.scheme || this.scheme.ns === currentDoc.schema.ns) &&
-        !currentDoc.isDeleted &&
+        (!this.scheme || this.scheme.ns === effectiveDoc.schema.ns) &&
+        !effectiveDoc.isDeleted &&
         this.predicate(this._predicateInfo!)
       ) {
-        this.addPathToResults(path, currentDoc);
-      } else if (this._bloomFilter.has(path)) {
-        const idx = this._includedPaths.indexOf(path);
-        if (idx >= 0) {
-          this._includedPaths.splice(idx, 1);
-          // If the number of removed items gets above the desired threshold,
-          // rebuild our filter to maintain a reasonable FPR
-          if (++this._bloomFilterDeleteCount >= this._bloomFilterCount * 0.1) {
-            this._rebuildBloomFilter();
-          }
-          this.emit('DocumentChanged', path, currentDoc);
+        ++this._resultsGeneration;
+        this.addPathToResults(path, effectiveDoc, !this._liveUpdates);
+      } else if (this._includedPaths.has(path)) {
+        if (this._removePath(path)) {
+          this.emit('DocumentChanged', path, effectiveDoc);
         }
       }
     }
   }
 
   private onNewCommit(commit: Commit): void {
+    if (this._closed) return;
     const repo = this.repo;
     const key = commit.key;
-    const prevHeadId = this._headIdForKey.get(key);
+    const path = itemPathJoin(repo.path, key);
+    // For local commits, onItemChanged fires before onNewCommit (set() →
+    // onItemChanged → DocumentChanged), so we can skip handleDocChange here.
+    // For remote commits the ordering is reversed: the isRebase parameter on
+    // onItemChanged causes it to bail early, meaning we must fall through to
+    // handleDocChange to emit DocumentChanged. During initial scan
+    // (_loadingFinished=false) we must also run handleDocChange to populate
+    // results.
+    if (
+      this._liveUpdates &&
+      this._loadingFinished &&
+      this.db.itemLoaded(path) &&
+      commit.createdLocally
+    ) {
+      const currentHead = repo.headForKey(key);
+      if (currentHead) this._headIdForKey.set(path, currentHead.id);
+      this._age = Math.max(this._age, commit.age || 0);
+      return;
+    }
+    const prevHeadId = this._headIdForKey.get(path);
     const currentHead = repo.headForKey(key);
     this._age = Math.max(this._age, commit.age || 0);
     if (currentHead && prevHeadId !== currentHead?.id) {
@@ -680,12 +768,80 @@ export class Query<
         ? repo.itemForCommit(currentHead)
         : Item.nullItem(repo.db.registry);
       this.handleDocChange(
-        itemPathJoin(repo.path, key),
+        path,
         prevDoc as unknown as Item<IS>,
         currentDoc as unknown as Item<IS>,
         currentHead,
       );
     }
+  }
+
+  private onItemChanged(path: string, isRebase: boolean): void {
+    if (this._closed) return;
+    if (isRebase) {
+      return;
+    }
+    // Only handle items in this query's repository
+    if (!this._repoPrefix) this._repoPrefix = this.repo.path + '/';
+    if (!path.startsWith(this._repoPrefix)) {
+      return;
+    }
+    const wasIncluded = this.has(path);
+    // For chained queries: if source no longer has this item, remove it from
+    // derived and stop. This relies on the source query's onItemChanged running
+    // before ours — guaranteed because the source query is always constructed
+    // before the derived query, so its attach() call registers its listener
+    // first, and Emitter dispatches in registration order (FIFO).
+    if (this.source instanceof Query && !this.source.has(path)) {
+      if (wasIncluded) {
+        this._removePath(path);
+        if (this.db.itemLoaded(path)) {
+          this.emit(
+            'DocumentChanged',
+            path,
+            this.db.item<IS>(path).currentItem,
+          );
+        }
+      }
+      return;
+    }
+    // Get current live state
+    if (!this.db.itemLoaded(path)) {
+      return;
+    }
+    const currentDoc = this.db.item<IS>(path).currentItem;
+    if (!this._predicateInfo) {
+      this._predicateInfo = { path, item: currentDoc, ctx: this.context };
+    } else {
+      this._predicateInfo.path = path;
+      this._predicateInfo.item = currentDoc;
+      this._predicateInfo.ctx = this.context;
+    }
+    const matchesPredicate =
+      (!this.scheme || this.scheme.ns === currentDoc.schema.ns) &&
+      !currentDoc.isDeleted &&
+      this.predicate(this._predicateInfo);
+    if (matchesPredicate && !wasIncluded) {
+      ++this._resultsGeneration;
+      this.addPathToResults(path, currentDoc, true);
+    } else if (!matchesPredicate && wasIncluded) {
+      this._removePath(path);
+      this.emit('DocumentChanged', path, currentDoc);
+    } else if (matchesPredicate && wasIncluded) {
+      if (this.sortDescriptor) {
+        // Re-sort on next results() call
+        ++this._resultsGeneration;
+      }
+      this.emit('DocumentChanged', path, currentDoc);
+    }
+  }
+
+  private _removePath(path: string): boolean {
+    if (this._includedPaths.delete(path)) {
+      ++this._resultsGeneration;
+      return true;
+    }
+    return false;
   }
 
   private async scanRepo(): Promise<void> {
@@ -697,6 +853,36 @@ export class Query<
     let maxAge = 0;
     const cachedPaths = new Set(cache?.results || []);
 
+    // Fast path: if cache covers all changes, replay cached results in O(k)
+    if (cache && cache.age >= repo.storage.age) {
+      for (const path of cache.results) {
+        const key = itemPathGetPart(path, 'item')!;
+        const head = repo.headForKey(key);
+        if (head) {
+          this._headIdForKey.set(path, head.id);
+          // On initial load (_loadingFinished=false), populate _includedPaths
+          // from cache. On re-scans (_loadingFinished=true), _includedPaths is
+          // already maintained by onItemChanged — don't re-add items that were
+          // removed by live state changes before this commit landed.
+          if (!this._loadingFinished) {
+            const val = repo.valueForKey<IS>(key);
+            if (val) this.addPathToResults(path, val[0]);
+          }
+        }
+      }
+      this._age = cache.age;
+      this._scanTimeMs = performance.now() - startTime;
+      if (!this._loadingFinished) {
+        this._loadingFinished = true;
+        this.repo.db.queryPersistence?.register(
+          this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
+        );
+        this._loading = false;
+        this.emit('LoadingFinished');
+      }
+      return;
+    }
+
     const processPath = (path: string, stopHandle: () => void) => {
       const key = itemPathGetPart(path, 'item')!;
       ++total;
@@ -704,7 +890,7 @@ export class Query<
         stopHandle();
         return;
       }
-      const commitAge = repo.storage.ageForKey[path] || 0;
+      const commitAge = repo.storage.ageForKey[key] || 0;
       if (commitAge > maxAge) {
         maxAge = commitAge;
       }
@@ -714,7 +900,8 @@ export class Query<
           const head = repo.headForKey(key);
           if (head) {
             this._headIdForKey.set(path, head.id);
-            this.addPathToResults(path, repo.valueForKey<IS>(key)![0]);
+            const val = repo.valueForKey<IS>(key);
+            if (val) this.addPathToResults(path, val[0]);
           }
         }
         ++skipped;
@@ -738,7 +925,7 @@ export class Query<
           this.repo.db.queryPersistence?.register(
             this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
           );
-          await this.repo.db.queryPersistence?.flush(this.id);
+          await this.repo.db.queryPersistence?.flush(this.repo.path);
           this._loading = false;
           this.emit('LoadingFinished');
         }
@@ -756,7 +943,7 @@ export class Query<
           processPath(path, cancelCallback);
         },
       );
-      cancelPromise.then(cleanup);
+      cancelPromise.then(cleanup, cleanup);
     } else {
       let stopProcessing = false;
       const stopProcessingHandle = () => {
@@ -770,30 +957,6 @@ export class Query<
       }
       await cleanup();
     }
-
-    // console.log(
-    //   `Age change = ${ageChange.toLocaleString()}, Skipped ${skipped.toLocaleString()}, Total ${total.toLocaleString()}`,
-    // );
-  }
-
-  private _rebuildBloomFilter(): void {
-    // Since bloom filters are so cheap, we use an order of magnitude increments
-    // in size, to minimize allocation overhead
-    this._bloomFilterSize *= 10;
-    this._bloomFilter = new BloomFilter({
-      size: this._bloomFilterSize,
-      fpr: BLOOM_FPR,
-      maxHashes: 2,
-    });
-    // Reset the counter before re-adding all keys
-    this._bloomFilterCount = 0;
-    for (const key of this.paths()) {
-      this._bloomFilter.add(key);
-      ++this._bloomFilterCount;
-    }
-    // The new filter doesn't include all previously deleted keys, thus we
-    // can safely reset the delete count
-    this._bloomFilterDeleteCount = 0;
   }
 }
 
@@ -844,7 +1007,7 @@ export function generateQueryId<
   key += ns;
   let hash = gGeneratedQueryIds.get(key);
   if (!hash) {
-    hash = md51(key);
+    hash = murmur3(key, 0).toString(36);
     gGeneratedQueryIds.set(key, hash);
   }
   return hash;

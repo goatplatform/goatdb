@@ -1,4 +1,5 @@
 import { NextEventLoopCycleTimer, Timer, TimerCallback } from './timer.ts';
+import { log } from '../logging/log.ts';
 
 export type EmitterEvent = 'suspended' | 'resumed';
 
@@ -7,13 +8,15 @@ export type EmitterCallback = () => void;
 /** @group Events */
 export class Emitter<T extends string> {
   readonly alwaysActive: boolean;
-  private readonly _callbacks: Map<string, EmitterCallback[]>;
+  private readonly _callbacks: Map<string, (EmitterCallback | null)[]>;
   private readonly _delayedEmissionTimer?: Timer;
   private _suspendCallbacks: EmitterCallback[];
   private _resumeCallbacks: EmitterCallback[];
-  private _pendingEmissions: [event: string, args: unknown[]][];
+  private _pendingEmissions: [event: string, a0: unknown, a1: unknown][];
   private _isMuted = false;
   private _isActive: boolean;
+  private _dispatching = 0;
+  private _dispatchDirty = false;
 
   constructor(
     delayedEmissionTimerConstructor?: (callback: TimerCallback) => Timer,
@@ -27,11 +30,15 @@ export class Emitter<T extends string> {
       this._delayedEmissionTimer = delayedEmissionTimerConstructor(() => {
         const emissions = this._pendingEmissions;
         this._pendingEmissions = [];
-        for (const [e, args] of emissions) {
+        for (const [e, a0, a1] of emissions) {
           try {
-            this.emitInPlace(e as T, ...args);
+            this._emitCore(e, a0, a1);
           } catch (err: unknown) {
-            console.error(`Uncaught error in delayed emission: ${err}`);
+            log({
+              severity: 'ERROR',
+              error: 'NotReached',
+              message: `Uncaught error in delayed emission: ${err}`,
+            });
           }
         }
       });
@@ -51,38 +58,57 @@ export class Emitter<T extends string> {
     return this._isActive;
   }
 
-  emit<E extends T | EmitterEvent>(e: E, ...args: unknown[]): void {
-    if (this._isMuted) {
-      return;
-    }
+  /**
+   * Emits an event to all registered listeners in registration (FIFO) order.
+   * This ordering is a stable contract -- chained query listeners depend on it.
+   */
+  emit<E extends T | EmitterEvent>(
+    e: E,
+    a0?: unknown,
+    a1?: unknown,
+  ): void {
+    if (this._isMuted) return;
     if (this._delayedEmissionTimer) {
-      this._pendingEmissions.push([e, args]);
+      this._pendingEmissions.push([e, a0, a1]);
       this._delayedEmissionTimer.schedule();
     } else {
-      this.emitInPlace(e, ...args);
+      this._emitCore(e, a0, a1);
     }
   }
 
-  private emitInPlace<E extends T | EmitterEvent>(
-    e: E,
-    ...args: unknown[]
-  ): void {
-    if (this._isMuted) {
-      return;
-    }
-    let callbacks: EmitterCallback[] | undefined;
+  // Listeners are dispatched in registration (FIFO) order.
+  // This is a stable guarantee — chained query listeners depend on it.
+  private _emitCore(e: string, a0: unknown, a1: unknown): void {
+    if (this._isMuted) return;
+    let callbacks: (EmitterCallback | null)[] | undefined;
     if (e === 'EmitterSuspended') {
       callbacks = this._suspendCallbacks;
     } else if (e === 'EmitterResumed') {
       callbacks = this._resumeCallbacks;
     } else {
-      callbacks = this._callbacks.get(e as T);
+      callbacks = this._callbacks.get(e);
     }
-    if (!callbacks || !callbacks.length) {
-      return;
-    }
-    for (const f of Array.from(callbacks)) {
-      (f as (...arg0: unknown[]) => void)(...args);
+    if (!callbacks || callbacks.length === 0) return;
+    ++this._dispatching;
+    try {
+      for (let i = 0; i < callbacks.length; i++) {
+        const f = callbacks[i];
+        if (f === null) continue;
+        try {
+          (f as (a0: unknown, a1: unknown) => void)(a0, a1);
+        } catch (err: unknown) {
+          log({
+            severity: 'ERROR',
+            error: 'NotReached',
+            message: `Uncaught error in event listener: ${err}`,
+          });
+        }
+      }
+    } finally {
+      if (--this._dispatching === 0 && this._dispatchDirty) {
+        this._dispatchDirty = false;
+        this._compactCallbacks();
+      }
     }
   }
 
@@ -141,29 +167,62 @@ export class Emitter<T extends string> {
     if (idx < 0) {
       return;
     }
+    if (this._dispatching > 0) {
+      (arr as (EmitterCallback | null)[])[idx] = null;
+      this._dispatchDirty = true;
+      return;
+    }
     if (arr.length === 1) {
       this._callbacks.delete(e as T);
+      this._isActive = this.calcIsActive();
       if (!this.isActive) {
         this.suspend();
         this.emit('suspended');
       }
+    } else {
+      arr.splice(idx, 1);
+      this._isActive = this.calcIsActive();
     }
-    this._isActive = this.calcIsActive();
   }
 
   detachAll<E extends T | EmitterEvent>(e?: E): void {
     if (e === undefined) {
+      if (this._dispatching > 0) {
+        for (const arr of this._callbacks.values()) {
+          for (let i = 0; i < arr.length; i++) arr[i] = null;
+        }
+        for (let i = 0; i < this._suspendCallbacks.length; i++) {
+          (this._suspendCallbacks as (EmitterCallback | null)[])[i] = null;
+        }
+        for (let i = 0; i < this._resumeCallbacks.length; i++) {
+          (this._resumeCallbacks as (EmitterCallback | null)[])[i] = null;
+        }
+        this._dispatchDirty = true;
+        return;
+      }
       this._suspendCallbacks = [];
       this._resumeCallbacks = [];
       if (this._callbacks.size > 0) {
         this._callbacks.clear();
+        this._isActive = this.calcIsActive();
         if (!this.isActive) {
           this.suspend();
+          this.emit('suspended');
         }
       }
       return;
     }
     if (e === 'EmitterSuspended' || e === 'EmitterResumed') {
+      if (this._dispatching > 0) {
+        const arr = this[
+          e === 'EmitterSuspended' ? '_suspendCallbacks' : '_resumeCallbacks'
+        ];
+        for (let i = 0; i < arr.length; i++) {
+          (arr as (EmitterCallback | null)[])[i] = null;
+        }
+        this._dispatchDirty = true;
+        return;
+      }
       this[
         e === 'EmitterSuspended' ? '_suspendCallbacks' : '_resumeCallbacks'
       ] = [];
@@ -171,21 +230,55 @@ export class Emitter<T extends string> {
     }
     const callbacks = this._callbacks.get(e);
     if ((callbacks?.length || 0) > 0) {
+      if (this._dispatching > 0) {
+        for (let i = 0; i < callbacks!.length; i++) callbacks![i] = null;
+        this._dispatchDirty = true;
+        return;
+      }
       this._callbacks.delete(e);
+      this._isActive = this.calcIsActive();
       if (!this.isActive) {
         this.suspend();
+        this.emit('suspended');
       }
     }
   }
 
   // deno-lint-ignore ban-types
   once<C extends Function, E extends T | EmitterEvent>(e: E, c: C): () => void {
-    const callback = (...args: unknown[]) => {
-      (c as unknown as (...arg0: unknown[]) => void)(...args);
+    const callback = (a0?: unknown, a1?: unknown) => {
+      (c as unknown as (a0: unknown, a1: unknown) => void)(a0, a1);
       this.detach(e, callback);
     };
     this.attach(e, callback);
     return () => this.detach(e, callback);
+  }
+
+  private _compactCallbacks(): void {
+    for (const [event, arr] of this._callbacks) {
+      let write = 0;
+      for (let read = 0; read < arr.length; read++) {
+        if (arr[read] !== null) {
+          arr[write++] = arr[read];
+        }
+      }
+      arr.length = write;
+      if (write === 0) {
+        this._callbacks.delete(event);
+      }
+    }
+    this._suspendCallbacks = this._suspendCallbacks.filter(
+      (c) => c !== null,
+    );
+    this._resumeCallbacks = this._resumeCallbacks.filter((c) => c !== null);
+    const wasActive = this._isActive;
+    this._isActive = this.calcIsActive();
+    if (wasActive && !this._isActive) {
+      this.suspend();
+      if (!this._isMuted) {
+        this._emitCore('suspended', undefined, undefined);
+      }
+    }
   }
 
   protected suspend(): void {}

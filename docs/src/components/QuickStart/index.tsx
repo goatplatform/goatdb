@@ -2,40 +2,57 @@ import React from 'react';
 import CodeBlock from '@theme/CodeBlock';
 import styles from './styles.module.css';
 
-const STEP1 = `const TodoSchema = {
-  ns: 'todo',
+const STEP1 = `const AgentMemorySchema = {
+  ns: 'agent-memory',
   version: 1,
   fields: {
-    text: { type: 'string', required: true },
-    done: { type: 'boolean', default: () => false },
-    createdAt: { type: 'date', default: () => new Date() }
+    observation: { type: 'string', required: true },
+    confidence:  { type: 'number', default: () => 0.5 },
+    source:      { type: 'string', required: true },
+    recordedAt:  { type: 'date',   default: () => new Date() }
   }
 } as const;
 
-const todo = db.create('/data/todos/task1', TodoSchema, {
-  text: 'Review pull requests'
+// Create a memory item — source identifies which agent wrote it
+const mem = db.create('/data/memories/pref-1', AgentMemorySchema, {
+  observation: 'User prefers concise responses',
+  confidence: 0.9,
+  source: 'preference-agent'
+});`;
+
+const STEP2 = `// Warm query runs in microseconds — data is already in memory
+const memories = db.query({
+  source: '/data/memories',
+  schema: AgentMemorySchema,
+  predicate: ({ item }) => item.get('confidence') > 0.7,
+  sortBy: 'recordedAt'
 });
-todo.set('done', true);`;
 
-const STEP2 = `function TodoList() {
-  const todos = useQuery({
-    source: '/data/todos',
-    schema: TodoSchema,
-    predicate: ({ item }) => !item.get('done'),
-    sortBy: 'createdAt'
-  });
-
-  return todos.results().map(todo => (
-    <TodoItem key={todo.path} path={todo.path} />
-  ));
+// In React: const memories = useQuery(db, { source: '/data/memories', ... });
+// Results auto-update when data changes
+for (const mem of memories.results()) {
+  console.log(mem.get('observation'));
 }`;
 
-const STEP4 = `const task = db.create('/data/tasks/plan-1', TaskSchema, {
+const STEP3 = `// Agent A — offline, updates confidence
+mem.set('confidence', 0.95);
+
+// Agent B — offline, same item, updates observation
+mem.set('observation', 'User prefers bullet points over paragraphs');
+
+// Both reconnect — GoatDB merges automatically.
+// Result: confidence = 0.95, observation = 'User prefers bullet points...'`;
+
+const STEP4 = `// Every write is signed automatically with Ed25519
+const task = db.create('/data/tasks/plan-1', TaskSchema, {
   title: 'Analyze Q4 metrics',
-  status: 'pending',
-  assignedAgent: session.id
+  assignedTo: 'analytics-agent',
+  status: 'pending'
 });
-task.set('status', 'complete');`;
+task.set('status', 'complete');
+
+// Verify which agent wrote what, cryptographically
+task.commit.session; // Ed25519 session that signed this commit`;
 
 interface Step {
   num: number;
@@ -49,28 +66,32 @@ const STEPS: Step[] = [
   {
     num: 1,
     title: 'Define & create',
-    description: 'Declare your schema and write data locally — no await, no round trips.',
+    description:
+      'TypeScript schemas. No SQL, no migrations, no ORM. The source field lets you track which agent instance wrote each memory.',
     code: STEP1,
     lang: 'typescript',
   },
   {
     num: 2,
     title: 'Query live',
-    description: 'React hooks that re-render whenever data changes, from any peer.',
+    description:
+      'After the first scan, queries update incrementally — no re-query, no polling. In React, wrap any query with useQuery() for automatic re-renders on data changes — no useEffect, no subscriptions, no cleanup. Same predicate API on Deno, Node.js, and the browser.',
     code: STEP2,
-    lang: 'tsx',
+    lang: 'typescript',
   },
   {
     num: 3,
     title: 'It just syncs',
     description:
-      'No conflict dialogs. Ever. Offline edits, concurrent users, multiple devices — everything merges automatically. You never write conflict-resolution code.',
+      'Concurrent agents, multiple devices, offline edits — everything merges automatically with Git-style three-way merge. No conflict-resolution code to write.',
+    code: STEP3,
+    lang: 'typescript',
   },
   {
     num: 4,
-    title: 'Built for AI agents',
+    title: 'Signed by default',
     description:
-      'Give agents resilient state that follows them across devices. From cloud to edge — one cryptographically signed data layer.',
+      'Every commit is cryptographically signed with Ed25519. Verify which agent wrote what, build audit trails, or enforce authorization — without trusting the server.',
     code: STEP4,
     lang: 'typescript',
   },
@@ -78,11 +99,13 @@ const STEPS: Step[] = [
 
 export default function QuickStart(): React.JSX.Element {
   return (
-    <section className={styles.quickstart}>
+    <section className={styles.quickstart} id='quickstart'>
       <div className='container'>
         <div className={styles.quickstartHeader}>
-          <h2>Start building in seconds</h2>
-          <p>Everything you need to build collaborative, offline-capable apps.</p>
+          <h2>Four steps. That&apos;s the whole API.</h2>
+          <p>
+            Define, query, sync, verify. No migrations. No ORM. No glue code.
+          </p>
         </div>
 
         <div className={styles.steps}>
