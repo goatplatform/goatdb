@@ -163,6 +163,11 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
     while (bytesWritten < buf.byteLength) {
       const arr = buf.subarray(bytesWritten);
       const len = handle.file.write(arr, { at: handle.pos });
+      if (len === 0) {
+        throw new Error(
+          `OPFS write stalled at offset ${handle.pos}: 0 bytes written`,
+        );
+      }
       bytesWritten += len;
       handle.pos += len;
     }
