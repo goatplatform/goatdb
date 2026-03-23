@@ -261,7 +261,7 @@ async function BinaryLogFileScan(
             id = binaryExtractId(cursor.objectBuf, payloadLen);
           } else {
             log({
-              severity: 'WARNING',
+              severity: 'ERROR',
               error: 'StorageError',
               message: 'binary scan: non-binary record in .goat file, skipping',
             });
