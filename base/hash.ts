@@ -270,8 +270,7 @@ export function murmur3(value: string, seed?: number): number {
 // Largely inspired by MurmurHash2/3, but with a focus on speed/simplicity.
 // See https://stackoverflow.com/questions/7616461/generate-a-hash-from-string-in-javascript/52171480#52171480
 // https://github.com/bryc/code/blob/master/jshash/experimental/cyrb53.js
-const defaultCyrb64Seed = randomInt(0, Number.MAX_SAFE_INTEGER);
-export function cyrb64(str: string, seed = defaultCyrb64Seed): number {
+function _cyrb64Core(str: string, seed: number): [h2: number, h1: number] {
   let h1 = 0xdeadbeef ^ seed,
     h2 = 0x41c6ce57 ^ seed;
   for (let i = 0, ch; i < str.length; i++) {
@@ -283,6 +282,12 @@ export function cyrb64(str: string, seed = defaultCyrb64Seed): number {
   h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
   h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return [h2, h1];
+}
+
+const defaultCyrb64Seed = randomInt(0, Number.MAX_SAFE_INTEGER);
+export function cyrb64(str: string, seed = defaultCyrb64Seed): number {
+  const [h2, h1] = _cyrb64Core(str, seed);
   return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 }
 
@@ -292,16 +297,6 @@ export function cyrb64u64(
   str: string,
   seed: number,
 ): [high: number, low: number] {
-  let h1 = 0xdeadbeef ^ seed,
-    h2 = 0x41c6ce57 ^ seed;
-  for (let i = 0, ch; i < str.length; i++) {
-    ch = str.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
-  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
-  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  const [h2, h1] = _cyrb64Core(str, seed);
   return [h2 >>> 0, h1 >>> 0];
 }
