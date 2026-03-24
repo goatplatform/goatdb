@@ -60,7 +60,6 @@ export interface IndexSlot {
   logDelta: number;
   commitLen: number;
   timestamp: number;
-  keyLen: number;
   key: string;
 }
 
@@ -203,7 +202,6 @@ export function readIndexSlot(buf: Uint8Array, slotIndex: number): IndexSlot {
     logDelta: readU32(buf, base + 8),
     commitLen: readU32(buf, base + 12),
     timestamp: readFloat64LE(buf, base + 16),
-    keyLen,
     key,
   };
 }
@@ -219,11 +217,12 @@ export function writeIndexSlot(
   writeU32(buf, base + 8, slot.logDelta);
   writeU32(buf, base + 12, slot.commitLen);
   writeFloat64LE(buf, base + 16, slot.timestamp);
-  assert(slot.keyLen <= MAX_KEY_LEN, 'Key exceeds MAX_KEY_LEN');
-  buf[base + 24] = slot.keyLen;
+  const keyLen = slot.key.length;
+  assert(keyLen <= MAX_KEY_LEN, 'Key exceeds MAX_KEY_LEN');
+  buf[base + 24] = keyLen;
   // Direct byte-by-byte ASCII copy, zero-padded to 39 bytes
   let i = 0;
-  for (; i < slot.keyLen; i++) {
+  for (; i < keyLen; i++) {
     buf[base + 25 + i] = slot.key.charCodeAt(i);
   }
   for (; i < MAX_KEY_LEN; i++) {

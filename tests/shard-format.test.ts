@@ -50,7 +50,6 @@ function makeSlot(overrides?: Partial<IndexSlot>): IndexSlot {
     logDelta: 1024,
     commitLen: 256,
     timestamp: 1700000000000,
-    keyLen: 4,
     key: 'test',
     ...overrides,
   };
@@ -205,7 +204,6 @@ export default function setup(): void {
     assertEquals(result.logDelta, slot.logDelta);
     assertEquals(result.commitLen, slot.commitLen);
     assertEquals(result.timestamp, slot.timestamp);
-    assertEquals(result.keyLen, slot.keyLen);
     assertEquals(result.key, slot.key);
   });
 
@@ -213,20 +211,20 @@ export default function setup(): void {
   TEST('ShardFormat', 'index slot max key length boundary', () => {
     const buf = allocBuf();
     const maxKey = 'a'.repeat(MAX_KEY_LEN); // 39 chars
-    const slot = makeSlot({ keyLen: MAX_KEY_LEN, key: maxKey });
+    const slot = makeSlot({ key: maxKey });
     writeIndexSlot(buf, 0, slot);
     const result = readIndexSlot(buf, 0);
-    assertEquals(result.keyLen, MAX_KEY_LEN);
+    assertEquals(result.key.length, MAX_KEY_LEN);
     assertEquals(result.key, maxKey);
   });
 
   // 11. Index slot empty key (0 bytes)
   TEST('ShardFormat', 'index slot empty key', () => {
     const buf = allocBuf();
-    const slot = makeSlot({ keyLen: 0, key: '' });
+    const slot = makeSlot({ key: '' });
     writeIndexSlot(buf, 0, slot);
     const result = readIndexSlot(buf, 0);
-    assertEquals(result.keyLen, 0);
+    assertEquals(result.key.length, 0);
     assertEquals(result.key, '');
   });
 
