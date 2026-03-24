@@ -5,6 +5,7 @@
 //   [0..127]    Double header (2 x 64 bytes)
 //   [128..]     Index region (INDEX_SLOT_SIZE x MAX_SLOTS bytes)
 //   [logOffset] Commit log (4B BE len + binary commit payload)
+// Note: logOffset is u32, limiting shard files to ~4GB.
 
 import { assert } from '../base/error.ts';
 import { crc32 } from '../base/crc32.ts';
@@ -149,6 +150,10 @@ export function readShardHeader(buf: Uint8Array): ShardHeader {
   throw new Error('Both shard header copies are corrupt');
 }
 
+/**
+ * Writes an updated header to the meta-page copy with the lower generation.
+ * Mutates `header.generation` to one past the current maximum.
+ */
 export function updateShardHeader(
   buf: Uint8Array,
   header: ShardHeader,

@@ -169,7 +169,7 @@ const kValidItemPathChars = 'abcdefghijklmnopqrstuvwxyz0123456789-_';
  * Checks if the given path is valid.
  * Valid paths must contain lowercase letters, numbers, and the characters
  * `-` and `_`. They must also contain at most 4 components separated by `/`
- * characters.
+ * characters. Each path component must be at most 39 bytes.
  *
  * @param path The path to validate.
  * @returns True if the path is valid, false otherwise.
