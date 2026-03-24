@@ -1,10 +1,11 @@
-// Shard file format: preallocated hash index + append-only commit log.
+// Shard file format: preallocated ID pool + hash index + append-only commit log.
 // Double meta-page header for crash safety. Open-addressing linear probe index.
 //
 // Layout:
-//   [0..127]    Double header (2 x 64 bytes)
-//   [128..]     Index region (INDEX_SLOT_SIZE x MAX_SLOTS bytes)
-//   [logOffset] Commit log (4B BE len + binary commit payload)
+//   [0..127]              Double header (2 x 64 bytes)
+//   [128..POOL_END-1]     ID Pool: MAX_POOL x 80B entries
+//   [POOL_END..IDX_END-1] Hash Index: MAX_SLOTS x 32B slots
+//   [IDX_END..]           Commit log (4B BE len + binary commit payload)
 // Note: logOffset is u32, limiting shard files to ~4GB.
 
 import { assert } from '../base/error.ts';
@@ -19,22 +20,71 @@ import {
   writeU32,
 } from '../base/core-types/encoding/binary-commit.ts';
 
-// -- Constants --
+// -- Format-invariant constants --
 
 export const SHARD_MAGIC = 0x474f4154; // 'GOAT'
 export const SHARD_VERSION = 1;
 export const SHARD_HEADER_SIZE = 64;
 export const SHARD_DOUBLE_HEADER_SIZE = 128;
-export const INDEX_SLOT_SIZE = 64;
-export const MAX_SLOTS = 150000;
-export const MAX_SHARD_COMMITS = 100000;
-export const SPLIT_THRESHOLD = 75000;
-export const MIN_SHARD_COMMITS = 10000;
+export const COMMIT_ID_LEN = 24;
+export const POOL_ENTRY_SIZE = 80;
+export const INDEX_SLOT_SIZE = 32;
 export const MAX_KEY_LEN = 39;
 export const LOG_DELTA_MAX = 0xffffffff;
-export const INDEX_REGION_OFFSET = 128;
-export const INDEX_REGION_SIZE = MAX_SLOTS * INDEX_SLOT_SIZE;
-export const DEFAULT_LOG_OFFSET = INDEX_REGION_OFFSET + INDEX_REGION_SIZE;
+export const POOL_NONE = 0xffffffff;
+export const INDEX_OVERFLOW_FLAG = 1; // bit0 of flags byte
+
+// -- Configurable shard sizing --
+
+export interface ShardConfig {
+  // User knobs
+  maxCommits: number;
+  splitThreshold: number;
+  minCommits: number;
+  // Derived (internal)
+  maxPool: number;
+  poolSplitThreshold: number;
+  maxSlots: number;
+  poolRegionOffset: number;
+  poolRegionSize: number;
+  indexRegionOffset: number;
+  indexRegionSize: number;
+  defaultLogOffset: number;
+}
+
+export function makeShardConfig(opts?: {
+  maxCommits?: number;
+  splitThreshold?: number;
+  minCommits?: number;
+}): ShardConfig {
+  const maxCommits = opts?.maxCommits ?? 100_000;
+  const splitThreshold = opts?.splitThreshold ?? Math.floor(maxCommits * 0.75);
+  const minCommits = opts?.minCommits ?? Math.floor(maxCommits * 0.1);
+  const maxPool = Math.floor(maxCommits * 2.5);
+  const poolSplitThreshold = Math.floor(maxPool * 0.75);
+  const maxSlots = Math.floor(maxCommits * 1.5);
+  const poolRegionOffset = SHARD_DOUBLE_HEADER_SIZE;
+  const poolRegionSize = maxPool * POOL_ENTRY_SIZE;
+  const indexRegionOffset = poolRegionOffset + poolRegionSize;
+  const indexRegionSize = maxSlots * INDEX_SLOT_SIZE;
+  const defaultLogOffset = indexRegionOffset + indexRegionSize;
+  return {
+    maxCommits,
+    splitThreshold,
+    minCommits,
+    maxPool,
+    poolSplitThreshold,
+    maxSlots,
+    poolRegionOffset,
+    poolRegionSize,
+    indexRegionOffset,
+    indexRegionSize,
+    defaultLogOffset,
+  };
+}
+
+export const SERVER_SHARD_CONFIG = makeShardConfig();
+export const BROWSER_SHARD_CONFIG = makeShardConfig({ maxCommits: 25_000 });
 
 // -- Interfaces --
 
@@ -51,16 +101,25 @@ export interface ShardHeader {
   indexUsedCount: number;
   logOffset: number;
   createdAt: number;
+  poolUsedCount: number;
   crc32: number;
 }
 
+export interface PoolEntry {
+  id: string; // 24-byte ASCII commit ID
+  parent0: number; // pool index or POOL_NONE
+  parent1: number; // pool index or POOL_NONE
+  ancestor0: number; // pool index or POOL_NONE
+  ancestor1: number; // pool index or POOL_NONE
+  key: string; // up to 39 ASCII bytes (empty for foreign refs)
+}
+
 export interface IndexSlot {
-  idHashHigh: number;
-  idHashLow: number;
-  logDelta: number;
-  commitLen: number;
-  timestamp: number;
-  key: string;
+  poolIdx: number; // u32 (POOL_NONE = empty)
+  logDelta: number; // u32
+  commitLen: number; // u32
+  timestamp: number; // f64
+  flags: number; // u8 (bit0 = has_overflow)
 }
 
 // -- Private u64 helpers (two u32 LE reads/writes, no BigInt) --
@@ -85,8 +144,8 @@ function writeU64(
 
 // -- Header functions --
 
-// CRC32 covers bytes 0..55 of a header copy (everything except crc32 + padding)
-const HEADER_CRC_LEN = 56;
+// CRC32 covers bytes 0..59 of a header copy (everything except crc32 field)
+const HEADER_CRC_LEN = 60;
 
 export function writeShardHeader(
   buf: Uint8Array,
@@ -105,23 +164,32 @@ export function writeShardHeader(
   writeU32(buf, base + 40, header.indexUsedCount);
   writeU32(buf, base + 44, header.logOffset);
   writeFloat64LE(buf, base + 48, header.createdAt);
-  // Compute CRC32 over bytes 0..55
+  writeU32(buf, base + 56, header.poolUsedCount);
+  // Compute CRC32 over bytes 0..59
   const checksum = crc32(buf, base, HEADER_CRC_LEN);
-  writeU32(buf, base + 56, checksum);
-  // Zero padding bytes 60..63
-  buf[base + 60] = 0;
-  buf[base + 61] = 0;
-  buf[base + 62] = 0;
-  buf[base + 63] = 0;
+  writeU32(buf, base + 60, checksum);
+}
+
+export function readShardHeader(buf: Uint8Array): ShardHeader {
+  const h0 = readOneHeader(buf, 0);
+  const h1 = readOneHeader(buf, 1);
+  if (h0 !== null && h1 !== null) {
+    // Equal generations only occur during initial setup; copy 1 is chosen
+    // arbitrarily. updateShardHeader always produces distinct generations.
+    return h1.generation >= h0.generation ? h1 : h0;
+  }
+  if (h0 !== null) return h0;
+  if (h1 !== null) return h1;
+  throw new Error('Both shard header copies are corrupt');
 }
 
 function readOneHeader(buf: Uint8Array, copyIndex: 0 | 1): ShardHeader | null {
   const base = copyIndex * SHARD_HEADER_SIZE;
   if (buf.length < base + SHARD_HEADER_SIZE) return null;
-  const storedCrc = readU32(buf, base + 56);
+  const storedCrc = readU32(buf, base + 60);
   const computedCrc = crc32(buf, base, HEADER_CRC_LEN);
   if (storedCrc !== computedCrc) return null;
-  // Validate magic and version after CRC — a random buffer with valid CRC
+  // Validate magic and version after CRC -- a random buffer with valid CRC
   // should not be accepted as a valid header.
   const magic = readU32(buf, base + 0);
   const version = readU16(buf, base + 4);
@@ -139,21 +207,9 @@ function readOneHeader(buf: Uint8Array, copyIndex: 0 | 1): ShardHeader | null {
     indexUsedCount: readU32(buf, base + 40),
     logOffset: readU32(buf, base + 44),
     createdAt: readFloat64LE(buf, base + 48),
+    poolUsedCount: readU32(buf, base + 56),
     crc32: storedCrc,
   };
-}
-
-export function readShardHeader(buf: Uint8Array): ShardHeader {
-  const h0 = readOneHeader(buf, 0);
-  const h1 = readOneHeader(buf, 1);
-  if (h0 !== null && h1 !== null) {
-    // Equal generations only occur during initial setup; copy 1 is chosen
-    // arbitrarily. updateShardHeader always produces distinct generations.
-    return h1.generation >= h0.generation ? h1 : h0;
-  }
-  if (h0 !== null) return h0;
-  if (h1 !== null) return h1;
-  throw new Error('Both shard header copies are corrupt');
 }
 
 /**
@@ -184,32 +240,116 @@ export function updateShardHeader(
   writeShardHeader(buf, targetCopy, header);
 }
 
-// -- Index slot functions --
+// -- Pool entry functions --
 
-// Index slot layout (64 bytes):
-//   [0..7]    u64  idHash (high at +4, low at +0)
-//   [8..11]   u32  logDelta
-//   [12..15]  u32  commitLen
-//   [16..23]  f64  timestamp
-//   [24]      u8   keyLen
-//   [25..63]  39B  key (zero-padded ASCII)
+// Pool entry layout (80 bytes):
+//   [0..23]   24B  id (raw ASCII commit ID, zero-padded)
+//   [24..27]  u32  parent0 (pool index or POOL_NONE)
+//   [28..31]  u32  parent1 (pool index or POOL_NONE)
+//   [32..35]  u32  ancestor0 (pool index or POOL_NONE)
+//   [36..39]  u32  ancestor1 (pool index or POOL_NONE)
+//   [40]      u8   keyLen (0..39; 0 for foreign refs)
+//   [41..79]  39B  key (zero-padded ASCII)
 
-export function readIndexSlot(buf: Uint8Array, slotIndex: number): IndexSlot {
-  assert(slotIndex >= 0 && slotIndex < MAX_SLOTS, 'slotIndex out of bounds');
-  const base = INDEX_REGION_OFFSET + slotIndex * INDEX_SLOT_SIZE;
-  const keyLen = buf[base + 24];
-  // Direct ASCII decode (no TextEncoder), keys are always ASCII [a-z0-9-_]
+/** Reads a pool entry at the given index. Returns zeroed fields for empty slots. */
+export function readPoolEntry(
+  buf: Uint8Array,
+  poolIdx: number,
+  cfg: ShardConfig,
+): PoolEntry {
+  assert(poolIdx >= 0 && poolIdx < cfg.maxPool, 'poolIdx out of bounds');
+  const base = cfg.poolRegionOffset + poolIdx * POOL_ENTRY_SIZE;
+  // Decode 24-byte ASCII id; null byte stops early (corruption tolerance:
+  // a truncated id is still returned rather than reading into adjacent data)
+  let id = '';
+  for (let i = 0; i < COMMIT_ID_LEN; i++) {
+    const b = buf[base + i];
+    if (b === 0) break;
+    id += String.fromCharCode(b);
+  }
+  const keyLen = buf[base + 40];
   let key = '';
   for (let i = 0; i < keyLen; i++) {
-    key += String.fromCharCode(buf[base + 25 + i]);
+    key += String.fromCharCode(buf[base + 41 + i]);
   }
   return {
-    idHashHigh: readU64High(buf, base),
-    idHashLow: readU64Low(buf, base),
-    logDelta: readU32(buf, base + 8),
-    commitLen: readU32(buf, base + 12),
-    timestamp: readFloat64LE(buf, base + 16),
+    id,
+    parent0: readU32(buf, base + 24),
+    parent1: readU32(buf, base + 28),
+    ancestor0: readU32(buf, base + 32),
+    ancestor1: readU32(buf, base + 36),
     key,
+  };
+}
+
+/** Writes a pool entry at the given index. Zero-pads the key region. */
+export function writePoolEntry(
+  buf: Uint8Array,
+  poolIdx: number,
+  entry: PoolEntry,
+  cfg: ShardConfig,
+): void {
+  assert(poolIdx >= 0 && poolIdx < cfg.maxPool, 'poolIdx out of bounds');
+  const base = cfg.poolRegionOffset + poolIdx * POOL_ENTRY_SIZE;
+  // Write 24-byte ASCII id (exact length required)
+  assert(
+    entry.id.length === COMMIT_ID_LEN,
+    'Commit ID must be exactly 24 bytes',
+  );
+  for (let i = 0; i < COMMIT_ID_LEN; i++) {
+    buf[base + i] = entry.id.charCodeAt(i);
+  }
+  writeU32(buf, base + 24, entry.parent0);
+  writeU32(buf, base + 28, entry.parent1);
+  writeU32(buf, base + 32, entry.ancestor0);
+  writeU32(buf, base + 36, entry.ancestor1);
+  // Write key
+  const keyLen = entry.key.length;
+  assert(keyLen <= MAX_KEY_LEN, 'Key exceeds MAX_KEY_LEN');
+  buf[base + 40] = keyLen;
+  for (let k = 0; k < keyLen; k++) {
+    buf[base + 41 + k] = entry.key.charCodeAt(k);
+  }
+  for (let k = keyLen; k < MAX_KEY_LEN; k++) {
+    buf[base + 41 + k] = 0;
+  }
+}
+
+/** Returns true if the pool slot is unused (first id byte is null). */
+export function poolEntryIsEmpty(
+  buf: Uint8Array,
+  poolIdx: number,
+  cfg: ShardConfig,
+): boolean {
+  assert(poolIdx >= 0 && poolIdx < cfg.maxPool, 'poolIdx out of bounds');
+  const base = cfg.poolRegionOffset + poolIdx * POOL_ENTRY_SIZE;
+  // Empty entry: first byte of id is 0 (valid IDs are alphanumeric, never start with \0)
+  return buf[base] === 0;
+}
+
+// -- Index slot functions --
+
+// Index slot layout (32 bytes):
+//   [0..3]    u32  poolIdx (POOL_NONE = empty)
+//   [4..7]    u32  logDelta
+//   [8..11]   u32  commitLen
+//   [12..19]  f64  timestamp
+//   [20]      u8   flags (bit0 = has_overflow)
+//   [21..31]  11B  reserved (zeros)
+
+export function readIndexSlot(
+  buf: Uint8Array,
+  slotIndex: number,
+  cfg: ShardConfig,
+): IndexSlot {
+  assert(slotIndex >= 0 && slotIndex < cfg.maxSlots, 'slotIndex out of bounds');
+  const base = cfg.indexRegionOffset + slotIndex * INDEX_SLOT_SIZE;
+  return {
+    poolIdx: readU32(buf, base),
+    logDelta: readU32(buf, base + 4),
+    commitLen: readU32(buf, base + 8),
+    timestamp: readFloat64LE(buf, base + 12),
+    flags: buf[base + 20],
   };
 }
 
@@ -217,52 +357,82 @@ export function writeIndexSlot(
   buf: Uint8Array,
   slotIndex: number,
   slot: IndexSlot,
+  cfg: ShardConfig,
 ): void {
-  assert(slotIndex >= 0 && slotIndex < MAX_SLOTS, 'slotIndex out of bounds');
-  const base = INDEX_REGION_OFFSET + slotIndex * INDEX_SLOT_SIZE;
-  writeU64(buf, base, slot.idHashHigh, slot.idHashLow);
-  writeU32(buf, base + 8, slot.logDelta);
-  writeU32(buf, base + 12, slot.commitLen);
-  writeFloat64LE(buf, base + 16, slot.timestamp);
-  const keyLen = slot.key.length;
-  assert(keyLen <= MAX_KEY_LEN, 'Key exceeds MAX_KEY_LEN');
-  buf[base + 24] = keyLen;
-  // Direct byte-by-byte ASCII copy, zero-padded to 39 bytes
-  let i = 0;
-  for (; i < keyLen; i++) {
-    buf[base + 25 + i] = slot.key.charCodeAt(i);
+  assert(slotIndex >= 0 && slotIndex < cfg.maxSlots, 'slotIndex out of bounds');
+  const base = cfg.indexRegionOffset + slotIndex * INDEX_SLOT_SIZE;
+  writeU32(buf, base, slot.poolIdx);
+  writeU32(buf, base + 4, slot.logDelta);
+  writeU32(buf, base + 8, slot.commitLen);
+  writeFloat64LE(buf, base + 12, slot.timestamp);
+  buf[base + 20] = slot.flags;
+  // Zero reserved bytes 21..31
+  for (let i = 21; i < 32; i++) {
+    buf[base + i] = 0;
   }
-  for (; i < MAX_KEY_LEN; i++) {
-    buf[base + 25 + i] = 0;
+}
+
+// -- Index region initialization --
+
+/**
+ * Initializes the index region of a shard buffer so all slots read as empty
+ * (poolIdx = POOL_NONE). Must be called on any freshly allocated buffer
+ * before indexInsert/indexLookup.
+ */
+export function initIndexRegion(buf: Uint8Array, cfg: ShardConfig): void {
+  for (let i = 0; i < cfg.maxSlots; i++) {
+    const base = cfg.indexRegionOffset + i * INDEX_SLOT_SIZE;
+    writeU32(buf, base, POOL_NONE);
   }
 }
 
 // -- Index lookup/insert (open-addressing linear probe) --
 
-function slotIsEmpty(buf: Uint8Array, slotIndex: number): boolean {
-  // Empty slot: idHash == 0 (both high and low)
-  const base = INDEX_REGION_OFFSET + slotIndex * INDEX_SLOT_SIZE;
-  return readU32(buf, base) === 0 && readU32(buf, base + 4) === 0;
+function slotIsEmpty(
+  buf: Uint8Array,
+  slotIndex: number,
+  cfg: ShardConfig,
+): boolean {
+  const base = cfg.indexRegionOffset + slotIndex * INDEX_SLOT_SIZE;
+  return readU32(buf, base) === POOL_NONE;
 }
 
+// Zero-copy byte-by-byte comparison of commitId against the 24-byte ASCII id
+// stored in a pool entry, avoiding subarray allocation.
+function poolIdEquals(
+  buf: Uint8Array,
+  poolIdx: number,
+  commitId: string,
+  cfg: ShardConfig,
+): boolean {
+  assert(
+    commitId.length === COMMIT_ID_LEN,
+    'commitId must be exactly 24 bytes',
+  );
+  const base = cfg.poolRegionOffset + poolIdx * POOL_ENTRY_SIZE;
+  for (let i = 0; i < COMMIT_ID_LEN; i++) {
+    if (buf[base + i] !== commitId.charCodeAt(i)) return false;
+  }
+  return true;
+}
+
+/**
+ * Looks up a commit ID in the hash index via open-addressing linear probe.
+ * Returns the slot index on hit, or -1 on miss.
+ */
 export function indexLookup(
   buf: Uint8Array,
-  idHashHigh: number,
-  idHashLow: number,
-  capacity: number,
+  commitId: string,
+  cfg: ShardConfig,
 ): number {
-  assert(
-    idHashHigh !== 0 || idHashLow !== 0,
-    'Cannot lookup zero hash (reserved for empty)',
-  );
-  let idx = (idHashLow >>> 0) % capacity;
-  // 0.67 load factor cap guarantees termination well before capacity probes.
+  const capacity = cfg.maxSlots;
+  const [, low] = cyrb64u64(commitId, SHARD_HASH_SEED);
+  let idx = (low >>> 0) % capacity;
   for (let probes = 0; probes < capacity; probes++) {
-    if (slotIsEmpty(buf, idx)) return -1;
-    const base = INDEX_REGION_OFFSET + idx * INDEX_SLOT_SIZE;
-    const lo = readU32(buf, base);
-    const hi = readU32(buf, base + 4);
-    if (lo === idHashLow && hi === idHashHigh) return idx;
+    if (slotIsEmpty(buf, idx, cfg)) return -1;
+    const base = cfg.indexRegionOffset + idx * INDEX_SLOT_SIZE;
+    const poolIdx = readU32(buf, base);
+    if (poolIdEquals(buf, poolIdx, commitId, cfg)) return idx;
     idx = (idx + 1) % capacity;
   }
   return -1;
@@ -271,37 +441,29 @@ export function indexLookup(
 export function indexInsert(
   buf: Uint8Array,
   slot: IndexSlot,
+  commitId: string,
   usedCount: number,
-  capacity: number,
+  cfg: ShardConfig,
 ): number {
+  const capacity = cfg.maxSlots;
   // Load factor check: reject if adding would exceed 0.67
-  const maxLoad = Math.floor(capacity * 2 / 3);
+  const maxLoad = Math.floor((capacity * 2) / 3);
   assert(usedCount < maxLoad, 'Index load factor exceeds 0.67');
-  assert(
-    slot.idHashHigh !== 0 || slot.idHashLow !== 0,
-    'Cannot insert zero hash (reserved for empty)',
-  );
-  let idx = (slot.idHashLow >>> 0) % capacity;
+  assert(slot.poolIdx !== POOL_NONE, 'Cannot insert slot with POOL_NONE index');
+  const [, low] = cyrb64u64(commitId, SHARD_HASH_SEED);
+  let idx = (low >>> 0) % capacity;
   for (let probes = 0; probes < capacity; probes++) {
-    if (slotIsEmpty(buf, idx)) {
-      writeIndexSlot(buf, idx, slot);
+    if (slotIsEmpty(buf, idx, cfg)) {
+      writeIndexSlot(buf, idx, slot, cfg);
       return idx;
     }
-    const base = INDEX_REGION_OFFSET + idx * INDEX_SLOT_SIZE;
-    if (
-      readU32(buf, base) === slot.idHashLow &&
-      readU32(buf, base + 4) === slot.idHashHigh
-    ) {
-      throw new Error('Duplicate idHash in index');
+    const base = cfg.indexRegionOffset + idx * INDEX_SLOT_SIZE;
+    const existingPoolIdx = readU32(buf, base);
+    if (poolIdEquals(buf, existingPoolIdx, commitId, cfg)) {
+      throw new Error('Duplicate commit ID in index');
     }
     idx = (idx + 1) % capacity;
   }
   // Should never reach here if load factor is enforced
   throw new Error('Index is full');
-}
-
-// -- Hash helper for commit IDs --
-
-export function commitIdHash(id: string): [high: number, low: number] {
-  return cyrb64u64(id, SHARD_HASH_SEED);
 }

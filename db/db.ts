@@ -49,6 +49,7 @@ import { assert } from '../base/error.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { Emitter } from '../base/emitter.ts';
 import { getGoatConfig } from '../base/config.ts';
+import { makeShardConfig, type ShardConfig } from '../repo/shard-format.ts';
 
 /**
  * The result of a sync operation with all peers for a repository.
@@ -136,6 +137,16 @@ export interface DBInstanceConfig {
    * output during development or debugging.
    */
   storageFormat?: StorageFormat;
+  /**
+   * Maximum commits per shard. Controls RAM: each shard holds approximately
+   * (max * 2.5 * 80 + max * 1.5 * 32) bytes of metadata. Defaults to
+   * 100,000 (server) or 25,000 (browser).
+   */
+  maxShardCommits?: number;
+  /** Commit count that triggers a background shard split. Defaults to 75% of maxShardCommits. */
+  splitThreshold?: number;
+  /** Shards below this count are candidates for merging. Defaults to 10% of maxShardCommits. */
+  minShardCommits?: number;
 }
 
 /**
@@ -252,6 +263,7 @@ export class GoatDB<US extends Schema = Schema>
   private _syncSchedulers: SyncScheduler[] | undefined;
   private _trustPoolPromise: Promise<TrustPool>;
   private _ready: boolean = false;
+  readonly shardConfig: ShardConfig;
 
   constructor(config: DBInstanceConfig) {
     super();
@@ -268,6 +280,12 @@ export class GoatDB<US extends Schema = Schema>
     this.trusted = config.trusted ?? false;
     this.debug = config.debug ?? false;
     this.storageFormat = config.storageFormat ?? 'goat';
+    this.shardConfig = makeShardConfig({
+      maxCommits: config.maxShardCommits ??
+        (isBrowser() ? 25_000 : 100_000),
+      splitThreshold: config.splitThreshold,
+      minCommits: config.minShardCommits,
+    });
     if (config?.peers !== undefined) {
       this._peerURLs = typeof config.peers === 'string'
         ? [config.peers]
