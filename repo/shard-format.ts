@@ -184,6 +184,7 @@ export function updateShardHeader(
 //   [25..63]  39B  key (zero-padded ASCII)
 
 export function readIndexSlot(buf: Uint8Array, slotIndex: number): IndexSlot {
+  assert(slotIndex >= 0 && slotIndex < MAX_SLOTS, 'slotIndex out of bounds');
   const base = INDEX_REGION_OFFSET + slotIndex * INDEX_SLOT_SIZE;
   const keyLen = buf[base + 24];
   // Direct ASCII decode (no TextEncoder), keys are always ASCII [a-z0-9-_]
@@ -207,6 +208,7 @@ export function writeIndexSlot(
   slotIndex: number,
   slot: IndexSlot,
 ): void {
+  assert(slotIndex >= 0 && slotIndex < MAX_SLOTS, 'slotIndex out of bounds');
   const base = INDEX_REGION_OFFSET + slotIndex * INDEX_SLOT_SIZE;
   writeU64(buf, base, slot.idHashHigh, slot.idHashLow);
   writeU32(buf, base + 8, slot.logDelta);
@@ -272,6 +274,13 @@ export function indexInsert(
     if (slotIsEmpty(buf, idx)) {
       writeIndexSlot(buf, idx, slot);
       return idx;
+    }
+    const base = INDEX_REGION_OFFSET + idx * INDEX_SLOT_SIZE;
+    if (
+      readU32(buf, base) === slot.idHashLow &&
+      readU32(buf, base + 4) === slot.idHashHigh
+    ) {
+      throw new Error('Duplicate idHash in index');
     }
     idx = (idx + 1) % capacity;
   }

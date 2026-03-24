@@ -338,7 +338,17 @@ export default function setup(): void {
     );
   });
 
-  // 16. itemPathIsValid rejects >39 char components
+  // 16. Duplicate idHash insert throws
+  TEST('ShardFormat', 'index insert duplicate hash throws', () => {
+    const buf = allocBuf();
+    const capacity = 200;
+    const [h, l] = commitIdHash('dup-key');
+    const slot = makeSlot({ idHashHigh: h, idHashLow: l });
+    indexInsert(buf, slot, 0, capacity);
+    assertThrows(() => indexInsert(buf, slot, 1, capacity));
+  });
+
+  // 17. itemPathIsValid rejects >39 char components
   TEST('ShardFormat', 'itemPathIsValid rejects long components', () => {
     assertEquals(
       itemPathIsValid('/sys/' + 'a'.repeat(39) + '/item'),
