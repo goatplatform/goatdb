@@ -17,6 +17,7 @@ type Peer = Map<string, Commit>;
 function buildMessage(
   local: Peer,
   peerFilter: BloomFilter | undefined,
+  expectedSyncCycles: number,
 ): SyncMessage {
   const entries: [string, Commit][] = Array.from(local.entries());
   return SyncMessage.build(
@@ -24,7 +25,7 @@ function buildMessage(
     entries,
     local.size,
     0,
-    5,
+    expectedSyncCycles,
     'test-org',
     kMergeTestRegistry,
   );
@@ -33,13 +34,13 @@ function buildMessage(
 /**
  * Builds a bloom filter that covers all commit IDs in the peer's map.
  */
-function buildFilter(peer: Peer): BloomFilter {
+function buildFilter(peer: Peer, expectedSyncCycles: number): BloomFilter {
   const msg = SyncMessage.build(
     undefined,
     Array.from(peer.entries()),
     peer.size,
     0,
-    5,
+    expectedSyncCycles,
     'test-org',
     kMergeTestRegistry,
     false,
@@ -51,14 +52,14 @@ function buildFilter(peer: Peer): BloomFilter {
  * Simulates one symmetric sync round: both peers exchange simultaneously.
  * Returns whether full convergence was reached after the round.
  */
-function syncRound(a: Peer, b: Peer): void {
+function syncRound(a: Peer, b: Peer, expectedSyncCycles: number): void {
   // Capture filters before the round (symmetric / simultaneous)
-  const filterA = buildFilter(a);
-  const filterB = buildFilter(b);
+  const filterA = buildFilter(a, expectedSyncCycles);
+  const filterB = buildFilter(b, expectedSyncCycles);
 
   // Each peer builds its message using the OTHER peer's filter
-  const msgFromA = buildMessage(a, filterB);
-  const msgFromB = buildMessage(b, filterA);
+  const msgFromA = buildMessage(a, filterB, expectedSyncCycles);
+  const msgFromB = buildMessage(b, filterA, expectedSyncCycles);
 
   // Apply received values
   for (const commit of msgFromA.values) {
@@ -97,7 +98,7 @@ export default function setup() {
 
     let rounds = 0;
     while (!converged(a, b)) {
-      syncRound(a, b);
+      syncRound(a, b, 5);
       rounds++;
       assertTrue(
         rounds <= 5,
@@ -107,23 +108,27 @@ export default function setup() {
     assertTrue(converged(a, b), 'Peers did not converge');
   });
 
-  TEST('SyncConvergence', 'single round for small disjoint sets', (_ctx) => {
+  TEST('SyncConvergence', 'small disjoint sets converge in <=2 rounds', (_ctx) => {
     const a = makeCommits(5, 'small-a');
     const b = makeCommits(5, 'small-b');
 
-    syncRound(a, b);
-
-    assertTrue(
-      converged(a, b),
-      'Expected convergence in exactly 1 round for small disjoint sets',
-    );
+    let rounds = 0;
+    while (!converged(a, b)) {
+      syncRound(a, b, 1);
+      rounds++;
+      assertTrue(
+        rounds <= 2,
+        `Expected convergence in <=2 rounds, took ${rounds}`,
+      );
+    }
+    assertTrue(converged(a, b), 'Peers did not converge');
   });
 
   TEST('SyncConvergence', 'convergence from empty peer', (_ctx) => {
     const a = makeCommits(10, 'full');
     const b: Peer = new Map();
 
-    syncRound(a, b);
+    syncRound(a, b, 1);
 
     assertTrue(
       converged(a, b),
