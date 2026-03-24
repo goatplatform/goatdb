@@ -71,6 +71,15 @@ export function readFloat64LE(buf: Uint8Array, offset: number): number {
   return _f64[0];
 }
 
+export function writeFloat64LE(
+  buf: Uint8Array,
+  offset: number,
+  val: number,
+): void {
+  _f64[0] = val;
+  for (let i = 0; i < 8; i++) buf[offset + i] = _f64u8[i];
+}
+
 // Read i32-LE preserving sign bit (no >>> 0)
 export function readI32LE(buf: Uint8Array, offset: number): number {
   return (
@@ -82,13 +91,13 @@ export function readI32LE(buf: Uint8Array, offset: number): number {
 }
 
 // Write a u16-LE at position in buf
-function writeU16(buf: Uint8Array, offset: number, val: number): void {
+export function writeU16(buf: Uint8Array, offset: number, val: number): void {
   buf[offset] = val & 0xff;
   buf[offset + 1] = (val >> 8) & 0xff;
 }
 
 // Write a u32-LE at position in buf
-function writeU32(buf: Uint8Array, offset: number, val: number): void {
+export function writeU32(buf: Uint8Array, offset: number, val: number): void {
   buf[offset] = val & 0xff;
   buf[offset + 1] = (val >> 8) & 0xff;
   buf[offset + 2] = (val >> 16) & 0xff;
