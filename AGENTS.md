@@ -146,6 +146,10 @@ db.create('/data/repo/item', kMySchema, data);
   JSON contents bytes are at `contentsOffset` (no length prefix, extends to end)
 - **Strict format**: `.goat` files must contain only binary records; non-binary
   records are rejected with an error log and skipped
+- **Max key length**: 39 bytes (39 ASCII characters from `[a-z0-9-_]`). Applies
+  to all path components (type, repo, item, embed). Enforced at `db/path.ts` in
+  `itemPathIsValid()`. Derived from 64-byte cache-line-aligned shard index slot
+  (64B - 24B existing fields - 1B length prefix = 39B)
 
 ## CI
 

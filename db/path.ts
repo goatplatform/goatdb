@@ -183,12 +183,16 @@ export function itemPathIsValid(path: string): boolean {
     return false;
   }
   let sepCount = 0;
+  let componentLen = 0;
   for (let i = 0; i < path.length; ++i) {
     if (path[i] === '/') {
       if (++sepCount > 4) {
         return false;
       }
+      componentLen = 0;
     } else if (!kValidItemPathChars.includes(path[i])) {
+      return false;
+    } else if (++componentLen > 39) {
       return false;
     }
   }
