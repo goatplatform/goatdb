@@ -35,6 +35,7 @@ import setupProgressTests from './progress.test.ts';
 import setupMergeAdjList from './merge-adjlist.test.ts';
 import setupMergeBloom from './merge-bloom.test.ts';
 import setupBloomFPR from './bloom-fpr.test.ts';
+import setupShardFormat from './shard-format.test.ts';
 import setupAncestorLeafDetection from './ancestor-leaf-detection.test.ts';
 import setupMergeLCA from './merge-lca.test.ts';
 import setupMergeRecord from './merge-record.test.ts';
@@ -75,6 +76,7 @@ export async function registerAllTests(): Promise<void> {
   setupMergeAdjList(); // Adjacency list data structure
   setupMergeBloom(); // Bloom filter operations
   setupBloomFPR(); // Bloom filter false-positive rate verification
+  setupShardFormat(); // Shard file format read/write primitives
   setupAncestorLeafDetection(); // Ancestor edges and leaf detection via AdjacencyList
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
