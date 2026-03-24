@@ -121,9 +121,14 @@ function readOneHeader(buf: Uint8Array, copyIndex: 0 | 1): ShardHeader | null {
   const storedCrc = readU32(buf, base + 56);
   const computedCrc = crc32(buf, base, HEADER_CRC_LEN);
   if (storedCrc !== computedCrc) return null;
+  // Validate magic and version after CRC — a random buffer with valid CRC
+  // should not be accepted as a valid header.
+  const magic = readU32(buf, base + 0);
+  const version = readU16(buf, base + 4);
+  if (magic !== SHARD_MAGIC || version !== SHARD_VERSION) return null;
   return {
-    magic: readU32(buf, base + 0),
-    version: readU16(buf, base + 4),
+    magic,
+    version,
     flags: readU16(buf, base + 6),
     shardIdHigh: readU64High(buf, base + 8),
     shardIdLow: readU64Low(buf, base + 8),
@@ -142,6 +147,8 @@ export function readShardHeader(buf: Uint8Array): ShardHeader {
   const h0 = readOneHeader(buf, 0);
   const h1 = readOneHeader(buf, 1);
   if (h0 !== null && h1 !== null) {
+    // Equal generations only occur during initial setup; copy 1 is chosen
+    // arbitrarily. updateShardHeader always produces distinct generations.
     return h1.generation >= h0.generation ? h1 : h0;
   }
   if (h0 !== null) return h0;
@@ -249,6 +256,7 @@ export function indexLookup(
     'Cannot lookup zero hash (reserved for empty)',
   );
   let idx = (idHashLow >>> 0) % capacity;
+  // 0.67 load factor cap guarantees termination well before capacity probes.
   for (let probes = 0; probes < capacity; probes++) {
     if (slotIsEmpty(buf, idx)) return -1;
     const base = INDEX_REGION_OFFSET + idx * INDEX_SLOT_SIZE;
