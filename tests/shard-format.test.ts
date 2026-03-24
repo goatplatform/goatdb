@@ -3,26 +3,40 @@ import { TEST } from './mod.ts';
 import { crc32 } from '../base/crc32.ts';
 import { cyrb64, cyrb64u64, SHARD_HASH_SEED } from '../base/hash.ts';
 import {
-  commitIdHash,
-  DEFAULT_LOG_OFFSET,
-  INDEX_REGION_OFFSET,
+  BROWSER_SHARD_CONFIG,
+  COMMIT_ID_LEN,
+  INDEX_OVERFLOW_FLAG,
   INDEX_SLOT_SIZE,
   indexInsert,
   indexLookup,
+  initIndexRegion,
+  makeShardConfig,
   MAX_KEY_LEN,
-  MAX_SLOTS,
+  POOL_ENTRY_SIZE,
+  POOL_NONE,
+  poolEntryIsEmpty,
   readIndexSlot,
+  readPoolEntry,
   readShardHeader,
+  SERVER_SHARD_CONFIG,
   SHARD_DOUBLE_HEADER_SIZE,
   SHARD_HEADER_SIZE,
   SHARD_MAGIC,
   SHARD_VERSION,
   updateShardHeader,
   writeIndexSlot,
+  writePoolEntry,
   writeShardHeader,
 } from '../repo/shard-format.ts';
-import type { IndexSlot, ShardHeader } from '../repo/shard-format.ts';
+import type {
+  IndexSlot,
+  PoolEntry,
+  ShardConfig,
+  ShardHeader,
+} from '../repo/shard-format.ts';
 import { itemPathIsValid } from '../db/path.ts';
+
+const cfg = SERVER_SHARD_CONFIG;
 
 function makeHeader(overrides?: Partial<ShardHeader>): ShardHeader {
   return {
@@ -36,8 +50,9 @@ function makeHeader(overrides?: Partial<ShardHeader>): ShardHeader {
     lastAge: 42,
     generation: 1,
     indexUsedCount: 0,
-    logOffset: DEFAULT_LOG_OFFSET,
+    logOffset: cfg.defaultLogOffset,
     createdAt: 1700000000000,
+    poolUsedCount: 0,
     crc32: 0,
     ...overrides,
   };
@@ -45,21 +60,33 @@ function makeHeader(overrides?: Partial<ShardHeader>): ShardHeader {
 
 function makeSlot(overrides?: Partial<IndexSlot>): IndexSlot {
   return {
-    idHashHigh: 0xdeadbeef,
-    idHashLow: 0xcafebabe,
+    poolIdx: 0,
     logDelta: 1024,
     commitLen: 256,
     timestamp: 1700000000000,
-    key: 'test',
+    flags: 0,
     ...overrides,
   };
 }
 
-// Allocate a buffer large enough for headers + some index slots
-function allocBuf(slots = 200): Uint8Array {
-  return new Uint8Array(
-    SHARD_DOUBLE_HEADER_SIZE + slots * INDEX_SLOT_SIZE,
-  );
+function makePoolEntry(overrides?: Partial<PoolEntry>): PoolEntry {
+  return {
+    id: 'abcdefghij1234567890abcd',
+    parent0: POOL_NONE,
+    parent1: POOL_NONE,
+    ancestor0: POOL_NONE,
+    ancestor1: POOL_NONE,
+    key: 'test-key',
+    ...overrides,
+  };
+}
+
+// Allocate a buffer large enough for pool + index regions of the given config.
+function allocBuf(c: ShardConfig = cfg): Uint8Array {
+  const size = c.indexRegionOffset + c.maxSlots * INDEX_SLOT_SIZE;
+  const buf = new Uint8Array(size);
+  initIndexRegion(buf, c);
+  return buf;
 }
 
 export default function setup(): void {
@@ -114,10 +141,10 @@ export default function setup(): void {
     assertEquals(composite, reconstructed);
   });
 
-  // 4. Header round-trip
+  // 4. Header round-trip (with poolUsedCount)
   TEST('ShardFormat', 'header round-trip', () => {
-    const buf = allocBuf(0);
-    const header = makeHeader();
+    const buf = allocBuf();
+    const header = makeHeader({ poolUsedCount: 42 });
     writeShardHeader(buf, 0, header);
     writeShardHeader(buf, 1, header);
     const result = readShardHeader(buf);
@@ -133,11 +160,12 @@ export default function setup(): void {
     assertEquals(result.indexUsedCount, header.indexUsedCount);
     assertEquals(result.logOffset, header.logOffset);
     assertEquals(result.createdAt, header.createdAt);
+    assertEquals(result.poolUsedCount, 42);
   });
 
   // 5. Header double meta-page: higher generation wins
   TEST('ShardFormat', 'header double meta-page higher gen wins', () => {
-    const buf = allocBuf(0);
+    const buf = allocBuf();
     writeShardHeader(buf, 0, makeHeader({ generation: 1, lastAge: 10 }));
     writeShardHeader(buf, 1, makeHeader({ generation: 2, lastAge: 20 }));
     const result = readShardHeader(buf);
@@ -147,7 +175,7 @@ export default function setup(): void {
 
   // 6. Header CRC32 fallback on corruption
   TEST('ShardFormat', 'header crc32 fallback on corruption', () => {
-    const buf = allocBuf(0);
+    const buf = allocBuf();
     writeShardHeader(buf, 0, makeHeader({ generation: 1, lastAge: 10 }));
     writeShardHeader(buf, 1, makeHeader({ generation: 2, lastAge: 20 }));
     // Corrupt copy 1 (higher gen) by flipping a byte
@@ -160,7 +188,7 @@ export default function setup(): void {
 
   // 7. Header both corrupt throws
   TEST('ShardFormat', 'header both corrupt throws', () => {
-    const buf = allocBuf(0);
+    const buf = allocBuf();
     writeShardHeader(buf, 0, makeHeader({ generation: 1 }));
     writeShardHeader(buf, 1, makeHeader({ generation: 2 }));
     // Corrupt both copies
@@ -171,7 +199,7 @@ export default function setup(): void {
 
   // 8. updateShardHeader alternation
   TEST('ShardFormat', 'updateShardHeader alternation', () => {
-    const buf = allocBuf(0);
+    const buf = allocBuf();
     const h = makeHeader({ generation: 0 });
     // First update: both copies are empty/corrupt, writes to copy 0
     updateShardHeader(buf, h);
@@ -193,160 +221,255 @@ export default function setup(): void {
     assertEquals(result.lastAge, 200);
   });
 
-  // 9. Index slot round-trip
+  // 9. Pool entry round-trip (own commit with parents + ancestors)
+  TEST('ShardFormat', 'pool entry round-trip', () => {
+    const buf = allocBuf();
+    const entry = makePoolEntry({
+      parent0: 5,
+      parent1: 10,
+      ancestor0: 2,
+      ancestor1: 8,
+      key: 'my-item-key',
+    });
+    writePoolEntry(buf, 0, entry, cfg);
+    const result = readPoolEntry(buf, 0, cfg);
+    assertEquals(result.id, entry.id);
+    assertEquals(result.parent0, 5);
+    assertEquals(result.parent1, 10);
+    assertEquals(result.ancestor0, 2);
+    assertEquals(result.ancestor1, 8);
+    assertEquals(result.key, 'my-item-key');
+  });
+
+  // 10. Pool entry with POOL_NONE edges
+  TEST('ShardFormat', 'pool entry with POOL_NONE edges', () => {
+    const buf = allocBuf();
+    const entry = makePoolEntry();
+    writePoolEntry(buf, 0, entry, cfg);
+    const result = readPoolEntry(buf, 0, cfg);
+    assertEquals(result.parent0, POOL_NONE);
+    assertEquals(result.parent1, POOL_NONE);
+    assertEquals(result.ancestor0, POOL_NONE);
+    assertEquals(result.ancestor1, POOL_NONE);
+  });
+
+  // 11. Pool entry foreign ref (keyLen=0, all edges POOL_NONE)
+  TEST('ShardFormat', 'pool entry foreign ref', () => {
+    const buf = allocBuf();
+    const entry = makePoolEntry({ key: '' });
+    writePoolEntry(buf, 3, entry, cfg);
+    const result = readPoolEntry(buf, 3, cfg);
+    assertEquals(result.id, entry.id);
+    assertEquals(result.key, '');
+    assertEquals(result.parent0, POOL_NONE);
+  });
+
+  // 12. Pool entry max key length
+  TEST('ShardFormat', 'pool entry max key length', () => {
+    const buf = allocBuf();
+    const maxKey = 'a'.repeat(MAX_KEY_LEN);
+    const entry = makePoolEntry({ key: maxKey });
+    writePoolEntry(buf, 0, entry, cfg);
+    const result = readPoolEntry(buf, 0, cfg);
+    assertEquals(result.key, maxKey);
+    assertEquals(result.key.length, MAX_KEY_LEN);
+  });
+
+  // 13. Pool entry key exceeds MAX_KEY_LEN throws
+  TEST('ShardFormat', 'pool entry key exceeds max throws', () => {
+    const buf = allocBuf();
+    const entry = makePoolEntry({ key: 'a'.repeat(MAX_KEY_LEN + 1) });
+    assertThrows(() => writePoolEntry(buf, 0, entry, cfg));
+  });
+
+  // 14. poolEntryIsEmpty on fresh vs written entry
+  TEST('ShardFormat', 'poolEntryIsEmpty', () => {
+    const buf = allocBuf();
+    assertTrue(poolEntryIsEmpty(buf, 0, cfg));
+    writePoolEntry(buf, 0, makePoolEntry(), cfg);
+    assertTrue(!poolEntryIsEmpty(buf, 0, cfg));
+  });
+
+  // 15. Pool entry ID length is exactly COMMIT_ID_LEN
+  TEST('ShardFormat', 'pool entry id length', () => {
+    const buf = allocBuf();
+    assertEquals(COMMIT_ID_LEN, 24);
+    const entry = makePoolEntry({ id: 'x'.repeat(24) });
+    writePoolEntry(buf, 0, entry, cfg);
+    const result = readPoolEntry(buf, 0, cfg);
+    assertEquals(result.id.length, 24);
+  });
+
+  // 16. writePoolEntry rejects wrong-length commit IDs
+  TEST('ShardFormat', 'writePoolEntry rejects wrong-length ID', () => {
+    const buf = allocBuf();
+    const short = makePoolEntry({ id: 'x'.repeat(23) });
+    assertThrows(() => writePoolEntry(buf, 0, short, cfg));
+    const long = makePoolEntry({ id: 'x'.repeat(25) });
+    assertThrows(() => writePoolEntry(buf, 0, long, cfg));
+  });
+
+  // 17. Index slot round-trip (new 32B format)
   TEST('ShardFormat', 'index slot round-trip', () => {
     const buf = allocBuf();
-    const slot = makeSlot();
-    writeIndexSlot(buf, 0, slot);
-    const result = readIndexSlot(buf, 0);
-    assertEquals(result.idHashHigh, slot.idHashHigh);
-    assertEquals(result.idHashLow, slot.idHashLow);
+    const slot = makeSlot({ poolIdx: 42, flags: 0 });
+    writeIndexSlot(buf, 0, slot, cfg);
+    const result = readIndexSlot(buf, 0, cfg);
+    assertEquals(result.poolIdx, 42);
     assertEquals(result.logDelta, slot.logDelta);
     assertEquals(result.commitLen, slot.commitLen);
     assertEquals(result.timestamp, slot.timestamp);
-    assertEquals(result.key, slot.key);
+    assertEquals(result.flags, 0);
   });
 
-  // 10. Index slot MAX_KEY_LEN boundary (39 bytes)
-  TEST('ShardFormat', 'index slot max key length boundary', () => {
+  // 18. Index slot flags byte round-trip (has_overflow set/clear)
+  TEST('ShardFormat', 'index slot flags round-trip', () => {
     const buf = allocBuf();
-    const maxKey = 'a'.repeat(MAX_KEY_LEN); // 39 chars
-    const slot = makeSlot({ key: maxKey });
-    writeIndexSlot(buf, 0, slot);
-    const result = readIndexSlot(buf, 0);
-    assertEquals(result.key.length, MAX_KEY_LEN);
-    assertEquals(result.key, maxKey);
+    const slot = makeSlot({ poolIdx: 1, flags: INDEX_OVERFLOW_FLAG });
+    writeIndexSlot(buf, 0, slot, cfg);
+    const result = readIndexSlot(buf, 0, cfg);
+    assertEquals(result.flags & INDEX_OVERFLOW_FLAG, INDEX_OVERFLOW_FLAG);
+
+    // Clear flag
+    const slot2 = makeSlot({ poolIdx: 2, flags: 0 });
+    writeIndexSlot(buf, 1, slot2, cfg);
+    const result2 = readIndexSlot(buf, 1, cfg);
+    assertEquals(result2.flags & INDEX_OVERFLOW_FLAG, 0);
   });
 
-  // 11. Index slot empty key (0 bytes)
-  TEST('ShardFormat', 'index slot empty key', () => {
+  // 19. Index lookup through pool dereference
+  TEST('ShardFormat', 'index lookup through pool dereference', () => {
     const buf = allocBuf();
-    const slot = makeSlot({ key: '' });
-    writeIndexSlot(buf, 0, slot);
-    const result = readIndexSlot(buf, 0);
-    assertEquals(result.key.length, 0);
-    assertEquals(result.key, '');
-  });
+    const commitId = 'commit-abc-1234567890abc';
+    // Write pool entry at index 0
+    writePoolEntry(buf, 0, makePoolEntry({ id: commitId, key: 'k' }), cfg);
+    // Insert index slot pointing to pool entry 0
+    const slot = makeSlot({ poolIdx: 0 });
+    indexInsert(buf, slot, commitId, 0, cfg);
 
-  // 12. Index lookup hit and miss
-  TEST('ShardFormat', 'index lookup hit and miss', () => {
-    const buf = allocBuf();
-    const capacity = 200;
-    const [h, l] = commitIdHash('commit-abc');
-    const slot = makeSlot({ idHashHigh: h, idHashLow: l });
-    writeIndexSlot(buf, (l >>> 0) % capacity, slot);
-
-    // Hit
-    const found = indexLookup(buf, h, l, capacity);
+    // Lookup should find it
+    const found = indexLookup(buf, commitId, cfg);
     assertTrue(found >= 0);
-    const result = readIndexSlot(buf, found);
-    assertEquals(result.idHashHigh, h);
-    assertEquals(result.idHashLow, l);
+    const result = readIndexSlot(buf, found, cfg);
+    assertEquals(result.poolIdx, 0);
 
     // Miss
-    const [mh, ml] = commitIdHash('nonexistent');
-    assertEquals(indexLookup(buf, mh, ml, capacity), -1);
+    assertEquals(indexLookup(buf, 'nonexistent-id-000000000', cfg), -1);
   });
 
-  // 13. Index collision resolution
-  TEST('ShardFormat', 'index collision resolution', () => {
+  // 20. Index insert + lookup end-to-end (multiple entries)
+  TEST('ShardFormat', 'index insert lookup end-to-end', () => {
     const buf = allocBuf();
-    const capacity = 200;
-    // Force multiple entries into the same start slot by using
-    // hashes that map to the same bucket
-    const baseSlot = (0xcafe0000 >>> 0) % capacity;
-    const entries: IndexSlot[] = [];
-    for (let i = 0; i < 5; i++) {
-      // Craft hashes that all land on the same start slot
-      const fakeLow = baseSlot + i * capacity;
-      const slot = makeSlot({
-        idHashHigh: 0xaa000000 + i,
-        idHashLow: fakeLow >>> 0,
-        logDelta: i * 100,
-      });
-      entries.push(slot);
-      indexInsert(buf, slot, i, capacity);
-    }
-    // All entries should be found
-    for (const entry of entries) {
-      const idx = indexLookup(
-        buf,
-        entry.idHashHigh,
-        entry.idHashLow,
-        capacity,
-      );
-      assertTrue(idx >= 0);
-      const result = readIndexSlot(buf, idx);
-      assertEquals(result.logDelta, entry.logDelta);
-    }
-  });
-
-  // 14. Index load factors 0.1, 0.5, 0.67 -- all lookups succeed
-  TEST('ShardFormat', 'index load factors', () => {
-    for (const loadFraction of [0.1, 0.5, 0.66]) {
-      const capacity = 300;
-      const count = Math.floor(capacity * loadFraction);
-      const buf = new Uint8Array(
-        INDEX_REGION_OFFSET + capacity * INDEX_SLOT_SIZE,
-      );
-      const inserted: Array<[number, number]> = [];
-      for (let i = 0; i < count; i++) {
-        const [h, l] = commitIdHash('load-test-' + i);
-        const slot = makeSlot({ idHashHigh: h, idHashLow: l, logDelta: i });
-        indexInsert(buf, slot, i, capacity);
-        inserted.push([h, l]);
-      }
-      // Verify all lookups succeed
-      for (let i = 0; i < inserted.length; i++) {
-        const [h, l] = inserted[i];
-        const idx = indexLookup(buf, h, l, capacity);
-        assertTrue(idx >= 0);
-        const result = readIndexSlot(buf, idx);
-        assertEquals(result.logDelta, i);
-      }
-    }
-  });
-
-  // 15. Index insert beyond 0.67 throws
-  TEST('ShardFormat', 'index insert beyond 0.67 throws', () => {
-    const capacity = 30;
-    const maxLoad = Math.floor(capacity * 2 / 3); // 20
-    const buf = new Uint8Array(
-      INDEX_REGION_OFFSET + capacity * INDEX_SLOT_SIZE,
-    );
-    // Fill to max load
-    for (let i = 0; i < maxLoad; i++) {
-      const [h, l] = commitIdHash('fill-' + i);
+    const ids: string[] = [];
+    for (let i = 0; i < 10; i++) {
+      const id = 'id-' + String(i).padStart(20, '0') + '0';
+      ids.push(id);
+      writePoolEntry(buf, i, makePoolEntry({ id, key: 'key-' + i }), cfg);
       indexInsert(
         buf,
-        makeSlot({ idHashHigh: h, idHashLow: l }),
+        makeSlot({ poolIdx: i, logDelta: i * 100 }),
+        id,
         i,
-        capacity,
+        cfg,
       );
     }
-    // One more should throw
-    const [h, l] = commitIdHash('overflow');
+    // All should be found
+    for (let i = 0; i < ids.length; i++) {
+      const found = indexLookup(buf, ids[i], cfg);
+      assertTrue(found >= 0);
+      const result = readIndexSlot(buf, found, cfg);
+      assertEquals(result.poolIdx, i);
+      assertEquals(result.logDelta, i * 100);
+    }
+  });
+
+  // 21. Index collision resolution via pool dereference
+  TEST('ShardFormat', 'index collision resolution', () => {
+    const buf = allocBuf();
+    // Insert multiple entries -- linear probing handles collisions
+    const ids: string[] = [];
+    for (let i = 0; i < 20; i++) {
+      const id = 'col-' + String(i).padStart(19, '0') + '0';
+      ids.push(id);
+      writePoolEntry(buf, i, makePoolEntry({ id, key: 'k' }), cfg);
+      indexInsert(buf, makeSlot({ poolIdx: i, logDelta: i }), id, i, cfg);
+    }
+    for (let i = 0; i < ids.length; i++) {
+      const found = indexLookup(buf, ids[i], cfg);
+      assertTrue(found >= 0);
+      assertEquals(readIndexSlot(buf, found, cfg).logDelta, i);
+    }
+  });
+
+  // 22. Index load factors 0.1, 0.5, 0.66 -- all lookups succeed
+  TEST('ShardFormat', 'index load factors', () => {
+    // Use a smaller config for this test to keep memory reasonable
+    const smallCfg = makeShardConfig({ maxCommits: 200 });
+    for (const loadFraction of [0.1, 0.5, 0.66]) {
+      const capacity = smallCfg.maxSlots; // 300
+      const count = Math.floor(capacity * loadFraction);
+      const buf = allocBuf(smallCfg);
+      const ids: string[] = [];
+      for (let i = 0; i < count; i++) {
+        const id = 'lf-' + String(i).padStart(20, '0') + '0';
+        ids.push(id);
+        writePoolEntry(buf, i, makePoolEntry({ id, key: 'k' }), smallCfg);
+        indexInsert(
+          buf,
+          makeSlot({ poolIdx: i, logDelta: i }),
+          id,
+          i,
+          smallCfg,
+        );
+      }
+      for (let i = 0; i < ids.length; i++) {
+        const found = indexLookup(buf, ids[i], smallCfg);
+        assertTrue(found >= 0);
+        assertEquals(readIndexSlot(buf, found, smallCfg).logDelta, i);
+      }
+    }
+  });
+
+  // 23. Index insert beyond 0.67 throws
+  TEST('ShardFormat', 'index insert beyond 0.67 throws', () => {
+    const smallCfg = makeShardConfig({ maxCommits: 20 });
+    const capacity = smallCfg.maxSlots; // 30
+    const maxLoad = Math.floor(capacity * 2 / 3);
+    const buf = allocBuf(smallCfg);
+    for (let i = 0; i < maxLoad; i++) {
+      const id = 'fill' + String(i).padStart(19, '0') + '0';
+      writePoolEntry(buf, i, makePoolEntry({ id, key: 'k' }), smallCfg);
+      indexInsert(buf, makeSlot({ poolIdx: i }), id, i, smallCfg);
+    }
+    const overflowId = 'overflow-id-000000000000';
+    writePoolEntry(
+      buf,
+      maxLoad,
+      makePoolEntry({ id: overflowId, key: 'k' }),
+      smallCfg,
+    );
     assertThrows(() =>
       indexInsert(
         buf,
-        makeSlot({ idHashHigh: h, idHashLow: l }),
+        makeSlot({ poolIdx: maxLoad }),
+        overflowId,
         maxLoad,
-        capacity,
+        smallCfg,
       )
     );
   });
 
-  // 16. Duplicate idHash insert throws
-  TEST('ShardFormat', 'index insert duplicate hash throws', () => {
+  // 24. Duplicate commit ID insert throws
+  TEST('ShardFormat', 'index insert duplicate id throws', () => {
     const buf = allocBuf();
-    const capacity = 200;
-    const [h, l] = commitIdHash('dup-key');
-    const slot = makeSlot({ idHashHigh: h, idHashLow: l });
-    indexInsert(buf, slot, 0, capacity);
-    assertThrows(() => indexInsert(buf, slot, 1, capacity));
+    const id = 'dup-key-id-0000000000abc';
+    writePoolEntry(buf, 0, makePoolEntry({ id, key: 'k' }), cfg);
+    indexInsert(buf, makeSlot({ poolIdx: 0 }), id, 0, cfg);
+    writePoolEntry(buf, 1, makePoolEntry({ id, key: 'k2' }), cfg);
+    assertThrows(() => indexInsert(buf, makeSlot({ poolIdx: 1 }), id, 1, cfg));
   });
 
-  // 17. itemPathIsValid rejects >39 char components
+  // 25. itemPathIsValid rejects >39 char components
   TEST('ShardFormat', 'itemPathIsValid rejects long components', () => {
     assertEquals(
       itemPathIsValid('/sys/' + 'a'.repeat(39) + '/item'),
@@ -355,6 +478,144 @@ export default function setup(): void {
     assertEquals(
       itemPathIsValid('/sys/' + 'a'.repeat(40) + '/item'),
       false,
+    );
+  });
+
+  // 26. Constants chain consistency (via config properties)
+  TEST('ShardFormat', 'constants chain consistency', () => {
+    assertEquals(cfg.poolRegionOffset, SHARD_DOUBLE_HEADER_SIZE);
+    assertEquals(
+      cfg.indexRegionOffset,
+      cfg.poolRegionOffset + cfg.poolRegionSize,
+    );
+    assertEquals(
+      cfg.defaultLogOffset,
+      cfg.indexRegionOffset + cfg.indexRegionSize,
+    );
+    assertEquals(cfg.poolRegionSize, cfg.maxPool * POOL_ENTRY_SIZE);
+    assertEquals(cfg.indexRegionSize, cfg.maxSlots * INDEX_SLOT_SIZE);
+    assertEquals(INDEX_SLOT_SIZE, 32);
+    assertEquals(POOL_ENTRY_SIZE, 80);
+    assertEquals(COMMIT_ID_LEN, 24);
+    assertEquals(cfg.maxPool, 250000);
+    assertEquals(
+      cfg.defaultLogOffset,
+      128 + 250000 * 80 + 150000 * 32,
+    );
+  });
+
+  // 27. Pool split threshold
+  TEST('ShardFormat', 'pool split threshold', () => {
+    assertEquals(cfg.poolSplitThreshold, Math.floor(cfg.maxPool * 0.75));
+    assertEquals(cfg.splitThreshold, 75000);
+  });
+
+  // 28. Full shard: pool full vs index full
+  TEST('ShardFormat', 'full shard conditions', () => {
+    // Pool full condition
+    assertTrue(cfg.maxPool > cfg.maxCommits);
+    assertTrue(cfg.poolSplitThreshold > cfg.splitThreshold);
+    // Index full at 0.67 load
+    const maxLoad = Math.floor(cfg.maxSlots * 2 / 3);
+    assertEquals(maxLoad, 100000);
+  });
+
+  // 29. initIndexRegion marks all slots empty
+  TEST('ShardFormat', 'initIndexRegion marks slots empty', () => {
+    const smallCfg = makeShardConfig({ maxCommits: 34 });
+    const buf = allocBuf(smallCfg);
+    for (let i = 0; i < smallCfg.maxSlots; i++) {
+      const base = smallCfg.indexRegionOffset + i * INDEX_SLOT_SIZE;
+      // poolIdx should be POOL_NONE
+      const poolIdx = (buf[base]) |
+        (buf[base + 1] << 8) |
+        (buf[base + 2] << 16) |
+        ((buf[base + 3] << 24) >>> 0);
+      assertEquals(poolIdx >>> 0, POOL_NONE);
+    }
+  });
+
+  // 30. Pool entry multiple slots isolation
+  TEST('ShardFormat', 'pool entries do not overlap', () => {
+    const buf = allocBuf();
+    const e0 = makePoolEntry({ id: 'aaaa1111222233334444aaaa', key: 'key-a' });
+    const e1 = makePoolEntry({ id: 'bbbb5555666677778888bbbb', key: 'key-b' });
+    writePoolEntry(buf, 0, e0, cfg);
+    writePoolEntry(buf, 1, e1, cfg);
+    const r0 = readPoolEntry(buf, 0, cfg);
+    const r1 = readPoolEntry(buf, 1, cfg);
+    assertEquals(r0.id, e0.id);
+    assertEquals(r0.key, 'key-a');
+    assertEquals(r1.id, e1.id);
+    assertEquals(r1.key, 'key-b');
+  });
+
+  // 31. makeShardConfig produces correct derived values for server (100K)
+  TEST('ShardFormat', 'makeShardConfig server defaults', () => {
+    const c = makeShardConfig();
+    assertEquals(c.maxCommits, 100_000);
+    assertEquals(c.splitThreshold, 75_000);
+    assertEquals(c.minCommits, 10_000);
+    assertEquals(c.maxPool, 250_000);
+    assertEquals(c.poolSplitThreshold, 187_500);
+    assertEquals(c.maxSlots, 150_000);
+    assertEquals(c.poolRegionOffset, SHARD_DOUBLE_HEADER_SIZE);
+    assertEquals(c.poolRegionSize, 250_000 * POOL_ENTRY_SIZE);
+    assertEquals(
+      c.indexRegionOffset,
+      SHARD_DOUBLE_HEADER_SIZE + 250_000 * POOL_ENTRY_SIZE,
+    );
+    assertEquals(c.indexRegionSize, 150_000 * INDEX_SLOT_SIZE);
+  });
+
+  // 32. makeShardConfig produces correct derived values for browser (25K)
+  TEST('ShardFormat', 'makeShardConfig browser defaults', () => {
+    const c = makeShardConfig({ maxCommits: 25_000 });
+    assertEquals(c.maxCommits, 25_000);
+    assertEquals(c.splitThreshold, 18_750);
+    assertEquals(c.minCommits, 2_500);
+    assertEquals(c.maxPool, 62_500);
+    assertEquals(c.maxSlots, 37_500);
+    assertEquals(c.poolRegionSize, 62_500 * POOL_ENTRY_SIZE);
+    assertEquals(c.indexRegionSize, 37_500 * INDEX_SLOT_SIZE);
+    // Total metadata ~6.2 MB
+    const totalMeta = c.poolRegionSize + c.indexRegionSize;
+    assertTrue(totalMeta < 7_000_000);
+    assertTrue(totalMeta > 6_000_000);
+  });
+
+  // 33. Smaller config rejects out-of-bounds pool access
+  TEST('ShardFormat', 'small config rejects out-of-bounds pool', () => {
+    const smallCfg = makeShardConfig({ maxCommits: 10 });
+    const buf = allocBuf(smallCfg);
+    // maxPool = floor(10 * 2.5) = 25
+    assertEquals(smallCfg.maxPool, 25);
+    // Writing at index 24 should work, index 25 should fail
+    writePoolEntry(buf, 24, makePoolEntry(), smallCfg);
+    assertThrows(() => writePoolEntry(buf, 25, makePoolEntry(), smallCfg));
+    assertThrows(() => readPoolEntry(buf, 25, smallCfg));
+    assertThrows(() => poolEntryIsEmpty(buf, 25, smallCfg));
+  });
+
+  // 34. Smaller config rejects out-of-bounds index access
+  TEST('ShardFormat', 'small config rejects out-of-bounds index', () => {
+    const smallCfg = makeShardConfig({ maxCommits: 10 });
+    const buf = allocBuf(smallCfg);
+    // maxSlots = floor(10 * 1.5) = 15
+    assertEquals(smallCfg.maxSlots, 15);
+    assertThrows(() => readIndexSlot(buf, 15, smallCfg));
+    assertThrows(() =>
+      writeIndexSlot(buf, 15, makeSlot({ poolIdx: 0 }), smallCfg)
+    );
+  });
+
+  // 35. SERVER_SHARD_CONFIG and BROWSER_SHARD_CONFIG are distinct
+  TEST('ShardFormat', 'preset configs differ', () => {
+    assertEquals(SERVER_SHARD_CONFIG.maxCommits, 100_000);
+    assertEquals(BROWSER_SHARD_CONFIG.maxCommits, 25_000);
+    assertTrue(
+      SERVER_SHARD_CONFIG.defaultLogOffset >
+        BROWSER_SHARD_CONFIG.defaultLogOffset,
     );
   });
 }
