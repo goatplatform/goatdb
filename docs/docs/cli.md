@@ -116,7 +116,10 @@ await compile({
   jsPath: './client/index.tsx',       // React client entry (required)
   buildDir: './build',                // Intermediate build output (required)
   htmlPath: './client/index.html',    // HTML template (optional)
-  cssPath: './client/index.css',      // Stylesheet (optional)
+  // CSS from JS imports is bundled automatically. Use cssPath only for static
+  // CSS that must load before bundled styles (e.g., resets, font-face rules).
+  // cssPath: './client/fonts.css',  // optional: prepend a static CSS file (resets, fonts, etc.)
+  // esbuildPlugins: [],              // optional: custom esbuild plugins
   outputName: 'my-app',              // Binary name, default: "app" (optional)
 });
 ```
@@ -187,6 +190,9 @@ deno task dev   # or: npm run dev
 
 If you need to embed a debug server in a custom script:
 
+`startDebugServer()` is currently Deno-only. Its development build pipeline
+uses the Deno loader, so the `esbuildPlugins` hook below is also Deno-only.
+
 ```typescript
 import { startDebugServer } from '@goatdb/goatdb/server/build';
 import { registerSchemas } from './common/schema.ts';
@@ -196,7 +202,10 @@ registerSchemas();
 await startDebugServer({
   jsPath: './client/index.tsx',
   htmlPath: './client/index.html',
-  cssPath: './client/index.css',
+  // CSS from JS imports is bundled automatically. Use cssPath only for static
+  // CSS that must load before bundled styles (e.g., resets, font-face rules).
+  // cssPath: './client/fonts.css',  // optional: prepend a static CSS file (resets, fonts, etc.)
+  // esbuildPlugins: [],               // optional: Deno-only custom esbuild plugins
   buildDir: './build',
   watchDir: '.',            // directory to watch for changes
   port: 8080,
@@ -216,3 +225,20 @@ Watch options:
 | `beforeBuild` / `afterBuild` | — | Async hooks that run before/after each rebuild |
 
 `orgId` simulates a specific organization's environment locally. `setup` is called after the server and database are initialized but before HTTP listening begins — use it to access the GoatDB instance for server-side logic (event handlers, background processes, custom endpoints).
+
+> **Bare-specifier CSS** (e.g. `import 'normalize.css'`): GoatDB's built-in CSS
+> loader only handles relative/absolute imports. To import CSS from a package,
+> supply a plugin that resolves and loads the bare specifier. In the debug
+> server this plugin path is Deno-only; production `compile()` supports both
+> Deno and Node.js:
+>
+> ```ts
+> // Node.js ESM — use createRequire(import.meta.url).resolve() to get the filesystem path:
+> import { createRequire } from 'node:module';
+> const require = createRequire(import.meta.url);
+> { name: 'normalize-css', setup(b) { b.onResolve({ filter: /^normalize\.css$/ }, () => ({ path: require.resolve('normalize.css'), namespace: 'file' })); } }
+>
+> // Deno — use import.meta.resolve() then convert the file URL to a path:
+> import { fromFileUrl } from '@std/path';
+> { name: 'normalize-css', setup(b) { b.onResolve({ filter: /^normalize\.css$/ }, async () => ({ path: fromFileUrl(import.meta.resolve('npm:normalize.css/normalize.css')), namespace: 'file' })); } }
+> ```

@@ -13,6 +13,8 @@ export {
   startDebugServer,
 } from './cli/debug-server.ts';
 
+export type { BuildPluginLike } from './build.ts';
+
 export {
   compile,
   type CompileOptions,

@@ -10,7 +10,11 @@ import * as path from '../base/path.ts';
 import { SimpleTimer } from '../base/timer.ts';
 import { tuple4Get, tuple4Set } from '../base/tuple.ts';
 import type { VersionNumber } from '../base/version-number.ts';
-import { createBuildContext, type ReBuildContext } from '../build.ts';
+import {
+  type BuildPluginLike,
+  createBuildContext,
+  type ReBuildContext,
+} from '../build.ts';
 import { getGoatConfig } from '../base/config.ts';
 import { Server, type ServerOptions } from '../net/server/server.ts';
 import { buildAssets } from './build-assets.ts';
@@ -91,6 +95,16 @@ export type DebugServerOptions<US extends Schema> =
   & AppConfig
   & {
     /**
+     * Custom esbuild plugins injected into the client bundle pipeline.
+     * Deno-only. In development (`startDebugServer`), plugins are baked into
+     * the build context at startup, run before GoatDB's fallback CSS loader,
+     * and require a restart to change.
+     *
+     * @remarks The namespace `'node-stub'` is reserved by GoatDB internally.
+     * User-supplied plugins must not register that name.
+     */
+    esbuildPlugins?: BuildPluginLike[];
+    /**
      * Called after the server and database are initialized but before
      * HTTP listening begins. Use this to access the GoatDB instance
      * for server-side application logic (event handlers, background
@@ -140,7 +154,8 @@ function getCwd(): string {
  * Starts a local debug server with live reload.
  *
  * The debug server automatically transpiles TypeScript and JSX using ESBuild
- * and watches for file changes to trigger rebuilds.
+ * and watches for file changes to trigger rebuilds. Deno-only: the client
+ * build context uses `@luca/esbuild-deno-loader`.
  *
  * @param options Options for running the debug server.
  * @returns Never returns - runs until the process is terminated.
@@ -149,6 +164,13 @@ function getCwd(): string {
 export async function startDebugServer<US extends Schema>(
   options: DebugServerOptions<US>,
 ): Promise<never> {
+  if (!isDeno()) {
+    throw new Error(
+      'startDebugServer() is only supported in Deno. GoatDB debug-server ' +
+        'bundling uses @luca/esbuild-deno-loader; Node.js users should run ' +
+        'the scaffolded dev server or use compile() for production builds.',
+    );
+  }
   getGoatConfig().debug = true; // Turn on debug mode globally
 
   const cwd = getCwd();
@@ -193,9 +215,15 @@ export async function startDebugServer<US extends Schema>(
     await options.beforeBuild();
   }
 
-  const ctx = await createBuildContext(entryPoints);
+  // createBuildContext is development-only and never minifies;
+  // appConfig.minify is intentionally not forwarded here.
+  const ctx = await createBuildContext(
+    entryPoints,
+    options.esbuildPlugins,
+  );
+  const { esbuildPlugins: _ignoredEsbuildPlugins, ...buildOptions } = options;
   server.updateStaticAssets(
-    await buildAssets(ctx, entryPoints, options),
+    await buildAssets(ctx, entryPoints, buildOptions),
   );
 
   if (options.afterBuild) {
@@ -254,7 +282,7 @@ export async function startDebugServer<US extends Schema>(
         }
 
         server.updateStaticAssets(
-          await buildAssets(ctx, entryPoints, options),
+          await buildAssets(ctx, entryPoints, buildOptions),
         );
 
         if (options.afterBuild) {

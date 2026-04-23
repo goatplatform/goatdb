@@ -1,6 +1,7 @@
 import * as path from '../base/path.ts';
 import {
   adapterStubPlugin,
+  type BuildPluginLike,
   getEsbuild,
   stopBackgroundCompiler,
 } from '../build.ts';
@@ -134,7 +135,18 @@ export type ExecutableOptions = {
  */
 export type CompileOptions =
   & ExecutableOptions
-  & AppConfig;
+  & AppConfig
+  & {
+    /**
+     * Custom esbuild plugins injected into the client bundle pipeline.
+     * In production (compile), plugins are applied per build and run before
+     * GoatDB's fallback CSS loader, so they can rewrite or resolve local CSS.
+     *
+     * @remarks The namespace `'node-stub'` is reserved by GoatDB internally.
+     * User-supplied plugins must not register that name.
+     */
+    esbuildPlugins?: BuildPluginLike[];
+  };
 
 /**
  * Compiles a GoatDB application into a standalone executable.
@@ -197,6 +209,7 @@ async function bundleClientAssets(
   const buildAssetsOpts: BuildAssetsOptions = {
     runtime: runtime ?? 'deno',
     keepEsbuildAlive,
+    esbuildPlugins: options.esbuildPlugins,
   };
   const assets = staticAssetsToJS(
     await buildAssets(

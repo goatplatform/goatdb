@@ -11,7 +11,6 @@ async function main(): Promise<void> {
     serverEntry: 'server/server-sea.ts',
     jsPath: 'client/index.tsx',
     htmlPath: 'client/index.html',
-    cssPath: 'client/index.css',
     assetsPath: 'client/assets',
   });
   process.exit();

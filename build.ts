@@ -2,8 +2,12 @@
 // that would break when this module is transitively bundled into SEA binaries.
 import * as path from './base/path.ts';
 import { APP_ENTRY_POINT } from './net/server/static-assets.ts';
-// IMPORTANT: These MUST remain `import type` — runtime imports would break
-// Node.js SEA binaries since esbuild/deno-loader are Deno-specific packages.
+import { readFile } from './base/json-log/file-impl.ts';
+import { isDeno } from './base/common.ts';
+
+// IMPORTANT: `esbuild` and `@luca/esbuild-deno-loader` MUST remain `import type`.
+// Runtime imports of these Deno/JSR-specific packages break Node.js SEA binaries.
+// `readFile` is a GoatDB-internal utility and is safe as a runtime import.
 import type { Plugin } from 'esbuild';
 import type { denoPlugins } from '@luca/esbuild-deno-loader';
 
@@ -36,6 +40,19 @@ export async function getDenoPlugins(): Promise<typeof denoPlugins> {
 export interface BundleResult {
   source: string;
   map: string;
+  css?: string; // companion CSS emitted by esbuild from bundled CSS imports; sourceMappingURL already stripped
+  cssMap?: string; // corresponding CSS source map JSON string from esbuild .css.map output
+}
+
+/**
+ * Minimal public plugin shape for GoatDB's build-only APIs.
+ * Keeps `esbuild` out of the root package's exported type surface while still
+ * allowing callers to pass standard esbuild-compatible plugins.
+ */
+export interface BuildPluginLike {
+  name: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setup(build: any): void;
 }
 
 export function bundleResultFromBuildResult(
@@ -48,7 +65,8 @@ export function bundleResultFromBuildResult(
     );
   }
   for (const file of buildResult.outputFiles) {
-    const entryPoint = path.basename(file.path).split('.')[0] as string;
+    const entryPoint = path.basename(file.path)
+      .replace(/\.(js\.map|css\.map|js|css)$/, '') as string;
     let bundleResult: BundleResult | undefined = result[entryPoint];
     if (!bundleResult) {
       bundleResult = {} as BundleResult;
@@ -58,6 +76,17 @@ export function bundleResultFromBuildResult(
       bundleResult.source = file.text;
     } else if (file.path.endsWith('.js.map')) {
       bundleResult.map = file.text;
+    } else if (file.path.endsWith('.css.map')) {
+      // Collect the esbuild CSS source map; offset correction happens in
+      // buildAssets when CSS chunks are combined into the final emitted asset.
+      bundleResult.cssMap = file.text;
+    } else if (file.path.endsWith('.css')) {
+      // Strip the trailing sourceMappingURL comment — buildAssets reattaches the
+      // final map URL for whichever emitted CSS asset owns this chunk.
+      bundleResult.css = file.text.replace(
+        /\/\*#\s*sourceMappingURL=\S+\s*\*\/\s*$/,
+        '',
+      );
     }
   }
   return result;
@@ -108,19 +137,120 @@ export function isReBuildContext(
   return typeof (ctx as ReBuildContext).rebuild === 'function';
 }
 
+// Load resolved CSS files before the runtime module loaders (deno-loader /
+// node-stub) see them. This keeps native CSS Modules semantics for
+// `.module.css` while still letting user plugins rewrite CSS imports by
+// returning a different file-namespace path from onResolve.
+export const cssLoaderPlugin: Plugin = {
+  name: 'goatdb-css-loader',
+  setup(build) {
+    build.onLoad(
+      { filter: /\.css$/, namespace: 'file' },
+      async (args) => ({
+        contents: new TextDecoder().decode(await readFile(args.path)),
+        loader: args.path.endsWith('.module.css') ? 'local-css' : 'css',
+        resolveDir: path.dirname(args.path),
+        watchFiles: [args.path],
+      }),
+    );
+  },
+};
+
+/**
+ * Intercepts `node:*` imports in browser bundles with empty stubs that throw
+ * if called at runtime (which should never happen). Required for Node.js-path
+ * builds where library code contains `node:*` imports behind runtime checks.
+ */
+export const nodeStubPlugin: Plugin = {
+  name: 'node-stub',
+  setup(build) {
+    build.onResolve({ filter: /^node:/ }, (args) => ({
+      path: args.path,
+      namespace: 'node-stub',
+    }));
+    build.onLoad(
+      { filter: /.*/, namespace: 'node-stub' },
+      (args) => ({
+        contents: `
+          // Stub for ${args.path} - this code should never run in browser
+          export default new Proxy({}, {
+            get(_, prop) {
+              throw new Error(\`Cannot access \${String(prop)} from ${args.path} in browser\`);
+            }
+          });
+          ${
+          args.path === 'node:crypto'
+            ? 'export const webcrypto = globalThis.crypto;'
+            : ''
+        }
+        `,
+        loader: 'js',
+      }),
+    );
+  },
+};
+
+/**
+ * Returns the shared client-bundle plugin stack in precedence order.
+ *
+ * Ordering is intentional:
+ * - adapter stubs always run first so unused runtime adapters never bundle in.
+ * - node stubs (Node.js production only) must run before user plugins so
+ *   browser bundles cannot remap `node:*` imports back into real Node APIs.
+ * - user plugins run before GoatDB's CSS fallback so they can rewrite or
+ *   resolve local `.css` imports when desired.
+ * - cssLoaderPlugin remains the fallback that turns unresolved CSS files into
+ *   native esbuild CSS / CSS Modules inputs.
+ * - Deno runtime loaders stay last so user plugins and cssLoaderPlugin can
+ *   intercept imports before deno-loader sees them.
+ */
+export async function getClientBuildPlugins(
+  targetRuntime: 'deno' | 'node',
+  extraPlugins: BuildPluginLike[] = [],
+): Promise<Plugin[]> {
+  const plugins: Plugin[] = [adapterStubPlugin(['deno', 'node'])];
+  if (targetRuntime === 'node') {
+    plugins.push(nodeStubPlugin);
+  }
+  plugins.push(...extraPlugins as Plugin[], cssLoaderPlugin);
+  if (targetRuntime === 'deno') {
+    plugins.push(...(await getDenoPlugins())());
+  }
+  return plugins;
+}
+
+/**
+ * Creates an esbuild incremental context for the debug server (development,
+ * hot-reload). Deno-only — uses `@luca/esbuild-deno-loader` which is not
+ * available on Node.js. Production builds go through `buildAssets()` in
+ * `cli/build-assets.ts` directly.
+ */
 export async function createBuildContext(
   entryPoints: { in: string; out: string }[],
+  extraPlugins: BuildPluginLike[] = [],
 ): Promise<ReBuildContext> {
+  if (!isDeno()) {
+    throw new Error(
+      'createBuildContext() is only supported in Deno. GoatDB debug-server ' +
+        'bundling uses @luca/esbuild-deno-loader; use buildAssets() or ' +
+        'compile() for Node.js production builds.',
+    );
+  }
   const esbuild = await getEsbuild();
-  const denoPlugins = await getDenoPlugins();
   const ctx = await esbuild.context({
     entryPoints,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    plugins: [...denoPlugins()] as any,
+    plugins: await getClientBuildPlugins('deno', extraPlugins) as any,
     bundle: true,
     write: false,
     sourcemap: 'linked',
     outdir: 'output',
+    jsx: 'automatic',
+    platform: 'browser',
+    define: {
+      '__BUNDLE_TARGET__': '"browser"',
+      'import.meta.main': 'false',
+    },
     logOverride: {
       'empty-import-meta': 'silent',
     },

@@ -1,4 +1,5 @@
 // React app entry point - https://goatdb.dev/docs/react
+import './index.css';
 // deno-lint-ignore no-unused-vars
 import React from 'react';
 import { createRoot } from 'react-dom/client';

@@ -13,20 +13,15 @@ import { TEST, type TestSuite } from './mod.ts';
 import { assertEquals, assertExists, assertTrue } from './asserts.ts';
 import * as path from '../base/path.ts';
 import { isDeno, isNode } from '../base/common.ts';
+import { stopBackgroundCompiler } from '../build.ts';
+import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
+import { buildAssets } from '../cli/build-assets.ts';
 import {
-  getCWD,
   mkdir,
   pathExists,
   readTextFile,
   writeTextFile,
 } from '../base/json-log/file-impl.ts';
-
-/**
- * Helper function to check if a file exists
- */
-async function fileExists(filePath: string): Promise<boolean> {
-  return await pathExists(filePath);
-}
 
 export default function setupCliInitTests() {
   TEST(
@@ -57,63 +52,63 @@ export default function setupCliInitTests() {
 
       // Verify core files exist
       assertTrue(
-        await fileExists(path.join(testDir, 'client/index.html')),
+        await pathExists(path.join(testDir, 'client/index.html')),
         'client/index.html should exist',
       );
       assertTrue(
-        await fileExists(path.join(testDir, 'client/index.css')),
+        await pathExists(path.join(testDir, 'client/index.css')),
         'client/index.css should exist',
       );
       assertTrue(
-        await fileExists(path.join(testDir, 'client/index.tsx')),
+        await pathExists(path.join(testDir, 'client/index.tsx')),
         'client/index.tsx should exist',
       );
       assertTrue(
-        await fileExists(path.join(testDir, 'client/app.tsx')),
+        await pathExists(path.join(testDir, 'client/app.tsx')),
         'client/app.tsx should exist',
       );
       assertTrue(
-        await fileExists(path.join(testDir, 'common/schema.ts')),
+        await pathExists(path.join(testDir, 'common/schema.ts')),
         'common/schema.ts should exist',
       );
       assertTrue(
-        await fileExists(path.join(testDir, 'server/debug-server.ts')),
+        await pathExists(path.join(testDir, 'server/debug-server.ts')),
         'server/debug-server.ts should exist',
       );
       assertTrue(
-        await fileExists(path.join(testDir, 'server/server.ts')),
+        await pathExists(path.join(testDir, 'server/server.ts')),
         'server/server.ts should exist',
       );
       assertTrue(
-        await fileExists(path.join(testDir, 'server/build.ts')),
+        await pathExists(path.join(testDir, 'server/build.ts')),
         'server/build.ts should exist',
       );
       assertTrue(
-        await fileExists(path.join(testDir, '.gitignore')),
+        await pathExists(path.join(testDir, '.gitignore')),
         '.gitignore should exist',
       );
 
       // Verify runtime-specific config files
       if (isDeno()) {
         assertTrue(
-          await fileExists(path.join(testDir, 'deno.json')),
+          await pathExists(path.join(testDir, 'deno.json')),
           'deno.json should exist for Deno runtime',
         );
       } else if (isNode()) {
         assertTrue(
-          await fileExists(path.join(testDir, 'package.json')),
+          await pathExists(path.join(testDir, 'package.json')),
           'package.json should exist for Node runtime',
         );
         assertTrue(
-          await fileExists(path.join(testDir, 'tsconfig.json')),
+          await pathExists(path.join(testDir, 'tsconfig.json')),
           'tsconfig.json should exist for Node runtime',
         );
         assertTrue(
-          await fileExists(path.join(testDir, '.npmrc')),
+          await pathExists(path.join(testDir, '.npmrc')),
           '.npmrc should exist for Node runtime',
         );
         assertTrue(
-          await fileExists(path.join(testDir, 'server', 'server-sea.ts')),
+          await pathExists(path.join(testDir, 'server', 'server-sea.ts')),
           'server/server-sea.ts should exist for Node runtime',
         );
       }
@@ -199,7 +194,7 @@ export default function setupCliInitTests() {
       const testDir = await ctx.tempDir('init-no-overwrite');
       // Create existing file with custom content
       await mkdir(path.join(testDir, 'client'));
-      const customContent = '/* Custom CSS Content */\\nbody { color: red; }';
+      const customContent = '/* Custom CSS Content */\nbody { color: red; }';
       await writeTextFile(
         path.join(testDir, 'client/index.css'),
         customContent,
@@ -240,12 +235,26 @@ export default function setupCliInitTests() {
         path.join(testDir, 'client/index.html'),
       );
       assertTrue(
-        htmlContent?.includes('<!DOCTYPE html>') || false,
+        htmlContent?.includes('<!DOCTYPE html>') === true,
         'HTML should have doctype',
       );
       assertTrue(
-        htmlContent?.includes('<div id="root">') || false,
+        htmlContent?.includes('<div id="root">') === true,
         'HTML should have root div',
+      );
+      assertTrue(
+        htmlContent?.includes('<link rel="stylesheet" href="/index.css"') ===
+          true,
+        'HTML should link /index.css stylesheet',
+      );
+
+      // Verify index.tsx imports CSS entry point
+      const indexContent = await readTextFile(
+        path.join(testDir, 'client/index.tsx'),
+      );
+      assertTrue(
+        indexContent?.includes("import './index.css'") === true,
+        'index.tsx should import CSS entry point',
       );
 
       // Verify React app template
@@ -253,11 +262,11 @@ export default function setupCliInitTests() {
         path.join(testDir, 'client/app.tsx'),
       );
       assertTrue(
-        appContent?.includes('export function App') || false,
+        appContent?.includes('export function App') === true,
         'App component should be exported',
       );
       assertTrue(
-        appContent?.includes('useDBReady') || false,
+        appContent?.includes('useDBReady') === true,
         'App should use GoatDB hook',
       );
 
@@ -266,13 +275,127 @@ export default function setupCliInitTests() {
         path.join(testDir, 'common/schema.ts'),
       );
       assertTrue(
-        schemaContent?.includes('kSchemaMyItem') || false,
+        schemaContent?.includes('kSchemaMyItem') === true,
         'Schema should define example item',
       );
       assertTrue(
-        schemaContent?.includes('registerSchemas') || false,
+        schemaContent?.includes('registerSchemas') === true,
         'Schema should export registration function',
       );
+    },
+  );
+
+  TEST(
+    'CLI-Init',
+    'real scaffold entry builds through buildAssets',
+    async (ctx: TestSuite) => {
+      if (typeof document !== 'undefined') return;
+
+      const testDir = await ctx.tempDir('init-real-scaffold-build');
+      const initModule = await import('../cli/init.ts');
+      await initModule.bootstrapProject({
+        targetDir: testDir,
+        skipDependencies: true,
+      });
+
+      const stubsDir = path.join(testDir, 'test-stubs');
+      await mkdir(stubsDir);
+      await writeTextFile(
+        path.join(stubsDir, 'react.ts'),
+        'export default {};\n',
+      );
+      await writeTextFile(
+        path.join(stubsDir, 'react-dom-client.ts'),
+        'export function createRoot() { return { render() {} }; }\n',
+      );
+      await writeTextFile(
+        path.join(stubsDir, 'react-jsx-runtime.ts'),
+        'export const Fragment = Symbol.for("fragment");\n' +
+          'export function jsx(type: unknown, props: unknown) {\n' +
+          '  return { type, props };\n' +
+          '}\n' +
+          'export const jsxs = jsx;\n',
+      );
+      await writeTextFile(
+        path.join(stubsDir, 'goatdb.ts'),
+        'export class DataRegistry {\n' +
+          '  static default = new DataRegistry();\n' +
+          '  registerSchema(_schema: unknown): void {}\n' +
+          '}\n',
+      );
+      await writeTextFile(
+        path.join(stubsDir, 'goatdb-react.ts'),
+        "export function useDBReady(): 'ready' { return 'ready'; }\n",
+      );
+      const runtime = isDeno() ? 'deno' : 'node';
+
+      const stubbedImportPaths = {
+        react: path.join(stubsDir, 'react.ts'),
+        'react-dom/client': path.join(stubsDir, 'react-dom-client.ts'),
+        'react/jsx-runtime': path.join(stubsDir, 'react-jsx-runtime.ts'),
+        '@goatdb/goatdb': path.join(stubsDir, 'goatdb.ts'),
+        '@goatdb/goatdb/react': path.join(stubsDir, 'goatdb-react.ts'),
+      };
+      // deno-lint-ignore no-explicit-any
+      const scaffoldDepsPlugin: any = {
+        name: 'scaffold-deps-stub',
+        setup(build: any) {
+          build.onResolve({ filter: /.*/ }, (args: any) => {
+            const stubPath = stubbedImportPaths[
+              args.path as keyof typeof stubbedImportPaths
+            ];
+            return stubPath ? { path: stubPath, namespace: 'file' } : undefined;
+          });
+        },
+      };
+
+      try {
+        const assets = await buildAssets(
+          undefined,
+          [{
+            in: path.join(testDir, 'client/index.tsx'),
+            out: APP_ENTRY_POINT,
+          }],
+          {
+            buildDir: path.join(testDir, 'build'),
+            jsPath: path.join(testDir, 'client/index.tsx'),
+            htmlPath: path.join(testDir, 'client/index.html'),
+          },
+          {
+            runtime,
+            keepEsbuildAlive: false,
+            esbuildPlugins: [scaffoldDepsPlugin],
+          },
+        );
+
+        assertExists(
+          assets['/index.html'],
+          'scaffold build must emit /index.html',
+        );
+        assertExists(assets['/app.js'], 'scaffold build must emit /app.js');
+        assertExists(
+          assets['/index.css'],
+          'scaffold build must emit /index.css',
+        );
+
+        const html = new TextDecoder().decode(assets['/index.html'].data);
+        const js = new TextDecoder().decode(assets['/app.js'].data);
+        const css = new TextDecoder().decode(assets['/index.css'].data);
+        assertTrue(
+          html.includes('<link rel="stylesheet" href="/index.css"'),
+          'built scaffold HTML must reference /index.css',
+        );
+        assertTrue(
+          js.length > 0,
+          'built scaffold JS must be non-empty',
+        );
+        assertTrue(
+          css.trim().length > 0,
+          'built scaffold CSS must be non-empty',
+        );
+      } finally {
+        await stopBackgroundCompiler();
+      }
     },
   );
 }

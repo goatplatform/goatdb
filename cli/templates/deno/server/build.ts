@@ -7,7 +7,6 @@ async function main(): Promise<void> {
     serverEntry: 'server/server.ts',
     jsPath: 'client/index.tsx',
     htmlPath: 'client/index.html',
-    cssPath: 'client/index.css',
     assetsPath: 'client/assets',
     // Cross-compile: deno run -A server/build.ts --target=x86_64-pc-windows-msvc
     // os: "linux",

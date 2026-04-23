@@ -9,5 +9,19 @@ A configuration of a Single Page Application built on top GoatDB.
 
 ## Definition
 
-**Type:** <code>AppConfig = &#123; appName?: string; assetsFilter?: (path: string) =&gt; boolean; assetsPath?: string; buildDir: string; cssPath?: string; denoJson?: string; htmlPath?: string; jsPath: string; minify?: boolean &#125;</code>
+**Type:** <code>AppConfig = &#123; appName?: string; assetsFilter?: (path: string) =&gt; boolean; assetsPath?: string; buildDir: string; cssPath?: string; denoJson?: string; htmlPath?: string; jsPath: string; minify?: boolean; packageJson?: string &#125;</code>
 
+## Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `buildDir` | `string` | Output directory for intermediate files and the final binary. |
+| `jsPath` | `string` | Main client entry point (`.js .jsx .ts .tsx`). Accessible at `/app.js`. |
+| `htmlPath` | `string` (optional) | HTML template. Unknown paths redirect here. Accessible at `/index.html`. |
+| `cssPath` | `string` (optional) | Static CSS prepended into `/index.css` before esbuild-bundled CSS. |
+| `assetsPath` | `string` (optional) | Static assets directory. Accessible at `/assets/*`. |
+| `assetsFilter` | `(path: string) => boolean` (optional) | Filter for asset inclusion. Default: skips dotfiles. |
+| `denoJson` | `string` (optional) | Path to `deno.json`. Defaults to `deno.json` in CWD. |
+| `packageJson` | `string` (optional) | Path to `package.json` (Node.js). Defaults to `package.json` in CWD. |
+| `minify` | `boolean` (optional) | Enable output minification. |
+| `appName` | `string` (optional) | Application name. Read from `deno.json`/`package.json` automatically. |

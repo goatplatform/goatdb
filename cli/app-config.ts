@@ -25,9 +25,9 @@ export type AppConfig = {
    */
   htmlPath?: string;
   /**
-   * Path to the main CSS file for the app.
-   *
-   * Accessible at `/index.css`.
+   * Optional static CSS file prepended into `/index.css` before esbuild-bundled CSS.
+   * Use this for global resets or vendor CSS that must load before component styles.
+   * For application CSS, prefer `import './index.css'` in your JS entry point instead.
    */
   cssPath?: string;
   /**
