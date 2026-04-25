@@ -7,8 +7,8 @@ import { sourceMapDecoder } from './browser/sourcemap-decoder.ts';
  * Command line options:
  * --deno-inspect-brk: Enable Deno debugger
  * --node-inspect-brk: Enable Node.js debugger
- * --suite=<name> or -suite <name>: Run specific test suite
- * --test=<name> or -test <name>: Run specific test
+ * --suite=<name> or -suite <name>: Run a suite by exact suite name
+ * --test=<name> or -test <name>: Run tests by exact registered test name
  * --runtime=<deno|node|browser> or -runtime <deno|node|browser>: Run in specific runtime only
  *
  * @returns Promise that resolves when all tests complete
@@ -67,7 +67,7 @@ async function runTests(): Promise<void> {
     console.error(
       'Unknown argument:',
       arg,
-      '\nUsage: deno task test [--deno-inspect-brk] [--node-inspect-brk] [-suite <suite>] [--suite=<suite>] [-test <test>] [--test=<test>] [-runtime <deno|node|browser>] [--debug]',
+      '\nUsage: deno task test [--deno-inspect-brk] [--node-inspect-brk] [-suite <exact-suite-name>] [--suite=<exact-suite-name>] [-test <exact-test-name>] [--test=<exact-test-name>] [-runtime <deno|node|browser>] [--debug]',
     );
     Deno.exit(1);
   }

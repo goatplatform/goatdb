@@ -214,7 +214,7 @@ export async function getClientBuildPlugins(
   }
   plugins.push(...extraPlugins as Plugin[], cssLoaderPlugin);
   if (targetRuntime === 'deno') {
-    plugins.push(...(await getDenoPlugins())());
+    plugins.push(...(await getDenoPlugins())() as unknown as Plugin[]);
   }
   return plugins;
 }

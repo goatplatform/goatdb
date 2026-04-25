@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and GoatDB adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Bug Fixes
+
+- Exact `--suite` and `--test` no-match failures are now surfaced clearly on
+  single-runtime execution paths, including the Node.js runner.
+- Mixed-runtime filtered runs now tolerate a no-match result from one selected
+  runtime when another selected runtime still has matching tests.
+
 ## [0.5.1] - 2026-03-05
 
 ### Breaking Changes

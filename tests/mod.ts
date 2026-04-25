@@ -61,6 +61,23 @@ export interface TestSummary {
   readonly results: TestResult[];
 }
 
+export function formatNoMatchingTestsMessage(
+  suiteName?: string,
+  testName?: string,
+): string {
+  const filters: string[] = [];
+  if (suiteName) {
+    filters.push(`--suite=${JSON.stringify(suiteName)}`);
+  }
+  if (testName) {
+    filters.push(`--test=${JSON.stringify(testName)}`);
+  }
+  if (filters.length === 0) {
+    return 'No tests matched the provided filters';
+  }
+  return `No tests matched ${filters.join(' ')}`;
+}
+
 /**
  * Represents a collection of related test cases that can be run together.
  * Each test suite has a name and maintains a map of test functions.
@@ -276,6 +293,17 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
     return { suiteCount, testCount };
   }
 
+  private getRequiredTestCount(
+    suiteName?: string,
+    testName?: string,
+  ): { suiteCount: number; testCount: number } {
+    const counts = this.getTestCount(suiteName, testName);
+    if ((suiteName || testName) && counts.testCount === 0) {
+      throw new Error(formatNoMatchingTestsMessage(suiteName, testName));
+    }
+    return counts;
+  }
+
   /**
    * Runs test suites and their tests.
    * Can run all suites, a specific suite, or a specific test within a suite.
@@ -288,21 +316,10 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
     const allResults: TestResult[] = [];
     const runStart = performance.now();
 
-    // Calculate total tests and suite count for progress
-    let totalTests = 0;
-    let suiteCount = 0;
-    for (const [name, suite] of this._suites.entries()) {
-      if (suiteName && name !== suiteName) continue;
-      if (testName) {
-        if (suite['_tests'].has(testName)) {
-          totalTests += 1;
-          suiteCount++;
-        }
-      } else {
-        totalTests += suite['_tests'].size;
-        suiteCount++;
-      }
-    }
+    const { suiteCount, testCount: totalTests } = this.getRequiredTestCount(
+      suiteName,
+      testName,
+    );
 
     const pm = new ProgressManager();
     let currentTest = 0;

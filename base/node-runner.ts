@@ -19,7 +19,7 @@ export async function compileForNodeWithEsbuild(
         out: outName,
       },
     ],
-    plugins: [...denoPlugins()],
+    plugins: denoPlugins() as unknown as esbuild.Plugin[],
     outfile: outName,
     bundle: true,
     platform: 'node',
@@ -45,24 +45,60 @@ export async function compileForNodeWithEsbuild(
   });
 }
 
+export interface NodeRunResult {
+  success: boolean;
+  exitCode: number;
+  stderrText: string;
+}
+
+async function forwardAndCaptureStream(
+  stream: ReadableStream<Uint8Array> | null,
+): Promise<string> {
+  if (!stream) {
+    return '';
+  }
+
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let captured = '';
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (!value) {
+        continue;
+      }
+      captured += decoder.decode(value, { stream: true });
+      await Deno.stderr.write(value);
+    }
+    captured += decoder.decode();
+    return captured;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 /**
  * Runs a pre-compiled esbuild result in Node.js environment.
  *
  * @param result - The esbuild BuildResult (output of compileForNodeWithEsbuild)
  * @param inspectBrk - Optional flag to enable Node.js inspector with break on start
  * @param env - Optional environment variables to set for the Node.js process
- * @returns A Promise that resolves to true if the Node.js process exits successfully, false otherwise
+ * @returns Structured execution result including exit status and captured stderr text
  */
 export async function nodeRun(
   result: Awaited<ReturnType<typeof compileForNodeWithEsbuild>>,
   inspectBrk?: boolean,
   env?: Record<string, string>,
-): Promise<boolean> {
+): Promise<NodeRunResult> {
   try {
     const nodeCmd = new Deno.Command('node', {
       stdin: 'piped',
       stdout: 'inherit',
-      stderr: 'inherit',
+      stderr: 'piped',
       ...(inspectBrk
         ? {
           args: ['--inspect-brk'],
@@ -74,13 +110,23 @@ export async function nodeRun(
       },
     });
     const nodeProcess = nodeCmd.spawn();
+    const stderrPromise = forwardAndCaptureStream(nodeProcess.stderr);
     const writer = nodeProcess.stdin.getWriter();
     await writer.write(result.outputFiles![0].contents);
     await writer.close();
-    await nodeProcess.output();
-    return (await nodeProcess.status).success;
-  } catch (_: unknown) {
-    return false;
+    const status = await nodeProcess.status;
+    const stderrText = await stderrPromise;
+    return {
+      success: status.success,
+      exitCode: status.code,
+      stderrText,
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      exitCode: -1,
+      stderrText: error instanceof Error ? error.message : String(error),
+    };
   } finally {
     await esbuild.stop();
   }

@@ -12,7 +12,12 @@
  */
 
 import { isBrowser } from '../base/common.ts';
-import { TestsRunner, type TestSummary } from './mod.ts';
+import type { BrowserStructuredNoMatchResult } from '../base/runtime-filter.ts';
+import {
+  formatNoMatchingTestsMessage,
+  TestsRunner,
+  type TestSummary,
+} from './mod.ts';
 import { exit } from '../base/process.ts';
 import {
   type LogEntry,
@@ -23,6 +28,7 @@ import { ConsoleLogStream } from '../logging/console-stream.ts';
 import type { NormalizedLogEntry } from '../logging/entry.ts';
 
 // All browser-compatible existing tests (no Server class usage)
+import setupAssertsTests from './asserts.test.ts';
 import setupOrderstamp from './orderstamp-expose.test.ts';
 import setupItemPath from './item-path.ts';
 import setupCommit from './commit.test.ts';
@@ -32,7 +38,6 @@ import setupGoatRequest from './goat-request.test.ts';
 import setupStaticAssetsEndpoint from './static-assets-endpoint.test.ts';
 import setupHealthCheckEndpoint from './health-check-endpoint.test.ts';
 import { getEnvVar } from '../base/os.ts';
-import { notReached } from '../base/error.ts';
 
 /**
  * Custom log stream for browser tests that filters out METRIC logs
@@ -53,7 +58,7 @@ class TestConsoleLogStream implements LogStream {
 /**
  * Browser test entry point - all browser-compatible existing tests.
  */
-async function main(): Promise<void> {
+export function registerBrowserTests(): void {
   // Install custom log stream to filter out metrics in browser tests
   if (isBrowser()) {
     setGlobalLoggerStreams([new TestConsoleLogStream()]);
@@ -63,6 +68,7 @@ async function main(): Promise<void> {
   // but excluding server-only tests
 
   // FAST UNIT TESTS (0-1ms each) - Pure logic, no I/O
+  setupAssertsTests(); // Assertion utility correctness
   setupOrderstamp(); // Utility functions for distributed timestamps
   setupItemPath(); // Path validation and parsing logic
   setupHealthCheckEndpoint(); // Simple HTTP endpoint check
@@ -75,25 +81,63 @@ async function main(): Promise<void> {
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
   setupTrusted(); // Database operations in trusted mode - CRITICAL for browser
   setupStaticAssetsEndpoint(); // File serving and asset management
+}
+
+/**
+ * Browser test entry point - all browser-compatible existing tests.
+ */
+async function main(): Promise<void> {
+  registerBrowserTests();
 
   // Get test configuration
   const suiteName = getEnvVar('GOATDB_SUITE');
   const testName = getEnvVar('GOATDB_TEST');
 
   // Forward test events to browser UI
-  TestsRunner.default.attach('testStart', (data) => {
+  TestsRunner.default.attach('testStart', (data: unknown) => {
     globalThis.dispatchEvent(new CustomEvent('testStart', { detail: data }));
   });
 
-  TestsRunner.default.attach('testComplete', (data) => {
+  TestsRunner.default.attach('testComplete', (data: unknown) => {
     globalThis.dispatchEvent(new CustomEvent('testComplete', { detail: data }));
   });
 
-  // Run the tests
-  const summary: TestSummary = await TestsRunner.default.run(
-    suiteName,
-    testName,
-  );
+  let summary: TestSummary;
+  try {
+    summary = await TestsRunner.default.run(
+      suiteName,
+      testName,
+    );
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === formatNoMatchingTestsMessage(suiteName, testName)
+    ) {
+      const noMatchResult: BrowserStructuredNoMatchResult = {
+        status: 'no-match',
+        totalTests: 0,
+        passed: 0,
+        failed: 0,
+        duration: 0,
+        results: [],
+        error: {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        },
+        completed: true,
+        exitCode: 1,
+      };
+
+      (globalThis as any).testResults = noMatchResult;
+      globalThis.dispatchEvent(
+        new CustomEvent('testsComplete', { detail: noMatchResult }),
+      );
+      await exit(1);
+      return;
+    }
+    throw error;
+  }
 
   // Print summary (will be captured by browser automation)
   TestsRunner.printSummary(summary);
@@ -116,7 +160,5 @@ async function main(): Promise<void> {
 
 // Auto-run when used as entry point or in browser
 if (isBrowser()) {
-  main();
-} else {
-  notReached('Tests entry point should only be used in browser environment');
+  void main();
 }

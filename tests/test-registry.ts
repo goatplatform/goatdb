@@ -13,6 +13,7 @@
 import setupUntrusted from './db-untrusted.test.ts';
 import setupTrusted from './db-trusted.test.ts';
 import setupItemPath from './item-path.ts';
+import setupAssertsTests from './asserts.test.ts';
 import setupOrderstamp from './orderstamp-expose.test.ts';
 import setupGoatRequestTest from './goat-request.test.ts';
 import setupSession from './session.test.ts';
@@ -30,6 +31,7 @@ import setupCliCompileTests from './cli-compile.test.ts';
 import setupPathTests from './path.test.ts';
 import setupRuntimeTests from './runtime.test.ts';
 import setupProgressTests from './progress.test.ts';
+import setupTestRunnerTests from './test-runner.test.ts';
 import setupMergeAdjList from './merge-adjlist.test.ts';
 import setupMergeBloom from './merge-bloom.test.ts';
 import setupMergeLCA from './merge-lca.test.ts';
@@ -57,11 +59,13 @@ import setupSecurityBoundaries from './security-boundaries.test.ts';
  */
 export async function registerAllTests(): Promise<void> {
   // FAST UNIT TESTS (0-1ms each) - Pure logic, no I/O
+  setupAssertsTests(); // Assertion utility correctness
   setupOrderstamp(); // Utility functions for distributed timestamps
   setupItemPath(); // Path validation and parsing logic
   setupPathTests(); // Cross-platform path utilities
   setupRuntimeTests(); // Runtime abstraction layer invariants
   setupProgressTests(); // TUI progress tracking - Task state machine, aggregation
+  setupTestRunnerTests(); // Test filtering and no-match error behavior
   setupHealthCheckEndpointTest(); // Simple HTTP endpoint check
   setupMergeAdjList(); // Adjacency list data structure
   setupMergeBloom(); // Bloom filter operations
