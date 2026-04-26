@@ -17,6 +17,7 @@ import {
 } from '../logging/log.ts';
 import { ConsoleLogStream } from '../logging/console-stream.ts';
 import type { NormalizedLogEntry } from '../logging/entry.ts';
+import { clearOPFS } from '../base/json-log/file-impl-opfs.ts';
 
 // Import benchmark setup functions
 import setupGoatDB from './goatdb.bench.ts';
@@ -42,6 +43,9 @@ class BenchmarkConsoleLogStream implements LogStream {
  * Browser benchmark entry point.
  */
 async function main(): Promise<void> {
+  // Wipe OPFS to prevent stale data from previous runs contaminating results
+  await clearOPFS();
+
   // Install custom log stream to filter out metrics in browser benchmarks
   if (isBrowser()) {
     setGlobalLoggerStreams([new BenchmarkConsoleLogStream()]);

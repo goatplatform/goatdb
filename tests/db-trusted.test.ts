@@ -7,6 +7,7 @@ import {
 } from './asserts.ts';
 import { TEST } from './mod.ts';
 import { isBrowser } from '../base/common.ts';
+import type { GoatDB } from '../db/db.ts';
 
 // Define a test schema
 const TestSchema = {
@@ -223,6 +224,78 @@ export default function setup(): void {
     }
   });
 
+  TEST('Trusted', 'query cache cross-session correctness', async (ctx) => {
+    // Regression test: ageForKey was keyed by item key but looked up by full
+    // path, causing stale cache hits after DB reopen (items changed after cache
+    // write were silently missed).
+    if (isBrowser()) {
+      return; // Server-only: requires direct path reopen
+    }
+
+    const dbPath = await ctx.tempDir('db-query-cache');
+
+    // Session 1: populate and run a query to seed the cache.
+    const db1 = new (await import('../db/db.ts')).GoatDB({
+      path: dbPath,
+      orgId: 'test-org',
+      trusted: true,
+      registry: kDataRegistry,
+    });
+    let targetKey: string;
+    try {
+      await db1.readyPromise();
+      db1.create('/test/qcache', TestSchema, { name: 'A', count: 5 });
+      const target = db1.create('/test/qcache', TestSchema, {
+        name: 'B',
+        count: 5,
+      });
+      targetKey = target.key;
+      db1.create('/test/qcache', TestSchema, { name: 'C', count: 30 });
+      await db1.flush('/test/qcache');
+
+      const q1 = db1.query({
+        source: '/test/qcache',
+        schema: TestSchema,
+        predicate: ({ item }) => item.get('count') > 15,
+      });
+      await q1.loadingFinished();
+      assertEquals(q1.results().length, 1); // Only C passes
+      q1.close();
+
+      // Mutate B so it now passes the predicate.
+      const b = db1.item<typeof TestSchema>('/test/qcache', targetKey);
+      b.set('count', 20);
+      await db1.flushAll();
+    } finally {
+      await db1.close();
+    }
+
+    // Session 2: reopen and re-run the query — B must now appear.
+    const db2 = new (await import('../db/db.ts')).GoatDB({
+      path: dbPath,
+      orgId: 'test-org',
+      trusted: true,
+      registry: kDataRegistry,
+    });
+    try {
+      await db2.readyPromise();
+      const q2 = db2.query({
+        source: '/test/qcache',
+        schema: TestSchema,
+        predicate: ({ item }) => item.get('count') > 15,
+      });
+      await q2.loadingFinished();
+      const names = q2.results().map((i) => i.get('name'));
+      assertEquals(names.length, 2, 'B should now appear after cache fix');
+      expectToContain(names, 'B');
+      expectToContain(names, 'C');
+      q2.close();
+    } finally {
+      await db2.flushAll();
+      await db2.close();
+    }
+  });
+
   TEST('Trusted', 'ManagedItem loading state management', async (ctx) => {
     const db = await ctx.createDB('db-loading', {
       registry: kDataRegistry,
@@ -313,4 +386,146 @@ export default function setup(): void {
     assertEquals(reloadedItem.get('name'), 'Close Commit Item');
     assertEquals(reloadedItem.get('count'), newCount);
   });
+
+  TEST('Trusted', 'auto-flush persists items beyond threshold', async (ctx) => {
+    const db = await ctx.createDB('auto-flush', {
+      registry: kDataRegistry,
+    });
+    try {
+      const itemCount = 1100; // exceeds AUTO_FLUSH_THRESHOLD (1000)
+      for (let i = 0; i < itemCount; i++) {
+        db.create(`/test/auto-flush/item-${i}`, TestSchema, {
+          name: `item-${i}`,
+        });
+      }
+      await db.flushAll();
+      await db.closeRepo('/test/auto-flush');
+
+      // Re-open and verify all items persisted
+      await db.open('/test/auto-flush');
+      for (let i = 0; i < itemCount; i++) {
+        const item = db.item('/test/auto-flush', `item-${i}`);
+        assertEquals(item.get('name'), `item-${i}`);
+      }
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('Trusted', 'insert basic bulk', async (ctx) => {
+    const db = await ctx.createDB('db-insert-bulk', {
+      registry: kDataRegistry,
+    });
+    try {
+      await db.readyPromise();
+      await db.insert('/test/insert-bulk', TestSchema, [
+        { data: { name: 'A' } },
+        { data: { name: 'B' } },
+        { data: { name: 'C' } },
+      ]);
+      assertEquals(db.count('/test/insert-bulk'), 3);
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('Trusted', 'insert with explicit keys', async (ctx) => {
+    const db = await ctx.createDB('db-insert-keys', {
+      registry: kDataRegistry,
+    });
+    try {
+      await db.readyPromise();
+      await db.insert('/test/insert-keys', TestSchema, [
+        { key: 'alpha', data: { name: 'Alpha' } },
+        { key: 'beta', data: { name: 'Beta' } },
+      ]);
+      assertEquals(db.count('/test/insert-keys'), 2);
+      const keys = Array.from(db.keys('/test/insert-keys'));
+      expectToContain(keys, 'alpha');
+      expectToContain(keys, 'beta');
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('Trusted', 'insert empty array is no-op', async (ctx) => {
+    const db = await ctx.createDB('db-insert-empty', {
+      registry: kDataRegistry,
+    });
+    try {
+      await db.readyPromise();
+      await db.insert('/test/insert-empty', TestSchema, []);
+      assertEquals(db.count('/test/insert-empty'), 0);
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('Trusted', 'insert persistence across reopen', async (ctx) => {
+    if (isBrowser()) return; // Server-only: requires direct path reopen
+    const dbPath = await ctx.tempDir('db-insert-persist');
+    const { GoatDB: DB } = await import('../db/db.ts');
+    const db1: GoatDB = new DB({
+      path: dbPath,
+      orgId: 'test-org',
+      trusted: true,
+      registry: kDataRegistry,
+    });
+    try {
+      await db1.readyPromise();
+      await db1.insert('/test/insert-persist', TestSchema, [
+        { key: 'p1', data: { name: 'Persist1' } },
+        { key: 'p2', data: { name: 'Persist2' } },
+      ]);
+      await db1.flushAll();
+    } finally {
+      await db1.close();
+    }
+    const db2: GoatDB = new DB({
+      path: dbPath,
+      orgId: 'test-org',
+      trusted: true,
+      registry: kDataRegistry,
+    });
+    try {
+      await db2.readyPromise();
+      await db2.open('/test/insert-persist');
+      assertEquals(db2.count('/test/insert-persist'), 2);
+      const keys = Array.from(db2.keys('/test/insert-persist'));
+      expectToContain(keys, 'p1');
+      expectToContain(keys, 'p2');
+    } finally {
+      await db2.flushAll();
+      await db2.close();
+    }
+  });
+
+  TEST(
+    'Trusted',
+    'WriteFailure listener attaches without firing',
+    async (ctx) => {
+      const db = await ctx.createDB('db-write-failure', {
+        registry: kDataRegistry,
+      });
+      try {
+        await db.readyPromise();
+        let fired = false;
+        db.attach('WriteFailure', () => {
+          fired = true;
+        });
+        // Normal operations should not trigger WriteFailure
+        db.create('/test/write-failure', TestSchema, { name: 'ok' });
+        await db.flushAll();
+        assertEquals(fired, false);
+        // TODO: deeper test with injectable storage to simulate actual write errors
+      } finally {
+        await db.flushAll();
+        await db.close();
+      }
+    },
+  );
 }

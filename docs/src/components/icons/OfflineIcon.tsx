@@ -8,33 +8,33 @@ export default function OfflineIcon({ className }: { className?: string }) {
       fill='none'
       xmlns='http://www.w3.org/2000/svg'
     >
-      <circle cx='24' cy='36' r='3' fill='currentColor' />
-      <path
-        d='M17 32 A8 8 0 0 1 31 32'
-        stroke='currentColor'
-        strokeWidth='2'
-        strokeLinecap='round'
-      />
-      <path
-        d='M12 29 A14 14 0 0 1 36 29'
-        stroke='currentColor'
-        strokeWidth='2'
-        strokeLinecap='round'
-      />
-      <path
-        d='M7 26 A20 20 0 0 1 41 26'
-        stroke='currentColor'
-        strokeWidth='2'
-        strokeLinecap='round'
-      />
+      {/* Outer circle */}
+      <circle cx='24' cy='24' r='16' stroke='currentColor' strokeWidth='2' />
+      {/* Equator */}
       <line
-        x1='10'
-        y1='10'
-        x2='38'
-        y2='38'
+        x1='8'
+        y1='24'
+        x2='40'
+        y2='24'
         stroke='currentColor'
         strokeWidth='2'
         strokeLinecap='round'
+      />
+      {/* Left meridian arc */}
+      <path
+        d='M24 8 C16 12 16 36 24 40'
+        stroke='currentColor'
+        strokeWidth='2'
+        strokeLinecap='round'
+        fill='none'
+      />
+      {/* Right meridian arc */}
+      <path
+        d='M24 8 C32 12 32 36 24 40'
+        stroke='currentColor'
+        strokeWidth='2'
+        strokeLinecap='round'
+        fill='none'
       />
     </svg>
   );

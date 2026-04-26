@@ -33,9 +33,8 @@ if (
   globalThis.crypto = require('node:crypto').webcrypto;
 }
 
-export const SESSION_CRYPTO_KEY_GEN_PARAMS: EcKeyGenParams = {
-  name: 'ECDSA',
-  namedCurve: 'P-384',
+export const SESSION_CRYPTO_KEY_GEN_PARAMS: AlgorithmIdentifier = {
+  name: 'Ed25519',
 };
 
 export interface Session {
@@ -65,10 +64,11 @@ export function isOwnedSession(session: Session): session is OwnedSession {
 }
 
 export async function generateKeyPair(): Promise<CryptoKeyPair> {
-  return await crypto.subtle.generateKey(SESSION_CRYPTO_KEY_GEN_PARAMS, true, [
-    'sign',
-    'verify',
-  ]);
+  return (await crypto.subtle.generateKey(
+    SESSION_CRYPTO_KEY_GEN_PARAMS,
+    true,
+    ['sign', 'verify'],
+  )) as CryptoKeyPair;
 }
 
 export async function generateSession(
@@ -148,10 +148,7 @@ export async function signData(
   const stableJSONString = stableStringify(container);
   const buffer = encoder.encode(stableJSONString);
   const sig = await crypto.subtle.sign(
-    {
-      name: 'ECDSA',
-      hash: { name: 'SHA-384' },
-    },
+    'Ed25519',
     session.privateKey,
     buffer,
   );
@@ -214,10 +211,7 @@ export async function verifyData<T extends JSONValue>(
   }
   const buffer = encoder.encode(stableJSONString);
   const result = await crypto.subtle.verify(
-    {
-      name: 'ECDSA',
-      hash: { name: 'SHA-384' },
-    },
+    'Ed25519',
     expectedSigner.publicKey,
     decodeBase32URL(sig.signature) as BufferSource,
     buffer,
@@ -285,15 +279,14 @@ export async function signCommit(
       signed: false,
     }),
   );
-  return new Commit({
+  return Commit.create({
     id: commit.id,
     session: commit.session,
     key: commit.key,
     contents: commit.contents,
     timestamp: commit.timestamp,
     parents: commit.parents,
-    ancestorsFilter: commit.ancestorsFilter,
-    ancestorsCount: commit.ancestorsCount,
+    ancestors: commit.ancestors,
     signature,
     mergeBase: commit.mergeBase,
     mergeLeader: commit.mergeLeader,

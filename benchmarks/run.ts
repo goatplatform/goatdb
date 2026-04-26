@@ -1,4 +1,7 @@
 import { runAcrossPlatforms } from '../base/multi-runner.ts';
+import { getSystemInfo } from '../base/system-info.ts';
+import * as path from '../base/path.ts';
+import { writeTextFile } from '../base/json-log/file-impl.ts';
 
 /**
  * Runs benchmarks in Deno and/or Node.js environments based on command line arguments.
@@ -19,6 +22,9 @@ async function runBenchmarks(): Promise<void> {
 
   let benchmarkName: string | undefined = undefined;
   let runtime: string | undefined = undefined;
+
+  let outputJson = false;
+  let outputDir: string | undefined = undefined;
 
   // Parse command line arguments
   for (let i = 0; i < Deno.args.length; ++i) {
@@ -50,13 +56,45 @@ async function runBenchmarks(): Promise<void> {
       continue;
     }
 
+    // Parse output-json flag
+    if (arg === '--output-json') {
+      outputJson = true;
+      continue;
+    }
+
+    // Parse output-dir argument
+    if (arg.startsWith('--output-dir=')) {
+      outputDir = arg.substring('--output-dir='.length);
+      continue;
+    }
+    if (arg === '--output-dir') {
+      outputDir = Deno.args[i + 1];
+      i++;
+      continue;
+    }
+
     // Unknown argument - show usage and exit
     console.error(
       'Unknown argument:',
       arg,
-      '\nUsage: deno task bench [--headless] [--deno-inspect-brk] [--node-inspect-brk] [-benchmark <benchmark>] [--benchmark=<benchmark>] [-runtime <deno|node|browser|all>] [--debug]',
+      '\nUsage: deno task bench [--headless] [--deno-inspect-brk] [--node-inspect-brk] [-benchmark <benchmark>] [--benchmark=<benchmark>] [-runtime <deno|node|browser|all>] [--output-json] [--output-dir=<path>] [--debug]',
     );
     Deno.exit(1);
+  }
+
+  // Detect hardware once in the main process and share via env var.
+  // All runtimes run on the same machine, so detection only needs to happen once.
+  const systemInfo = await getSystemInfo();
+  Deno.env.set('GOATDB_SYSTEM_HARDWARE', JSON.stringify(systemInfo.hardware));
+
+  // Wire output flags into env so subprocesses inherit them
+  if (outputJson) {
+    Deno.env.set('GOATDB_OUTPUT_JSON', 'true');
+  }
+  if (outputDir) {
+    Deno.env.set('GOATDB_BENCH_OUTPUT_DIR', outputDir);
+    // Ensure the output directory exists
+    await Deno.mkdir(outputDir, { recursive: true });
   }
 
   // Determine which runtimes to run based on arguments
@@ -104,6 +142,14 @@ async function runBenchmarks(): Promise<void> {
       denoInspectBrk,
       nodeInspectBrk,
       mode: 'benchmark',
+      onBrowserResult: outputJson
+        ? async (summary) => {
+          const dir = outputDir || '/tmp';
+          const jsonPath = path.join(dir, 'goatdb-bench-browser.json');
+          await writeTextFile(jsonPath, JSON.stringify(summary, null, 2));
+          console.log(`📄 Browser results saved to: ${jsonPath}`);
+        }
+        : undefined,
     });
   } catch (error) {
     console.error('Benchmark execution failed:', (error as Error).message);

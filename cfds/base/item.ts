@@ -608,9 +608,7 @@ export class Item<S extends Schema = Schema>
     this._schema = schema as S;
     const dataDecoder = decoder.getDecoder('d');
     this._data = deserialize(dataDecoder, this.schema);
-    if (dataDecoder instanceof JSONCyclicalDecoder) {
-      dataDecoder.finalize();
-    }
+    dataDecoder.finalize?.();
     // this.invalidateCaches();
     this._normalized = decoder.get<boolean>('n') || false;
     this.normalize();

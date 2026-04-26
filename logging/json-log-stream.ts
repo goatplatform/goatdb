@@ -6,11 +6,12 @@ import {
   JSONLogFileFlush,
   JSONLogFileOpen,
 } from '../base/json-log/json-log.ts';
-
 import type { NormalizedLogEntry } from './entry.ts';
 import { randomInt } from '../base/math.ts';
 import { SimpleTimer } from '../base/timer.ts';
 import { kMinuteMs } from '../base/date.ts';
+
+const TEXT_ENCODER = new TextEncoder();
 
 /**
  * A LogStream implementation that writes log entries to a JSON file.
@@ -28,7 +29,10 @@ export class JSONLogStream implements LogStream {
    * @param throttleRate Optional throttling rate - only 1/throttleRate entries
    *                     will be written. Default is 1 (no throttling).
    */
-  constructor(readonly path: string, readonly throttleRate: number = 1) {
+  constructor(
+    readonly path: string,
+    readonly throttleRate: number = 1,
+  ) {
     this._closeTimer = new SimpleTimer(
       kMinuteMs,
       false,
@@ -46,7 +50,9 @@ export class JSONLogStream implements LogStream {
       this._log = await JSONLogFileOpen(this.path, true);
     }
     if (this.throttleRate <= 1 || randomInt(0, this.throttleRate) === 0) {
-      await JSONLogFileAppend(this._log, [e]);
+      // deno-lint-ignore no-explicit-any
+      const encoded = TEXT_ENCODER.encode(JSON.stringify(e as any));
+      await JSONLogFileAppend(this._log, [encoded]);
     }
     this._closeTimer.reset();
   }

@@ -11,6 +11,40 @@ import {
   isBrowserStructuredNoMatchResult,
 } from '../base/runtime-filter.ts';
 
+const kPromptFailureThresholdMs = 15000;
+
+async function runDenoCommandWithTimeout(args: string[]): Promise<{
+  code: number;
+  stdoutText: string;
+  stderrText: string;
+  elapsedMs: number;
+}> {
+  const abort = new AbortController();
+  const start = performance.now();
+  const timeoutId = setTimeout(
+    () => abort.abort(),
+    kPromptFailureThresholdMs,
+  );
+  try {
+    const cmd = new Deno.Command(Deno.execPath(), {
+      args,
+      cwd: getRuntime().getCWD(),
+      stdout: 'piped',
+      stderr: 'piped',
+      signal: abort.signal,
+    });
+    const { code, stdout, stderr } = await cmd.output();
+    return {
+      code,
+      stdoutText: new TextDecoder().decode(stdout),
+      stderrText: new TextDecoder().decode(stderr),
+      elapsedMs: performance.now() - start,
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export default function setupTestRunnerTests(): void {
   TEST(
     'TestRunner',
@@ -221,20 +255,13 @@ export default function setupTestRunnerTests(): void {
     'tests/run.ts surfaces no-match errors through the Node.js path',
     async () => {
       if (typeof Deno === 'undefined') return;
-      const cmd = new Deno.Command(Deno.execPath(), {
-        args: [
-          'run',
-          '-A',
-          './tests/run.ts',
-          '--runtime=node',
-          '--suite=MissingSuite',
-        ],
-        cwd: getRuntime().getCWD(),
-        stdout: 'piped',
-        stderr: 'piped',
-      });
-      const { code, stderr } = await cmd.output();
-      const stderrText = new TextDecoder().decode(stderr);
+      const { code, stderrText } = await runDenoCommandWithTimeout([
+        'run',
+        '-A',
+        './tests/run.ts',
+        '--runtime=node',
+        '--suite=MissingSuite',
+      ]);
 
       assertTrue(code !== 0, 'CLI Node.js no-match path must exit non-zero');
       assertTrue(
@@ -251,20 +278,13 @@ export default function setupTestRunnerTests(): void {
     'tests/run.ts surfaces missing --test errors through the Node.js path',
     async () => {
       if (typeof Deno === 'undefined') return;
-      const cmd = new Deno.Command(Deno.execPath(), {
-        args: [
-          'run',
-          '-A',
-          './tests/run.ts',
-          '--runtime=node',
-          '--test=missing',
-        ],
-        cwd: getRuntime().getCWD(),
-        stdout: 'piped',
-        stderr: 'piped',
-      });
-      const { code, stderr } = await cmd.output();
-      const stderrText = new TextDecoder().decode(stderr);
+      const { code, stderrText } = await runDenoCommandWithTimeout([
+        'run',
+        '-A',
+        './tests/run.ts',
+        '--runtime=node',
+        '--test=missing',
+      ]);
 
       assertTrue(code !== 0, 'CLI Node.js no-match path must exit non-zero');
       assertTrue(
@@ -281,22 +301,13 @@ export default function setupTestRunnerTests(): void {
     'tests/run.ts surfaces no-match errors through the Deno worker path',
     async () => {
       if (typeof Deno === 'undefined') return;
-      const start = performance.now();
-      const cmd = new Deno.Command(Deno.execPath(), {
-        args: [
-          'run',
-          '-A',
-          './tests/run.ts',
-          '--runtime=deno',
-          '--suite=MissingSuite',
-        ],
-        cwd: getRuntime().getCWD(),
-        stdout: 'piped',
-        stderr: 'piped',
-      });
-      const { code, stderr } = await cmd.output();
-      const elapsedMs = performance.now() - start;
-      const stderrText = new TextDecoder().decode(stderr);
+      const { code, stderrText, elapsedMs } = await runDenoCommandWithTimeout([
+        'run',
+        '-A',
+        './tests/run.ts',
+        '--runtime=deno',
+        '--suite=MissingSuite',
+      ]);
 
       assertTrue(code !== 0, 'CLI no-match path must exit non-zero');
       assertTrue(
@@ -307,7 +318,7 @@ export default function setupTestRunnerTests(): void {
       );
       assertLessThan(
         elapsedMs,
-        15000,
+        kPromptFailureThresholdMs,
         'CLI no-match path must fail promptly instead of hanging in the worker path',
       );
     },
@@ -318,22 +329,13 @@ export default function setupTestRunnerTests(): void {
     'tests/run.ts surfaces missing --test errors through the Deno worker path',
     async () => {
       if (typeof Deno === 'undefined') return;
-      const start = performance.now();
-      const cmd = new Deno.Command(Deno.execPath(), {
-        args: [
-          'run',
-          '-A',
-          './tests/run.ts',
-          '--runtime=deno',
-          '--test=missing',
-        ],
-        cwd: getRuntime().getCWD(),
-        stdout: 'piped',
-        stderr: 'piped',
-      });
-      const { code, stderr } = await cmd.output();
-      const elapsedMs = performance.now() - start;
-      const stderrText = new TextDecoder().decode(stderr);
+      const { code, stderrText, elapsedMs } = await runDenoCommandWithTimeout([
+        'run',
+        '-A',
+        './tests/run.ts',
+        '--runtime=deno',
+        '--test=missing',
+      ]);
 
       assertTrue(code !== 0, 'CLI no-match path must exit non-zero');
       assertTrue(
@@ -344,8 +346,36 @@ export default function setupTestRunnerTests(): void {
       );
       assertLessThan(
         elapsedMs,
-        15000,
+        kPromptFailureThresholdMs,
         'CLI no-match path must fail promptly instead of hanging in the worker path',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'tests/run.ts surfaces no-match errors through the browser path',
+    async () => {
+      if (typeof Deno === 'undefined') return;
+      const { code, stderrText, elapsedMs } = await runDenoCommandWithTimeout([
+        'run',
+        '-A',
+        './tests/run.ts',
+        '--runtime=browser',
+        '--suite=MissingSuite',
+      ]);
+
+      assertTrue(code !== 0, 'CLI browser no-match path must exit non-zero');
+      assertTrue(
+        stderrText.includes(
+          'Test execution failed: No tests matched --suite="MissingSuite"',
+        ),
+        'CLI browser no-match path must surface the exact filter error message',
+      );
+      assertLessThan(
+        elapsedMs,
+        kPromptFailureThresholdMs,
+        'CLI browser no-match path must fail promptly',
       );
     },
   );

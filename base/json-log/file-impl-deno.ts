@@ -43,7 +43,11 @@ export const FileImplDeno: FileImpl<Deno.FsFile> = {
     let bytesWritten = 0;
     while (bytesWritten < buf.byteLength) {
       const arr = buf.subarray(bytesWritten);
-      bytesWritten += await handle.write(arr);
+      const len = await handle.write(arr);
+      if (len === 0) {
+        throw new Error('Deno write stalled: 0 bytes written');
+      }
+      bytesWritten += len;
     }
   },
 

@@ -25,8 +25,10 @@ durable storage with efficient read and write operations.
 
 <RepositoryStructure />
 
-Each repository is backed by a single `.jsonl` file that stores a log of
-commits. This design takes advantage of modern SSD characteristics:
+Each repository is backed by a single file that stores a log of commits. The
+default format is `.goat` (length-prefixed binary), with `.jsonl`
+(newline-delimited JSON) available as an option for development and debugging.
+This design takes advantage of modern SSD characteristics:
 
 - **Sequential I/O**: Optimized for SSD performance with sequential writes,
   enabling efficient batching of operations
@@ -35,11 +37,12 @@ commits. This design takes advantage of modern SSD characteristics:
   to work in parallel
 - **Write Amplification**: Minimized through append-only design
 
-The [JSON Lines](https://jsonlines.org/) format provides several benefits:
+The storage format can be selected via the `storageFormat` config option:
 
-- **Human Readable**: Commits are stored in readable JSON format
-- **Append-Only**: New commits are always appended to the end
-- **Atomic Writes**: Each line is written atomically for consistency
+- **`'goat'` (default)**: Compact binary with 4-byte length prefix per record
+  — best for production; fast I/O
+- **`'jsonl'`**: [JSON Lines](https://jsonlines.org/) — one JSON object per
+  line; human-readable, useful for debugging
 
 ### Commit Graphs
 

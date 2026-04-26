@@ -1,5 +1,5 @@
 import { Emitter } from '../base/emitter.ts';
-// import { BloomFilter } from '../base/bloom.ts';
+import { log } from '../logging/log.ts';
 import {
   type Session,
   sessionFromItem,
@@ -40,10 +40,12 @@ import { CONNECTION_ID } from './commit.ts';
 import { compareStrings } from '../base/string.ts';
 import { RedBlackTree } from '@std/data-structures';
 import type { GoatDB } from '../db/db.ts';
-import { BloomFilter } from '../base/bloom.ts';
-// import { BloomFilter } from '../cpp/bloom_filter.ts';
 import { itemPathIsValid, itemPathJoin } from '../db/path.ts';
-import type { AuthRule, AuthRuleInfo } from '../cfds/base/data-registry.ts';
+import type {
+  AuthOp,
+  AuthRule,
+  AuthRuleInfo,
+} from '../cfds/base/data-registry.ts';
 
 /**
  * Fired when the value of a document changes (the head of the commit graph
@@ -84,7 +86,6 @@ export interface RepoStorage<T extends RepoStorage<T>> {
   allKeys(): Iterable<string>;
   persistCommits(c: Iterable<Commit>): Iterable<Commit>;
   close(): void;
-  // ageForKey(key: string): number;
 }
 
 interface CachedHead {
@@ -114,7 +115,8 @@ export class Repository<
   readonly allowedNamespaces: string[] | undefined;
   private readonly _cachedHeadsByKey: Map<string, CachedHead>;
   readonly authorizer?: AuthRule;
-  private readonly _cachedRecordForCommit: Map<string, Item>;
+  private readonly _cachedRecordForCommit: Map<string, WeakRef<Item>>;
+  private readonly _itemCleanup: FinalizationRegistry<string>;
   private readonly _cachedValueForKey: Map<string, [Item, Commit] | undefined>;
   private readonly _adjList: AdjacencyList;
   private readonly _pendingCommitPromises: Map<
@@ -125,9 +127,12 @@ export class Repository<
   private readonly _commitIsCorruptedResult: Map<string, boolean>;
   private readonly _cachedCommitsWithRecord: Set<string>;
   private readonly _cachedLeavesForKey: Map<string, Commit[]>;
-  private readonly _authInfo: AuthRuleInfo;
-
-  allowMerge = true;
+  // Pool of pre-allocated AuthRuleInfo objects, one per hardware thread.
+  // Sync callers use index 0 (single-threaded, no concurrency risk).
+  // verifyCommits uses the batch-item index to give each concurrent promise
+  // its own object — no per-call allocation on the hot path.
+  private readonly _concurrency: number;
+  private readonly _authInfoPool: AuthRuleInfo[];
 
   constructor(
     readonly db: GoatDB,
@@ -149,6 +154,9 @@ export class Repository<
     this._cachedHeadsByKey = new Map();
     this._cachedValueForKey = new Map();
     this._cachedRecordForCommit = new Map();
+    this._itemCleanup = new FinalizationRegistry((id: string) =>
+      this._cachedRecordForCommit.delete(id)
+    );
     this._adjList = new AdjacencyList();
     this._pendingCommitPromises = new Map();
     this._cachedCommitsPerUser = new Map();
@@ -156,13 +164,15 @@ export class Repository<
     this.priorityRepo = priorityRepo === true;
     this._cachedCommitsWithRecord = new Set();
     this._cachedLeavesForKey = new Map();
-    this._authInfo = {
+    this._concurrency =
+      (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 8;
+    this._authInfoPool = Array.from({ length: this._concurrency }, () => ({
       db: this.db,
       repoPath: this.path,
       itemKey: '',
       session: this.trustPool.currentSession,
-      op: 'read',
-    };
+      op: 'read' as AuthOp,
+    }));
   }
 
   static path(storage: string, id: string): string {
@@ -222,10 +232,10 @@ export class Repository<
       session.owner !== 'root' &&
       authorizer
     ) {
-      this._authInfo.itemKey = c.key;
-      this._authInfo.session = session;
-      this._authInfo.op = 'read';
-      if (!authorizer(this._authInfo)) {
+      this._authInfoPool[0].itemKey = c.key;
+      this._authInfoPool[0].session = session;
+      this._authInfoPool[0].op = 'read';
+      if (!authorizer(this._authInfoPool[0])) {
         throw serviceUnavailable();
       }
     }
@@ -254,10 +264,10 @@ export class Repository<
           filterIterable(
             this.storage.allCommitsIds(),
             (id) => {
-              this._authInfo.itemKey = this.getCommit(id).key;
-              this._authInfo.session = session;
-              this._authInfo.op = 'read';
-              return authorizer(this._authInfo);
+              this._authInfoPool[0].itemKey = this.getCommit(id).key;
+              this._authInfoPool[0].session = session;
+              this._authInfoPool[0].op = 'read';
+              return authorizer(this._authInfoPool[0]);
             },
           ),
         );
@@ -287,10 +297,11 @@ export class Repository<
         continue;
       }
       if (authorizer) {
-        this._authInfo.itemKey = c.key;
-        this._authInfo.session = session || this.trustPool.currentSession;
-        this._authInfo.op = 'read';
-        if (authorizer(this._authInfo)) {
+        this._authInfoPool[0].itemKey = c.key;
+        this._authInfoPool[0].session = session ||
+          this.trustPool.currentSession;
+        this._authInfoPool[0].op = 'read';
+        if (authorizer(this._authInfoPool[0])) {
           yield c;
         }
       }
@@ -337,64 +348,36 @@ export class Repository<
   }
 
   /**
-   * This method determines, to a high probability, whether the given commit is
-   * a leaf commit or not, even when the full graph isn't available.
+   * Returns true if the given commit is a leaf in the commit graph, meaning no
+   * other commit references it — either as a direct `parent` or as an explicit
+   * `ancestor` — i.e. it has no in-edges of any kind in the adjacency list.
    *
-   * It works by inspecting the bloom filters of the newest `2*log4(N)` commits,
-   * and checking for the presence of the candidate commit. If present in all
-   * filters, the commit guaranteed not to be a leaf.
+   * Note: `persistVerifiedCommits` registers both `parent` and `ancestor` edges,
+   * so a commit that appears only in another commit's `ancestors` array is also
+   * not a leaf. This prevents a merge from re-including commits that are already
+   * transitively covered by a descendant.
    *
    * @param candidate The commit to inspect.
    * @returns true if the commit is a leaf and can be safely included in a merge
    *          commit, false otherwise.
    */
-  commitIsHighProbabilityLeaf(candidate: Commit | string): boolean {
+  commitIsLeaf(candidate: Commit | string): boolean {
     const id = typeof candidate === 'string' ? candidate : candidate.id;
-    if (this._adjList.hasInEdges(id)) {
-      return false;
-    }
-    if (typeof candidate === 'string') {
-      if (!this.hasCommit(id)) {
-        return false;
-      }
-      candidate = this.getCommit(id);
-    }
-    const commitsForKey = Array.from(this.commitsForKey(candidate.key));
-    const graphSize = Math.max(
-      commitsForKey.length,
-      commitsForKey[commitsForKey.length - 1].ancestorsCount,
-    );
-    // 2log[fpr](N) = K. Since FPR = 0.25, we're using 2log[4](N).
-    const agreementSize = 2 * (Math.log2(graphSize) / Math.log2(4));
-    // We must consider the newest commits as leaves, otherwise we'd deadlock
-    // and not converge on all branches. These cases work out OK because the
-    // merge will take the latest commit per connection thus skipping
-    // temporary gaps in the graph.
-    if (commitsForKey.length < agreementSize) {
-      return true;
-    }
-    // For older commits we can consult their ancestors filter
-    for (let i = 0; i <= agreementSize; ++i) {
-      const c = commitsForKey[i];
-      if (!c.ancestorsFilter.has(id)) {
-        return true;
-      }
-    }
-    return false;
+    // Only graph-structural edges ('parent', 'ancestor') determine leaf status.
+    // Other logical edge types must not suppress leaf detection.
+    return !this._adjList.hasInEdges(id, 'parent') &&
+      !this._adjList.hasInEdges(id, 'ancestor');
   }
 
-  leavesForKey(key: string, session?: Session): readonly Commit[] {
+  leavesForKey(key: string): readonly Commit[] {
     let leaves = this._cachedLeavesForKey.get(key);
     if (!leaves) {
-      const adjList = this._adjList;
-      // const result: Commit[] = [];
       leaves = [];
-      for (const c of this.commitsForKey(key, session)) {
-        if (!adjList.hasInEdges(c.id) && this.hasItemForCommit(c)) {
+      for (const c of this.commitsForKey(key)) {
+        if (this.commitIsLeaf(c) && this.hasItemForCommit(c)) {
           leaves.push(c);
         }
       }
-      // leaves = this.filterLatestCommitsByConnection(result);
       Object.freeze(leaves);
       this._cachedLeavesForKey.set(key, leaves);
     }
@@ -413,10 +396,10 @@ export class Repository<
       return filterIterable(
         this.storage.allKeys(),
         (key) => {
-          this._authInfo.itemKey = key;
-          this._authInfo.session = session;
-          this._authInfo.op = 'read';
-          return authorizer(this._authInfo);
+          this._authInfoPool[0].itemKey = key;
+          this._authInfoPool[0].session = session;
+          this._authInfoPool[0].op = 'read';
+          return authorizer(this._authInfoPool[0]);
         },
       );
     }
@@ -437,15 +420,16 @@ export class Repository<
    *
    * @param commits An iterable of commits.
    *
-   * @returns A tuple of 3 values:
+   * @returns A tuple of 4 values:
    *          1. The commits to include in the merge. Commits with broken
-   *             ancestry path are skipped from the merge if a common base can't
-   *             be found.
+   *             ancestry path or deferred merges are excluded.
    *
    *          2. The base commit (LCA) to use for the merge, or undefined if
    *             one can't be found.
    *
    *          3. The scheme to use for the merge.
+   *
+   *          4. Whether a root commit was encountered during traversal.
    */
   findMergeBase(
     commits: Commit[],
@@ -471,13 +455,9 @@ export class Repository<
       if (!this.hasItemForCommit(c)) {
         continue;
       }
-      const [newBase, foundRoot] = this._findLCAMergeBase(result, c);
+      const [newBase, foundRoot, defer] = this._findLCAMergeBase(result, c);
       reachedRoot = reachedRoot || foundRoot;
-      // if (!newBase) {
-      //   [newBase, foundRoot] = this._findChronologicalMergeBase(result, c);
-      //   reachedRoot = reachedRoot || foundRoot;
-      // }
-      if (!newBase) {
+      if (defer || !newBase) {
         continue;
       }
       result = newBase;
@@ -488,9 +468,6 @@ export class Repository<
         scheme = s;
       }
     }
-    // if (result && commits.includes(result)) {
-    //   result = undefined;
-    // }
     return [includedCommits, result, scheme, reachedRoot];
   }
 
@@ -499,90 +476,84 @@ export class Repository<
    * merge for c1 and c2. This is a simple iterative LCA implementation based on
    * the assumption of a DAG (if it's not, something is terribly broken).
    *
-   * NOTE: This method ignores any broken branches and treats them as the end
-   *       of the chain. This has a few effects:
-   *
-   *       1. A band actor can't bring the entire system to a freeze by not
-   *          sending part of the graph.
-   *
-   *       2. The system is much more responsive by not waiting for the full
-   *          graph to be available.
-   *
-   *       3. A slow party may have some of its edits reverted if not acting
-   *          fast enough during concurrent editing.
+   * The BFS expands through both `commit.parents` and `commit.ancestors`,
+   * tracking depth to rank candidates. When the closest LCA candidate exists
+   * in the intersection but is missing from the local graph, the method
+   * signals defer (third return value) rather than falling back to a farther
+   * ancestor that would produce a wider, destructive diff.
    *
    * @param c1 First commit.
    * @param c2 Second commit.
    *
-   * @returns The base for a 3-way merge between c1 and c2, or undefined if no
-   *          such base can be found.
+   * @returns A tuple [base, reachedRoot, deferMerge]:
+   *          - base: the LCA commit, or undefined if none found
+   *          - reachedRoot: true if a root commit was encountered
+   *          - deferMerge: true if a closer candidate exists but is missing
    */
   private _findLCAMergeBase(
     c1: Commit,
     c2: Commit,
-  ): [Commit | undefined, boolean] {
+  ): [Commit | undefined, boolean, boolean] {
     if (!c1.parents.length || !c2.parents.length) {
-      return [undefined, true];
+      return [undefined, true, false];
     }
     if (c1.key !== c2.key) {
-      return [undefined, false];
+      return [undefined, false, false];
     }
-    // if (c1.contentsChecksum === c2.contentsChecksum) {
-    //   return [c1, false];
-    // }
     if (c1.parents.includes(c2.id)) {
-      return [c2, false];
+      return [c2, false, false];
     }
     if (c2.parents.includes(c1.id)) {
-      return [c1, false];
+      return [c1, false, false];
     }
-    const parents1 = new Set<string>(c1.parents);
-    const parents2 = new Set<string>(c2.parents);
-    // parents1.add(c1.id);
-    // parents2.add(c2.id);
+
+    const depths1 = new Map<string, number>();
+    const depths2 = new Map<string, number>();
+    for (const p of c1.parents) depths1.set(p, 1);
+    for (const p of c2.parents) depths2.set(p, 1);
+    // Ancestors skip intermediate commits, so depth +2 approximates real
+    // graph distance (see computeAncestors — 2 hops: grandparents + greats).
+    for (const a of c1.ancestors) setMinDepth(depths1, a, 2);
+    for (const a of c2.ancestors) setMinDepth(depths2, a, 2);
 
     let reachedRoot = false;
     while (true) {
-      const bases = SetUtils.intersection(parents1, parents2);
-      if (bases.size > 0) {
-        const prioritizedBases = Array.from(bases)
-          .filter((id) => this.hasCommit(id))
-          .map((id) => this.getCommit(id))
-          .sort(compareCommitsDesc);
-        for (const base of prioritizedBases) {
-          if (this.hasItemForCommit(base)) {
-            return [base, reachedRoot];
-          }
-        }
-      }
       let updated = false;
-      for (const parentId of Array.from(parents1)) {
+      let len1 = 0;
+      for (const k of depths1.keys()) _scratchKeys1[len1++] = k;
+      for (let i = 0; i < len1; i++) {
+        const parentId = _scratchKeys1[i];
         if (this.hasCommit(parentId)) {
           const parent = this.getCommit(parentId);
-          if (parent.parents.length == 0) {
+          if (parent.parents.length === 0) {
             reachedRoot = true;
             continue;
           }
+          const d = depths1.get(parentId)!;
           for (const p of parent.parents) {
-            if (!parents1.has(p)) {
-              parents1.add(p);
-              updated = true;
-            }
+            if (setMinDepth(depths1, p, d + 1)) updated = true;
+          }
+          for (const a of parent.ancestors) {
+            if (setMinDepth(depths1, a, d + 2)) updated = true;
           }
         }
       }
-      for (const parentId of Array.from(parents2)) {
+      let len2 = 0;
+      for (const k of depths2.keys()) _scratchKeys2[len2++] = k;
+      for (let i = 0; i < len2; i++) {
+        const parentId = _scratchKeys2[i];
         if (this.hasCommit(parentId)) {
           const parent = this.getCommit(parentId);
-          if (parent.parents.length == 0) {
+          if (parent.parents.length === 0) {
             reachedRoot = true;
             continue;
           }
+          const d = depths2.get(parentId)!;
           for (const p of parent.parents) {
-            if (!parents2.has(p)) {
-              parents2.add(p);
-              updated = true;
-            }
+            if (setMinDepth(depths2, p, d + 1)) updated = true;
+          }
+          for (const a of parent.ancestors) {
+            if (setMinDepth(depths2, a, d + 2)) updated = true;
           }
         }
       }
@@ -590,51 +561,57 @@ export class Repository<
         break;
       }
     }
-    return [undefined, reachedRoot];
-  }
+    // Release retained string references from scratch arrays
+    _scratchKeys1.length = 0;
+    _scratchKeys2.length = 0;
 
-  private _findChronologicalMergeBase(
-    c1: Commit,
-    c2: Commit,
-  ): [base: Commit | undefined, reachedRoot: boolean] {
-    if (commitInGracePeriod(c1)) {
-      return [undefined, false];
-    }
-    if (commitInGracePeriod(c2)) {
-      return [undefined, false];
-    }
-    const minTs = Math.min(c1.timestamp, c2.timestamp);
-    const base = this.findCommitBefore(c1.key, minTs, [c1.session, c2.session]);
-    return [base, base === undefined];
-  }
-
-  private findCommitBefore(
-    key: string,
-    ts: number,
-    sessions?: string | Iterable<string>,
-  ): Commit | undefined {
-    const commits = this.commitsForKey(key);
-    if (!sessions) {
-      sessions = [];
-    } else if (typeof sessions === 'string') {
-      sessions = [sessions];
-    } else {
-      sessions = Array.from(sessions);
-    }
-    for (const candidate of commits) {
-      if (
-        candidate.timestamp < ts &&
-        (sessions as string[]).includes(candidate.session) &&
-        this.hasItemForCommit(candidate)
-      ) {
-        return candidate;
+    // Single-pass intersection: find closest available candidate
+    let minTotalDepth = Infinity;
+    let bestCommit: Commit | undefined;
+    let hasCandidate = false;
+    for (const [id, d1] of depths1) {
+      const d2 = depths2.get(id);
+      if (d2 === undefined) continue;
+      const total = d1 + d2;
+      if (total > minTotalDepth) continue;
+      hasCandidate = true;
+      if (!this.hasCommit(id) || !this.hasItemForCommit(this.getCommit(id))) {
+        if (total < minTotalDepth) {
+          // New closer depth but candidate unavailable — reset best
+          minTotalDepth = total;
+          bestCommit = undefined;
+        }
+        continue;
+      }
+      const c = this.getCommit(id);
+      if (total < minTotalDepth) {
+        minTotalDepth = total;
+        bestCommit = c;
+      } else if (bestCommit !== undefined) {
+        // Same depth — tiebreak: newest timestamp, then highest id
+        if (
+          c.timestamp > bestCommit.timestamp ||
+          (c.timestamp === bestCommit.timestamp &&
+            compareStrings(c.id, bestCommit.id) > 0)
+        ) {
+          bestCommit = c;
+        }
+      } else {
+        bestCommit = c;
       }
     }
-    return undefined;
+
+    if (!hasCandidate) {
+      return [undefined, reachedRoot, false];
+    }
+    if (bestCommit !== undefined) {
+      return [bestCommit, reachedRoot, false];
+    }
+    // Closest candidates exist but all are missing — defer merge
+    return [undefined, reachedRoot, true];
   }
 
   hasItemForCommit(c: Commit | string): boolean {
-    // let tail: Commit[] = [];
     while (c !== undefined) {
       if (this._cachedCommitsWithRecord.has(typeof c === 'string' ? c : c.id)) {
         return true;
@@ -645,25 +622,23 @@ export class Repository<
         }
         c = this.getCommit(c);
       }
-      if (commitContentsIsDocument(c.contents)) {
+      if (c.isDocumentCommit) {
         this._cachedCommitsWithRecord.add(c.id);
         return true;
       }
-      // tail.push(c);
-      c = c.contents.base;
-      // if (
-      //   this.hasRecordForCommit(c.contents.base)
-      //   //&& !this.commitIsCorrupted(c)
-      // ) {
-      //   this._cachedCommitsWithRecord.add(c.id);
-      //   return true;
-      // }
+      // For delta commits, follow the base chain
+      const baseId = c.deltaBaseId;
+      if (baseId !== undefined) {
+        c = baseId;
+      } else {
+        return false;
+      }
     }
     return false;
   }
 
   commitIsCorrupted(c: Commit): boolean {
-    if (commitContentsIsDocument(c.contents)) {
+    if (c.isDocumentCommit) {
       return false;
     }
     if (this._commitIsCorruptedResult.has(c.id)) {
@@ -722,70 +697,44 @@ export class Repository<
     return undefined;
   }
 
-  static callCount = 0;
-
   itemForCommit<S extends Schema>(c: Commit | string): Item<S> {
-    try {
-      if (++Repository.callCount === 2) {
-        // debugger;
+    let result = this._cachedRecordForCommit.get(
+      typeof c === 'string' ? c : c.id,
+    )?.deref();
+    if (!result) {
+      if (typeof c === 'string') {
+        c = this.getCommit(c);
       }
-      let result = this._cachedRecordForCommit.get(
-        typeof c === 'string' ? c : c.id,
-      );
-      if (!result) {
-        if (typeof c === 'string') {
-          c = this.getCommit(c);
-        }
-        if (commitContentsIsDocument(c.contents)) {
-          result = c.contents.record;
-        } else {
-          let commitCorrupted = this._commitIsCorruptedResult.get(c.id);
-          if (commitCorrupted !== true) {
-            const contents: DeltaContents = c.contents as DeltaContents;
-            result = this.itemForCommit(contents.base).clone();
-            if (result.checksum === contents.edit.srcChecksum) {
-              result.patch(contents.edit.changes);
-              commitCorrupted = result.checksum !== contents.edit.dstChecksum;
-            } else {
-              commitCorrupted = true;
-            }
-            this._commitIsCorruptedResult.set(c.id, commitCorrupted);
+      if (commitContentsIsDocument(c.contents)) {
+        result = c.contents.record;
+      } else {
+        let commitCorrupted = this._commitIsCorruptedResult.get(c.id);
+        if (commitCorrupted !== true) {
+          const contents: DeltaContents = c.contents as DeltaContents;
+          result = this.itemForCommit(contents.base).clone();
+          if (result.checksum === contents.edit.srcChecksum) {
+            result.patch(contents.edit.changes);
+            commitCorrupted = result.checksum !== contents.edit.dstChecksum;
+          } else {
+            commitCorrupted = true;
           }
-          if (commitCorrupted) {
-            // if (!readonly) {
-            //   const goodCommitsToMerge =
-            //     this.findNonCorruptedParentsFromCommits(c.parents);
-            //   if (goodCommitsToMerge.length > 0) {
-            //     // If any of the checksums didn't match, we create a new commit that
-            //     // reverts the bad one we've just found. While discarding data, this
-            //     // allows parties to continue their work without being stuck.
-            //     this.createMergeCommit(
-            //       goodCommitsToMerge,
-            //       undefined,
-            //       c.id,
-            //       false,
-            //     );
-            //   }
-            // }
-            const lastGoodCommit = this.findLatestNonCorruptedCommitForKey(
-              c.key,
-            );
-            // No good parents are available. This key is effectively null.
-            result = lastGoodCommit
-              ? this.itemForCommit(lastGoodCommit)
-              : Item.nullItem(this.db.registry);
-          }
-          // assert(result.checksum === contents.edit.srcChecksum);
-          // result.patch(contents.edit.changes);
-          // assert(result.checksum === contents.edit.dstChecksum);
+          this._commitIsCorruptedResult.set(c.id, commitCorrupted);
         }
-        result!.lock();
-        this._cachedRecordForCommit.set(c.id, result!);
+        if (commitCorrupted) {
+          const lastGoodCommit = this.findLatestNonCorruptedCommitForKey(
+            c.key,
+          );
+          // No good parents are available. This key is effectively null.
+          result = lastGoodCommit
+            ? this.itemForCommit(lastGoodCommit)
+            : Item.nullItem(this.db.registry);
+        }
       }
-      return result! as unknown as Item<S>;
-    } finally {
-      --Repository.callCount;
+      result!.lock();
+      this._cachedRecordForCommit.set(c.id, new WeakRef(result!));
+      this._itemCleanup.register(result!, c.id);
     }
+    return result! as unknown as Item<S>;
   }
 
   private cacheHeadForKey(
@@ -797,25 +746,15 @@ export class Repository<
     }
     const entry = this._cachedHeadsByKey.get(key);
     if (entry?.commit.id === head.id) {
-      // entry.timestamp = performance.now();
       return head;
     }
     if (!this.hasItemForCommit(head)) {
       return undefined;
-      // const ancestors = this.findNonCorruptedParentsFromCommits(head.parents);
-      // if (!ancestors || ancestors.length === 0) {
-      //   head = this.findLatestNonCorruptedCommitForKey(head.key);
-      // } else {
-      //   ancestors.sort(compareCommitsDesc);
-      //   head = ancestors[0];
-      // }
     }
-    if (head) {
-      this._cachedHeadsByKey.set(key, {
-        commit: head,
-        timestamp: 0, //performance.now(),
-      });
-    }
+    this._cachedHeadsByKey.set(key, {
+      commit: head,
+      timestamp: 0,
+    });
     return head;
   }
 
@@ -859,8 +798,7 @@ export class Repository<
     const cacheEntry = this._cachedHeadsByKey.get(key);
     if (
       cacheEntry &&
-      cacheEntry.commit.session === CONNECTION_ID
-      // && performance.now() - cacheEntry.timestamp <= HEAD_CACHE_EXPIRATION_MS
+      cacheEntry.commit.connectionId === CONNECTION_ID
     ) {
       return cacheEntry.commit;
     }
@@ -882,12 +820,11 @@ export class Repository<
 
   private createMergeCommit(
     commitsToMerge: Commit[],
-    // parents?: string[],
     mergeLeader?: string,
     revert?: string,
     deltaCompress = true,
   ): Promise<Commit | undefined> {
-    if (commitsToMerge.length <= 0 /*|| !this.allowMerge*/) {
+    if (commitsToMerge.length <= 0) {
       return Promise.resolve(undefined);
     }
     const key = commitsToMerge[0].key;
@@ -895,7 +832,6 @@ export class Repository<
     if (!result) {
       result = this._createMergeCommitImpl(
         commitsToMerge,
-        // parents,
         mergeLeader,
         revert,
         deltaCompress,
@@ -1005,50 +941,90 @@ export class Repository<
     return [base, lca];
   }
 
-  private ancestorsFilterForKey(key: string): [BloomFilter, number] {
-    const adjList = this._adjList;
-    const ancestors = new Set<string>();
-    for (const commit of this.commitsForKey(key)) {
-      if (adjList.hasInEdges(commit.id)) {
-        ancestors.add(commit.id);
+  // FORMAT INVARIANT: 2 hops (grandparents + great-grandparents).
+  // Together with parents stored on the commit itself this gives 3 levels of
+  // ancestry -- enough for fast common-ancestor detection without traversing
+  // the full graph. The binary format uses a u8 for ancestor count (max 255).
+  // Changing the hop depth is a format-level decision that requires a version
+  // bump in the binary codec.
+  private computeAncestors(commits: Commit[]): string[] {
+    // Build a local lookup from the live commit objects so we can resolve
+    // parents that haven't been persisted yet (e.g. newly created commits).
+    const localMap = new Map<string, Commit>(commits.map((c) => [c.id, c]));
+    const getCommit = (id: string): Commit | undefined =>
+      localMap.get(id) ?? (this.hasCommit(id) ? this.getCommit(id) : undefined);
+
+    const parentIds = commits.map((c) => c.id);
+    const parentSet = new Set(parentIds);
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const pid of parentIds) {
+      const parent = getCommit(pid);
+      if (!parent) continue;
+      // Hop 1: grandparents
+      for (const gpId of parent.parents) {
+        const gp = getCommit(gpId);
+        if (!gp || parentSet.has(gpId) || seen.has(gpId)) {
+          continue;
+        }
+        seen.add(gpId);
+        result.push(gpId);
+        if (result.length >= 255) {
+          log({
+            severity: 'WARNING',
+            error: 'StorageError',
+            message:
+              `computeAncestors: truncated to 255 (binary format u8 limit); ` +
+              `repo=${this.path}`,
+          });
+          return result;
+        }
+        // Hop 2: great-grandparents
+        for (const ggpId of gp.parents) {
+          if (!getCommit(ggpId) || parentSet.has(ggpId) || seen.has(ggpId)) {
+            continue;
+          }
+          seen.add(ggpId);
+          result.push(ggpId);
+          if (result.length >= 255) {
+            log({
+              severity: 'WARNING',
+              error: 'StorageError',
+              message:
+                `computeAncestors: truncated to 255 (binary format u8 limit); ` +
+                `repo=${this.path}`,
+            });
+            return result;
+          }
+        }
       }
     }
-    const result = new BloomFilter({
-      size: ancestors.size,
-      fpr: 0.25,
-    });
-    for (const id of ancestors) {
-      result.add(id);
-    }
-    return [result, ancestors.size];
+    return result;
   }
 
   private async _createMergeCommitImpl(
     commitsToMerge: Commit[],
-    // parents?: string[],
     mergeLeader?: string,
     revert?: string,
     deltaCompress = true,
   ): Promise<Commit | undefined> {
-    if (commitsToMerge.length <= 0 /*|| !this.allowMerge*/) {
+    if (commitsToMerge.length <= 0) {
       return undefined;
     }
     const key = commitsToMerge[0].key;
     const session = this.trustPool.currentSession.id;
-    const [ancestorsFilter, ancestorsCount] = this.ancestorsFilterForKey(key);
-    assert(ancestorsCount > 0, 'Merge commit got empty ancestors filter'); // Sanity check
+    const ancestors = this.computeAncestors(commitsToMerge);
     try {
       const [merge, base] = this.createMergeRecord(commitsToMerge);
       if (merge.isNull) {
         return undefined;
       }
-      let mergeCommit = new Commit({
+      let mergeCommit: Commit = Commit.create({
         session,
         key,
         contents: merge,
         parents: commitsToMerge.map((c) => c.id),
-        ancestorsFilter,
-        ancestorsCount,
+        ancestors,
         mergeBase: base?.id,
         mergeLeader,
         revert,
@@ -1065,7 +1041,6 @@ export class Repository<
       return this.cacheHeadForKey(key, signedCommit);
     } catch (e) {
       if (!(e instanceof ServerError && e.code === Code.ServiceUnavailable)) {
-        debugger;
         throw e; // Unknown error. Rethrow.
       }
     }
@@ -1087,13 +1062,12 @@ export class Repository<
     const mergeLeaderSession = mergeLeaderFromLeaves(leaves) || sessionId;
     if (
       leaves.length > 1 &&
-      //this.allowMerge &&
       mergeLeaderSession === sessionId
     ) {
       // Filter out any commits with equal records
-      const commitsToMerge = this.commitsWithUniqueItems(
-        leaves.filter((c) => this.commitIsHighProbabilityLeaf(c)),
-      ).sort(coreValueCompare);
+      const commitsToMerge = this.commitsWithUniqueItems(leaves).sort(
+        coreValueCompare,
+      );
       if (commitsToMerge.length === 1) {
         return undefined;
       }
@@ -1139,9 +1113,6 @@ export class Repository<
       if (head) {
         result = [this.itemForCommit(head), head];
       }
-      // if (!result) {
-      //   result = Document.nullDocument();
-      // }
       this._cachedValueForKey.set(key, result);
     }
     return result as [Item<T>, Commit] | undefined;
@@ -1213,14 +1184,16 @@ export class Repository<
         return undefined;
       }
     }
-    const [ancestorsFilter, ancestorsCount] = this.ancestorsFilterForKey(key);
-    let commit = new Commit({
+    const ancestors = this.computeAncestors(
+      parentCommit ? [parentCommit] : [],
+    );
+    let commit: Commit = Commit.create({
       session: session.id,
       key,
-      contents: value.clone() as unknown as Item,
+      // No clone needed - Commit constructor calls commitContentsClone() internally
+      contents: value as unknown as Item,
       parents: parentCommit?.id,
-      ancestorsFilter,
-      ancestorsCount,
+      ancestors,
       orgId: this.orgId,
     });
     commit = this.deltaCompressIfNeeded(commit);
@@ -1234,6 +1207,62 @@ export class Repository<
 
   async create<S extends Schema>(key: string, value: Item<S>): Promise<Commit> {
     return (await this.setValueForKey(key, value, undefined))!;
+  }
+
+  /**
+   * Bulk-insert new items into this repository. Items whose keys already exist
+   * fall back to the per-item `setValueForKey` path; new keys are batched for
+   * significantly lower overhead.
+   */
+  async insert(entries: { key: string; value: Item }[]): Promise<Commit[]> {
+    const session = this.trustPool.currentSession;
+    const newEntries: { key: string; value: Item }[] = [];
+    const existingPromises: Promise<Commit | undefined>[] = [];
+
+    for (const entry of entries) {
+      if (this.valueForKey(entry.key)) {
+        existingPromises.push(
+          this.setValueForKey(entry.key, entry.value, undefined),
+        );
+      } else {
+        newEntries.push(entry);
+      }
+    }
+
+    // Build root commits for new keys — safe to skip ancestor computation
+    // and delta compression because these are the first commit per key.
+    const commits: Commit[] = [];
+    for (const { key, value } of newEntries) {
+      commits.push(
+        Commit.create({
+          session: session.id,
+          key,
+          contents: value,
+          ancestors: [],
+          orgId: this.orgId,
+        }),
+      );
+    }
+
+    // Sign sequentially (avoids 100k microtask scheduling from Promise.all)
+    if (!this.db.trusted) {
+      for (let i = 0; i < commits.length; i++) {
+        commits[i] = await signCommit(session, commits[i]);
+      }
+    }
+
+    // Persist in one batch
+    if (commits.length > 0) {
+      await this.persistVerifiedCommits(commits);
+    }
+
+    // Await fallback for existing keys
+    const existingResults = await Promise.all(existingPromises);
+    for (const c of existingResults) {
+      if (c) commits.push(c);
+    }
+
+    return commits;
   }
 
   /**
@@ -1293,7 +1322,7 @@ export class Repository<
       randomInt(0, 20) === 0 ||
       // Sessions are too important to apply delta compression to, since they
       // bootstrap everything else.
-      fullCommit.scheme?.ns === kSchemaSession.ns
+      fullCommit.schemaNamespace === kSchemaSession.ns
     ) {
       return fullCommit;
     }
@@ -1307,6 +1336,7 @@ export class Repository<
         changes: changes,
         srcChecksum: baseRecord.checksum,
         dstChecksum: fullCommit.contentsChecksum,
+        scheme: fullCommit.scheme,
       });
       const deltaLength = JSON.stringify(edit.toJS()).length;
       const fullLength = JSON.stringify(
@@ -1315,14 +1345,13 @@ export class Repository<
       // Only if our delta format is small enough relative to the full format,
       // then it's worth switching to it
       if (deltaLength <= fullLength * 0.85) {
-        deltaCommit = new Commit({
+        deltaCommit = Commit.create({
           id: fullCommit.id,
           session: fullCommit.session,
           key,
           contents: { base: lastRecordCommit.id, edit },
           parents: fullCommit.parents,
-          ancestorsFilter: fullCommit.ancestorsFilter,
-          ancestorsCount: fullCommit.ancestorsCount,
+          ancestors: fullCommit.ancestors,
           mergeBase: fullCommit.mergeBase,
           mergeLeader: fullCommit.mergeLeader,
           revert: fullCommit.revert,
@@ -1342,7 +1371,7 @@ export class Repository<
   private lastRecordCommitForKey(key: string): Commit | undefined {
     let result: Commit | undefined;
     for (const c of this.commitsForKey(key)) {
-      if (!commitContentsIsDocument(c.contents)) {
+      if (!c.isDocumentCommit) {
         continue;
       }
       if (!result || c.timestamp > result.timestamp) {
@@ -1366,14 +1395,13 @@ export class Repository<
     const authorizer = this.authorizer;
     commits = Array.from(commits).sort((c1, c2) => c1.timestamp - c2.timestamp);
     const result: Commit[] = [];
-    for (
-      const batch of ArrayUtils.slices(
-        commits,
-        navigator.hardwareConcurrency,
-      )
-    ) {
+    for (const batch of ArrayUtils.slices(commits, this._concurrency)) {
       const promises: Promise<void>[] = [];
-      for (const c of batch) {
+      for (let idx = 0; idx < batch.length; idx++) {
+        const c = batch[idx];
+        // Safe: ArrayUtils.slices() caps batch to _concurrency === pool length,
+        // so idx < pool.length always holds and no two promises share an entry.
+        const info = this._authInfoPool[idx % this._authInfoPool.length];
         promises.push(
           (async () => {
             if (await this.trustPool.verify(c)) {
@@ -1382,24 +1410,18 @@ export class Repository<
                 if (!session) {
                   return;
                 }
-                this._authInfo.itemKey = c.key;
-                this._authInfo.session = session;
-                this._authInfo.op = 'write';
+                info.itemKey = c.key;
+                info.session = session;
+                info.op = 'write';
                 if (
                   session.owner === 'root' ||
-                  authorizer(this._authInfo)
+                  authorizer(info)
                 ) {
                   result.push(c);
-                } else {
-                  // debugger;
-                  // authorizer(this, c, session, true);
                 }
               } else {
                 result.push(c);
               }
-            } else {
-              // debugger;
-              // this.trustPool.verify(c);
             }
           })(),
         );
@@ -1423,17 +1445,21 @@ export class Repository<
     c: Commit,
     batchIndex: Map<string, Commit>,
   ): string | null | undefined {
-    if (c.scheme !== undefined) return c.scheme.ns;
+    if (c.schemaNamespace !== undefined) return c.schemaNamespace;
     const visited = new Set<string>();
     let cur: Commit | undefined = c;
-    while (cur && commitContentsIsDelta(cur.contents)) {
+    while (cur) {
+      const baseId: string | undefined = cur.deltaBaseId;
+      if (baseId === undefined) break;
       if (visited.has(cur.id)) return undefined;
       visited.add(cur.id);
-      const baseId: string = (cur.contents as DeltaContents).base;
       cur = batchIndex.get(baseId) ?? this.storage.getCommit(baseId);
     }
-    if (cur && commitContentsIsDocument(cur.contents)) {
-      return cur.contents.record.schema.ns;
+    if (cur && cur.isDocumentCommit) {
+      const contents = cur.contents;
+      if (commitContentsIsDocument(contents)) {
+        return contents.record.schema.ns;
+      }
     }
     return undefined;
   }
@@ -1443,10 +1469,10 @@ export class Repository<
     const result: Commit[] = [];
     let batch: Commit[] = [];
     const all = Array.from(commits);
+    const batchIndex = new Map<string, Commit>();
+    for (const c of all) batchIndex.set(c.id, c);
     let filtered: Commit[];
     if (this.allowedNamespaces !== undefined) {
-      const batchIndex = new Map<string, Commit>();
-      for (const c of all) batchIndex.set(c.id, c);
       filtered = all.filter((c) => {
         if (this.storage.getCommit(c.id) !== undefined) return false;
         const ns = this.resolveCommitNs(c, batchIndex);
@@ -1454,11 +1480,11 @@ export class Repository<
           this.allowedNamespaces!.includes(ns);
       });
     } else {
-      filtered = all.filter(
-        (c) =>
-          this.storage.getCommit(c.id) === undefined &&
-          c.scheme?.ns !== null,
-      );
+      filtered = all.filter((c) => {
+        if (this.storage.getCommit(c.id) !== undefined) return false;
+        const ns = this.resolveCommitNs(c, batchIndex);
+        return ns !== null && ns !== undefined;
+      });
     }
     for (const verifiedCommit of await this.verifyCommits(filtered)) {
       batch.push(verifiedCommit);
@@ -1483,6 +1509,7 @@ export class Repository<
       }
       batch.push(c);
       if (batch.length >= 500) {
+        const batchStart = result.length;
         for (
           const persisted of await this._persistCommitsBatchToStorage(
             batch,
@@ -1490,36 +1517,36 @@ export class Repository<
         ) {
           result.push(persisted);
         }
-        for (const c of batch) {
+        for (let i = batchStart; i < result.length; i++) {
+          const c = result[i];
           for (const p of c.parents) {
             adjList.addEdge(c.id, p, 'parent');
+          }
+          for (const a of c.ancestors) {
+            adjList.addEdge(c.id, a, 'ancestor');
           }
         }
         batch = [];
       }
     }
     if (batch.length > 0) {
+      const batchStart = result.length;
       for (const persisted of await this._persistCommitsBatchToStorage(batch)) {
         result.push(persisted);
       }
-      for (const c of batch) {
+      for (let i = batchStart; i < result.length; i++) {
+        const c = result[i];
         for (const p of c.parents) {
           adjList.addEdge(c.id, p, 'parent');
+        }
+        for (const a of c.ancestors) {
+          adjList.addEdge(c.id, a, 'ancestor');
         }
       }
     }
 
-    // const leaves = result.filter((c) => this.commitIsHighProbabilityLeaf(c));
-    // for (const c of leaves) {
-    //   this._cachedHeadsByKey.delete(c.key);
-    // }
-
-    // for (const c of SetUtils.unionIter(
-    //   commitsAffectingTmpRecords,
-    //   result.filter((c) => this.commitIsHighProbabilityLeaf(c)),
-    // )) {
     for (const c of result) {
-      if (!this._adjList.hasInEdges(c.id)) {
+      if (this.commitIsLeaf(c)) {
         await this._runUpdatesOnNewLeafCommit(c);
       }
     }
@@ -1545,7 +1572,7 @@ export class Repository<
 
   private async _runUpdatesOnNewLeafCommit(commit: Commit): Promise<void> {
     // Auto add newly discovered sessions to our trust pool
-    if (commit.scheme?.ns === kSchemaSession.ns) {
+    if (commit.schemaNamespace === kSchemaSession.ns) {
       this._cachedHeadsByKey.delete(commit.key);
       const headEntry = this.valueForKey<SchemaTypeSession>(commit.key);
       if (!headEntry) {
@@ -1582,15 +1609,21 @@ export class Repository<
     return result;
   }
 
-  private subGraphForCommit(id: string): CommitGraph {
+  private subGraphForCommit(
+    id: string,
+    visited = new Set<string>(),
+  ): CommitGraph {
+    visited.add(id);
     const adjList = this._adjList;
     const root = this.getCommit(id);
     const graph: CommitGraph = {
       commit: root,
       children: [],
     };
-    for (const { vertex } of adjList.inEdges(root.id)) {
-      graph.children.push(this.subGraphForCommit(vertex));
+    for (const { vertex } of adjList.inEdges(root.id, 'parent')) {
+      if (!visited.has(vertex)) {
+        graph.children.push(this.subGraphForCommit(vertex, visited));
+      }
     }
     return graph;
   }
@@ -1695,29 +1728,6 @@ export class Repository<
         return c;
       }
     }
-    // let parentsToCheck: Set<string> = new Set(commit.parents);
-    // while (parentsToCheck.size > 0) {
-    //   let latestParent: undefined | Commit;
-    //   const parents = parentsToCheck;
-    //   parentsToCheck = new Set();
-    //   for (const id of parents) {
-    //     if (this.hasCommit(id)) {
-    //       const c = this.getCommit(id);
-    //       if (
-    //         (!latestParent ||
-    //           c.timestamp.getTime() > latestParent.timestamp.getTime()) &&
-    //         filter(c)
-    //       ) {
-    //         latestParent = c;
-    //       } else {
-    //         SetUtils.update(parentsToCheck, c.parents);
-    //       }
-    //     }
-    //   }
-    //   if (latestParent !== undefined) {
-    //     return latestParent;
-    //   }
-    // }
     return undefined;
   }
 
@@ -1740,6 +1750,11 @@ export class Repository<
   }
 }
 
+// Scratch arrays for BFS key snapshots — avoids Array.from() allocations.
+// Cleared after each call to release references. Safe: _findLCAMergeBase is not reentrant.
+const _scratchKeys1: string[] = [];
+const _scratchKeys2: string[] = [];
+
 function compareCommitsDesc(c1: Commit, c2: Commit): number {
   if (c2.timestamp > c1.timestamp) {
     return 1;
@@ -1748,6 +1763,22 @@ function compareCommitsDesc(c1: Commit, c2: Commit): number {
     return -1;
   }
   return compareStrings(c2.id, c1.id);
+}
+
+// Returns true when the map was modified: either first insertion or depth
+// decreased. Returning true on depth refinement ensures the BFS re-expands
+// children at the corrected (shorter) depth, yielding globally minimal depths.
+function setMinDepth(
+  map: Map<string, number>,
+  id: string,
+  depth: number,
+): boolean {
+  const existing = map.get(id);
+  if (existing === undefined || depth < existing) {
+    map.set(id, depth);
+    return true;
+  }
+  return false;
 }
 
 function compareCommitsAsc(c1: Commit, c2: Commit): number {
@@ -1771,7 +1802,6 @@ export class MemRepoStorage implements RepoStorage<MemRepoStorage> {
   // Key -> Commit Id -> Commit
   private readonly _commitsByKey: Map<string, RedBlackTree<Commit>>;
   private readonly _commitsById: Map<string, Commit>;
-  private readonly _cachedCommitsByKeyDescArr: Map<string, Commit[]>;
   readonly ageForKey: Record<string, number>;
   private _age = 0;
   private _cachedKeys?: string[];
@@ -1783,19 +1813,8 @@ export class MemRepoStorage implements RepoStorage<MemRepoStorage> {
   constructor(commits?: Iterable<Commit>) {
     this._commitsByKey = new Map();
     this._commitsById = new Map();
-    this._cachedCommitsByKeyDescArr = new Map();
-    // this.ageForKey = new Map();
     this.ageForKey = {};
     if (commits) {
-      // for (const c of commits) {
-      //   let keyMap = this._commitsByKey.get(c.key);
-      //   if (!keyMap) {
-      //     keyMap = new RedBlackTree(compareCommitsDesc);
-      //     this._commitsByKey.set(c.key, keyMap);
-      //   }
-      //   keyMap.insert(c);
-      //   this._commitsById.set(c.id, c);
-      // }
       this.persistCommits(commits);
     }
   }
@@ -1817,20 +1836,7 @@ export class MemRepoStorage implements RepoStorage<MemRepoStorage> {
   }
 
   commitsForKeyDesc(key: string): Iterable<Commit> {
-    // let res = this._cachedCommitsByKeyDescArr.get(key);
-    // if (!res) {
-    //   res = Array.from(this._commitsByKey.get(key) || []).sort(
-    //     compareCommitsDesc,
-    //   );
-    //   this._cachedCommitsByKeyDescArr.set(key, res);
-    // }
-    // return res;
     return (this._commitsByKey.get(key) ?? []) as Iterable<Commit>;
-    // const keyMap = this._commitsByRecordKey.get(key);
-    // if (!keyMap) {
-    //   return [];
-    // }
-    // return SetUtils.mapToArray(keyMap, (id) => this.getCommit(id));
   }
 
   allKeys(): Iterable<string> {
@@ -1858,15 +1864,14 @@ export class MemRepoStorage implements RepoStorage<MemRepoStorage> {
         this._cachedKeys = undefined;
       }
       set.insert(c);
-      this._cachedCommitsByKeyDescArr.delete(c.key);
-      if (!c.age) {
+      if (c.age === undefined) {
         c.age = ++this._age;
       } else {
         // assert(this._age < c.age, `Age for ${c.key} is ${c.age} but current age is ${this._age}`);
         this._age = Math.max(this._age, c.age);
       }
       const ageForKey = this.ageForKey[c.key]; // this.ageForKey.get(c.key);
-      if (!ageForKey || c.age > ageForKey) {
+      if (ageForKey === undefined || c.age > ageForKey) {
         // this.ageForKey.set(c.key, c.age);
         this.ageForKey[c.key] = c.age;
       }
@@ -1875,19 +1880,5 @@ export class MemRepoStorage implements RepoStorage<MemRepoStorage> {
     return result;
   }
 
-  // ageForKey(key: string): number {
-  //   return this.ageForKey.get(key) || 0;
-  // }
-
   close(): void {}
-}
-
-const gFirstSeenCommit = new Map<string, number>();
-function commitInGracePeriod(c: Commit): boolean {
-  let firstSeen = gFirstSeenCommit.get(c.id);
-  if (!firstSeen) {
-    firstSeen = Date.now();
-    gFirstSeenCommit.set(c.id, firstSeen);
-  }
-  return Date.now() - firstSeen > 3 * kSecondMs;
 }

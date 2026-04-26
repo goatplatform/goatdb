@@ -21,7 +21,6 @@ import { FileImplGet } from '../base/json-log/file-impl.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import { Edit } from '../cfds/base/edit.ts';
 import { Commit } from '../repo/commit.ts';
-import { BloomFilter } from '../base/bloom.ts';
 
 function createDeltaCommit(opts: {
   orgId?: string;
@@ -29,7 +28,7 @@ function createDeltaCommit(opts: {
   baseCommitId: string;
   parents?: string[];
 }): Commit {
-  return new Commit({
+  return Commit.create({
     session: 'test-session',
     orgId: opts.orgId ?? 'test-org',
     key: opts.key,
@@ -38,8 +37,7 @@ function createDeltaCommit(opts: {
       edit: new Edit({ changes: [], srcChecksum: 'x', dstChecksum: 'x' }),
     },
     parents: opts.parents ?? [],
-    ancestorsFilter: BloomFilter.empty,
-    ancestorsCount: opts.parents?.length ?? 0,
+    ancestors: [],
   });
 }
 

@@ -72,6 +72,11 @@ export const FileImplNode: FileImpl<NodeFsFile> = {
         buf.length - bytesWritten,
         handle.pos,
       );
+      if (result.bytesWritten === 0) {
+        throw new Error(
+          `Node write stalled at offset ${handle.pos}: 0 bytes written`,
+        );
+      }
       bytesWritten += result.bytesWritten;
       handle.pos += result.bytesWritten;
     }

@@ -158,7 +158,7 @@ export default function setup() {
       await assertThrows(async () => {
         await decodeSession({
           id: 'x',
-          publicKey: { kty: 'EC', crv: 'P-384', x: 'bad', y: 'bad' },
+          publicKey: { kty: 'OKP', crv: 'Ed25519', x: 'bad' },
           expiration: Date.now(),
         } as any);
       });

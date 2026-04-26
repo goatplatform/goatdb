@@ -1,4 +1,5 @@
 import * as path from '../base/path.ts';
+import { log } from '../logging/log.ts';
 import { sessionFromItem, TrustPool } from './session.ts';
 import { Repository, type RepositoryConfig } from '../repo/repo.ts';
 import type { DBSettings, DBSettingsProvider } from './settings/settings.ts';
@@ -34,7 +35,6 @@ import type {
   ReadonlyJSONObject,
   ReadonlyJSONValue,
 } from '../base/interfaces.ts';
-// import { BloomFilter } from '../cpp/bloom_filter.ts';
 import {
   generateQueryId,
   Query,
@@ -43,13 +43,13 @@ import {
 } from '../repo/query.ts';
 import { sendLoginEmail } from '../net/rest-api.ts';
 import { normalizeEmail } from '../base/string.ts';
-import { FileImplGet } from '../base/json-log/file-impl.ts';
+import { FileImplGet, pathExists } from '../base/json-log/file-impl.ts';
 import { FileImplOPFS } from '../base/json-log/file-impl-opfs.ts';
 import { assert } from '../base/error.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { Emitter } from '../base/emitter.ts';
 import { getGoatConfig } from '../base/config.ts';
-// import { remove } from '../base/json-log/json-log.ts';
+import { makeShardConfig, type ShardConfig } from '../repo/shard-format.ts';
 
 /**
  * The result of a sync operation with all peers for a repository.
@@ -73,6 +73,15 @@ export type SyncResult =
  * @group Database
  */
 export type DBMode = 'client' | 'server';
+
+/**
+ * The on-disk storage format for repository commit logs.
+ *
+ * - `'goat'` (default): length-prefixed binary — compact and fast
+ * - `'jsonl'`: newline-delimited JSON — human-readable, useful for debugging
+ * @group Database
+ */
+export type StorageFormat = 'jsonl' | 'goat';
 
 /** @group Database */
 export interface DBInstanceConfig {
@@ -122,6 +131,22 @@ export interface DBInstanceConfig {
    * Defaults to false.
    */
   debug?: boolean;
+  /**
+   * The on-disk format for repository commit logs.
+   * Defaults to `'goat'` (compact binary). Use `'jsonl'` for human-readable
+   * output during development or debugging.
+   */
+  storageFormat?: StorageFormat;
+  /**
+   * Maximum commits per shard. Controls RAM: each shard holds approximately
+   * (max * 2.5 * 80 + max * 1.5 * 32) bytes of metadata. Defaults to
+   * 100,000 (server) or 25,000 (browser).
+   */
+  maxShardCommits?: number;
+  /** Commit count that triggers a background shard split. Defaults to 75% of maxShardCommits. */
+  splitThreshold?: number;
+  /** Shards below this count are candidates for merging. Defaults to 10% of maxShardCommits. */
+  minShardCommits?: number;
 }
 
 /**
@@ -138,6 +163,44 @@ export type OpenOptions = Omit<RepositoryConfig, 'storage' | 'authorizer'>;
 export type EventUserChanged = 'UserChanged';
 
 /**
+ * Emitted by GoatDB when commits are permanently dropped after 3 consecutive
+ * write failures for the same file. **Applications MUST attach a listener** to
+ * detect data loss and alert the user or trigger a sync.
+ *
+ * @example
+ * ```ts
+ * db.attach('WriteFailure', (detail) => {
+ *   console.error(`Lost ${detail.droppedCommits} commit(s):`, detail.error);
+ * });
+ * ```
+ * @group Database
+ */
+export type EventWriteFailure = 'WriteFailure';
+
+/**
+ * Emitted when a managed item's data changes (local mutation or rebase).
+ * Payload: (path: string, isRebase: boolean)
+ * @group Database
+ */
+export type EventItemChanged = 'ItemChanged';
+
+/**
+ * Payload for the {@link EventWriteFailure} event, fired after 3 consecutive
+ * I/O failures cause pending commits to be permanently dropped.
+ * @group Database
+ */
+export interface WriteFailureDetail {
+  /** Number of commit payloads that were dropped. */
+  droppedCommits: number;
+  /** The underlying I/O error from the last failed write attempt. */
+  error: unknown;
+  /** Repository path whose writes were dropped. */
+  repoPath: string;
+  /** IDs of the dropped commits. */
+  commitIds: string[];
+}
+
+/**
  * The main database class that manages repositories, synchronization, and data
  * access.
  *
@@ -146,21 +209,46 @@ export type EventUserChanged = 'UserChanged';
  * - Data synchronization with peers
  * - User authentication and authorization
  * - Schema validation
+ * - Buffered writes: commits are coalesced and written to disk only on
+ *   {@link flush} / {@link flushAll}. Commits pending in the buffer are lost
+ *   on ungraceful exit; listen for the {@link EventWriteFailure} event to
+ *   detect repeated write failures that cause commits to be dropped.
  *
  * @template US The user schema type, defaults to the base Schema type
  * @group Database
  */
 export class GoatDB<US extends Schema = Schema>
-  extends Emitter<EventUserChanged> {
+  extends Emitter<EventUserChanged | EventWriteFailure | EventItemChanged> {
   readonly orgId: string;
   readonly registry: DataRegistry;
   readonly trusted: boolean;
   readonly debug: boolean;
   readonly mode: DBMode;
+  readonly storageFormat: StorageFormat;
   private readonly _basePath: string;
   private readonly _repositories: Map<string, Repository>;
   private readonly _openPromises: Map<string, Promise<Repository>>;
   private readonly _files: Map<string, JSONLogFile>;
+  /**
+   * Coalesced write buffer: commits are enqueued by NewCommitSync and drained
+   * to disk only when flush()/flushAll() is called. Commits buffered here are
+   * lost on ungraceful exit.
+   */
+  private readonly _pendingAppends: Map<
+    JSONLogFile,
+    { values: Uint8Array[]; ids: string[]; bytes: number }
+  >;
+  // Consecutive write-failure count per file; dropped and logged at 3 failures.
+  private readonly _appendFailCounts = new Map<JSONLogFile, number>();
+  // @internal Test-only: when > 0, _drainPendingAppends throws instead of
+  // writing, simulating I/O failures. Decremented on each triggered failure.
+  _testForceAppendFailures = 0;
+  // Tracks the most recent fire-and-forget drain promise per file so that
+  // flush()/closeRepo() can await it before their own drain loop.
+  private readonly _inFlightDrains = new Map<JSONLogFile, Promise<void>>();
+  // Tracks repos that have already emitted the legacy-format fallback warning,
+  // so each repo warns at most once per open/close cycle.
+  private readonly _warnedLegacyRepos = new Set<string>();
   private readonly _peerURLs: string[] | undefined;
   private readonly _repoClients: Map<string, RepoClient[]> | undefined;
   private readonly _items: Map<string, ManagedItem>;
@@ -175,6 +263,7 @@ export class GoatDB<US extends Schema = Schema>
   private _syncSchedulers: SyncScheduler[] | undefined;
   private _trustPoolPromise: Promise<TrustPool>;
   private _ready: boolean = false;
+  readonly shardConfig: ShardConfig;
 
   constructor(config: DBInstanceConfig) {
     super();
@@ -185,10 +274,18 @@ export class GoatDB<US extends Schema = Schema>
     this._repositories = new Map();
     this._openPromises = new Map();
     this._files = new Map();
+    this._pendingAppends = new Map();
     this._items = new Map();
     this._openQueries = new Map();
     this.trusted = config.trusted ?? false;
     this.debug = config.debug ?? false;
+    this.storageFormat = config.storageFormat ?? 'goat';
+    this.shardConfig = makeShardConfig({
+      maxCommits: config.maxShardCommits ??
+        (isBrowser() ? 25_000 : 100_000),
+      splitThreshold: config.splitThreshold,
+      minCommits: config.minShardCommits,
+    });
     if (config?.peers !== undefined) {
       this._peerURLs = typeof config.peers === 'string'
         ? [config.peers]
@@ -310,7 +407,7 @@ export class GoatDB<US extends Schema = Schema>
     this._openQueries.clear();
 
     // Close all repositories
-    for (const repoPath of this._repositories.keys()) {
+    for (const repoPath of [...this._repositories.keys()]) {
       await this.closeRepo(repoPath);
     }
 
@@ -392,8 +489,16 @@ export class GoatDB<US extends Schema = Schema>
       this._items.get(k)!.deactivate();
       this._items.delete(k);
     }
-    // Flush log file
-    await this.flush(path);
+    // Flush log file - retry if data was re-queued after a transient failure
+    const fileEntry = this._files.get(repoId);
+    if (fileEntry) {
+      await this._flushFileWithRetry(
+        fileEntry,
+        'Failed to flush pending writes on close',
+        repoId,
+      );
+      await JSONLogFileFlush(fileEntry);
+    }
     // Flush query caches
     await this.queryPersistence?.closeRepo(repoId);
     // Close repo clients
@@ -405,12 +510,13 @@ export class GoatDB<US extends Schema = Schema>
     repo.detachAll();
 
     // Close log file
-    const fileEntry = this._files.get(repoId);
     if (fileEntry) {
       await JSONLogFileClose(fileEntry);
+      this._appendFailCounts.delete(fileEntry);
     }
     this._files.delete(repoId);
     this._repositories.delete(repoId);
+    this._warnedLegacyRepos.delete(repoId);
   }
 
   /**
@@ -515,6 +621,36 @@ export class GoatDB<US extends Schema = Schema>
   }
 
   /**
+   * Bulk-insert items into a repository. Significantly faster than individual
+   * `load()` calls for large batches, as it batches signing and persistence.
+   *
+   * @param repoPath Path to the target repository (e.g. '/data/todos').
+   * @param schema   The schema for the items.
+   * @param items    Array of items to insert. Each may include an optional key;
+   *                 if omitted, a unique key is generated.
+   *
+   * Commits are buffered in memory; call `flush()` or `flushAll()` to persist.
+   */
+  async insert<S extends Schema>(
+    repoPath: string,
+    schema: S,
+    items: { key?: string; data: SchemaDataType<S> }[],
+  ): Promise<void> {
+    const repo = await this.open(repoPath);
+    const entries = [];
+    for (const item of items) {
+      entries.push({
+        key: item.key || uniqueId(),
+        value: new Item(
+          { schema, data: item.data },
+          this.registry,
+        ) as unknown as Item,
+      });
+    }
+    await repo.insert(entries);
+  }
+
+  /**
    * Returns the number of items at the specified path, or -1 if the path
    * doesn't exist.
    *
@@ -585,6 +721,112 @@ export class GoatDB<US extends Schema = Schema>
   }
 
   /**
+   * Flushes buffered commits for a given file to disk.
+   *
+   * Commits are buffered in memory until this method is called. On 3
+   * consecutive write failures for a file, ALL buffered commits for that file
+   * are dropped and a `WriteFailure` event is emitted. Callers can listen to
+   * `WriteFailure` to react (e.g. alert the user or trigger a sync).
+   *
+   * Write-retry semantics:
+   * - Data is removed from the queue before the write attempt to prevent
+   *   double-writes if a concurrent flush fires.
+   * - On failure, data is prepended back to the queue (preserving order).
+   * - If new batches arrived between failure and re-queue, they merge into a
+   *   single queue entry that inherits the pre-existing fail count.
+   * - After MAX_WRITE_FAILURES consecutive failures the data is dropped and
+   *   `WriteFailure` is emitted — callers MUST handle this event.
+   */
+  private async _drainPendingAppends(
+    file: JSONLogFile,
+    repoId: string,
+  ): Promise<void> {
+    const pending = this._pendingAppends.get(file);
+    if (!pending || pending.values.length === 0) {
+      return;
+    }
+    this._pendingAppends.delete(file);
+    try {
+      if (this._testForceAppendFailures > 0) {
+        this._testForceAppendFailures--;
+        throw new Error('test-forced append failure');
+      }
+      await JSONLogFileAppend(file, pending.values, pending.ids);
+      this._appendFailCounts.delete(file);
+    } catch (e) {
+      const failCount = (this._appendFailCounts.get(file) ?? 0) + 1;
+      if (failCount >= MAX_WRITE_FAILURES) {
+        // Drop after 3 consecutive failures to prevent unbounded accumulation.
+        this._appendFailCounts.delete(file);
+        log({
+          severity: 'ERROR',
+          error: 'StorageError',
+          message:
+            `[GoatDB] Dropping ${pending.values.length} pending commit(s) after 3 write failures: ${e}`,
+        });
+        this.emit('WriteFailure', {
+          droppedCommits: pending.values.length,
+          error: e,
+          repoPath: repoId,
+          commitIds: pending.ids,
+        });
+        return;
+      }
+      // Re-queue data for the next flush — no need to surface an error yet.
+      this._appendFailCounts.set(file, failCount);
+      const existing = this._pendingAppends.get(file);
+      if (existing) {
+        existing.values = pending.values.concat(existing.values);
+        existing.ids = pending.ids.concat(existing.ids);
+        existing.bytes += pending.bytes;
+      } else {
+        this._pendingAppends.set(file, pending);
+      }
+    }
+  }
+
+  /**
+   * Drains and retries pending appends for a single file, emitting
+   * `WriteFailure` if data cannot be flushed after all retries.
+   *
+   * Two-layer retry design:
+   *   Layer 1 (_drainPendingAppends): On failure, increments _appendFailCounts
+   *   and re-queues the data. After MAX_WRITE_FAILURES consecutive failures it
+   *   drops the data and emits WriteFailure itself.
+   *
+   *   Layer 2 (this method): Calls drain up to MAX_WRITE_FAILURES times. The
+   *   loop exits early when the queue is empty (success or layer-1 drop).
+   *   The safety-net below the loop handles the rare edge case where new data
+   *   was concurrently enqueued between iterations faster than the counter
+   *   reaches the layer-1 threshold, leaving data stranded after all retries.
+   */
+  private async _flushFileWithRetry(
+    fileEntry: JSONLogFile,
+    errorContext: string,
+    repoId: string,
+  ): Promise<void> {
+    const inFlight = this._inFlightDrains.get(fileEntry);
+    if (inFlight) await inFlight.catch(() => {});
+    for (let attempt = 0; attempt < MAX_WRITE_FAILURES; attempt++) {
+      await this._drainPendingAppends(fileEntry, repoId);
+      if (!this._pendingAppends.has(fileEntry)) break;
+    }
+    // This does NOT double-emit for data already dropped by layer-1:
+    // layer-1 deletes from _pendingAppends on drop, so `remaining` is
+    // undefined. This only fires for NEW data enqueued between iterations.
+    const remaining = this._pendingAppends.get(fileEntry);
+    if (remaining) {
+      this._pendingAppends.delete(fileEntry);
+      this.emit('WriteFailure', {
+        droppedCommits: remaining.ids.length,
+        error: new Error(errorContext),
+        repoPath: repoId,
+        commitIds: remaining.ids,
+      });
+    }
+  }
+
+  /**
    * Flushes all pending writes for the given repository to disk. Use this
    * method when you must ensure all previously known commits are written to the
    * local disk.
@@ -608,7 +850,14 @@ export class GoatDB<US extends Schema = Schema>
     await Promise.allSettled(promises);
     await this.queryPersistence?.flush(repoId);
     const fileEntry = this._files.get(repoId);
-    return fileEntry ? JSONLogFileFlush(fileEntry) : Promise.resolve();
+    if (fileEntry) {
+      await this._flushFileWithRetry(
+        fileEntry,
+        'Failed to flush pending writes',
+        repoId,
+      );
+      return JSONLogFileFlush(fileEntry);
+    }
   }
 
   /**
@@ -769,6 +1018,7 @@ export class GoatDB<US extends Schema = Schema>
       this.queryPersistence = new QueryPersistence(
         new QueryPersistenceFile(this._path),
       );
+      this.queryPersistence.start();
     }
 
     await this._settingsProvider.load();
@@ -811,7 +1061,6 @@ export class GoatDB<US extends Schema = Schema>
     repoId: string,
     opts?: OpenOptions,
   ): Promise<Repository> {
-    // await BloomFilter.initNativeFunctions();
     repoId = Repository.normalizePath(repoId);
     let trustPool: TrustPool;
     // Special Case: skip the call to loadSysSessions() when loading user
@@ -826,11 +1075,37 @@ export class GoatDB<US extends Schema = Schema>
       authorizer: this.registry.authRuleForRepo(repoId),
     });
     this._repositories.set(repoId, repo);
+    const configuredPath = path.join(
+      this.path,
+      relativePathForRepo(repoId, this.storageFormat),
+    );
+    // Fall back to jsonl if the configured format file is missing
+    const jsonlPath = path.join(
+      this.path,
+      relativePathForRepo(repoId, 'jsonl'),
+    );
+    let actualFormat: StorageFormat = this.storageFormat;
+    if (!(await pathExists(configuredPath))) {
+      if (await pathExists(jsonlPath)) {
+        actualFormat = 'jsonl';
+        if (!this._warnedLegacyRepos.has(repoId)) {
+          this._warnedLegacyRepos.add(repoId);
+          log({
+            severity: 'WARNING',
+            error: 'StorageError',
+            message:
+              `[GoatDB] Repo "${repoId}": ${this.storageFormat} file not found, loading jsonl instead.`,
+          });
+        }
+      }
+    }
     const file = await JSONLogFileOpen(
-      path.join(this.path, relativePathForRepo(repoId)),
+      path.join(
+        this.path,
+        relativePathForRepo(repoId, actualFormat),
+      ),
       true,
     );
-    // const commitIds = new Set<string>();
     this._files.set(repoId, file);
     repo.mute();
     this.queryPersistence?.get(repoId);
@@ -838,30 +1113,73 @@ export class GoatDB<US extends Schema = Schema>
     let loadedFromBackup = false;
     let done = false;
     let nextPromise = JSONLogFileScan(cursor);
+    // actualFormat may differ from storageFormat after legacy jsonl fallback above
+    const isJSONL = actualFormat === 'jsonl';
+    const textDecoder = new TextDecoder();
+    const textEncoder = new TextEncoder();
     do {
-      let entries: readonly ReadonlyJSONObject[];
-      [entries, done] = await nextPromise;
-      nextPromise = JSONLogFileScan(cursor);
-      // [entries, done] = await JSONLogFileScan(cursor);
-      const commits = Commit.fromJSArr(this.orgId, entries, this.registry);
+      const result = await nextPromise;
+      done = result.done;
+      if (!done) nextPromise = JSONLogFileScan(cursor);
+      let commits: Commit[];
+      if (result.buffer && result.offsets) {
+        // Binary (.goat) single-buffer path: subarray-backed BinaryCommits
+        commits = Commit.fromBinaryScanResult(
+          this.orgId,
+          result.buffer,
+          result.offsets,
+          this.registry,
+        );
+      } else {
+        const entries = result.values ?? [];
+        if (isJSONL) {
+          commits = Commit.fromJSArr(
+            this.orgId,
+            entries.map((e) =>
+              JSON.parse(textDecoder.decode(e)) as ReadonlyJSONObject
+            ),
+            this.registry,
+          );
+        } else {
+          commits = Commit.fromBinaryBytesArr(
+            this.orgId,
+            entries as Uint8Array[],
+            this.registry,
+          );
+        }
+      }
       if (commits.length > 0) {
         loadedFromBackup = true;
       }
-      // for (const c of commits) {
-      //   commitIds.add(c.id);
-      // }
       await repo.persistVerifiedCommits(commits);
     } while (!done);
-    // Pre-assemble all commit graphs
-    // for (const k of repo.keys()) {
-    //   repo.valueForKey(k);
-    // }
-    repo.unmute();
     repo.attach('NewCommitSync', (c: Commit) => {
-      // if (!commitIds.has(c.id)) {
-      JSONLogFileAppend(file, [c.toJS()]);
-      // commitIds.add(c.id);
-      // }
+      let pending = this._pendingAppends.get(file);
+      if (!pending) {
+        pending = { values: [], ids: [], bytes: 0 };
+        this._pendingAppends.set(file, pending);
+      }
+      const encoded = isJSONL
+        ? textEncoder.encode(JSON.stringify(c.toJS()))
+        : c.toBytes();
+      pending.values.push(encoded);
+      pending.ids.push(c.id);
+      pending.bytes += encoded.byteLength;
+      if (
+        pending.values.length >= AUTO_FLUSH_THRESHOLD ||
+        pending.bytes >= AUTO_FLUSH_BYTES
+      ) {
+        const prev = this._inFlightDrains.get(file) ?? Promise.resolve();
+        const p = prev.catch(() => {}).then(() =>
+          this._drainPendingAppends(file, repoId)
+        );
+        this._inFlightDrains.set(file, p);
+        p.finally(() => {
+          if (this._inFlightDrains.get(file) === p) {
+            this._inFlightDrains.delete(file);
+          }
+        });
+      }
     });
     repo.attach('NewCommit', async (c: Commit) => {
       await repo.mergeIfNeeded(c.key);
@@ -875,6 +1193,7 @@ export class GoatDB<US extends Schema = Schema>
         }
       }
     });
+    repo.unmute();
     if (this._syncSchedulers) {
       const clients: RepoClient[] = [];
       for (const scheduler of this._syncSchedulers) {
@@ -893,8 +1212,13 @@ export class GoatDB<US extends Schema = Schema>
         ) {
           try {
             await c.sync();
-          } catch (_: unknown) {
-            // Ignore
+          } catch (e: unknown) {
+            log({
+              severity: 'WARNING',
+              error: 'UnknownSyncError',
+              message: `Initial sync failed for ${repoId}`,
+              trace: String(e),
+            });
           }
         }
         c.startSyncing();
@@ -916,12 +1240,19 @@ export class GoatDB<US extends Schema = Schema>
   }
 }
 
-function relativePathForRepo(repoId: string): string {
+function relativePathForRepo(repoId: string, format: StorageFormat): string {
   const [storage, id] = Repository.parseId(Repository.normalizePath(repoId));
-  return path.join(storage, id + '.jsonl');
+  return path.join(storage, id + '.' + format);
 }
 
 let gSelectedInstanceNumber = -1;
+// Max consecutive write failures before buffered commits are dropped and a
+// WriteFailure event is emitted. Also used as the retry limit in closeRepo().
+const MAX_WRITE_FAILURES = 3;
+// Number of buffered commits before auto-flushing to prevent unbounded growth.
+const AUTO_FLUSH_THRESHOLD = 1000;
+// Byte total of buffered commits before auto-flushing regardless of count.
+const AUTO_FLUSH_BYTES = 4 * 1024 * 1024; // 4 MB
 
 /**
  * Picks a unique instance number for this browser tab (or worker), used to
@@ -948,36 +1279,55 @@ let gSelectedInstanceNumber = -1;
  * @returns A Promise that resolves to the selected instance number, or
  *          `undefined` if not applicable.
  */
-async function pickInstanceNumber(
-  startIndex: number = 0,
-): Promise<number | undefined> {
-  if ((await FileImplGet()) === FileImplOPFS) {
-    const indefinitePromise = new Promise<void>(() => {
-    });
+async function pickInstanceNumber(): Promise<number | undefined> {
+  if ((await FileImplGet()) !== FileImplOPFS) {
+    return undefined;
+  }
+  if (gSelectedInstanceNumber >= 0) {
+    return gSelectedInstanceNumber;
+  }
+  const indefinitePromise = new Promise<void>(() => {});
+  const MAX_INSTANCES = 64;
+  for (let i = 0; i < MAX_INSTANCES; i++) {
+    const idx = i;
     let resolve: (value: number | undefined) => void;
     const promise = new Promise<number | undefined>((res) => {
       resolve = res;
     });
-    if (gSelectedInstanceNumber >= 0) {
-      resolve!(gSelectedInstanceNumber);
-    }
     navigator.locks.request(
-      'GoatDB-' + startIndex,
+      'GoatDB-' + idx,
       { ifAvailable: true },
-      async (lockOrNull) => {
-        if (lockOrNull === null) {
-          const idx = (await pickInstanceNumber(startIndex + 1))!;
-          gSelectedInstanceNumber = idx;
-          resolve(idx);
-        }
+      (lockOrNull) => {
         if (lockOrNull !== null) {
-          resolve(startIndex);
+          resolve(idx);
           return indefinitePromise;
         }
+        resolve(undefined);
       },
     );
-    return promise;
-  } else {
-    return Promise.resolve(undefined);
+    const result = await promise;
+    if (result !== undefined) {
+      gSelectedInstanceNumber = result;
+      return result;
+    }
   }
+  // All slots taken — block on last slot's lock to serialize access.
+  // This typically means too many tabs are open simultaneously.
+  log({
+    severity: 'WARNING',
+    error: 'StorageError',
+    message:
+      `[GoatDB] All ${MAX_INSTANCES} OPFS instance slots are taken; blocking on slot ${
+        MAX_INSTANCES - 1
+      }. Too many tabs open?`,
+  });
+  const idx = MAX_INSTANCES - 1;
+  await new Promise<void>((resolve) => {
+    navigator.locks.request('GoatDB-' + idx, () => {
+      gSelectedInstanceNumber = idx;
+      resolve();
+      return indefinitePromise;
+    });
+  });
+  return gSelectedInstanceNumber;
 }

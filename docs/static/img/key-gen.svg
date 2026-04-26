@@ -30,7 +30,7 @@
     <rect x="40" y="80" width="160" height="80" rx="4" ry="4" class="bg-card"/>
     <text x="55" y="105" class="text-icon-small text-key-private">🔑</text>
     <text x="80" y="105" class="text-code text-key-private">Private Key</text>
-    <text x="120" y="125" text-anchor="middle" class="text-body">ECDSA P-384</text>
+    <text x="120" y="125" text-anchor="middle" class="text-body">Ed25519</text>
     <text x="120" y="145" text-anchor="middle" class="text-body">Stored locally</text>
   </g>
 

@@ -145,7 +145,6 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
 
   protected buildSyncMessage(
     includeMissing: boolean,
-    lowAccuracy?: boolean,
   ): Promise<SyncMessage> {
     const repo = this.repo;
     const session = repo.trustPool.currentSession;
@@ -158,7 +157,6 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
       this.orgId,
       this.registry,
       includeMissing,
-      lowAccuracy,
     );
   }
 
@@ -269,7 +267,7 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
     if (syncResp.buildVersion !== config.version) {
       // New version detected. Save everything before continuing.
       await this.repo.db.flushAll();
-      if (config.debug) {
+      if (config.debug && typeof location !== 'undefined') {
         location.reload();
       } else {
         this._setIsOnline(false);
@@ -299,7 +297,6 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
       }
     }
 
-    this._requestInProgress = false;
     if (this.closed) {
       return false;
     }
@@ -308,9 +305,6 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
       this.touch();
     }
 
-    // if (persistedCount > 0 || this.needsReplication()) {
-    //   this.touch();
-    // }
     this._setIsOnline(true);
     if (this.status !== startingStatus) {
       this.emit(EVENT_STATUS_CHANGED);
@@ -347,7 +341,6 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
   }
 
   needsReplication(): boolean {
-    // if (performance.now() - this._lastComputedNeedsReplication >= 100) {
     const serverFilter = this._previousServerFilter;
     if (!serverFilter) {
       this._cachedNeedsReplication = false;
@@ -360,19 +353,7 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
         }
       }
     }
-    //   this._lastComputedNeedsReplication = performance.now();
-    // }
     return this._cachedNeedsReplication;
-    // const serverFilter = this._previousServerFilter;
-    // if (!serverFilter) {
-    //   return false;
-    // }
-    // for (const id of this.localIds()) {
-    //   if (!serverFilter.has(id)) {
-    //     return true;
-    //   }
-    // }
-    // return false;
   }
 
   touch(): void {

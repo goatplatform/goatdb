@@ -208,6 +208,353 @@ export default function setup() {
     }
   });
 
+  TEST('MergeLCA', 'ancestor jump over missing parent', async (ctx) => {
+    const db = await ctx.createDB('lca-ancestor-jump', {
+      registry: kMergeTestRegistry,
+    });
+    try {
+      await db.readyPromise();
+      await db.open('/merge-test/lca-aj');
+      const repo = db.repository('/merge-test/lca-aj')!;
+
+      // Chain: root -> A -> B -> C, branch at A -> D
+      // Persist all except B. C.ancestors includes A.
+      const root = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'root' },
+      });
+      const a = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'a' },
+        parents: [root.id],
+      });
+      const b = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'b' },
+        parents: [a.id],
+      });
+      const c = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'c' },
+        parents: [b.id],
+        ancestors: [a.id],
+      });
+      const d = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'd' },
+        parents: [a.id],
+      });
+
+      // Persist all except B — ancestor pointer on C bridges the gap
+      await repo.persistVerifiedCommits([root, a, c, d]);
+      const [commits, base] = repo.findMergeBase([c, d]);
+      assertExists(base, 'LCA should be found via ancestor pointer');
+      assertEquals(base!.id, a.id, 'LCA should be A (jumped over missing B)');
+      assertEquals(commits.length, 2, 'both leaves should be included');
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('MergeLCA', 'closer candidate missing defers merge', async (ctx) => {
+    const db = await ctx.createDB('lca-defer', {
+      registry: kMergeTestRegistry,
+    });
+    try {
+      await db.readyPromise();
+      await db.open('/merge-test/lca-defer');
+      const repo = db.repository('/merge-test/lca-defer')!;
+
+      // Chain: root -> A -> B -> C -> D (leaf1), root -> A -> B -> E (leaf2)
+      // Persist all except B. Both D and E have B and A in ancestors.
+      // Intersection = {B, A}. B is closer but missing -> defer.
+      const root = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'root' },
+      });
+      const a = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'a' },
+        parents: [root.id],
+      });
+      const b = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'b' },
+        parents: [a.id],
+      });
+      const c = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'c' },
+        parents: [b.id],
+        ancestors: [b.id, a.id],
+      });
+      const d = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'd' },
+        parents: [c.id],
+        ancestors: [b.id, a.id],
+      });
+      const e = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'e' },
+        parents: [b.id],
+        ancestors: [b.id, a.id],
+      });
+
+      // Persist all except B
+      await repo.persistVerifiedCommits([root, a, c, d, e]);
+      const [commits] = repo.findMergeBase([d, e]);
+      // E is excluded from merge (deferred) because closest candidate B is missing.
+      // D remains as the initial result commit.
+      assertEquals(
+        commits.length,
+        1,
+        'deferred leaf should be excluded from merge',
+      );
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('MergeLCA', 'closer candidate available uses it', async (ctx) => {
+    const db = await ctx.createDB('lca-closer-avail', {
+      registry: kMergeTestRegistry,
+    });
+    try {
+      await db.readyPromise();
+      await db.open('/merge-test/lca-ca');
+      const repo = db.repository('/merge-test/lca-ca')!;
+
+      // Same graph as above but persist B too
+      const root = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'root' },
+      });
+      const a = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'a' },
+        parents: [root.id],
+      });
+      const b = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'b' },
+        parents: [a.id],
+      });
+      const d = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'd' },
+        parents: [b.id],
+        ancestors: [b.id, a.id],
+      });
+      const e = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'e' },
+        parents: [b.id],
+        ancestors: [b.id, a.id],
+      });
+
+      await repo.persistVerifiedCommits([root, a, b, d, e]);
+      const [commits, base] = repo.findMergeBase([d, e]);
+      assertExists(base, 'LCA should be found');
+      assertEquals(base!.id, b.id, 'LCA should be B (closest available)');
+      assertEquals(commits.length, 2, 'both leaves should be included');
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('MergeLCA', 'all candidates missing defers merge', async (ctx) => {
+    const db = await ctx.createDB('lca-all-missing', {
+      registry: kMergeTestRegistry,
+    });
+    try {
+      await db.readyPromise();
+      await db.open('/merge-test/lca-am');
+      const repo = db.repository('/merge-test/lca-am')!;
+
+      // Two leaves that share ancestors A and B, but neither is persisted
+      const root = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'root' },
+      });
+      const a = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'a' },
+        parents: [root.id],
+      });
+      const b = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'b' },
+        parents: [a.id],
+      });
+      const d = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'd' },
+        parents: [b.id],
+        ancestors: [b.id, a.id],
+      });
+      const e = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'e' },
+        parents: [b.id],
+        ancestors: [b.id, a.id],
+      });
+
+      // Only persist the leaves, not their ancestors
+      await repo.persistVerifiedCommits([d, e]);
+      const [commits] = repo.findMergeBase([d, e]);
+      assertEquals(
+        commits.length,
+        1,
+        'all candidates missing should defer merge',
+      );
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('MergeLCA', 'genuine disconnection no defer', async (ctx) => {
+    const db = await ctx.createDB('lca-disconnect', {
+      registry: kMergeTestRegistry,
+    });
+    try {
+      await db.readyPromise();
+      await db.open('/merge-test/lca-disc');
+      const repo = db.repository('/merge-test/lca-disc')!;
+
+      // Two completely separate chains with no shared ancestry
+      const rootA = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'rootA' },
+      });
+      const leafA = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'leafA' },
+        parents: [rootA.id],
+      });
+      const rootB = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'rootB' },
+      });
+      const leafB = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'leafB' },
+        parents: [rootB.id],
+      });
+
+      await repo.persistVerifiedCommits([rootA, leafA, rootB, leafB]);
+      const [commits, base, _scheme, reachedRoot] = repo.findMergeBase([
+        leafA,
+        leafB,
+      ]);
+      assertTrue(reachedRoot, 'should reach root for disconnected graphs');
+      // No shared ancestry: leafB excluded, no defer (genuine disconnection)
+      assertEquals(commits.length, 1, 'disconnected leaf should be excluded');
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('MergeLCA', 'depth refinement picks closer LCA', async (ctx) => {
+    const db = await ctx.createDB('lca-depth-refine', {
+      registry: kMergeTestRegistry,
+    });
+    try {
+      await db.readyPromise();
+      await db.open('/merge-test/lca-dr');
+      const repo = db.repository('/merge-test/lca-dr')!;
+
+      // Diamond: root -> A -> B -> leaf1, root -> A -> C -> leaf2
+      // Ancestor shortcuts on both leaves point to root (depth 2).
+      // BFS discovers A at depth 2 on both sides. Root and A tie on total
+      // depth (4), but A has a higher timestamp and wins the tiebreak.
+      // Before the setMinDepth fix, a refined depth could leave children
+      // with stale high depths, breaking the ranking for deeper graphs.
+      const root = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'root' },
+        timestamp: 1000,
+      });
+      const a = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'a' },
+        parents: [root.id],
+        timestamp: 2000,
+      });
+      const b = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'b' },
+        parents: [a.id],
+        timestamp: 3000,
+      });
+      const c = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'c' },
+        parents: [a.id],
+        timestamp: 3000,
+      });
+      const leaf1 = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'leaf1' },
+        parents: [b.id],
+        ancestors: [root.id],
+        timestamp: 4000,
+      });
+      const leaf2 = createRawCommit({
+        key: 'k1',
+        schema: S,
+        data: { title: 'leaf2' },
+        parents: [c.id],
+        ancestors: [root.id],
+        timestamp: 4000,
+      });
+
+      await repo.persistVerifiedCommits([root, a, b, c, leaf1, leaf2]);
+      const [commits, base] = repo.findMergeBase([leaf1, leaf2]);
+      assertExists(base, 'LCA should be found');
+      assertEquals(base!.id, a.id, 'LCA should be A (closer than root)');
+      assertEquals(commits.length, 2, 'both leaves should be included');
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
   TEST('MergeLCA', 'n-way merge 3+ leaves', async (ctx) => {
     const db = await ctx.createDB('lca-nway', {
       registry: kMergeTestRegistry,

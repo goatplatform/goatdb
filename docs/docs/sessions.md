@@ -19,7 +19,7 @@ with [user management](/docs/authorization).
 ## Understanding Session-Based Authentication
 
 At its core, GoatDB's authentication system revolves around sessions - secure
-connections to the database that are represented by **ECDSA P-384 public/private
+connections to the database that are represented by **Ed25519 public/private
 key pairs**. The private key is generated and stored exclusively on the peer's
 machine, never leaving its local storage. Only the corresponding public key is
 shared with the GoatDB network.

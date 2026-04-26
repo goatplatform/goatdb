@@ -95,5 +95,23 @@ export default function setup(): void {
     assertEquals(itemPathIsValid('/sys/repo1/item1/embed1/extra'), false); // too many components
     assertEquals(itemPathIsValid(''), false); // empty path
     assertEquals(itemPathIsValid('/sys/repo 1/item1'), false); // space
+
+    // Test 39-byte component length limit
+    assertEquals(
+      itemPathIsValid('/sys/' + 'a'.repeat(39) + '/item1'),
+      true,
+    ); // exactly 39
+    assertEquals(
+      itemPathIsValid('/sys/' + 'a'.repeat(40) + '/item1'),
+      false,
+    ); // 40 chars rejected
+    assertEquals(
+      itemPathIsValid('/sys/repo1/' + 'a'.repeat(39)),
+      true,
+    ); // item at limit
+    assertEquals(
+      itemPathIsValid('/sys/repo1/' + 'a'.repeat(40)),
+      false,
+    ); // item over limit
   });
 }

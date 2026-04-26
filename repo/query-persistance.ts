@@ -15,7 +15,6 @@ const QUERY_CACHE_VERSION = 1;
  */
 export interface QueryCache {
   readonly age: number;
-  // readonly filter: BloomFilter;
   readonly results: string[];
 }
 
@@ -118,7 +117,7 @@ export class QueryPersistence {
       false,
       () => this.flushAll(),
       'Query Persistance Flush',
-    ).schedule();
+    );
     this._loadingPromises = new Map();
     this._flushPromises = new Map();
   }
@@ -162,9 +161,9 @@ export class QueryPersistence {
     const set = this._queries.get(query.repo.path);
     if (set) {
       set.delete(query);
+      this._persistedGeneration.delete(query);
       if (set.size === 0) {
         this._queries.delete(query.repo.path);
-        this._persistedGeneration.delete(query);
       }
     }
   }
@@ -219,7 +218,7 @@ export class QueryPersistence {
       return new Map();
     }
     const map = new Map();
-    for (const queryId in json.queries) {
+    for (const queryId of Object.keys(json.queries)) {
       map.set(queryId, json.queries[queryId]);
     }
     return map;
@@ -267,31 +266,43 @@ export class QueryPersistence {
       return;
     }
     repoId = Repository.normalizePath(repoId);
-    let changed = false;
-    const queries = this._queries.get(repoId) || [];
-    for (const q of queries) {
-      const prevGen = this._persistedGeneration.get(q) || 0;
-      if (prevGen !== q.age) {
-        changed = true;
-        break;
+    try {
+      let changed = false;
+      const queries = this._queries.get(repoId) || [];
+      for (const q of queries) {
+        const prevGen = this._persistedGeneration.get(q) || 0;
+        if (prevGen !== q.age) {
+          changed = true;
+          break;
+        }
       }
-    }
-    if (!changed) {
-      return;
-    }
-    const repoCache: EncodedRepoCache = {
-      version: QUERY_CACHE_VERSION,
-      queries: {},
-    };
-    for (const q of queries) {
-      repoCache.queries[q.id] = {
-        age: q.age,
-        results: Array.from(q.paths()),
+      if (!changed) {
+        return;
+      }
+      const repoCache: EncodedRepoCache = {
+        version: QUERY_CACHE_VERSION,
+        queries: {},
       };
+      for (const q of queries) {
+        repoCache.queries[q.id] = {
+          age: q.age,
+          results: Array.from(q.paths()),
+        };
+      }
+      await this.storage.store(repoId, repoCache);
+      // Populate in-memory cache with the data we just wrote
+      const map = new Map<string, QueryCache>();
+      for (const queryId of Object.keys(repoCache.queries)) {
+        map.set(queryId, repoCache.queries[queryId]);
+      }
+      this._cachedDataForRepo.set(repoId, map);
+      // Track persisted generation to skip unchanged flushes
+      for (const q of queries) {
+        this._persistedGeneration.set(q, q.age);
+      }
+    } finally {
+      this._flushPromises.delete(repoId);
     }
-    this._cachedDataForRepo.delete(repoId);
-    await this.storage.store(repoId, repoCache);
-    this._flushPromises.delete(repoId);
   }
 
   /**

@@ -14,6 +14,30 @@ leaves of the [commit graph](/docs/commit-graph), it performs a
 to resolve the conflict. Internally, a conflict-free patch function is used
 temporarily during the merge process.
 
+## Merge Base Selection
+
+A three-way merge needs a **base version** — the point where the two divergent
+branches last shared the same state. GoatDB finds this base by computing the
+Lowest Common Ancestor (LCA) of the two leaf commits in the
+[commit graph](/docs/commit-graph).
+
+The LCA algorithm walks the graph from both leaves simultaneously, expanding
+through both parent links and [ancestor pointers](/docs/commit-graph#ancestor-pointers).
+It tracks the depth (number of hops) from each leaf to every reachable commit
+and builds an intersection of commits reachable from both sides. Among
+candidates in the intersection, the one with the lowest combined depth from
+both leaves is selected — this is the closest common ancestor.
+
+When the closest candidate exists in the intersection but has not yet been
+synced to the local peer, the merge is **deferred** rather than falling back to
+a farther ancestor. A farther base would produce a wider diff and risk
+reverting intermediate changes. The deferred leaf stays in the graph and is
+retried on the next merge attempt, after the [sync protocol](/docs/sync)
+delivers the missing commit. See the
+[sync page](/docs/sync#merge-deferral-on-incomplete-graphs) for how ancestor
+pointers and bloom-filter false-positive rates interact to keep deferrals rare
+in practice.
+
 ## CRDTs
 
 [Conflict-Free Replicated Data Structures (CRDTs)](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type)

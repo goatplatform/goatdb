@@ -35,8 +35,10 @@ export async function compileForNodeWithEsbuild(
       'postject',
     ],
     banner: {
+      // Aliased to __createRequire__ to avoid potential naming conflicts with
+      // npm packages that also declare `createRequire` in their bundle headers.
       js:
-        "import { createRequire } from 'node:module';const require = createRequire(import.meta.url);globalThis.require = require;",
+        "import { createRequire as __createRequire__ } from 'node:module';const require = __createRequire__(import.meta.url);globalThis.require = require;",
     },
     logOverride: {
       'empty-import-meta': 'silent',

@@ -26,17 +26,22 @@ import {
 } from '../logging/log.ts';
 import { ConsoleLogStream } from '../logging/console-stream.ts';
 import type { NormalizedLogEntry } from '../logging/entry.ts';
+import { clearOPFS } from '../base/json-log/file-impl-opfs.ts';
+import { notReached } from '../base/error.ts';
 
 // All browser-compatible existing tests (no Server class usage)
 import setupAssertsTests from './asserts.test.ts';
 import setupOrderstamp from './orderstamp-expose.test.ts';
 import setupItemPath from './item-path.ts';
+import setupBinaryEncoding from './binary-encoding.test.ts';
+import setupJsonLogFormats from './json-log-formats.test.ts';
 import setupCommit from './commit.test.ts';
 import setupSession from './session.test.ts';
 import setupTrusted from './db-trusted.test.ts';
 import setupGoatRequest from './goat-request.test.ts';
 import setupStaticAssetsEndpoint from './static-assets-endpoint.test.ts';
 import setupHealthCheckEndpoint from './health-check-endpoint.test.ts';
+import setupLiveQuery from './live-query.test.ts';
 import { getEnvVar } from '../base/os.ts';
 
 /**
@@ -74,11 +79,14 @@ export function registerBrowserTests(): void {
   setupHealthCheckEndpoint(); // Simple HTTP endpoint check
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
+  setupBinaryEncoding(); // Binary commit format encoding roundtrip
+  setupJsonLogFormats(); // GOAT binary/JSONL storage format roundtrip and edge cases
   setupCommit(); // Core commit/versioning logic
   setupSession(); // Authentication and session management
   setupGoatRequest(); // HTTP request processing
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
+  setupLiveQuery(); // Live query membership updates on ManagedItem edits
   setupTrusted(); // Database operations in trusted mode - CRITICAL for browser
   setupStaticAssetsEndpoint(); // File serving and asset management
 }
@@ -87,6 +95,9 @@ export function registerBrowserTests(): void {
  * Browser test entry point - all browser-compatible existing tests.
  */
 async function main(): Promise<void> {
+  // Wipe OPFS to prevent stale data from previous runs contaminating results
+  await clearOPFS();
+
   registerBrowserTests();
 
   // Get test configuration
@@ -161,4 +172,6 @@ async function main(): Promise<void> {
 // Auto-run when used as entry point or in browser
 if (isBrowser()) {
   void main();
+} else {
+  notReached('Tests entry point should only be used in browser environment');
 }

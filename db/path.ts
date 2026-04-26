@@ -169,7 +169,7 @@ const kValidItemPathChars = 'abcdefghijklmnopqrstuvwxyz0123456789-_';
  * Checks if the given path is valid.
  * Valid paths must contain lowercase letters, numbers, and the characters
  * `-` and `_`. They must also contain at most 4 components separated by `/`
- * characters.
+ * characters. Each path component must be at most 39 bytes.
  *
  * @param path The path to validate.
  * @returns True if the path is valid, false otherwise.
@@ -183,12 +183,16 @@ export function itemPathIsValid(path: string): boolean {
     return false;
   }
   let sepCount = 0;
+  let componentLen = 0;
   for (let i = 0; i < path.length; ++i) {
     if (path[i] === '/') {
       if (++sepCount > 4) {
         return false;
       }
+      componentLen = 0;
     } else if (!kValidItemPathChars.includes(path[i])) {
+      return false;
+    } else if (++componentLen > 39) {
       return false;
     }
   }

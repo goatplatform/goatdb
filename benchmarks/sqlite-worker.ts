@@ -201,7 +201,7 @@ export class SQLiteWorkerManager {
         });
         await this._promiser('exec', {
           dbId,
-          sql: 'PRAGMA cache_size = -4000',
+          sql: 'PRAGMA cache_size = -65536',
         });
         await this._promiser('exec', {
           dbId,
@@ -218,7 +218,7 @@ export class SQLiteWorkerManager {
         });
         await this._promiser('exec', {
           dbId,
-          sql: 'PRAGMA cache_size = -2000',
+          sql: 'PRAGMA cache_size = -65536',
         });
       }
 
@@ -245,6 +245,24 @@ export class SQLiteWorkerManager {
           tags TEXT DEFAULT '[]'
         )
       `,
+    });
+    await this._promiser('exec', {
+      dbId,
+      sql: `CREATE INDEX IF NOT EXISTS idx_count ON test_items(count)`,
+    });
+    await this._promiser('exec', {
+      dbId,
+      sql: `
+        CREATE TABLE IF NOT EXISTS item_tags (
+          item_id TEXT NOT NULL,
+          tag TEXT NOT NULL,
+          PRIMARY KEY (item_id, tag)
+        )
+      `,
+    });
+    await this._promiser('exec', {
+      dbId,
+      sql: `CREATE INDEX IF NOT EXISTS idx_item_tags_tag ON item_tags(tag)`,
     });
   }
 
