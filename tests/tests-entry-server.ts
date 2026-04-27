@@ -20,7 +20,12 @@
  * browser tests, see `tests-entry-browser.ts`.
  */
 
-import { TestsRunner, type TestSummary } from './mod.ts';
+import {
+  EXIT_CODE_NO_MATCH,
+  NoMatchError,
+  TestsRunner,
+  type TestSummary,
+} from './mod.ts';
 import { registerAllTests } from './test-registry.ts';
 import { exit } from '../base/process.ts';
 import { getEnvVar } from '../base/os.ts';
@@ -63,10 +68,19 @@ async function main(): Promise<void> {
   const testName = getEnvVar('GOATDB_TEST');
 
   // Run the tests
-  const summary: TestSummary = await TestsRunner.default.run(
-    suiteName,
-    testName,
-  );
+  let summary: TestSummary;
+  try {
+    summary = await TestsRunner.default.run(
+      suiteName,
+      testName,
+    );
+  } catch (error) {
+    if (error instanceof NoMatchError) {
+      await exit(EXIT_CODE_NO_MATCH);
+      return;
+    }
+    throw error;
+  }
 
   // Print summary
   TestsRunner.printSummary(summary);

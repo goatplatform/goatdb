@@ -1,4 +1,4 @@
-import { formatNoMatchingTestsMessage } from '../tests/mod.ts';
+import { EXIT_CODE_NO_MATCH, NoMatchError } from './error.ts';
 
 export type RuntimeName = 'deno' | 'node' | 'browser';
 
@@ -53,7 +53,7 @@ export function isBrowserStructuredNoMatchResult(
     typeof error.message === 'string' &&
     (error.stack === undefined || typeof error.stack === 'string') &&
     result.completed === true &&
-    typeof result.exitCode === 'number';
+    result.exitCode === EXIT_CODE_NO_MATCH;
 }
 
 export function finalizeFilteredRuntimeOutcomes(
@@ -74,6 +74,6 @@ export function finalizeFilteredRuntimeOutcomes(
   const noMatchRuntimeCount =
     outcomes.filter((outcome) => outcome.status === 'no-match').length;
   if (noMatchRuntimeCount === outcomes.length) {
-    throw new Error(formatNoMatchingTestsMessage(suite, test));
+    throw new NoMatchError(suite, test);
   }
 }

@@ -1,4 +1,4 @@
-import { TEST, TestsRunner } from './mod.ts';
+import { EXIT_CODE_NO_MATCH, NoMatchError, TEST, TestsRunner } from './mod.ts';
 import {
   assertEquals,
   assertLessThan,
@@ -9,6 +9,7 @@ import { getRuntime } from '../base/runtime/index.ts';
 import {
   finalizeFilteredRuntimeOutcomes,
   isBrowserStructuredNoMatchResult,
+  type RuntimeFilterOutcome,
 } from '../base/runtime-filter.ts';
 
 const kPromptFailureThresholdMs = 15000;
@@ -119,7 +120,7 @@ export default function setupTestRunnerTests(): void {
             'MissingSuite',
           );
         },
-        Error,
+        NoMatchError,
         'No tests matched --suite="MissingSuite"',
       );
     },
@@ -141,7 +142,7 @@ export default function setupTestRunnerTests(): void {
             'missing',
           );
         },
-        Error,
+        NoMatchError,
         'No tests matched --test="missing"',
       );
     },
@@ -164,7 +165,7 @@ export default function setupTestRunnerTests(): void {
             message: 'No tests matched --test="missing"',
           },
           completed: true,
-          exitCode: 1,
+          exitCode: EXIT_CODE_NO_MATCH,
         }),
         'structured browser no-match payload must be detectable by the orchestrator',
       );
@@ -191,7 +192,7 @@ export default function setupTestRunnerTests(): void {
           duration: 0,
           results: [],
           completed: true,
-          exitCode: 1,
+          exitCode: EXIT_CODE_NO_MATCH,
         }),
         'browser no-match payloads must include the structured error details',
       );
@@ -209,7 +210,7 @@ export default function setupTestRunnerTests(): void {
         async () => {
           await runner.run(undefined, 'missing');
         },
-        Error,
+        NoMatchError,
         'No tests matched --test="missing"',
       );
     },
@@ -226,7 +227,7 @@ export default function setupTestRunnerTests(): void {
         async () => {
           await runner.run('MissingSuite');
         },
-        Error,
+        NoMatchError,
         'No tests matched --suite="MissingSuite"',
       );
     },
@@ -244,7 +245,7 @@ export default function setupTestRunnerTests(): void {
         async () => {
           await runner.run('Alpha', 'other');
         },
-        Error,
+        NoMatchError,
         'No tests matched --suite="Alpha" --test="other"',
       );
     },
@@ -419,6 +420,141 @@ export default function setupTestRunnerTests(): void {
         stderrText.includes('Deno execution failed with exit code 7'),
         'Deno subprocess failures must report the child exit code',
       );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'finalizeFilteredRuntimeOutcomes is a no-op without filters',
+    () => {
+      const outcomes: RuntimeFilterOutcome[] = [{
+        runtime: 'deno',
+        status: 'no-match',
+      }];
+      const before = structuredClone(outcomes);
+      finalizeFilteredRuntimeOutcomes(outcomes);
+      assertEquals(outcomes, before);
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'finalizeFilteredRuntimeOutcomes is a no-op with empty outcomes',
+    () => {
+      const outcomes: RuntimeFilterOutcome[] = [];
+      const before = structuredClone(outcomes);
+      finalizeFilteredRuntimeOutcomes(outcomes, 'MissingSuite');
+      assertEquals(outcomes, before);
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'isBrowserStructuredNoMatchResult rejects totalTests > 0 with status no-match',
+    () => {
+      assertTrue(
+        !isBrowserStructuredNoMatchResult({
+          status: 'no-match',
+          totalTests: 1,
+          passed: 0,
+          failed: 0,
+          duration: 0,
+          results: [],
+          error: {
+            name: 'Error',
+            message: 'No tests matched',
+          },
+          completed: true,
+          exitCode: EXIT_CODE_NO_MATCH,
+        }),
+        'no-match status with totalTests > 0 is malformed',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'isBrowserStructuredNoMatchResult accepts valid no-match result',
+    () => {
+      assertTrue(
+        isBrowserStructuredNoMatchResult({
+          status: 'no-match',
+          totalTests: 0,
+          passed: 0,
+          failed: 0,
+          duration: 0,
+          results: [],
+          error: {
+            name: 'Error',
+            message: 'No tests matched --test="missing"',
+          },
+          completed: true,
+          exitCode: EXIT_CODE_NO_MATCH,
+        }),
+        'valid browser no-match payload must be detectable',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'isBrowserStructuredNoMatchResult rejects no-match payloads with non-no-match exit codes',
+    () => {
+      const payload = {
+        status: 'no-match',
+        totalTests: 0,
+        passed: 0,
+        failed: 0,
+        duration: 0,
+        results: [],
+        error: {
+          name: 'Error',
+          message: 'No tests matched --test="missing"',
+        },
+        completed: true,
+      };
+
+      assertTrue(
+        !isBrowserStructuredNoMatchResult({ ...payload, exitCode: 0 }),
+        'successful browser exits are not no-match results',
+      );
+      assertTrue(
+        !isBrowserStructuredNoMatchResult({ ...payload, exitCode: 1 }),
+        'generic browser failures are not no-match results',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'NoMatchError has correct name and message',
+    () => {
+      const err = new NoMatchError('MySuite', 'myTest');
+      assertEquals(err.name, 'NoMatchError');
+      assertTrue(err.message.includes('--suite="MySuite"'));
+      assertTrue(err.message.includes('--test="myTest"'));
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'NoMatchError with suite only includes suite flag',
+    () => {
+      const err = new NoMatchError('MySuite', undefined);
+      assertEquals(err.name, 'NoMatchError');
+      assertTrue(err.message.includes('--suite="MySuite"'));
+      assertTrue(!err.message.includes('--test='));
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'NoMatchError with test only includes test flag',
+    () => {
+      const err = new NoMatchError(undefined, 'myTest');
+      assertEquals(err.name, 'NoMatchError');
+      assertTrue(!err.message.includes('--suite='));
+      assertTrue(err.message.includes('--test="myTest"'));
     },
   );
 }

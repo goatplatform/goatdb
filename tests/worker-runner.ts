@@ -225,6 +225,11 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       } satisfies ReadyMessage,
     );
 
+    // No tests match the filter — main thread will reject; nothing to run.
+    if (testCount === 0 && (payload.suiteName || payload.testName)) {
+      return;
+    }
+
     // Run the tests
     const summary = await runTests(payload.suiteName, payload.testName);
 

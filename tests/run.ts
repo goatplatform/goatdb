@@ -1,4 +1,5 @@
 import { runAcrossPlatforms } from '../base/multi-runner.ts';
+import { EXIT_CODE_NO_MATCH, NoMatchError } from './mod.ts';
 import { sourceMapDecoder } from './browser/sourcemap-decoder.ts';
 
 /**
@@ -125,7 +126,7 @@ async function runTests(): Promise<void> {
     // Cleanup sourcemap decoder on error
     sourceMapDecoder.destroy();
     console.error('Test execution failed:', (error as Error).message);
-    Deno.exit(1);
+    Deno.exit(error instanceof NoMatchError ? EXIT_CODE_NO_MATCH : 1);
   }
 }
 

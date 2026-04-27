@@ -14,7 +14,8 @@
 import { isBrowser } from '../base/common.ts';
 import type { BrowserStructuredNoMatchResult } from '../base/runtime-filter.ts';
 import {
-  formatNoMatchingTestsMessage,
+  EXIT_CODE_NO_MATCH,
+  NoMatchError,
   TestsRunner,
   type TestSummary,
 } from './mod.ts';
@@ -120,10 +121,7 @@ async function main(): Promise<void> {
       testName,
     );
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === formatNoMatchingTestsMessage(suiteName, testName)
-    ) {
+    if (error instanceof NoMatchError) {
       const noMatchResult: BrowserStructuredNoMatchResult = {
         status: 'no-match',
         totalTests: 0,
@@ -137,14 +135,14 @@ async function main(): Promise<void> {
           stack: error.stack,
         },
         completed: true,
-        exitCode: 1,
+        exitCode: EXIT_CODE_NO_MATCH,
       };
 
       (globalThis as any).testResults = noMatchResult;
       globalThis.dispatchEvent(
         new CustomEvent('testsComplete', { detail: noMatchResult }),
       );
-      await exit(1);
+      await exit(EXIT_CODE_NO_MATCH);
       return;
     }
     throw error;

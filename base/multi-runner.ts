@@ -4,12 +4,9 @@ import {
   isBrowserStructuredNoMatchResult,
   type RuntimeFilterOutcome,
 } from './runtime-filter.ts';
+import { EXIT_CODE_NO_MATCH, NoMatchError } from './error.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
-import {
-  formatNoMatchingTestsMessage,
-  TestsRunner,
-  type TestSummary,
-} from '../tests/mod.ts';
+import { TestsRunner, type TestSummary } from '../tests/mod.ts';
 import { registerAllTests } from '../tests/test-registry.ts';
 
 /**
@@ -122,7 +119,7 @@ async function runDenoWithWorker(
             }
             pm.finish();
             worker.terminate();
-            reject(new Error(formatNoMatchingTestsMessage(suite, test)));
+            reject(new NoMatchError(suite, test));
             break;
           }
 
@@ -353,7 +350,7 @@ export async function runAcrossPlatforms(
       );
       recordRuntimeOutcome(runtimeOutcomes, 'deno', 'no-match');
     } else if (hasExactFilter && serverFilterTestCount === 0) {
-      throw new Error(formatNoMatchingTestsMessage(config.suite, config.test));
+      throw new NoMatchError(config.suite, config.test);
     } else {
       // Use Worker for responsive TUI, unless debugging (debugger needs main process)
       if (!config.denoInspectBrk && config.mode === 'test') {
@@ -408,6 +405,9 @@ export async function runAcrossPlatforms(
         });
         const denoResult = await denoCmd.output();
         if (!denoResult.success) {
+          if (denoResult.code === EXIT_CODE_NO_MATCH) {
+            throw new NoMatchError(config.suite, config.test);
+          }
           throw new Error(
             `Deno execution failed with exit code ${denoResult.code}`,
           );
@@ -430,7 +430,7 @@ export async function runAcrossPlatforms(
       );
       recordRuntimeOutcome(runtimeOutcomes, 'node', 'no-match');
     } else if (hasExactFilter && serverFilterTestCount === 0) {
-      throw new Error(formatNoMatchingTestsMessage(config.suite, config.test));
+      throw new NoMatchError(config.suite, config.test);
     } else {
       // Set up environment variables
       const nodeEnv: Record<string, string> = { ...Deno.env.toObject() };
@@ -466,12 +466,8 @@ export async function runAcrossPlatforms(
         nodeEnv,
       );
       if (!nodeResult.success) {
-        const noMatchMessage = formatNoMatchingTestsMessage(
-          config.suite,
-          config.test,
-        );
-        if (nodeResult.stderrText.includes(noMatchMessage)) {
-          throw new Error(noMatchMessage);
+        if (nodeResult.exitCode === EXIT_CODE_NO_MATCH) {
+          throw new NoMatchError(config.suite, config.test);
         }
         throw new Error(
           `Node.js execution failed with exit code ${nodeResult.exitCode}`,

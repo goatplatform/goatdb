@@ -26,6 +26,13 @@ import type { Schema } from '../cfds/base/schema.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
 import { Emitter } from '../base/emitter.ts';
+import {
+  EXIT_CODE_NO_MATCH,
+  formatNoMatchingTestsMessage,
+  NoMatchError,
+} from '../base/error.ts';
+
+export { EXIT_CODE_NO_MATCH, formatNoMatchingTestsMessage, NoMatchError };
 
 /**
  * A test function that takes a TestSuite context and returns either void or a
@@ -59,23 +66,6 @@ export interface TestSummary {
   readonly failed: number;
   readonly duration: number;
   readonly results: TestResult[];
-}
-
-export function formatNoMatchingTestsMessage(
-  suiteName?: string,
-  testName?: string,
-): string {
-  const filters: string[] = [];
-  if (suiteName) {
-    filters.push(`--suite=${JSON.stringify(suiteName)}`);
-  }
-  if (testName) {
-    filters.push(`--test=${JSON.stringify(testName)}`);
-  }
-  if (filters.length === 0) {
-    return 'No tests matched the provided filters';
-  }
-  return `No tests matched ${filters.join(' ')}`;
 }
 
 /**
@@ -299,7 +289,7 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
   ): { suiteCount: number; testCount: number } {
     const counts = this.getTestCount(suiteName, testName);
     if ((suiteName || testName) && counts.testCount === 0) {
-      throw new Error(formatNoMatchingTestsMessage(suiteName, testName));
+      throw new NoMatchError(suiteName, testName);
     }
     return counts;
   }
