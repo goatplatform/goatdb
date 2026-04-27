@@ -249,6 +249,13 @@ export async function getClientBuildPlugins(
   }
   plugins.push(...extraPlugins as Plugin[], cssLoaderPlugin);
   if (targetRuntime === 'deno') {
+    if (!isDeno()) {
+      throw new Error(
+        'GoatDB: cannot build Deno-target bundle from Node.js. ' +
+          'Deno loader plugins (@luca/esbuild-deno-loader) require the Deno runtime. ' +
+          'Use runtime: "node" or run the build under Deno.',
+      );
+    }
     plugins.push(...(await getDenoPlugins())() as unknown as Plugin[]);
   }
   return plugins;
