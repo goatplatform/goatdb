@@ -43,7 +43,7 @@ my-app/
 ├── common/
 │   └── schema.ts       # GoatDB schema definitions — add your schemas here
 ├── server/
-│   ├── debug-server.ts # Development server (port 8080, live reload)
+│   ├── debug-server.ts # Development server (port 8080)
 │   ├── server.ts       # Production server entry with CLI args
 │   └── build.ts        # Script to compile to a standalone executable
 ├── .gitignore          # Ignores node_modules, build, server-data, etc.
@@ -68,7 +68,11 @@ deno task dev
 npm run dev
 ```
 
-Both commands start a server at `http://localhost:8080` with live reload on file changes.
+Both commands start the local server at `http://localhost:8080`. In the Node.js
+scaffold, `npm run dev` runs `tsx watch server/debug-server.ts`, so the server
+process restarts when source files change. The Deno scaffold runs
+`deno run -A server/debug-server.ts`; it does not imply file watching unless the
+template changes.
 
 ---
 
@@ -116,8 +120,7 @@ await compile({
   jsPath: './client/index.tsx',       // React client entry (required)
   buildDir: './build',                // Intermediate build output (required)
   htmlPath: './client/index.html',    // HTML template (optional)
-  // CSS from JS imports is bundled automatically. Use cssPath only for static
-  // CSS that must load before bundled styles (e.g., resets, font-face rules).
+  // Import application CSS from JS. Use cssPath only for prepended static CSS.
   // cssPath: './client/fonts.css',  // optional: prepend a static CSS file (resets, fonts, etc.)
   // esbuildPlugins: [],              // optional: custom esbuild plugins
   outputName: 'my-app',              // Binary name, default: "app" (optional)
@@ -168,10 +171,10 @@ await compile({
 
 ```bash
 # Deno
-deno task compile
+deno task build
 
 # Node.js
-npm run compile
+npm run build
 ```
 
 Both tasks invoke `server/build.ts`, which is pre-wired with your project's paths.
@@ -180,7 +183,7 @@ Both tasks invoke `server/build.ts`, which is pre-wired with your project's path
 
 ### Development Server
 
-The development server is scaffolded by `init` into `server/debug-server.ts` — you don't need to configure anything. It starts on port 8080 and rebuilds client assets on file changes.
+The development server is scaffolded by `init` into `server/debug-server.ts` — you don't need to configure anything. It starts on port 8080.
 
 ```bash
 deno task dev   # or: npm run dev
@@ -190,7 +193,7 @@ deno task dev   # or: npm run dev
 
 If you need to embed a debug server in a custom script:
 
-`startDebugServer()` is currently Deno-only. Its development build pipeline
+`startDebugServer()` is Deno-only. Its development build pipeline
 uses the Deno loader, so the `esbuildPlugins` hook below is also Deno-only.
 
 ```typescript
@@ -202,8 +205,7 @@ registerSchemas();
 await startDebugServer({
   jsPath: './client/index.tsx',
   htmlPath: './client/index.html',
-  // CSS from JS imports is bundled automatically. Use cssPath only for static
-  // CSS that must load before bundled styles (e.g., resets, font-face rules).
+  // Import application CSS from JS. Use cssPath only for prepended static CSS.
   // cssPath: './client/fonts.css',  // optional: prepend a static CSS file (resets, fonts, etc.)
   // esbuildPlugins: [],               // optional: Deno-only custom esbuild plugins
   buildDir: './build',
@@ -220,25 +222,11 @@ Watch options:
 
 | Option | Default | Description |
 |---|---|---|
-| `watchDir` | `'.'` | Root directory to watch for changes |
+| `watchDir` | — | Root directory to watch for changes (only active when explicitly set) |
 | `watchFilter` | Ignores dotfiles, `.tmp` files, `.git/`, `node_modules/`, `build/`, `server-data/` | `(path: string) => boolean` — return `true` to trigger a rebuild |
 | `beforeBuild` / `afterBuild` | — | Async hooks that run before/after each rebuild |
 
 `orgId` simulates a specific organization's environment locally. `setup` is called after the server and database are initialized but before HTTP listening begins — use it to access the GoatDB instance for server-side logic (event handlers, background processes, custom endpoints).
 
-> **Bare-specifier CSS** (e.g. `import 'normalize.css'`): GoatDB's built-in CSS
-> loader only handles relative/absolute imports. To import CSS from a package,
-> supply a plugin that resolves and loads the bare specifier. In the debug
-> server this plugin path is Deno-only; production `compile()` supports both
-> Deno and Node.js:
->
-> ```ts
-> // Node.js ESM — use createRequire(import.meta.url).resolve() to get the filesystem path:
-> import { createRequire } from 'node:module';
-> const require = createRequire(import.meta.url);
-> { name: 'normalize-css', setup(b) { b.onResolve({ filter: /^normalize\.css$/ }, () => ({ path: require.resolve('normalize.css'), namespace: 'file' })); } }
->
-> // Deno — use import.meta.resolve() then convert the file URL to a path:
-> import { fromFileUrl } from '@std/path';
-> { name: 'normalize-css', setup(b) { b.onResolve({ filter: /^normalize\.css$/ }, async () => ({ path: fromFileUrl(import.meta.resolve('npm:normalize.css/normalize.css')), namespace: 'file' })); } }
-> ```
+For CSS imports, CSS Modules, emitted stylesheet paths, `cssPath`, and custom
+esbuild plugins, see [CSS and esbuild](/docs/css-esbuild).

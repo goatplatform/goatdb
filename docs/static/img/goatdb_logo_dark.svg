@@ -7,8 +7,7 @@
   viewBox="0 0 158.4 25.8"
 >
   <defs>
-    <style>
-    .cls-1 {
+    <style>.cls-1 {
       fill: #150224;
     }
 
@@ -18,8 +17,7 @@
 
     .cls-2 {
       fill: #5229f3;
-    }
-    </style>
+    }</style>
   </defs>
   <g>
     <path

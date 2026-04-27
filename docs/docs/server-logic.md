@@ -200,6 +200,10 @@ await startDebugServer({
 });
 ```
 
+For client build options used by `startDebugServer`, including CSS imports,
+CSS Modules, `cssPath`, and custom `esbuildPlugins`, see
+[CSS and esbuild](/docs/css-esbuild).
+
 :::warning
 
 Register endpoints and middleware before `start()` (or inside the `setup` callback). Registration order determines evaluation order.

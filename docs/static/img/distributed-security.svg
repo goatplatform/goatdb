@@ -1,7 +1,14 @@
-<svg width="800" height="500" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="14px">
+<svg
+  width="800"
+  height="500"
+  xmlns="http://www.w3.org/2000/svg"
+  font-family="Inter, sans-serif"
+  font-size="14px"
+>
   <defs>
     <style>
-    /* <![CDATA[ */
+      /*
+      <![CDATA[ */
       .bg-card { fill: #ffffff; stroke: #dee2e6; stroke-width: 1; }
       .bg-peer { fill: #e7f1ff; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
       .bg-graph { fill: #fffbeb; stroke: #dee2e6; stroke-width: 1.5; } /* Light yellow/gold */
@@ -16,66 +23,198 @@
       .arrow-head { fill: #6c757d; }
       .verify-line { stroke: #198754; stroke-width: 1; }
       .verify-text { font-size: 10px; fill: #198754; }
-    /* ]]> */
+    /* ]]>
+      */
     </style>
-    <marker id="arrowhead-dist" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <marker
+      id="arrowhead-dist"
+      markerWidth="8"
+      markerHeight="6"
+      refX="8"
+      refY="3"
+      orient="auto"
+    >
       <polygon points="0 0, 8 3, 0 6" class="arrow-head" />
     </marker>
   </defs>
 
-  <text x="400" y="30" text-anchor="middle" class="text-title">Distributed Security Architecture</text>
-  <text x="400" y="50" text-anchor="middle" class="text-body">Independent Verification by All Peers</text>
+  <text
+    x="400"
+    y="30"
+    text-anchor="middle"
+    class="text-title"
+  >Distributed Security Architecture</text>
+  <text
+    x="400"
+    y="50"
+    text-anchor="middle"
+    class="text-body"
+  >Independent Verification by All Peers</text>
 
   <g transform="translate(275, 80)">
-    <rect width="250" height="100" rx="8" ry="8" class="bg-graph"/>
+    <rect width="250" height="100" rx="8" ry="8" class="bg-graph" />
     <text x="125" y="35" text-anchor="middle" class="text-icon">🔗</text>
-    <text x="125" y="60" text-anchor="middle" class="text-heading">Tamper-Proof Commit Graph</text>
-    <text x="125" y="80" text-anchor="middle" class="text-body">(Signed Operations ✍️)</text>
+    <text
+      x="125"
+      y="60"
+      text-anchor="middle"
+      class="text-heading"
+    >Tamper-Proof Commit Graph</text>
+    <text
+      x="125"
+      y="80"
+      text-anchor="middle"
+      class="text-body"
+    >(Signed Operations ✍️)</text>
   </g>
 
   <g transform="translate(50, 224)">
-    <rect width="200" height="220" rx="8" ry="8" class="bg-peer"/>
+    <rect width="200" height="220" rx="8" ry="8" class="bg-peer" />
     <text x="100" y="35" text-anchor="middle" class="text-icon">💻</text>
-    <text x="100" y="60" text-anchor="middle" class="text-heading">Client Peer A</text>
-    <rect x="25" y="80" width="150" height="110" rx="4" ry="4" class="bg-card"/>
-    <text x="100" y="100" text-anchor="middle" class="text-body">Receives Graph Data</text>
+    <text
+      x="100"
+      y="60"
+      text-anchor="middle"
+      class="text-heading"
+    >Client Peer A</text>
+    <rect
+      x="25"
+      y="80"
+      width="150"
+      height="110"
+      rx="4"
+      ry="4"
+      class="bg-card"
+    />
+    <text
+      x="100"
+      y="100"
+      text-anchor="middle"
+      class="text-body"
+    >Receives Graph Data</text>
     <text x="45" y="130" class="text-icon-small">🔍</text>
     <text x="65" y="130" class="text-body">Verify with</text>
-    <text x="100" y="150" text-anchor="middle" class="text-code">Public Keys 🔑</text>
-    <text x="100" y="175" text-anchor="middle" class="text-success text-icon-small">✅ Verified</text>
-    </g>
+    <text
+      x="100"
+      y="150"
+      text-anchor="middle"
+      class="text-code"
+    >Public Keys 🔑</text>
+    <text
+      x="100"
+      y="175"
+      text-anchor="middle"
+      class="text-success text-icon-small"
+    >✅ Verified</text>
+  </g>
 
   <g transform="translate(300, 224)">
-    <rect width="200" height="220" rx="8" ry="8" class="bg-peer"/>
+    <rect width="200" height="220" rx="8" ry="8" class="bg-peer" />
     <text x="100" y="35" text-anchor="middle" class="text-icon">📱</text>
-    <text x="100" y="60" text-anchor="middle" class="text-heading">Client Peer B</text>
-     <rect x="25" y="80" width="150" height="110" rx="4" ry="4" class="bg-card"/>
-    <text x="100" y="100" text-anchor="middle" class="text-body">Receives Graph Data</text>
+    <text
+      x="100"
+      y="60"
+      text-anchor="middle"
+      class="text-heading"
+    >Client Peer B</text>
+    <rect
+      x="25"
+      y="80"
+      width="150"
+      height="110"
+      rx="4"
+      ry="4"
+      class="bg-card"
+    />
+    <text
+      x="100"
+      y="100"
+      text-anchor="middle"
+      class="text-body"
+    >Receives Graph Data</text>
     <text x="45" y="130" class="text-icon-small">🔍</text>
     <text x="65" y="130" class="text-body">Verify with</text>
-    <text x="100" y="150" text-anchor="middle" class="text-code">Public Keys 🔑</text>
-    <text x="100" y="175" text-anchor="middle" class="text-success text-icon-small">✅ Verified</text>
-     </g>
+    <text
+      x="100"
+      y="150"
+      text-anchor="middle"
+      class="text-code"
+    >Public Keys 🔑</text>
+    <text
+      x="100"
+      y="175"
+      text-anchor="middle"
+      class="text-success text-icon-small"
+    >✅ Verified</text>
+  </g>
 
   <g transform="translate(550, 224)">
-    <rect width="200" height="220" rx="8" ry="8" class="bg-peer"/>
+    <rect width="200" height="220" rx="8" ry="8" class="bg-peer" />
     <text x="100" y="35" text-anchor="middle" class="text-icon">☁️</text>
-    <text x="100" y="60" text-anchor="middle" class="text-heading">Server Peer C</text>
-     <rect x="25" y="80" width="150" height="110" rx="4" ry="4" class="bg-card"/>
-    <text x="100" y="100" text-anchor="middle" class="text-body">Receives Graph Data</text>
+    <text
+      x="100"
+      y="60"
+      text-anchor="middle"
+      class="text-heading"
+    >Server Peer C</text>
+    <rect
+      x="25"
+      y="80"
+      width="150"
+      height="110"
+      rx="4"
+      ry="4"
+      class="bg-card"
+    />
+    <text
+      x="100"
+      y="100"
+      text-anchor="middle"
+      class="text-body"
+    >Receives Graph Data</text>
     <text x="45" y="130" class="text-icon-small">🔍</text>
     <text x="65" y="130" class="text-body">Verify with</text>
-    <text x="100" y="150" text-anchor="middle" class="text-code">Public Keys 🔑</text>
-    <text x="100" y="175" text-anchor="middle" class="text-success text-icon-small">✅ Verified</text>
-    </g>
+    <text
+      x="100"
+      y="150"
+      text-anchor="middle"
+      class="text-code"
+    >Public Keys 🔑</text>
+    <text
+      x="100"
+      y="175"
+      text-anchor="middle"
+      class="text-success text-icon-small"
+    >✅ Verified</text>
+  </g>
 
-  <path d="M 400 180 Q 275 204 150 224" stroke="#6c757d" stroke-width="1.5" stroke-dasharray="3 3" fill="none" marker-end="url(#arrowhead-dist)"/>
-  <path d="M 400 180 V 224" stroke="#6c757d" stroke-width="1.5" stroke-dasharray="3 3" fill="none" marker-end="url(#arrowhead-dist)"/>
-  <path d="M 400 180 Q 525 204 650 224" stroke="#6c757d" stroke-width="1.5" stroke-dasharray="3 3" fill="none" marker-end="url(#arrowhead-dist)"/>
-
+  <path
+    d="M 400 180 Q 275 204 150 224"
+    stroke="#6c757d"
+    stroke-width="1.5"
+    stroke-dasharray="3 3"
+    fill="none"
+    marker-end="url(#arrowhead-dist)"
+  />
+  <path
+    d="M 400 180 V 224"
+    stroke="#6c757d"
+    stroke-width="1.5"
+    stroke-dasharray="3 3"
+    fill="none"
+    marker-end="url(#arrowhead-dist)"
+  />
+  <path
+    d="M 400 180 Q 525 204 650 224"
+    stroke="#6c757d"
+    stroke-width="1.5"
+    stroke-dasharray="3 3"
+    fill="none"
+    marker-end="url(#arrowhead-dist)"
+  />
 
   <text x="400" y="470" text-anchor="middle" class="text-body">
-     <tspan font-weight="500">Result:</tspan> Every peer independently validates the entire history, ensuring data integrity and resilience.
-   </text>
-
+    <tspan font-weight="500">Result:</tspan>
+    Every peer independently validates the entire history, ensuring data integrity and resilience.
+  </text>
 </svg>

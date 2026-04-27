@@ -4,6 +4,10 @@ import { zip } from 'jsr:@deno-library/compress';
 export async function buildDocs(): Promise<void> {
   await cli('rm', '-rf', 'build/docs');
   await cli('mkdir', '-p', 'build/docs');
+  // Marker forces Node.js to treat build/ output as CommonJS (needed for Rspack/SWC builds).
+  // Cleaned up in the finally block below.
+  const buildPackageMarker = 'build/package.json';
+  await Deno.writeTextFile(buildPackageMarker, '{"type":"commonjs"}\n');
 
   // Build Docusaurus via npx (Deno's npm: specifier has ESM compat issues)
   const buildProcess = new Deno.Command('npx', {
@@ -18,7 +22,12 @@ export async function buildDocs(): Promise<void> {
     stderr: 'inherit',
   });
 
-  const { code } = await buildProcess.output();
+  let code: number;
+  try {
+    ({ code } = await buildProcess.output());
+  } finally {
+    await Deno.remove(buildPackageMarker).catch(() => {});
+  }
   if (code !== 0) {
     throw new Error(`Docusaurus build failed with code ${code}`);
   }
@@ -29,7 +38,7 @@ export async function buildDocs(): Promise<void> {
 }
 
 async function serveDocs(): Promise<void> {
-  console.log('🚀 Starting Docusaurus development server...');
+  console.log('Starting Docusaurus development server...');
 
   // Start the dev server process
   const serveProcess = new Deno.Command('npx', {

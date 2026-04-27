@@ -45,12 +45,12 @@ function HomepageHeader() {
           >
             Get Started →
           </Link>
-          <Link
+          <a
             className='button button--outline button--secondary button--lg'
-            to='#quickstart'
+            href='#quickstart'
           >
             See how it works
-          </Link>
+          </a>
         </div>
       </div>
     </header>
@@ -773,7 +773,7 @@ function OpenSource() {
               className='button button--primary button--lg'
               to='https://github.com/goatplatform/goatdb'
             >
-              ⭐ Star on GitHub
+              Star on GitHub
             </Link>
             <Link
               className='button button--outline button--secondary button--lg'

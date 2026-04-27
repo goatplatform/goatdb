@@ -14,6 +14,7 @@ const config: Config = {
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
     v4: true, // Improve compatibility with the upcoming Docusaurus v4
+    faster: true, // Enable Rspack, SWC, LightningCSS build
   },
 
   // Set the production url of your site here
@@ -28,7 +29,11 @@ const config: Config = {
   projectName: 'goatdb', // Usually your repo name.
 
   onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
+  },
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
@@ -58,7 +63,9 @@ const config: Config = {
         rehypePlugins: [rehypeKatex],
       },
     ],
-    // Disable webpack-dev-server compression to fix ERR_CONTENT_DECODING_FAILED
+    // Disables webpack-dev-server compression to fix ERR_CONTENT_DECODING_FAILED.
+    // With `faster: true` (Rspack), this relies on Rspack's webpack-dev-server API compatibility
+    // for the `compress` option. Remove once verified working in a dev server session.
     function customWebpackPlugin() {
       return {
         name: 'custom-webpack-plugin',

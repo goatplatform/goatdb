@@ -1,7 +1,12 @@
-<svg width="760" height="350" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="14px">
+<svg
+  width="760"
+  height="350"
+  xmlns="http://www.w3.org/2000/svg"
+  font-family="Inter, sans-serif"
+  font-size="14px"
+>
   <defs>
-    <style>
-      .bg-card { fill: #ffffff; stroke: #dee2e6; stroke-width: 1; }
+    <style>.bg-card { fill: #ffffff; stroke: #dee2e6; stroke-width: 1; }
       .bg-section-blue { fill: #e7f1ff; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
       .bg-section-gray { fill: #f8f9fa; stroke: #6c757d; stroke-width: 1; stroke-dasharray: 4 2; }
       .text-title { font-size: 16px; font-weight: 600; fill: #0a58ca; }
@@ -13,57 +18,146 @@
       .arrow-line { stroke: #0d6efd; stroke-width: 2; }
       .arrow-head { fill: #0d6efd; }
       .offline-indicator { fill: #dc3545; }
-      .online-indicator { fill: #198754; }
-    </style>
-    <marker id="arrowhead" markerWidth="5" markerHeight="3.5" refX="0" refY="1.75" orient="auto">
+      .online-indicator { fill: #198754; }</style>
+    <marker
+      id="arrowhead"
+      markerWidth="5"
+      markerHeight="3.5"
+      refX="0"
+      refY="1.75"
+      orient="auto"
+    >
       <polygon points="0 0, 5 1.75, 0 3.5" class="arrow-head" />
     </marker>
   </defs>
 
-  <text x="360" y="30" text-anchor="middle" class="text-title">1. Local Copy &amp; Offline Availability</text>
+  <text
+    x="360"
+    y="30"
+    text-anchor="middle"
+    class="text-title"
+  >1. Local Copy &amp; Offline Availability</text>
 
   <g transform="translate(20, 60)">
-    <rect width="240" height="260" rx="8" ry="8" class="bg-section-blue"/>
+    <rect width="240" height="260" rx="8" ry="8" class="bg-section-blue" />
     <text x="120" y="30" text-anchor="middle" class="text-icon">💻</text>
-    <text x="120" y="55" text-anchor="middle" class="text-heading">Peer Machine</text>
-    
-    <rect x="40" y="80" width="160" height="80" rx="4" ry="4" class="bg-card"/>
+    <text
+      x="120"
+      y="55"
+      text-anchor="middle"
+      class="text-heading"
+    >Peer Machine</text>
+
+    <rect x="40" y="80" width="160" height="80" rx="4" ry="4" class="bg-card" />
     <text x="55" y="105" class="text-icon-small">💾</text>
     <text x="80" y="105" class="text-code">Local Copy</text>
-    <text x="120" y="125" text-anchor="middle" class="text-body">Complete database state</text>
-    <text x="120" y="145" text-anchor="middle" class="text-body">Stored on disk</text>
+    <text
+      x="120"
+      y="125"
+      text-anchor="middle"
+      class="text-body"
+    >Complete database state</text>
+    <text
+      x="120"
+      y="145"
+      text-anchor="middle"
+      class="text-body"
+    >Stored on disk</text>
 
-    <rect x="40" y="160" width="160" height="60" rx="4" ry="4" class="bg-card"/>
+    <rect
+      x="40"
+      y="160"
+      width="160"
+      height="60"
+      rx="4"
+      ry="4"
+      class="bg-card"
+    />
     <text x="55" y="185" class="text-icon-small offline-indicator">📶</text>
     <text x="80" y="185" class="text-body">Works offline</text>
-    <text x="120" y="205" text-anchor="middle" class="text-body">No network required</text>
+    <text
+      x="120"
+      y="205"
+      text-anchor="middle"
+      class="text-body"
+    >No network required</text>
   </g>
 
   <g transform="translate(280, 190)">
-    <line x1="0" y1="0" x2="30" y2="0" class="arrow-line" marker-end="url(#arrowhead)" />
-    <line x1="30" y1="0" x2="0" y2="0" class="arrow-line" marker-end="url(#arrowhead)" />
+    <line
+      x1="0"
+      y1="0"
+      x2="30"
+      y2="0"
+      class="arrow-line"
+      marker-end="url(#arrowhead)"
+    />
+    <line
+      x1="30"
+      y1="0"
+      x2="0"
+      y2="0"
+      class="arrow-line"
+      marker-end="url(#arrowhead)"
+    />
     <text x="15" y="20" text-anchor="middle" class="text-body">Sync</text>
   </g>
 
   <g transform="translate(330, 60)">
-    <rect width="390" height="260" rx="8" ry="8" class="bg-section-gray"/>
+    <rect width="390" height="260" rx="8" ry="8" class="bg-section-gray" />
     <text x="210" y="30" text-anchor="middle" class="text-icon">🌐</text>
-    <text x="210" y="55" text-anchor="middle" class="text-heading">GoatDB Network</text>
+    <text
+      x="210"
+      y="55"
+      text-anchor="middle"
+      class="text-heading"
+    >GoatDB Network</text>
 
-    <rect x="20" y="80" width="150" height="60" rx="4" ry="4" class="bg-card"/>
+    <rect x="20" y="80" width="150" height="60" rx="4" ry="4" class="bg-card" />
     <text x="35" y="105" class="text-icon-small online-indicator">📶</text>
     <text x="60" y="105" class="text-body">Online Storage</text>
-    <text x="110" y="125" text-anchor="middle" class="text-body">Distributed across peers</text>
+    <text
+      x="110"
+      y="125"
+      text-anchor="middle"
+      class="text-body"
+    >Distributed across peers</text>
 
-    <rect x="220" y="80" width="150" height="60" rx="4" ry="4" class="bg-card"/>
+    <rect
+      x="220"
+      y="80"
+      width="150"
+      height="60"
+      rx="4"
+      ry="4"
+      class="bg-card"
+    />
     <text x="235" y="105" class="text-icon-small">🔄</text>
     <text x="260" y="105" class="text-body">Sync Protocol</text>
-    <text x="310" y="125" text-anchor="middle" class="text-body">Ensures consistency</text>
+    <text
+      x="310"
+      y="125"
+      text-anchor="middle"
+      class="text-body"
+    >Ensures consistency</text>
 
-    <rect x="20" y="160" width="350" height="80" rx="4" ry="4" fill="#f1f1f1" stroke="#dee2e6"/>
+    <rect
+      x="20"
+      y="160"
+      width="350"
+      height="80"
+      rx="4"
+      ry="4"
+      fill="#f1f1f1"
+      stroke="#dee2e6"
+    />
     <text x="35" y="185" class="text-icon-small">📡</text>
-    <text x="55" y="185" class="text-body"><tspan font-weight="500">Online:</tspan> Syncs with network</text>
+    <text x="55" y="185" class="text-body">
+      <tspan font-weight="500">Online:</tspan> Syncs with network
+    </text>
     <text x="35" y="215" class="text-icon-small offline-indicator">📶</text>
-    <text x="55" y="215" class="text-body"><tspan font-weight="500">Offline:</tspan> Uses local copy</text>
+    <text x="55" y="215" class="text-body">
+      <tspan font-weight="500">Offline:</tspan> Uses local copy
+    </text>
   </g>
-</svg> 
+</svg>

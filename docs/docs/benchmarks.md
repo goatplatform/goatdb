@@ -173,7 +173,7 @@ The open cost maps naturally to user-initiated actions — opening a project, sw
 
 The comparisons below isolate specific GoatDB configuration options. Only operations where configurations differ by more than 2× are shown.
 
-<details>
+<details id="operational-modes">
 <summary>Trusted Mode — Bypassing Signatures</summary>
 
 GoatDB signs every commit with Ed25519 by default, enabling [multi-peer and untrusted environments](/docs/sessions). For single-user or fully-trusted local scenarios you can opt out with `trusted: true`, which removes the signing overhead.

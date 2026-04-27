@@ -6,8 +6,7 @@
   font-size="14px"
 >
   <defs>
-    <style>
-    .bg-card {
+    <style>.bg-card {
       fill: #ffffff;
       stroke: #dee2e6;
       stroke-width: 1;
@@ -79,8 +78,7 @@
     .plus-equals {
       font-size: 18px;
       fill: #6c757d;
-    }
-    </style>
+    }</style>
     <marker
       id="arrowhead-op"
       markerWidth="10"
@@ -93,19 +91,31 @@
     </marker>
   </defs>
 
-  <text x="400" y="30" text-anchor="middle" class="text-title"
+  <text
+    x="400"
+    y="30"
+    text-anchor="middle"
+    class="text-title"
   >2. Commit Signing &amp; Verification</text>
 
   <g transform="translate(20, 60)">
     <rect width="300" height="360" rx="8" ry="8" class="bg-section-blue" />
     <text x="150" y="30" text-anchor="middle" class="text-icon-large">💻</text>
-    <text x="150" y="55" text-anchor="middle" class="text-heading"
+    <text
+      x="150"
+      y="55"
+      text-anchor="middle"
+      class="text-heading"
     >On Peer Machine</text>
 
     <rect x="75" y="80" width="150" height="60" rx="4" ry="4" class="bg-card" />
     <text x="90" y="105" class="text-icon">📄</text>
     <text x="115" y="105" class="text-heading">Operation</text>
-    <text x="150" y="125" text-anchor="middle" class="text-body"
+    <text
+      x="150"
+      y="125"
+      text-anchor="middle"
+      class="text-body"
     >(e.g., write)</text>
 
     <text x="150" y="165" text-anchor="middle" class="plus-equals">+</text>
@@ -157,7 +167,11 @@
   <g transform="translate(420, 60)">
     <rect width="360" height="360" rx="8" ry="8" class="bg-section-gray" />
     <text x="180" y="30" text-anchor="middle" class="text-icon-large">🌐</text>
-    <text x="180" y="55" text-anchor="middle" class="text-heading"
+    <text
+      x="180"
+      y="55"
+      text-anchor="middle"
+      class="text-heading"
     >In GoatDB Network (Peers)</text>
 
     <rect
@@ -185,12 +199,18 @@
     />
     <text x="120" y="195" class="text-icon-small text-key-public">🔑</text>
     <text x="145" y="195" class="text-code text-key-public">Public Key</text>
-    <text x="180" y="215" text-anchor="middle" class="text-body"
+    <text
+      x="180"
+      y="215"
+      text-anchor="middle"
+      class="text-body"
     >(From session)</text>
 
     <g transform="translate(180, 260)" text-anchor="middle">
       <text y="0" class="text-icon-large text-success">✅</text>
-      <text y="25" class="text-heading text-success"
+      <text
+        y="25"
+        class="text-heading text-success"
       >Verification Successful</text>
       <text y="45" class="text-body">• Content Integrity Confirmed</text>
       <text y="60" class="text-body">• Creator Identity Proven</text>

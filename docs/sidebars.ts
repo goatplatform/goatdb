@@ -22,6 +22,7 @@ const sidebars: SidebarsConfig = {
     'authorization-rules',
     'sync',
     'server-logic',
+    'css-esbuild',
 
     // ADVANCED TOPICS (Deep dives)
     'conflict-resolution',
