@@ -61,6 +61,8 @@ and GoatDB adheres to
 - `WriteFailure` event on `GoatDB` — surfaced when a commit fails to persist
 - Binary commit codec (`base/core-types/encoding/binary-commit.ts`) bundled into
   the storage worker for zero-copy encode/decode
+- `esbuildPlugins` option on `compile()` and `startDebugServer()` for custom
+  esbuild plugins in the client bundle pipeline
 
 ### Changed
 
@@ -71,6 +73,13 @@ and GoatDB adheres to
   potential race between pool sizing and batch slicing in `verifyCommits`
 - Homepage redesigned with new hero, logo, and quick-start component
 - Benchmark suite overhauled; documentation updated
+- Test runner uses `NoMatchError` (exit code 2) instead of string-matching for
+  no-match filter failures
+- Docs upgraded to Docusaurus 3.10 with `@docusaurus/faster` for SWC-based
+  builds
+- CSS bundling documented in dedicated [CSS and esbuild](/docs/css-esbuild)
+  guide
+
 ## [0.5.1] - 2026-03-05
 
 ### Breaking Changes
@@ -337,7 +346,8 @@ and GoatDB adheres to
 
 [Unreleased]: https://github.com/goatplatform/goatdb/compare/v0.5.1...HEAD
 [0.5.1]: https://github.com/goatplatform/goatdb/compare/v0.5.0...v0.5.1
-[0.5.0]: https://github.com/goatplatform/goatdb/compare/v0.3.1...v0.5.0
+[0.5.0]: https://github.com/goatplatform/goatdb/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/goatplatform/goatdb/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/goatplatform/goatdb/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/goatplatform/goatdb/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/goatplatform/goatdb/compare/v0.2.1...v0.2.2
