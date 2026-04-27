@@ -108,21 +108,25 @@ export default function setup() {
     assertTrue(converged(a, b), 'Peers did not converge');
   });
 
-  TEST('SyncConvergence', 'small disjoint sets converge in <=2 rounds', (_ctx) => {
-    const a = makeCommits(5, 'small-a');
-    const b = makeCommits(5, 'small-b');
+  TEST(
+    'SyncConvergence',
+    'small disjoint sets converge in <=2 rounds',
+    (_ctx) => {
+      const a = makeCommits(5, 'small-a');
+      const b = makeCommits(5, 'small-b');
 
-    let rounds = 0;
-    while (!converged(a, b)) {
-      syncRound(a, b, 1);
-      rounds++;
-      assertTrue(
-        rounds <= 2,
-        `Expected convergence in <=2 rounds, took ${rounds}`,
-      );
-    }
-    assertTrue(converged(a, b), 'Peers did not converge');
-  });
+      let rounds = 0;
+      while (!converged(a, b)) {
+        syncRound(a, b, 1);
+        rounds++;
+        assertTrue(
+          rounds <= 2,
+          `Expected convergence in <=2 rounds, took ${rounds}`,
+        );
+      }
+      assertTrue(converged(a, b), 'Peers did not converge');
+    },
+  );
 
   TEST('SyncConvergence', 'convergence from empty peer', (_ctx) => {
     const a = makeCommits(10, 'full');

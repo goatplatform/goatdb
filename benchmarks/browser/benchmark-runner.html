@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/index.css" />
     <title>GoatDB Browser Benchmarks</title>
     <style>
       :root {
@@ -282,8 +283,7 @@
         );
 
         // Update status and progress
-        document.getElementById('status').textContent =
-          `Running: ${name}`;
+        document.getElementById('status').textContent = `Running: ${name}`;
         document.getElementById('progress').textContent =
           `${current} / ${total}`;
       });
@@ -345,16 +345,13 @@
 
           let errorHtml = '';
           if (result.error) {
-            errorHtml =
-              `<div class="error-message">${result.error}</div>`;
+            errorHtml = `<div class="error-message">${result.error}</div>`;
           }
 
           resultDiv.innerHTML = `
           <div class="result-header">
             <span class="result-name">${result.suite} / ${result.name}</span>
-            <span class="result-duration">${
-            result.duration.toFixed(2)
-          }ms</span>
+            <span class="result-duration">${result.duration.toFixed(2)}ms</span>
           </div>
           ${statsHtml}
           ${errorHtml}

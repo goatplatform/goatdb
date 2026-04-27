@@ -1,7 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/index.css" />
     <title>GoatDB Browser Tests</title>
     <style>
       :root {
@@ -273,12 +275,9 @@
       function appendLog(type, ...args) {
         const timestamp = new Date().toLocaleTimeString();
         const message = args.map((arg) =>
-          typeof arg === 'object'
-            ? JSON.stringify(arg, null, 2)
-            : String(arg)
+          typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
         ).join(' ');
-        logElement.textContent +=
-          `[${timestamp}] [${type}] ${message}\n`;
+        logElement.textContent += `[${timestamp}] [${type}] ${message}\n`;
         logElement.scrollTop = logElement.scrollHeight;
       }
 
@@ -321,8 +320,7 @@
         );
 
         // Update status and progress
-        document.getElementById('status').textContent =
-          `Running: ${name}`;
+        document.getElementById('status').textContent = `Running: ${name}`;
         document.getElementById('progress').textContent =
           `${current} / ${total}`;
       });
@@ -381,9 +379,7 @@
         }s</p>
                 <p style="color: ${
           success ? 'var(--success)' : 'var(--error)'
-        };">${
-          success ? '✓ All tests passed' : '✗ Some tests failed'
-        }</p>
+        };">${success ? '✓ All tests passed' : '✗ Some tests failed'}</p>
             `;
 
         document.getElementById('results').appendChild(summaryDiv);
@@ -397,8 +393,8 @@
         } else if (
           event.error?.message?.startsWith('TEST_COMPLETION_FAILURE')
         ) {
-          document.getElementById('status').textContent =
-            '✗ Tests failed: ' + event.error.message;
+          document.getElementById('status').textContent = '✗ Tests failed: ' +
+            event.error.message;
         } else {
           document.getElementById('status').textContent =
             '✗ Test execution error: ' + event.error?.message;
@@ -410,8 +406,7 @@
       setTimeout(updateConfig, 100);
 
       // Initial status
-      document.getElementById('status').textContent =
-        'Loading test bundle...';
+      document.getElementById('status').textContent = 'Loading test bundle...';
     </script>
 
     <!-- Test bundle will be served at /app.js by debug server -->
