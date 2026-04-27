@@ -48,6 +48,9 @@ export interface BundleResult {
  * Minimal public plugin shape for GoatDB's build-only APIs.
  * Keeps `esbuild` out of the root package's exported type surface while still
  * allowing callers to pass standard esbuild-compatible plugins.
+ *
+ * Plugins run before GoatDB's fallback CSS loader, so they can resolve package
+ * CSS, rewrite local CSS imports, or provide other browser bundle transforms.
  */
 export interface BuildPluginLike {
   name: string;
@@ -208,6 +211,38 @@ export async function getClientBuildPlugins(
   targetRuntime: 'deno' | 'node',
   extraPlugins: BuildPluginLike[] = [],
 ): Promise<Plugin[]> {
+  const seen = new Map<string, number>();
+  for (const p of extraPlugins) {
+    if (p.name && typeof p.name === 'string') {
+      seen.set(p.name, (seen.get(p.name) ?? 0) + 1);
+    }
+  }
+  const duplicates = [...seen.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([name]) => name);
+  if (duplicates.length > 0) {
+    throw new Error(
+      `GoatDB: duplicate esbuild plugin names: ${duplicates.join(', ')}.`,
+    );
+  }
+  const reservedNames = new Set(['node-stub', 'goatdb-css-loader', 'adapter-stub']);
+  for (const p of extraPlugins) {
+    if (!p.name || typeof p.name !== 'string') {
+      throw new Error(
+        'GoatDB: esbuild plugin has an invalid name. Expected a non-empty string.',
+      );
+    }
+    if (reservedNames.has(p.name)) {
+      throw new Error(
+        `GoatDB: esbuild plugin name '${p.name}' is reserved internally (${[...reservedNames].join(', ')}). Rename your plugin.`,
+      );
+    }
+    if (typeof p.setup !== 'function') {
+      throw new Error(
+        `GoatDB: esbuild plugin '${p.name}' is missing a setup() function.`,
+      );
+    }
+  }
   const plugins: Plugin[] = [adapterStubPlugin(['deno', 'node'])];
   if (targetRuntime === 'node') {
     plugins.push(nodeStubPlugin);

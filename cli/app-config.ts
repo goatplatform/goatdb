@@ -28,6 +28,7 @@ export type AppConfig = {
    * Optional static CSS file prepended into `/index.css` before esbuild-bundled CSS.
    * Use this for global resets or vendor CSS that must load before component styles.
    * For application CSS, prefer `import './index.css'` in your JS entry point instead.
+   * CSS under `assetsPath` is served as a static asset and is not merged here.
    */
   cssPath?: string;
   /**
@@ -36,6 +37,7 @@ export type AppConfig = {
    * the web server.
    *
    * Accessible at `/assets/*`.
+   * CSS files here are served as static files, not bundled into `/index.css`.
    */
   assetsPath?: string;
   /**

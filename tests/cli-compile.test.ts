@@ -28,8 +28,13 @@ import {
   denoTarget,
   targetFromOSArch,
 } from '../cli/compile.ts';
-import { createBuildContext, stopBackgroundCompiler } from '../build.ts';
-import { buildAssets } from '../cli/build-assets.ts';
+import {
+  createBuildContext,
+  getClientBuildPlugins,
+  type BuildPluginLike,
+  stopBackgroundCompiler,
+} from '../build.ts';
+import { buildAssets, buildCombinedCSS } from '../cli/build-assets.ts';
 import { startDebugServer } from '../cli/debug-server.ts';
 import type { StaticAssets } from '../system-assets/system-assets.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
@@ -1733,4 +1738,209 @@ export default function setupCliCompileTests() {
       );
     },
   );
+
+  TEST(
+    'CLI-Compile',
+    'buildCombinedCSS handles multi-chunk source maps correctly',
+    () => {
+      // Single chunk with map → direct map, not sections format
+      const single = buildCombinedCSS(
+        [{
+          content: '.a{color:red}',
+          map: '{"version":3,"sources":["a.css"]}',
+        }],
+        '/index.css.map',
+      );
+      assertEquals(
+        single.css,
+        '.a{color:red}\n/*# sourceMappingURL=/index.css.map */',
+      );
+      assertEquals(single.cssMap, '{"version":3,"sources":["a.css"]}');
+
+      // Two chunks, both mapped → sections format with correct offsets
+      const two = buildCombinedCSS(
+        [
+          {
+            content: '.a{color:red}',
+            map: '{"version":3,"sources":["a.css"]}',
+          },
+          {
+            content: '.b{color:blue}\n.b2{color:green}',
+            map: '{"version":3,"sources":["b.css"]}',
+          },
+        ],
+        '/index.css.map',
+      );
+      // deno-lint-ignore no-explicit-any
+      const sections = JSON.parse(two.cssMap!) as any;
+      assertEquals(sections.version, 3);
+      assertEquals(sections.sections.length, 2);
+      assertEquals(sections.sections[0].offset, { line: 0, column: 0 });
+      assertEquals(sections.sections[1].offset, { line: 2, column: 0 });
+
+      // Two chunks, first unmapped (cssPath), second mapped → sections with only second
+      const mixed = buildCombinedCSS(
+        [
+          { content: '/* reset */' },
+          {
+            content: '.a{color:red}',
+            map: '{"version":3,"sources":["a.css"]}',
+          },
+        ],
+        '/index.css.map',
+      );
+      // deno-lint-ignore no-explicit-any
+      const mixedSections = JSON.parse(mixed.cssMap!) as any;
+      assertEquals(mixedSections.sections.length, 1);
+      assertEquals(mixedSections.sections[0].offset, { line: 2, column: 0 });
+
+      // No mapped chunks → no cssMap
+      const none = buildCombinedCSS(
+        [{ content: '/* reset */' }, { content: '/* vendor */' }],
+        '/index.css.map',
+      );
+      assertEquals(none.cssMap, undefined);
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'getClientBuildPlugins rejects reserved node-stub plugin name',
+    async () => {
+      await assertThrows(
+        async () =>
+          getClientBuildPlugins('deno', [{
+            name: 'node-stub',
+            setup: () => {},
+          }]),
+        Error,
+        'node-stub',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'getClientBuildPlugins rejects plugin without setup function',
+    async () => {
+      await assertThrows(
+        async () =>
+          getClientBuildPlugins('deno', [{
+            name: 'bad-plugin',
+            setup: undefined as unknown as () => void,
+          }]),
+        Error,
+        'bad-plugin',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'getClientBuildPlugins rejects plugin with empty name',
+    async () => {
+      await assertThrows(
+        async () =>
+          getClientBuildPlugins('deno', [{
+            name: '',
+            setup: () => {},
+          }]),
+        Error,
+        'invalid name',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'getClientBuildPlugins rejects plugin with non-string name',
+    async () => {
+      await assertThrows(
+        async () =>
+          // deno-lint-ignore no-explicit-any
+          getClientBuildPlugins('deno', [{
+            name: 123 as any,
+            setup: () => {},
+          }]),
+        Error,
+        'invalid name',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'getClientBuildPlugins accepts valid plugins',
+    async () => {
+      const customPlugin: BuildPluginLike = {
+        name: 'custom-test',
+        setup: () => {},
+      };
+      const plugins = await getClientBuildPlugins('deno', [customPlugin]);
+      assertTrue(
+        plugins.some((p) => p.name === 'custom-test'),
+        'custom plugin should be included in returned plugins',
+      );
+    },
+  );
+
+  TEST('CLI-Compile', 'buildCombinedCSS handles empty chunks array', () => {
+    const result = buildCombinedCSS([], '/index.css.map');
+    assertEquals(result.css, '');
+    assertEquals(result.cssMap, undefined);
+  });
+
+  TEST('CLI-Compile', 'getClientBuildPlugins rejects reserved goatdb-css-loader plugin name', async () => {
+    await assertThrows(
+      async () =>
+        getClientBuildPlugins('deno', [{
+          name: 'goatdb-css-loader',
+          setup: () => {},
+        }]),
+      Error,
+      'goatdb-css-loader',
+    );
+  });
+
+  TEST('CLI-Compile', 'getClientBuildPlugins rejects reserved adapter-stub plugin name', async () => {
+    await assertThrows(
+      async () =>
+        getClientBuildPlugins('deno', [{
+          name: 'adapter-stub',
+          setup: () => {},
+        }]),
+      Error,
+      'adapter-stub',
+    );
+  });
+
+  TEST('CLI-Compile', 'getClientBuildPlugins rejects duplicate plugin names', async () => {
+    await assertThrows(
+      async () =>
+        getClientBuildPlugins('deno', [
+          { name: 'custom', setup: () => {} },
+          { name: 'custom', setup: () => {} },
+        ]),
+      Error,
+      'custom',
+    );
+  });
+
+  TEST('CLI-Compile', 'getClientBuildPlugins includes nodeStubPlugin for node runtime', async () => {
+    const plugins = await getClientBuildPlugins('node', []);
+    assertTrue(
+      plugins.some((p) => p.name === 'node-stub'),
+      'node-stub plugin should be included for node runtime',
+    );
+  });
+
+  TEST('CLI-Compile', 'getClientBuildPlugins preserves user plugin ordering', async () => {
+    const plugins = await getClientBuildPlugins('deno', [
+      { name: 'first', setup: () => {} },
+      { name: 'second', setup: () => {} },
+    ]);
+    const firstIdx = plugins.findIndex((p) => p.name === 'first');
+    const secondIdx = plugins.findIndex((p) => p.name === 'second');
+    assertTrue(firstIdx < secondIdx, 'user plugins should preserve input order');
+  });
 }

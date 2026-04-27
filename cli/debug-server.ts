@@ -98,7 +98,8 @@ export type DebugServerOptions<US extends Schema> =
      * Custom esbuild plugins injected into the client bundle pipeline.
      * Deno-only. In development (`startDebugServer`), plugins are baked into
      * the build context at startup, run before GoatDB's fallback CSS loader,
-     * and require a restart to change.
+     * and require a restart to change. Use them to rewrite CSS imports, resolve
+     * package CSS, or provide other browser bundle transforms.
      *
      * @remarks The namespace `'node-stub'` is reserved by GoatDB internally.
      * User-supplied plugins must not register that name.

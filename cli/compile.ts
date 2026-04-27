@@ -140,7 +140,8 @@ export type CompileOptions =
     /**
      * Custom esbuild plugins injected into the client bundle pipeline.
      * In production (compile), plugins are applied per build and run before
-     * GoatDB's fallback CSS loader, so they can rewrite or resolve local CSS.
+     * GoatDB's fallback CSS loader, so they can rewrite CSS imports, resolve
+     * package CSS, or provide other browser bundle transforms.
      *
      * @remarks The namespace `'node-stub'` is reserved by GoatDB internally.
      * User-supplied plugins must not register that name.

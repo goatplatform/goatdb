@@ -34,6 +34,7 @@ function countNewlines(s: string): number {
 }
 
 /**
+ * @internal
  * Combines CSS chunks into a single /index.css string and, when source maps are
  * available, a /index.css.map.
  *
@@ -46,7 +47,7 @@ function countNewlines(s: string): number {
  *   cssPath vendor file) are silently omitted from the map — DevTools will
  *   simply show no source for those lines, which is acceptable for vendor CSS.
  */
-function buildCombinedCSS(
+export function buildCombinedCSS(
   chunks: CSSChunk[],
   mapUrl: string,
 ): { css: string; cssMap?: string } {
@@ -104,7 +105,8 @@ export interface BuildAssetsOptions {
    */
   keepEsbuildAlive?: boolean;
   /**
-   * Custom esbuild plugins injected after GoatDB's internal plugins.
+   * Custom esbuild plugins injected between GoatDB's stub plugins and the CSS
+   * fallback loader.
    * Ignored when a pre-built ReBuildContext is passed because plugins must be
    * registered when that context is created.
    */
