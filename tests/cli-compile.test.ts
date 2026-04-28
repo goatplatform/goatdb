@@ -29,9 +29,8 @@ import {
   targetFromOSArch,
 } from '../cli/compile.ts';
 import {
-  createBuildContext,
-  getClientBuildPlugins,
   type BuildPluginLike,
+  createBuildContext,
   stopBackgroundCompiler,
 } from '../build.ts';
 import { buildAssets, buildCombinedCSS } from '../cli/build-assets.ts';
@@ -85,1535 +84,1581 @@ function getFirstMappedGeneratedLine(
   return undefined;
 }
 
+// Minimal local types for esbuild plugin callbacks in tests.
+// We avoid importing esbuild types to keep tests cross-runtime compatible.
+interface TestResolveArgs {
+  path: string;
+}
+
+interface TestResolveResult {
+  path: string;
+  namespace: string;
+}
+
+interface TestLoadResult {
+  contents: string;
+  loader: string;
+}
+
+const kPlaceholderAppConfig = {
+  buildDir: '/tmp',
+  htmlPath: '/dev/null',
+  jsPath: '/dev/null',
+};
+
 export default function setupCliCompileTests() {
-  TEST(
-    'CLI-Compile',
-    'createBuildContext fails clearly on Node.js',
-    async () => {
-      if (!isNode()) return;
-      await assertThrows(
-        async () => {
-          await createBuildContext([{
-            in: '/tmp/entry.ts',
-            out: APP_ENTRY_POINT,
-          }]);
-        },
-        Error,
-        'createBuildContext() is only supported in Deno',
-      );
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'startDebugServer fails clearly on Node.js',
-    async () => {
-      if (!isNode()) return;
-      await assertThrows(
-        async () => {
-          await startDebugServer({
-            buildDir: './build',
-            jsPath: './client/index.tsx',
-            path: './server-data',
-          } as never);
-        },
-        Error,
-        'startDebugServer() is only supported in Deno',
-      );
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'should compute target OS/arch correctly',
-    async () => {
-      // Skip in browser
-      if (isBrowser()) return;
-
-      // Test that targetFromOSArch works with explicit values
-      assertEquals(
-        targetFromOSArch('mac', 'arm64'),
-        'mac-arm64',
-        'Should return mac-arm64',
-      );
-      assertEquals(
-        targetFromOSArch('linux', 'x64'),
-        'linux-x64',
-        'Should return linux-x64',
-      );
-      assertEquals(
-        targetFromOSArch('windows', 'x64'),
-        'windows-x64',
-        'Should return windows-x64',
-      );
-
-      // Test auto-detection (should return current platform)
-      const detected = targetFromOSArch();
-      assertTrue(
-        detected.includes('-'),
-        `Detected target should have OS-arch format: ${detected}`,
-      );
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'should reject unsupported denoTarget windows-arm64',
-    async () => {
-      if (isBrowser()) return;
-      assertThrows(
-        () => denoTarget('windows', 'arm64'),
-        'denoTarget should throw for windows-arm64',
-      );
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'should map denoTarget for all supported platforms',
-    async () => {
-      if (isBrowser()) return;
-      assertEquals(denoTarget('mac', 'x64'), 'x86_64-apple-darwin');
-      assertEquals(denoTarget('mac', 'arm64'), 'aarch64-apple-darwin');
-      assertEquals(denoTarget('linux', 'x64'), 'x86_64-unknown-linux-gnu');
-      assertEquals(denoTarget('linux', 'arm64'), 'aarch64-unknown-linux-gnu');
-      assertEquals(denoTarget('windows', 'x64'), 'x86_64-pc-windows-msvc');
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'goatEntryPoints should match deno.json exports',
-    async () => {
-      if (isBrowser()) return;
-      const denoJsonPath = path.join(getRuntime().getCWD(), 'deno.json');
-      const content = await readTextFile(denoJsonPath);
-      assertExists(content, 'deno.json should be readable');
-      const denoJson = JSON.parse(content);
-      assertExists(denoJson.exports, 'deno.json should have exports field');
-      const exports = denoJson.exports as Record<string, string>;
-
-      // Every goatEntryPoints key should map to a deno.json export
-      for (const [suffix, file] of Object.entries(goatEntryPoints)) {
-        const exportKey = suffix === '' ? '.' : '.' + suffix;
-        assertEquals(
-          exports[exportKey],
-          './' + file,
-          `deno.json export "${exportKey}" should match goatEntryPoints`,
-        );
-      }
-
-      // Every deno.json export should have a matching goatEntryPoints entry
-      for (const [exportKey, exportPath] of Object.entries(exports)) {
-        const suffix = exportKey === '.' ? '' : exportKey.slice(1);
-        const expected = (exportPath as string).replace('./', '');
-        assertEquals(
-          (goatEntryPoints as Record<string, string>)[suffix],
-          expected,
-          `goatEntryPoints should have entry for deno.json export "${exportKey}"`,
-        );
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'bundleServerForSEA produces valid CJS',
-    async (ctx) => {
-      if (!isNode()) return;
-
-      const dir = await ctx.tempDir('bundle-sea');
-      const entryPath = path.join(dir, 'entry.ts');
-      await writeTextFile(
-        entryPath,
-        'export function main(): number { return 42; }',
-      );
-      const outPath = path.join(dir, 'bundle.cjs');
-
-      // bundleServerForSEA uses esbuild's background service; stop it after the
-      // test so the process can exit cleanly.
-      try {
-        await bundleServerForSEA(entryPath, outPath);
-      } finally {
-        await stopBackgroundCompiler();
-      }
-
-      const content = await readTextFile(outPath);
-      assertExists(content, 'output file should be readable');
-      const text = content!;
-      assertTrue(text.length > 0, 'output file must not be empty');
-      // esbuild's bundle mode (bundle: true) wraps all exports into a CJS module
-      // via `module.exports = __toCommonJS(entry_exports)`. This pattern is absent
-      // from ESM output and confirms the bundle is CJS, not ESM.
-      assertTrue(
-        text.includes('module.exports'),
-        'CJS output must assign module.exports',
-      );
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'buildAssets bundles CSS from imports and cssPath into /index.css',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return; // no esbuild in browser
-
-      const dir = await ctx.tempDir('build-assets-css');
-
-      // Entry TS that imports a CSS file
-      await writeTextFile(
-        path.join(dir, 'entry.ts'),
-        `import './bundled.css';\nexport {};\n`,
-      );
-      await writeTextFile(
-        path.join(dir, 'bundled.css'),
-        ':root { --goatdb-test-bundled: 1; }',
-      );
-      // Global CSS file — should be prepended via cssPath
-      await writeTextFile(
-        path.join(dir, 'global.css'),
-        ':root { --goatdb-test-global: 1; }',
-      );
-
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      let assets: StaticAssets;
-      try {
-        assets = await buildAssets(
-          undefined,
-          entryPoints,
-          {
-            buildDir: dir,
-            jsPath: path.join(dir, 'entry.ts'),
-            cssPath: path.join(dir, 'global.css'),
-          },
-          // Node path only — Deno path requires a deno.json in CWD for @luca/esbuild-deno-loader and is
-          // not covered by the unit suite. The full E2E test (opt-in, see below) exercises it.
-          { runtime: 'node', keepEsbuildAlive: false },
-        );
-
-        assertExists(
-          assets['/index.css'],
-          '/index.css must always be present in StaticAssets',
-        );
-        assertEquals(
-          assets['/index.css'].contentType,
-          'text/css',
-          '/index.css must have content-type text/css',
-        );
-        const css = new TextDecoder().decode(assets['/index.css'].data);
-
-        assertTrue(
-          css.includes('--goatdb-test-global'),
-          'cssPath content must appear in /index.css',
-        );
-        assertTrue(
-          css.includes('--goatdb-test-bundled'),
-          'bundled CSS from JS import must appear in /index.css',
-        );
-        assertTrue(
-          css.indexOf('--goatdb-test-global') <
-            css.indexOf('--goatdb-test-bundled'),
-          'cssPath content must be prepended before bundled CSS',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'buildAssets with runtime: deno bundles CSS into /index.css',
-    async (ctx: TestSuite) => {
-      if (!isDeno()) return;
-
-      const dir = await ctx.tempDir('build-assets-deno-css');
-      await writeTextFile(
-        path.join(dir, 'style.css'),
-        ':root { --deno-css-test: 1; }',
-      );
-      await writeTextFile(
-        path.join(dir, 'entry.ts'),
-        "import './style.css';\nexport {};",
-      );
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
-          { runtime: 'deno', keepEsbuildAlive: false },
-        );
-        assertExists(
-          assets['/index.css'],
-          '/index.css must be present for deno runtime',
-        );
-        const css = new TextDecoder().decode(assets['/index.css'].data);
-        assertTrue(
-          css.includes('--deno-css-test'),
-          'CSS from import must land in /index.css on deno path',
-        );
-        // Source map must also be emitted for the deno path
-        assertExists(
-          assets['/index.css.map'],
-          '/index.css.map must be present on deno path',
-        );
-        const cssMapStr = new TextDecoder().decode(
-          assets['/index.css.map'].data,
-        );
-        const cssMap = JSON.parse(cssMapStr);
-        assertEquals(
-          cssMap.version,
-          3,
-          '/index.css.map must be a valid v3 source map',
-        );
-        // Verify the map actually references the original source file.
-        // Single-chunk path returns an esbuild map directly (no sections wrapper).
-        const sources: string[] = cssMap.sources ??
-          cssMap.sections?.[0]?.map?.sources ?? [];
-        assertTrue(
-          sources.length > 0,
-          '/index.css.map must contain at least one source entry',
-        );
-        assertTrue(
-          sources.some((s: string) => s.includes('style.css')),
-          '/index.css.map must reference the original style.css source file',
-        );
-        const cssText = new TextDecoder().decode(assets['/index.css'].data);
-        assertTrue(
-          cssText.includes('sourceMappingURL=/index.css.map'),
-          '/index.css must reference /index.css.map',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'buildAssets emits empty /index.css when no CSS is present',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-      const dir = await ctx.tempDir('build-assets-no-css');
-      await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
-          { runtime: 'node', keepEsbuildAlive: false },
-        );
-        assertExists(
-          assets['/index.css'],
-          '/index.css must be present even with no CSS',
-        );
-        assertEquals(
-          new TextDecoder().decode(assets['/index.css'].data),
-          '',
-          '/index.css must be empty string when no CSS is present',
-        );
-        assertEquals(assets['/index.css'].contentType, 'text/css');
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'buildAssets emits per-entry CSS instead of merging non-app entry styles into /index.css',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-
-      const dir = await ctx.tempDir('build-assets-multi-entry-css');
-
-      await writeTextFile(
-        path.join(dir, 'a.css'),
-        ':root { --multi-entry-a: 1; }',
-      );
-      await writeTextFile(
-        path.join(dir, 'entry-a.ts'),
-        `import './a.css';\nexport {};\n`,
-      );
-      await writeTextFile(
-        path.join(dir, 'b.css'),
-        ':root { --multi-entry-b: 1; }',
-      );
-      await writeTextFile(
-        path.join(dir, 'entry-b.ts'),
-        `import './b.css';\nexport {};\n`,
-      );
-
-      const entryPoints = [
-        { in: path.join(dir, 'entry-a.ts'), out: APP_ENTRY_POINT },
-        { in: path.join(dir, 'entry-b.ts'), out: 'entry-b' },
-      ];
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          { buildDir: dir, jsPath: path.join(dir, 'entry-a.ts') },
-          { runtime: 'node', keepEsbuildAlive: false },
-        );
-
-        assertExists(assets['/index.css'], '/index.css must be present');
-        assertExists(assets['/entry-b.css'], '/entry-b.css must be present');
-        const appCss = new TextDecoder().decode(assets['/index.css'].data);
-        const entryBCss = new TextDecoder().decode(assets['/entry-b.css'].data);
-        assertTrue(
-          appCss.includes('--multi-entry-a'),
-          'CSS from entry-a must appear in /index.css',
-        );
-        assertTrue(
-          !appCss.includes('--multi-entry-b'),
-          'CSS from secondary entries must not appear in /index.css',
-        );
-        assertTrue(
-          entryBCss.includes('--multi-entry-b'),
-          'CSS from entry-b must appear in /entry-b.css',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'buildAssets emits a separate source map for secondary entry CSS',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-
-      const dir = await ctx.tempDir('build-assets-multi-entry-css-map');
-      await writeTextFile(
-        path.join(dir, 'entry-a.css'),
-        ':root { --entry-a-cssmap: 1; }',
-      );
-      await writeTextFile(
-        path.join(dir, 'entry-a.ts'),
-        "import './entry-a.css';\nexport {};\n",
-      );
-      await writeTextFile(
-        path.join(dir, 'entry-b.css'),
-        ':root { --entry-b-cssmap: 1; }',
-      );
-      await writeTextFile(
-        path.join(dir, 'entry-b.ts'),
-        "import './entry-b.css';\nexport {};\n",
-      );
-
-      const entryPoints = [
-        { in: path.join(dir, 'entry-a.ts'), out: APP_ENTRY_POINT },
-        { in: path.join(dir, 'entry-b.ts'), out: 'entry-b' },
-      ];
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          { buildDir: dir, jsPath: path.join(dir, 'entry-a.ts') },
-          { runtime: 'node', keepEsbuildAlive: false },
-        );
-
-        assertExists(
-          assets['/entry-b.css.map'],
-          'secondary entry CSS must emit its own source map',
-        );
-        const entryBCss = new TextDecoder().decode(assets['/entry-b.css'].data);
-        assertTrue(
-          entryBCss.includes('sourceMappingURL=/entry-b.css.map'),
-          'secondary entry CSS must reference its own source map',
-        );
-        const map = JSON.parse(
-          new TextDecoder().decode(assets['/entry-b.css.map'].data),
-        );
-        const sources: string[] = map.sources ??
-          map.sections?.[0]?.map?.sources ??
-          [];
-        assertTrue(
-          sources.some((s: string) => s.includes('entry-b.css')),
-          'secondary entry CSS map must reference the original CSS file',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'buildAssets throws descriptive error when cssPath does not exist',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-      const dir = await ctx.tempDir('build-assets-bad-css');
-      await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
-      const badCssPath = path.join(dir, 'nonexistent.css');
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      try {
-        // Contract: error message must include the problematic path so users can identify what's missing.
+  if (isNode()) {
+    TEST(
+      'CLI-Compile',
+      'createBuildContext fails clearly on Node.js',
+      async () => {
         await assertThrows(
-          () =>
-            buildAssets(
-              undefined,
-              entryPoints,
-              {
-                buildDir: dir,
-                jsPath: path.join(dir, 'entry.ts'),
-                cssPath: badCssPath,
-              },
-              { runtime: 'node', keepEsbuildAlive: false },
-            ),
+          async () => {
+            await createBuildContext([{
+              in: '/tmp/entry.ts',
+              out: APP_ENTRY_POINT,
+            }]);
+          },
           Error,
-          badCssPath,
+          'createBuildContext() is only supported in Deno',
         );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
+      },
+    );
+  }
 
-  TEST(
-    'CLI-Compile',
-    'buildAssets throws descriptive error when htmlPath does not exist',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-      const dir = await ctx.tempDir('build-assets-bad-html');
-      await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
-      const badHtmlPath = path.join(dir, 'nonexistent.html');
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      try {
-        // Contract: error message must include the problematic path so users can identify what's missing.
+  if (isNode()) {
+    TEST(
+      'CLI-Compile',
+      'startDebugServer fails clearly on Node.js',
+      async () => {
         await assertThrows(
-          () =>
-            buildAssets(
-              undefined,
-              entryPoints,
-              {
-                buildDir: dir,
-                jsPath: path.join(dir, 'entry.ts'),
-                htmlPath: badHtmlPath,
-              },
-              { runtime: 'node', keepEsbuildAlive: false },
-            ),
+          async () => {
+            await startDebugServer({
+              buildDir: './build',
+              jsPath: './client/index.tsx',
+              path: './server-data',
+            } as never);
+          },
           Error,
-          badHtmlPath,
+          'startDebugServer() is only supported in Deno',
         );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
+      },
+    );
+  }
 
-  TEST(
-    'CLI-Compile',
-    'buildAssets forwards esbuildPlugins to esbuild',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-      const dir = await ctx.tempDir('build-assets-plugins');
-      await writeTextFile(
-        path.join(dir, 'entry.ts'),
-        `import { __sentinel__ } from 'testplugin:sentinel';\nexport const x = __sentinel__;\n`,
-      );
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      // deno-lint-ignore no-explicit-any
-      const testPlugin: any = {
-        name: 'test-plugin',
-        setup(build: any) {
-          build.onResolve({ filter: /^testplugin:/ }, (args: any) => ({
-            path: args.path,
-            namespace: 'testplugin',
-          }));
-          build.onLoad(
-            { filter: /.*/, namespace: 'testplugin' },
-            () => ({
-              contents: 'export const __sentinel__ = "plugin-was-here";',
-              loader: 'js',
-            }),
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'should compute target OS/arch correctly',
+      async () => {
+        // Test that targetFromOSArch works with explicit values
+        assertEquals(
+          targetFromOSArch('mac', 'arm64'),
+          'mac-arm64',
+          'Should return mac-arm64',
+        );
+        assertEquals(
+          targetFromOSArch('linux', 'x64'),
+          'linux-x64',
+          'Should return linux-x64',
+        );
+        assertEquals(
+          targetFromOSArch('windows', 'x64'),
+          'windows-x64',
+          'Should return windows-x64',
+        );
+
+        // Test auto-detection (should return current platform)
+        const detected = targetFromOSArch();
+        assertTrue(
+          detected.includes('-'),
+          `Detected target should have OS-arch format: ${detected}`,
+        );
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'should reject unsupported denoTarget windows-arm64',
+      async () => {
+        assertThrows(
+          () => denoTarget('windows', 'arm64'),
+          'denoTarget should throw for windows-arm64',
+        );
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'should map denoTarget for all supported platforms',
+      async () => {
+        assertEquals(denoTarget('mac', 'x64'), 'x86_64-apple-darwin');
+        assertEquals(denoTarget('mac', 'arm64'), 'aarch64-apple-darwin');
+        assertEquals(denoTarget('linux', 'x64'), 'x86_64-unknown-linux-gnu');
+        assertEquals(denoTarget('linux', 'arm64'), 'aarch64-unknown-linux-gnu');
+        assertEquals(denoTarget('windows', 'x64'), 'x86_64-pc-windows-msvc');
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'goatEntryPoints should match deno.json exports',
+      async () => {
+        const denoJsonPath = path.join(getRuntime().getCWD(), 'deno.json');
+        const content = await readTextFile(denoJsonPath);
+        assertExists(content, 'deno.json should be readable');
+        const denoJson = JSON.parse(content);
+        assertExists(denoJson.exports, 'deno.json should have exports field');
+        const exports = denoJson.exports as Record<string, string>;
+
+        // Every goatEntryPoints key should map to a deno.json export
+        for (const [suffix, file] of Object.entries(goatEntryPoints)) {
+          const exportKey = suffix === '' ? '.' : '.' + suffix;
+          assertEquals(
+            exports[exportKey],
+            './' + file,
+            `deno.json export "${exportKey}" should match goatEntryPoints`,
           );
-        },
-      };
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          {
-            buildDir: dir,
-            jsPath: path.join(dir, 'entry.ts'),
-          },
-          {
-            runtime: 'node',
-            keepEsbuildAlive: false,
-            esbuildPlugins: [testPlugin],
-          },
-        );
-        const js = new TextDecoder().decode(assets['/app.js'].data);
-        assertTrue(
-          js.includes('plugin-was-here'),
-          'esbuildPlugins must be dispatched through the full resolution chain',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
+        }
 
-  TEST(
-    'CLI-Compile',
-    'buildAssets does not merge assetsPath CSS into /index.css',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-      const dir = await ctx.tempDir('build-assets-assets-css');
-      await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
-      const assetsDir = path.join(dir, 'assets');
-      await mkdir(assetsDir);
-      const cssSentinel = '--assets-sentinel: 1;';
-      await writeTextFile(
-        path.join(assetsDir, 'styles.css'),
-        `.root { ${cssSentinel} }\n`,
-      );
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          {
-            buildDir: dir,
-            jsPath: path.join(dir, 'entry.ts'),
-            assetsPath: assetsDir,
-          },
-          { runtime: 'node', keepEsbuildAlive: false },
-        );
-        assertExists(
-          assets['/assets/styles.css'],
-          '/assets/styles.css must be served from assetsPath',
-        );
-        const assetsCss = new TextDecoder().decode(
-          assets['/assets/styles.css'].data,
-        );
-        assertTrue(
-          assetsCss.includes(cssSentinel),
-          'assetsPath CSS must be served as-is',
-        );
-        const appCss = new TextDecoder().decode(assets['/index.css'].data);
-        assertTrue(
-          !appCss.includes(cssSentinel),
-          'assetsPath CSS must not be merged into /index.css',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'buildAssets: esbuildPlugins and cssLoaderPlugin coexist',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-      const dir = await ctx.tempDir('build-assets-plugins-css');
-      const cssSentinel = '--plugin-css-sentinel: 1;';
-      await writeTextFile(
-        path.join(dir, 'style.css'),
-        `.root { ${cssSentinel} }\n`,
-      );
-      await writeTextFile(
-        path.join(dir, 'entry.ts'),
-        `import './style.css';\nimport { __sentinel__ } from 'testplugin:sentinel';\nexport const x = __sentinel__;\n`,
-      );
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      // deno-lint-ignore no-explicit-any
-      const sentinelPlugin: any = {
-        name: 'sentinel-plugin',
-        setup(build: any) {
-          build.onResolve({ filter: /^testplugin:/ }, (args: any) => ({
-            path: args.path,
-            namespace: 'testplugin',
-          }));
-          build.onLoad(
-            { filter: /.*/, namespace: 'testplugin' },
-            () => ({
-              contents: 'export const __sentinel__ = "plugin-was-here";',
-              loader: 'js',
-            }),
+        // Every deno.json export should have a matching goatEntryPoints entry
+        for (const [exportKey, exportPath] of Object.entries(exports)) {
+          const suffix = exportKey === '.' ? '' : exportKey.slice(1);
+          const expected = (exportPath as string).replace('./', '');
+          assertEquals(
+            (goatEntryPoints as Record<string, string>)[suffix],
+            expected,
+            `goatEntryPoints should have entry for deno.json export "${exportKey}"`,
           );
-        },
-      };
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          {
-            buildDir: dir,
-            jsPath: path.join(dir, 'entry.ts'),
-          },
-          {
-            runtime: 'node',
-            keepEsbuildAlive: false,
-            esbuildPlugins: [sentinelPlugin],
-          },
-        );
-        const js = new TextDecoder().decode(assets['/app.js'].data);
-        assertTrue(
-          js.includes('plugin-was-here'),
-          'user esbuildPlugin must produce output in /app.js',
-        );
-        const css = new TextDecoder().decode(assets['/index.css'].data);
-        assertTrue(
-          css.includes(cssSentinel),
-          'cssLoaderPlugin must still bundle CSS into /index.css when esbuildPlugins are present',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
+        }
+      },
+    );
+  }
 
-  TEST(
-    'CLI-Compile',
-    'esbuildPlugins can rewrite local CSS imports on the production build path',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
+  if (isNode()) {
+    TEST(
+      'CLI-Compile',
+      'bundleServerForSEA produces valid CJS',
+      async (ctx) => {
+        const dir = await ctx.tempDir('bundle-sea');
+        const entryPath = path.join(dir, 'entry.ts');
+        await writeTextFile(
+          entryPath,
+          'export function main(): number { return 42; }',
+        );
+        const outPath = path.join(dir, 'bundle.cjs');
 
-      const dir = await ctx.tempDir('build-assets-local-css-plugin');
-      const originalSentinel = '--local-css-original: 1;';
-      const rewrittenSentinel = '--local-css-rewritten: 1;';
-      const originalCssPath = path.join(dir, 'style.css');
-      const rewrittenCssPath = path.join(dir, 'rewritten.css');
-      await writeTextFile(
-        originalCssPath,
-        `:root { ${originalSentinel} }\n`,
-      );
-      await writeTextFile(
-        rewrittenCssPath,
-        `:root { ${rewrittenSentinel} }\n`,
-      );
-      await writeTextFile(
-        path.join(dir, 'entry.ts'),
-        "import './style.css';\nexport {};\n",
-      );
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      // deno-lint-ignore no-explicit-any
-      const localCssPlugin: any = {
-        name: 'local-css-rewriter',
-        setup(build: any) {
-          build.onResolve(
-            { filter: /^\.\/style\.css$/, namespace: 'file' },
-            () => ({ path: rewrittenCssPath, namespace: 'file' }),
+        // bundleServerForSEA uses esbuild's background service; stop it after the
+        // test so the process can exit cleanly.
+        try {
+          await bundleServerForSEA(entryPath, outPath);
+        } finally {
+          await stopBackgroundCompiler();
+        }
+
+        const content = await readTextFile(outPath);
+        assertExists(content, 'output file should be readable');
+        const text = content!;
+        assertTrue(text.length > 0, 'output file must not be empty');
+        // esbuild's bundle mode (bundle: true) wraps all exports into a CJS module
+        // via `module.exports = __toCommonJS(entry_exports)`. This pattern is absent
+        // from ESM output and confirms the bundle is CJS, not ESM.
+        assertTrue(
+          text.includes('module.exports'),
+          'CJS output must assign module.exports',
+        );
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets bundles CSS from imports and cssPath into /index.css',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-css');
+
+        // Entry TS that imports a CSS file
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          `import './bundled.css';\nexport {};\n`,
+        );
+        await writeTextFile(
+          path.join(dir, 'bundled.css'),
+          ':root { --goatdb-test-bundled: 1; }',
+        );
+        // Global CSS file — should be prepended via cssPath
+        await writeTextFile(
+          path.join(dir, 'global.css'),
+          ':root { --goatdb-test-global: 1; }',
+        );
+
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        let assets: StaticAssets;
+        try {
+          assets = await buildAssets(
+            undefined,
+            entryPoints,
+            {
+              buildDir: dir,
+              jsPath: path.join(dir, 'entry.ts'),
+              cssPath: path.join(dir, 'global.css'),
+            },
+            // Node path only — Deno path requires a deno.json in CWD for @luca/esbuild-deno-loader and is
+            // not covered by the unit suite. The full E2E test (opt-in, see below) exercises it.
+            { runtime: 'node', keepEsbuildAlive: false },
           );
-        },
-      };
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          {
-            buildDir: dir,
-            jsPath: path.join(dir, 'entry.ts'),
-          },
-          {
-            runtime: 'node',
-            keepEsbuildAlive: false,
-            esbuildPlugins: [localCssPlugin],
-          },
-        );
-        const css = new TextDecoder().decode(assets['/index.css'].data);
-        assertTrue(
-          css.includes(rewrittenSentinel),
-          'user plugin must be able to rewrite local CSS imports before GoatDB CSS fallback runs',
-        );
-        assertTrue(
-          !css.includes(originalSentinel),
-          'rewritten local CSS must replace the original import target',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
 
-  TEST(
-    'CLI-Compile',
-    'esbuildPlugins can resolve bare-specifier CSS imports',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-
-      const dir = await ctx.tempDir('build-assets-bare-css-plugin');
-      const sentinel = '--bare-specifier-resolved: 1;';
-
-      await writeTextFile(
-        path.join(dir, 'entry.ts'),
-        `import 'my-css';\nexport {};\n`,
-      );
-      await writeTextFile(
-        path.join(dir, 'resolved.css'),
-        `:root { ${sentinel} }`,
-      );
-
-      // deno-lint-ignore no-explicit-any
-      const bareCssPlugin: any = {
-        name: 'bare-css-resolver',
-        setup(build: any) {
-          build.onResolve({ filter: /^my-css$/ }, () => ({
-            path: path.join(dir, 'resolved.css'),
-            namespace: 'file',
-          }));
-        },
-      };
-
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          {
-            buildDir: dir,
-            jsPath: path.join(dir, 'entry.ts'),
-          },
-          {
-            runtime: 'node',
-            keepEsbuildAlive: false,
-            esbuildPlugins: [bareCssPlugin],
-          },
-        );
-        assertExists(assets['/index.css'], '/index.css must be present');
-        const css = new TextDecoder().decode(assets['/index.css'].data);
-        assertTrue(
-          css.includes(sentinel),
-          'bare-specifier CSS resolved by user plugin must land in /index.css',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'buildAssets with ReBuildContext collects CSS on initial build and after rebuild',
-    async (ctx: TestSuite) => {
-      if (!isDeno()) return; // createBuildContext requires @luca/esbuild-deno-loader (Deno only)
-
-      const dir = await ctx.tempDir('build-assets-rebuild-css');
-      const cssPath = path.join(dir, 'style.css');
-      const entryPath = path.join(dir, 'entry.ts');
-      await writeTextFile(cssPath, ':root { --rebuild-v1: 1; }');
-      await writeTextFile(entryPath, `import './style.css';\nexport {};\n`);
-      const entryPoints = [{ in: entryPath, out: APP_ENTRY_POINT }];
-
-      const rebuildCtx = await createBuildContext(entryPoints);
-      try {
-        // Initial build via ReBuildContext
-        const assets1 = await buildAssets(rebuildCtx, entryPoints, {
-          buildDir: dir,
-          jsPath: entryPath,
-        });
-        const css1 = new TextDecoder().decode(assets1['/index.css'].data);
-        assertTrue(
-          css1.includes('--rebuild-v1'),
-          'CSS must appear on initial ReBuildContext build',
-        );
-
-        // Mutate CSS and rebuild
-        await writeTextFile(cssPath, ':root { --rebuild-v2: 1; }');
-        const assets2 = await buildAssets(rebuildCtx, entryPoints, {
-          buildDir: dir,
-          jsPath: entryPath,
-        });
-        const css2 = new TextDecoder().decode(assets2['/index.css'].data);
-        assertTrue(
-          css2.includes('--rebuild-v2'),
-          'Updated CSS must appear after rebuild',
-        );
-        assertTrue(
-          !css2.includes('--rebuild-v1'),
-          'Stale CSS must not appear after rebuild',
-        );
-      } finally {
-        rebuildCtx.close();
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'createBuildContext forwards extraPlugins into the build (debug server wiring)',
-    async (ctx: TestSuite) => {
-      if (!isDeno()) return;
-
-      const dir = await ctx.tempDir('build-ctx-plugins');
-      await writeTextFile(
-        path.join(dir, 'entry.ts'),
-        `import { __sentinel__ } from 'testplugin:sentinel';\nexport const x = __sentinel__;\n`,
-      );
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      // deno-lint-ignore no-explicit-any
-      const testPlugin: any = {
-        name: 'test-plugin',
-        setup(build: any) {
-          build.onResolve({ filter: /^testplugin:/ }, (args: any) => ({
-            path: args.path,
-            namespace: 'testplugin',
-          }));
-          build.onLoad({ filter: /.*/, namespace: 'testplugin' }, () => ({
-            contents: 'export const __sentinel__ = "ctx-plugin-was-here";',
-            loader: 'js',
-          }));
-        },
-      };
-      const rebuildCtx = await createBuildContext(entryPoints, [testPlugin]);
-      try {
-        const assets = await buildAssets(rebuildCtx, entryPoints, {
-          buildDir: dir,
-          jsPath: path.join(dir, 'entry.ts'),
-        });
-        const js = new TextDecoder().decode(assets['/app.js'].data);
-        assertTrue(
-          js.includes('ctx-plugin-was-here'),
-          'extraPlugins passed to createBuildContext must be applied during buildAssets',
-        );
-      } finally {
-        rebuildCtx.close();
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'createBuildContext extraPlugins can rewrite local CSS imports',
-    async (ctx: TestSuite) => {
-      if (!isDeno()) return;
-
-      const dir = await ctx.tempDir('build-ctx-local-css-plugin');
-      const originalSentinel = '--ctx-local-css-original: 1;';
-      const rewrittenSentinel = '--ctx-local-css-rewritten: 1;';
-      const rewrittenCssPath = path.join(dir, 'rewritten.css');
-      await writeTextFile(
-        path.join(dir, 'style.css'),
-        `:root { ${originalSentinel} }\n`,
-      );
-      await writeTextFile(
-        rewrittenCssPath,
-        `:root { ${rewrittenSentinel} }\n`,
-      );
-      await writeTextFile(
-        path.join(dir, 'entry.ts'),
-        "import './style.css';\nexport {};\n",
-      );
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      // deno-lint-ignore no-explicit-any
-      const localCssPlugin: any = {
-        name: 'ctx-local-css-rewriter',
-        setup(build: any) {
-          build.onResolve(
-            { filter: /^\.\/style\.css$/, namespace: 'file' },
-            () => ({ path: rewrittenCssPath, namespace: 'file' }),
+          assertExists(
+            assets['/index.css'],
+            '/index.css must always be present in StaticAssets',
           );
-        },
-      };
-      const rebuildCtx = await createBuildContext(entryPoints, [
-        localCssPlugin,
-      ]);
-      try {
-        const assets = await buildAssets(rebuildCtx, entryPoints, {
-          buildDir: dir,
-          jsPath: path.join(dir, 'entry.ts'),
-        });
-        const css = new TextDecoder().decode(assets['/index.css'].data);
-        assertTrue(
-          css.includes(rewrittenSentinel),
-          'debug build context must let user plugins rewrite local CSS imports',
-        );
-        assertTrue(
-          !css.includes(originalSentinel),
-          'debug build context must not fall back to the original local CSS file after rewrite',
-        );
-      } finally {
-        rebuildCtx.close();
-        await stopBackgroundCompiler();
-      }
-    },
-  );
+          assertEquals(
+            assets['/index.css'].contentType,
+            'text/css',
+            '/index.css must have content-type text/css',
+          );
+          const css = new TextDecoder().decode(assets['/index.css'].data);
 
-  TEST(
-    'CLI-Compile',
-    'buildAssets ignores BuildAssetsOptions.esbuildPlugins when ReBuildContext is provided',
-    async (ctx: TestSuite) => {
-      if (!isDeno()) return; // createBuildContext requires @luca/esbuild-deno-loader
+          assertTrue(
+            css.includes('--goatdb-test-global'),
+            'cssPath content must appear in /index.css',
+          );
+          assertTrue(
+            css.includes('--goatdb-test-bundled'),
+            'bundled CSS from JS import must appear in /index.css',
+          );
+          assertTrue(
+            css.indexOf('--goatdb-test-global') <
+              css.indexOf('--goatdb-test-bundled'),
+            'cssPath content must be prepended before bundled CSS',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
 
-      const dir = await ctx.tempDir('build-assets-ctx-plugin-ignored');
-      await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      const rebuildCtx = await createBuildContext(entryPoints);
+  if (isDeno()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets with runtime: deno bundles CSS into /index.css',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-deno-css');
+        await writeTextFile(
+          path.join(dir, 'style.css'),
+          ':root { --deno-css-test: 1; }',
+        );
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          "import './style.css';\nexport {};",
+        );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
 
-      let pluginSetupCalled = false;
-      // deno-lint-ignore no-explicit-any
-      const sentinelPlugin: any = {
-        name: 'sentinel',
-        setup() {
-          pluginSetupCalled = true;
-        },
-      };
-
-      try {
-        await buildAssets(rebuildCtx, entryPoints, {
-          buildDir: dir,
-          jsPath: path.join(dir, 'entry.ts'),
-        }, { esbuildPlugins: [sentinelPlugin] });
-        assertTrue(
-          !pluginSetupCalled,
-          'esbuildPlugins must not be applied when a ReBuildContext is passed',
-        );
-      } finally {
-        rebuildCtx.close();
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'cssLoaderPlugin resolves CSS @import chains via resolveDir',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-
-      const dir = await ctx.tempDir('css-import-chain');
-      // b.css is the leaf — contains the sentinel
-      await writeTextFile(
-        path.join(dir, 'b.css'),
-        ':root { --chain-sentinel: 1; }',
-      );
-      // a.css @imports b.css — tests resolveDir resolution
-      await writeTextFile(
-        path.join(dir, 'a.css'),
-        "@import './b.css';\n",
-      );
-      await writeTextFile(
-        path.join(dir, 'entry.ts'),
-        "import './a.css';\nexport {};\n",
-      );
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
-          { runtime: 'node', keepEsbuildAlive: false },
-        );
-        const css = new TextDecoder().decode(assets['/index.css'].data);
-        assertTrue(
-          css.includes('--chain-sentinel'),
-          'CSS @import chains must be resolved and bundled into /index.css',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'cssLoaderPlugin preserves CSS Modules exports on the node build path',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-
-      const dir = await ctx.tempDir('css-modules-node-path');
-      await writeTextFile(
-        path.join(dir, 'style.module.css'),
-        '.foo { color: red; }\n',
-      );
-      await writeTextFile(
-        path.join(dir, 'entry.ts'),
-        "import styles from './style.module.css';\nglobalThis.__goatCssModuleClassName = styles.foo;\nexport {};\n",
-      );
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
-          { runtime: 'node', keepEsbuildAlive: false },
-        );
-        const js = new TextDecoder().decode(assets['/app.js'].data);
-        const css = new TextDecoder().decode(assets['/index.css'].data);
-        const className = runBundledScript(js).__goatCssModuleClassName;
-        assertExists(
-          className,
-          'CSS Modules JS output must export a class name for foo',
-        );
-        assertTrue(
-          typeof className === 'string',
-          'CSS Modules export for foo must be a string',
-        );
-        const exportedClassName = className as string;
-        assertTrue(
-          exportedClassName.length > 0,
-          'CSS Modules export for foo must not be empty',
-        );
-        assertTrue(
-          css.includes(`.${exportedClassName}`),
-          'Bundled CSS must include the exported CSS Modules class name',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'buildAssets with ReBuildContext preserves CSS Modules exports after rebuild',
-    async (ctx: TestSuite) => {
-      if (!isDeno()) return; // createBuildContext requires @luca/esbuild-deno-loader
-
-      const dir = await ctx.tempDir('css-modules-rebuild-path');
-      const cssPath = path.join(dir, 'style.module.css');
-      const entryPath = path.join(dir, 'entry.ts');
-      await writeTextFile(cssPath, '.foo { color: red; }\n');
-      await writeTextFile(
-        entryPath,
-        "import styles from './style.module.css';\nglobalThis.__goatCssModuleClassName = styles.foo;\nexport {};\n",
-      );
-      const entryPoints = [{ in: entryPath, out: APP_ENTRY_POINT }];
-      const rebuildCtx = await createBuildContext(entryPoints);
-      try {
-        const assets1 = await buildAssets(rebuildCtx, entryPoints, {
-          buildDir: dir,
-          jsPath: entryPath,
-        });
-        const js1 = new TextDecoder().decode(assets1['/app.js'].data);
-        const css1 = new TextDecoder().decode(assets1['/index.css'].data);
-        const className1 = runBundledScript(js1).__goatCssModuleClassName;
-        assertExists(
-          className1,
-          'Initial CSS Modules build must export a class name for foo',
-        );
-        assertTrue(
-          typeof className1 === 'string',
-          'Initial CSS Modules export for foo must be a string',
-        );
-        const exportedClassName1 = className1 as string;
-        assertTrue(
-          css1.includes(`.${exportedClassName1}`),
-          'Initial bundled CSS must include the exported CSS Modules class name',
-        );
-        assertTrue(
-          css1.includes('color: red'),
-          'Initial bundled CSS must include the first CSS Modules content',
-        );
-
-        await writeTextFile(cssPath, '.foo { color: blue; }\n');
-        const assets2 = await buildAssets(rebuildCtx, entryPoints, {
-          buildDir: dir,
-          jsPath: entryPath,
-        });
-        const js2 = new TextDecoder().decode(assets2['/app.js'].data);
-        const css2 = new TextDecoder().decode(assets2['/index.css'].data);
-        const className2 = runBundledScript(js2).__goatCssModuleClassName;
-        assertExists(
-          className2,
-          'Rebuilt CSS Modules output must export a class name for foo',
-        );
-        assertTrue(
-          typeof className2 === 'string',
-          'Rebuilt CSS Modules export for foo must be a string',
-        );
-        const exportedClassName2 = className2 as string;
-        assertTrue(
-          css2.includes(`.${exportedClassName2}`),
-          'Rebuilt bundled CSS must include the exported CSS Modules class name',
-        );
-        assertTrue(
-          css2.includes('color: blue'),
-          'Rebuilt CSS must include the updated CSS Modules content',
-        );
-        assertTrue(
-          !css2.includes('color: red'),
-          'Rebuilt CSS must not include stale CSS Modules content',
-        );
-      } finally {
-        rebuildCtx.close();
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'buildAssets with ReBuildContext prepends cssPath into /index.css',
-    async (ctx: TestSuite) => {
-      if (!isDeno()) return; // createBuildContext requires @luca/esbuild-deno-loader (Deno only)
-
-      const dir = await ctx.tempDir('build-assets-rebuild-csspath');
-      const globalCssPath = path.join(dir, 'global.css');
-      const entryPath = path.join(dir, 'entry.ts');
-      await writeTextFile(globalCssPath, ':root { --global-sentinel: 1; }');
-      await writeTextFile(entryPath, 'export {};');
-      const entryPoints = [{ in: entryPath, out: APP_ENTRY_POINT }];
-      const rebuildCtx = await createBuildContext(entryPoints);
-      try {
-        const assets = await buildAssets(rebuildCtx, entryPoints, {
-          buildDir: dir,
-          jsPath: entryPath,
-          cssPath: globalCssPath,
-        });
-        const css = new TextDecoder().decode(assets['/index.css'].data);
-        assertTrue(
-          css.includes('--global-sentinel'),
-          'cssPath must be included in /index.css when using ReBuildContext',
-        );
-      } finally {
-        rebuildCtx.close();
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'buildAssets emits /index.css.map with correct sourceMappingURL reference',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-      const dir = await ctx.tempDir('build-assets-sourcemap-url');
-      await writeTextFile(
-        path.join(dir, 'style.css'),
-        ':root { --strip-test: 1; }',
-      );
-      await writeTextFile(
-        path.join(dir, 'entry.ts'),
-        "import './style.css';\nexport {};\n",
-      );
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
-          { runtime: 'node', keepEsbuildAlive: false },
-        );
-        const css = new TextDecoder().decode(assets['/index.css'].data);
-        assertTrue(
-          css.includes('sourceMappingURL=/index.css.map'),
-          '/index.css must reference /index.css.map as its source map',
-        );
-        assertExists(
-          assets['/index.css.map'],
-          '/index.css.map must be served when CSS is bundled',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'buildAssets /index.css.map is valid source map referencing original CSS files',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-      const dir = await ctx.tempDir('build-assets-cssmap-valid');
-      await writeTextFile(
-        path.join(dir, 'style.css'),
-        ':root { --cssmap-sentinel: 1; }',
-      );
-      await writeTextFile(
-        path.join(dir, 'entry.ts'),
-        "import './style.css';\nexport {};\n",
-      );
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
-          { runtime: 'node', keepEsbuildAlive: false },
-        );
-        assertExists(assets['/index.css.map'], '/index.css.map must exist');
-        const mapJson = new TextDecoder().decode(assets['/index.css.map'].data);
-        // deno-lint-ignore no-explicit-any
-        const map = JSON.parse(mapJson) as any;
-        assertEquals(map.version, 3, 'source map version must be 3');
-        const sources = getMapSources(map);
-        assertTrue(
-          Array.isArray(sources) &&
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
+            { runtime: 'deno', keepEsbuildAlive: false },
+          );
+          assertExists(
+            assets['/index.css'],
+            '/index.css must be present for deno runtime',
+          );
+          const css = new TextDecoder().decode(assets['/index.css'].data);
+          assertTrue(
+            css.includes('--deno-css-test'),
+            'CSS from import must land in /index.css on deno path',
+          );
+          // Source map must also be emitted for the deno path
+          assertExists(
+            assets['/index.css.map'],
+            '/index.css.map must be present on deno path',
+          );
+          const cssMapStr = new TextDecoder().decode(
+            assets['/index.css.map'].data,
+          );
+          const cssMap = JSON.parse(cssMapStr);
+          assertEquals(
+            cssMap.version,
+            3,
+            '/index.css.map must be a valid v3 source map',
+          );
+          // Verify the map actually references the original source file.
+          // Single-chunk path returns an esbuild map directly (no sections wrapper).
+          const sources: string[] = cssMap.sources ??
+            cssMap.sections?.[0]?.map?.sources ?? [];
+          assertTrue(
+            sources.length > 0,
+            '/index.css.map must contain at least one source entry',
+          );
+          assertTrue(
             sources.some((s: string) => s.includes('style.css')),
-          'source map must reference the original style.css file',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
+            '/index.css.map must reference the original style.css source file',
+          );
+          const cssText = new TextDecoder().decode(assets['/index.css'].data);
+          assertTrue(
+            cssText.includes('sourceMappingURL=/index.css.map'),
+            '/index.css must reference /index.css.map',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
 
-  TEST(
-    'CLI-Compile',
-    'buildAssets with cssPath and bundled CSS preserves source mapping to bundled CSS',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-      const dir = await ctx.tempDir('build-assets-cssmap-sections');
-      const globalCssContent = ':root { --global-cssmap-sentinel: 1; }\n';
-      await writeTextFile(
-        path.join(dir, 'global.css'),
-        globalCssContent,
-      );
-      await writeTextFile(
-        path.join(dir, 'bundled.css'),
-        ':root { --bundled-cssmap-sentinel: 2; }',
-      );
-      await writeTextFile(
-        path.join(dir, 'entry.ts'),
-        "import './bundled.css';\nexport {};\n",
-      );
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          {
-            buildDir: dir,
-            jsPath: path.join(dir, 'entry.ts'),
-            cssPath: path.join(dir, 'global.css'),
-          },
-          { runtime: 'node', keepEsbuildAlive: false },
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets emits empty /index.css when no CSS is present',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-no-css');
+        await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+          assertExists(
+            assets['/index.css'],
+            '/index.css must be present even with no CSS',
+          );
+          assertEquals(
+            new TextDecoder().decode(assets['/index.css'].data),
+            '',
+            '/index.css must be empty string when no CSS is present',
+          );
+          assertEquals(assets['/index.css'].contentType, 'text/css');
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets emits per-entry CSS instead of merging non-app entry styles into /index.css',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-multi-entry-css');
+
+        await writeTextFile(
+          path.join(dir, 'a.css'),
+          ':root { --multi-entry-a: 1; }',
         );
-        assertExists(assets['/index.css.map'], '/index.css.map must exist');
-        const cssText = new TextDecoder().decode(assets['/index.css'].data);
-        const mapJson = new TextDecoder().decode(assets['/index.css.map'].data);
+        await writeTextFile(
+          path.join(dir, 'entry-a.ts'),
+          `import './a.css';\nexport {};\n`,
+        );
+        await writeTextFile(
+          path.join(dir, 'b.css'),
+          ':root { --multi-entry-b: 1; }',
+        );
+        await writeTextFile(
+          path.join(dir, 'entry-b.ts'),
+          `import './b.css';\nexport {};\n`,
+        );
+
+        const entryPoints = [
+          { in: path.join(dir, 'entry-a.ts'), out: APP_ENTRY_POINT },
+          { in: path.join(dir, 'entry-b.ts'), out: 'entry-b' },
+        ];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            { buildDir: dir, jsPath: path.join(dir, 'entry-a.ts') },
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+
+          assertExists(assets['/index.css'], '/index.css must be present');
+          assertExists(assets['/entry-b.css'], '/entry-b.css must be present');
+          const appCss = new TextDecoder().decode(assets['/index.css'].data);
+          const entryBCss = new TextDecoder().decode(
+            assets['/entry-b.css'].data,
+          );
+          assertTrue(
+            appCss.includes('--multi-entry-a'),
+            'CSS from entry-a must appear in /index.css',
+          );
+          assertTrue(
+            !appCss.includes('--multi-entry-b'),
+            'CSS from secondary entries must not appear in /index.css',
+          );
+          assertTrue(
+            entryBCss.includes('--multi-entry-b'),
+            'CSS from entry-b must appear in /entry-b.css',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets emits a separate source map for secondary entry CSS',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-multi-entry-css-map');
+        await writeTextFile(
+          path.join(dir, 'entry-a.css'),
+          ':root { --entry-a-cssmap: 1; }',
+        );
+        await writeTextFile(
+          path.join(dir, 'entry-a.ts'),
+          "import './entry-a.css';\nexport {};\n",
+        );
+        await writeTextFile(
+          path.join(dir, 'entry-b.css'),
+          ':root { --entry-b-cssmap: 1; }',
+        );
+        await writeTextFile(
+          path.join(dir, 'entry-b.ts'),
+          "import './entry-b.css';\nexport {};\n",
+        );
+
+        const entryPoints = [
+          { in: path.join(dir, 'entry-a.ts'), out: APP_ENTRY_POINT },
+          { in: path.join(dir, 'entry-b.ts'), out: 'entry-b' },
+        ];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            { buildDir: dir, jsPath: path.join(dir, 'entry-a.ts') },
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+
+          assertExists(
+            assets['/entry-b.css.map'],
+            'secondary entry CSS must emit its own source map',
+          );
+          const entryBCss = new TextDecoder().decode(
+            assets['/entry-b.css'].data,
+          );
+          assertTrue(
+            entryBCss.includes('sourceMappingURL=/entry-b.css.map'),
+            'secondary entry CSS must reference its own source map',
+          );
+          const map = JSON.parse(
+            new TextDecoder().decode(assets['/entry-b.css.map'].data),
+          );
+          const sources: string[] = map.sources ??
+            map.sections?.[0]?.map?.sources ??
+            [];
+          assertTrue(
+            sources.some((s: string) => s.includes('entry-b.css')),
+            'secondary entry CSS map must reference the original CSS file',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets throws descriptive error when cssPath does not exist',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-bad-css');
+        await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
+        const badCssPath = path.join(dir, 'nonexistent.css');
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        try {
+          // Contract: error message must include the problematic path so users can identify what's missing.
+          await assertThrows(
+            () =>
+              buildAssets(
+                undefined,
+                entryPoints,
+                {
+                  buildDir: dir,
+                  jsPath: path.join(dir, 'entry.ts'),
+                  cssPath: badCssPath,
+                },
+                { runtime: 'node', keepEsbuildAlive: false },
+              ),
+            Error,
+            badCssPath,
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets throws descriptive error when htmlPath does not exist',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-bad-html');
+        await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
+        const badHtmlPath = path.join(dir, 'nonexistent.html');
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        try {
+          // Contract: error message must include the problematic path so users can identify what's missing.
+          await assertThrows(
+            () =>
+              buildAssets(
+                undefined,
+                entryPoints,
+                {
+                  buildDir: dir,
+                  jsPath: path.join(dir, 'entry.ts'),
+                  htmlPath: badHtmlPath,
+                },
+                { runtime: 'node', keepEsbuildAlive: false },
+              ),
+            Error,
+            badHtmlPath,
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets forwards esbuildPlugins to esbuild',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-plugins');
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          `import { __sentinel__ } from 'testplugin:sentinel';\nexport const x = __sentinel__;\n`,
+        );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
         // deno-lint-ignore no-explicit-any
-        const map = JSON.parse(mapJson) as any;
-        assertTrue(
-          cssText.includes('--global-cssmap-sentinel'),
-          '/index.css must include the prepended cssPath content',
-        );
-        assertTrue(
-          cssText.includes('--bundled-cssmap-sentinel'),
-          '/index.css must include the bundled CSS content',
-        );
-        assertTrue(
-          cssText.indexOf('--global-cssmap-sentinel') <
-            cssText.indexOf('--bundled-cssmap-sentinel'),
-          'prepended cssPath content must appear before bundled CSS',
-        );
-        assertTrue(
-          cssText.includes('sourceMappingURL=/index.css.map'),
-          '/index.css must reference /index.css.map when a CSS map is emitted',
-        );
-        const sources = getMapSources(map);
-        assertTrue(
-          sources.some((s: string) => s.includes('bundled.css')),
-          'source map must reference the bundled CSS source file',
-        );
-        assertTrue(
-          !sources.some((s: string) => s.includes('global.css')),
-          'prepended cssPath content must remain unmapped',
-        );
-        const firstMappedLine = getFirstMappedGeneratedLine(map);
-        assertExists(
-          firstMappedLine,
-          'source map must expose a mapped generated line',
-        );
-        assertEquals(
-          firstMappedLine,
-          getCssChunkStartLine(globalCssContent),
-          'first mapped generated line must start at the bundled CSS chunk boundary',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
+        const testPlugin: any = {
+          name: 'test-plugin',
+          setup(build: any) {
+            build.onResolve({ filter: /^testplugin:/ }, (args: any) => ({
+              path: args.path,
+              namespace: 'testplugin',
+            }));
+            build.onLoad(
+              { filter: /.*/, namespace: 'testplugin' },
+              () => ({
+                contents: 'export const __sentinel__ = "plugin-was-here";',
+                loader: 'js',
+              }),
+            );
+          },
+        };
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            {
+              buildDir: dir,
+              jsPath: path.join(dir, 'entry.ts'),
+            },
+            {
+              runtime: 'node',
+              keepEsbuildAlive: false,
+              esbuildPlugins: [testPlugin],
+            },
+          );
+          const js = new TextDecoder().decode(assets['/app.js'].data);
+          assertTrue(
+            js.includes('plugin-was-here'),
+            'esbuildPlugins must be dispatched through the full resolution chain',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
 
-  TEST(
-    'CLI-Compile',
-    'buildAssets emits no /index.css.map when there is no CSS',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-      const dir = await ctx.tempDir('build-assets-no-cssmap');
-      await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
-          { runtime: 'node', keepEsbuildAlive: false },
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets does not merge assetsPath CSS into /index.css',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-assets-css');
+        await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
+        const assetsDir = path.join(dir, 'assets');
+        await mkdir(assetsDir);
+        const cssSentinel = '--assets-sentinel: 1;';
+        await writeTextFile(
+          path.join(assetsDir, 'styles.css'),
+          `.root { ${cssSentinel} }\n`,
         );
-        assertTrue(
-          assets['/index.css.map'] === undefined,
-          '/index.css.map must not be emitted when there is no CSS',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            {
+              buildDir: dir,
+              jsPath: path.join(dir, 'entry.ts'),
+              assetsPath: assetsDir,
+            },
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+          assertExists(
+            assets['/assets/styles.css'],
+            '/assets/styles.css must be served from assetsPath',
+          );
+          const assetsCss = new TextDecoder().decode(
+            assets['/assets/styles.css'].data,
+          );
+          assertTrue(
+            assetsCss.includes(cssSentinel),
+            'assetsPath CSS must be served as-is',
+          );
+          const appCss = new TextDecoder().decode(assets['/index.css'].data);
+          assertTrue(
+            !appCss.includes(cssSentinel),
+            'assetsPath CSS must not be merged into /index.css',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
 
-  TEST(
-    'CLI-Compile',
-    'buildAssets with cssPath only emits no /index.css.map and no sourceMappingURL',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-      const dir = await ctx.tempDir('build-assets-cssonly-no-map');
-      await writeTextFile(
-        path.join(dir, 'vendor.css'),
-        ':root { --cssonly-sentinel: 1; }\n',
-      );
-      // Entry point imports no CSS — only cssPath is set
-      await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
-      const entryPoints = [{
-        in: path.join(dir, 'entry.ts'),
-        out: APP_ENTRY_POINT,
-      }];
-      try {
-        const assets = await buildAssets(
-          undefined,
-          entryPoints,
-          {
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets: esbuildPlugins and cssLoaderPlugin coexist',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-plugins-css');
+        const cssSentinel = '--plugin-css-sentinel: 1;';
+        await writeTextFile(
+          path.join(dir, 'style.css'),
+          `.root { ${cssSentinel} }\n`,
+        );
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          `import './style.css';\nimport { __sentinel__ } from 'testplugin:sentinel';\nexport const x = __sentinel__;\n`,
+        );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        // deno-lint-ignore no-explicit-any
+        const sentinelPlugin: any = {
+          name: 'sentinel-plugin',
+          setup(build: any) {
+            build.onResolve({ filter: /^testplugin:/ }, (args: any) => ({
+              path: args.path,
+              namespace: 'testplugin',
+            }));
+            build.onLoad(
+              { filter: /.*/, namespace: 'testplugin' },
+              () => ({
+                contents: 'export const __sentinel__ = "plugin-was-here";',
+                loader: 'js',
+              }),
+            );
+          },
+        };
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            {
+              buildDir: dir,
+              jsPath: path.join(dir, 'entry.ts'),
+            },
+            {
+              runtime: 'node',
+              keepEsbuildAlive: false,
+              esbuildPlugins: [sentinelPlugin],
+            },
+          );
+          const js = new TextDecoder().decode(assets['/app.js'].data);
+          assertTrue(
+            js.includes('plugin-was-here'),
+            'user esbuildPlugin must produce output in /app.js',
+          );
+          const css = new TextDecoder().decode(assets['/index.css'].data);
+          assertTrue(
+            css.includes(cssSentinel),
+            'cssLoaderPlugin must still bundle CSS into /index.css when esbuildPlugins are present',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'esbuildPlugins can rewrite local CSS imports on the production build path',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-local-css-plugin');
+        const originalSentinel = '--local-css-original: 1;';
+        const rewrittenSentinel = '--local-css-rewritten: 1;';
+        const originalCssPath = path.join(dir, 'style.css');
+        const rewrittenCssPath = path.join(dir, 'rewritten.css');
+        await writeTextFile(
+          originalCssPath,
+          `:root { ${originalSentinel} }\n`,
+        );
+        await writeTextFile(
+          rewrittenCssPath,
+          `:root { ${rewrittenSentinel} }\n`,
+        );
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          "import './style.css';\nexport {};\n",
+        );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        // deno-lint-ignore no-explicit-any
+        const localCssPlugin: any = {
+          name: 'local-css-rewriter',
+          setup(build: any) {
+            build.onResolve(
+              { filter: /^\.\/style\.css$/, namespace: 'file' },
+              () => ({ path: rewrittenCssPath, namespace: 'file' }),
+            );
+          },
+        };
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            {
+              buildDir: dir,
+              jsPath: path.join(dir, 'entry.ts'),
+            },
+            {
+              runtime: 'node',
+              keepEsbuildAlive: false,
+              esbuildPlugins: [localCssPlugin],
+            },
+          );
+          const css = new TextDecoder().decode(assets['/index.css'].data);
+          assertTrue(
+            css.includes(rewrittenSentinel),
+            'user plugin must be able to rewrite local CSS imports before GoatDB CSS fallback runs',
+          );
+          assertTrue(
+            !css.includes(originalSentinel),
+            'rewritten local CSS must replace the original import target',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'esbuildPlugins can resolve bare-specifier CSS imports',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-bare-css-plugin');
+        const sentinel = '--bare-specifier-resolved: 1;';
+
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          `import 'my-css';\nexport {};\n`,
+        );
+        await writeTextFile(
+          path.join(dir, 'resolved.css'),
+          `:root { ${sentinel} }`,
+        );
+
+        // deno-lint-ignore no-explicit-any
+        const bareCssPlugin: any = {
+          name: 'bare-css-resolver',
+          setup(build: any) {
+            build.onResolve({ filter: /^my-css$/ }, () => ({
+              path: path.join(dir, 'resolved.css'),
+              namespace: 'file',
+            }));
+          },
+        };
+
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            {
+              buildDir: dir,
+              jsPath: path.join(dir, 'entry.ts'),
+            },
+            {
+              runtime: 'node',
+              keepEsbuildAlive: false,
+              esbuildPlugins: [bareCssPlugin],
+            },
+          );
+          assertExists(assets['/index.css'], '/index.css must be present');
+          const css = new TextDecoder().decode(assets['/index.css'].data);
+          assertTrue(
+            css.includes(sentinel),
+            'bare-specifier CSS resolved by user plugin must land in /index.css',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (isDeno()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets with ReBuildContext collects CSS on initial build and after rebuild',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-rebuild-css');
+        const cssPath = path.join(dir, 'style.css');
+        const entryPath = path.join(dir, 'entry.ts');
+        await writeTextFile(cssPath, ':root { --rebuild-v1: 1; }');
+        await writeTextFile(entryPath, `import './style.css';\nexport {};\n`);
+        const entryPoints = [{ in: entryPath, out: APP_ENTRY_POINT }];
+
+        const rebuildCtx = await createBuildContext(entryPoints);
+        try {
+          // Initial build via ReBuildContext
+          const assets1 = await buildAssets(rebuildCtx, entryPoints, {
+            buildDir: dir,
+            jsPath: entryPath,
+          });
+          const css1 = new TextDecoder().decode(assets1['/index.css'].data);
+          assertTrue(
+            css1.includes('--rebuild-v1'),
+            'CSS must appear on initial ReBuildContext build',
+          );
+
+          // Mutate CSS and rebuild
+          await writeTextFile(cssPath, ':root { --rebuild-v2: 1; }');
+          const assets2 = await buildAssets(rebuildCtx, entryPoints, {
+            buildDir: dir,
+            jsPath: entryPath,
+          });
+          const css2 = new TextDecoder().decode(assets2['/index.css'].data);
+          assertTrue(
+            css2.includes('--rebuild-v2'),
+            'Updated CSS must appear after rebuild',
+          );
+          assertTrue(
+            !css2.includes('--rebuild-v1'),
+            'Stale CSS must not appear after rebuild',
+          );
+        } finally {
+          rebuildCtx.close();
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (isDeno()) {
+    TEST(
+      'CLI-Compile',
+      'createBuildContext forwards extraPlugins into the build (debug server wiring)',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-ctx-plugins');
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          `import { __sentinel__ } from 'testplugin:sentinel';\nexport const x = __sentinel__;\n`,
+        );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        // deno-lint-ignore no-explicit-any
+        const testPlugin: any = {
+          name: 'test-plugin',
+          setup(build: any) {
+            build.onResolve({ filter: /^testplugin:/ }, (args: any) => ({
+              path: args.path,
+              namespace: 'testplugin',
+            }));
+            build.onLoad({ filter: /.*/, namespace: 'testplugin' }, () => ({
+              contents: 'export const __sentinel__ = "ctx-plugin-was-here";',
+              loader: 'js',
+            }));
+          },
+        };
+        const rebuildCtx = await createBuildContext(entryPoints, [testPlugin]);
+        try {
+          const assets = await buildAssets(rebuildCtx, entryPoints, {
             buildDir: dir,
             jsPath: path.join(dir, 'entry.ts'),
-            cssPath: path.join(dir, 'vendor.css'),
+          });
+          const js = new TextDecoder().decode(assets['/app.js'].data);
+          assertTrue(
+            js.includes('ctx-plugin-was-here'),
+            'extraPlugins passed to createBuildContext must be applied during buildAssets',
+          );
+        } finally {
+          rebuildCtx.close();
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (isDeno()) {
+    TEST(
+      'CLI-Compile',
+      'createBuildContext extraPlugins can rewrite local CSS imports',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-ctx-local-css-plugin');
+        const originalSentinel = '--ctx-local-css-original: 1;';
+        const rewrittenSentinel = '--ctx-local-css-rewritten: 1;';
+        const rewrittenCssPath = path.join(dir, 'rewritten.css');
+        await writeTextFile(
+          path.join(dir, 'style.css'),
+          `:root { ${originalSentinel} }\n`,
+        );
+        await writeTextFile(
+          rewrittenCssPath,
+          `:root { ${rewrittenSentinel} }\n`,
+        );
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          "import './style.css';\nexport {};\n",
+        );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        // deno-lint-ignore no-explicit-any
+        const localCssPlugin: any = {
+          name: 'ctx-local-css-rewriter',
+          setup(build: any) {
+            build.onResolve(
+              { filter: /^\.\/style\.css$/, namespace: 'file' },
+              () => ({ path: rewrittenCssPath, namespace: 'file' }),
+            );
           },
-          { runtime: 'node', keepEsbuildAlive: false },
-        );
-        assertTrue(
-          assets['/index.css.map'] === undefined,
-          '/index.css.map must not be emitted when only cssPath (unmapped) is present',
-        );
-        const cssText = new TextDecoder().decode(assets['/index.css'].data);
-        assertTrue(
-          cssText.includes('--cssonly-sentinel'),
-          '/index.css must contain cssPath content',
-        );
-        assertTrue(
-          !cssText.includes('sourceMappingURL'),
-          '/index.css must not contain sourceMappingURL when no map is generated',
-        );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
+        };
+        const rebuildCtx = await createBuildContext(entryPoints, [
+          localCssPlugin,
+        ]);
+        try {
+          const assets = await buildAssets(rebuildCtx, entryPoints, {
+            buildDir: dir,
+            jsPath: path.join(dir, 'entry.ts'),
+          });
+          const css = new TextDecoder().decode(assets['/index.css'].data);
+          assertTrue(
+            css.includes(rewrittenSentinel),
+            'debug build context must let user plugins rewrite local CSS imports',
+          );
+          assertTrue(
+            !css.includes(originalSentinel),
+            'debug build context must not fall back to the original local CSS file after rewrite',
+          );
+        } finally {
+          rebuildCtx.close();
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
 
-  TEST(
-    'CLI-Compile',
-    'buildAssets with Node runtime collects CSS and sourceMappingURL on rebuild',
-    async (ctx: TestSuite) => {
-      if (isBrowser()) return;
-      const dir = await ctx.tempDir('build-assets-node-rebuild-css');
-      const cssFile = path.join(dir, 'style.css');
-      const entryFile = path.join(dir, 'entry.ts');
-      await writeTextFile(cssFile, ':root { --node-rebuild-v1: 1; }');
-      await writeTextFile(entryFile, `import './style.css';\nexport {};\n`);
-      const entryPoints = [{ in: entryFile, out: APP_ENTRY_POINT }];
-      const appConfig = { buildDir: dir, jsPath: entryFile };
-      try {
-        // First build
-        const assets1 = await buildAssets(
-          undefined,
-          entryPoints,
-          appConfig,
-          { runtime: 'node', keepEsbuildAlive: false },
-        );
-        const css1 = new TextDecoder().decode(assets1['/index.css'].data);
-        assertTrue(
-          css1.includes('--node-rebuild-v1'),
-          'CSS v1 must appear on first build',
-        );
-        assertTrue(
-          css1.includes('sourceMappingURL=/index.css.map'),
-          '/index.css must reference /index.css.map on first build',
-        );
-        assertExists(
-          assets1['/index.css.map'],
-          '/index.css.map must exist on first build',
-        );
+  if (isDeno()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets ignores BuildAssetsOptions.esbuildPlugins when ReBuildContext is provided',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-ctx-plugin-ignored');
+        await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        const rebuildCtx = await createBuildContext(entryPoints);
 
-        // Mutate CSS and rebuild
-        await writeTextFile(cssFile, ':root { --node-rebuild-v2: 1; }');
-        const assets2 = await buildAssets(
-          undefined,
-          entryPoints,
-          appConfig,
-          { runtime: 'node', keepEsbuildAlive: false },
+        let pluginSetupCalled = false;
+        // deno-lint-ignore no-explicit-any
+        const sentinelPlugin: any = {
+          name: 'sentinel',
+          setup() {
+            pluginSetupCalled = true;
+          },
+        };
+
+        try {
+          await buildAssets(rebuildCtx, entryPoints, {
+            buildDir: dir,
+            jsPath: path.join(dir, 'entry.ts'),
+          }, { esbuildPlugins: [sentinelPlugin] });
+          assertTrue(
+            !pluginSetupCalled,
+            'esbuildPlugins must not be applied when a ReBuildContext is passed',
+          );
+        } finally {
+          rebuildCtx.close();
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'cssLoaderPlugin resolves CSS @import chains via resolveDir',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('css-import-chain');
+        // b.css is the leaf — contains the sentinel
+        await writeTextFile(
+          path.join(dir, 'b.css'),
+          ':root { --chain-sentinel: 1; }',
         );
-        const css2 = new TextDecoder().decode(assets2['/index.css'].data);
-        assertTrue(
-          css2.includes('--node-rebuild-v2'),
-          'CSS v2 must appear after rebuild',
+        // a.css @imports b.css — tests resolveDir resolution
+        await writeTextFile(
+          path.join(dir, 'a.css'),
+          "@import './b.css';\n",
         );
-        assertTrue(
-          !css2.includes('--node-rebuild-v1'),
-          'Stale CSS must not appear after rebuild',
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          "import './a.css';\nexport {};\n",
         );
-        assertExists(
-          assets2['/index.css.map'],
-          '/index.css.map must exist after rebuild',
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+          const css = new TextDecoder().decode(assets['/index.css'].data);
+          assertTrue(
+            css.includes('--chain-sentinel'),
+            'CSS @import chains must be resolved and bundled into /index.css',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'cssLoaderPlugin preserves CSS Modules exports on the node build path',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('css-modules-node-path');
+        await writeTextFile(
+          path.join(dir, 'style.module.css'),
+          '.foo { color: red; }\n',
         );
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          "import styles from './style.module.css';\nglobalThis.__goatCssModuleClassName = styles.foo;\nexport {};\n",
+        );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+          const js = new TextDecoder().decode(assets['/app.js'].data);
+          const css = new TextDecoder().decode(assets['/index.css'].data);
+          const className = runBundledScript(js).__goatCssModuleClassName;
+          assertExists(
+            className,
+            'CSS Modules JS output must export a class name for foo',
+          );
+          assertTrue(
+            typeof className === 'string',
+            'CSS Modules export for foo must be a string',
+          );
+          const exportedClassName = className as string;
+          assertTrue(
+            exportedClassName.length > 0,
+            'CSS Modules export for foo must not be empty',
+          );
+          assertTrue(
+            css.includes(`.${exportedClassName}`),
+            'Bundled CSS must include the exported CSS Modules class name',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (isDeno()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets with ReBuildContext preserves CSS Modules exports after rebuild',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('css-modules-rebuild-path');
+        const cssPath = path.join(dir, 'style.module.css');
+        const entryPath = path.join(dir, 'entry.ts');
+        await writeTextFile(cssPath, '.foo { color: red; }\n');
+        await writeTextFile(
+          entryPath,
+          "import styles from './style.module.css';\nglobalThis.__goatCssModuleClassName = styles.foo;\nexport {};\n",
+        );
+        const entryPoints = [{ in: entryPath, out: APP_ENTRY_POINT }];
+        const rebuildCtx = await createBuildContext(entryPoints);
+        try {
+          const assets1 = await buildAssets(rebuildCtx, entryPoints, {
+            buildDir: dir,
+            jsPath: entryPath,
+          });
+          const js1 = new TextDecoder().decode(assets1['/app.js'].data);
+          const css1 = new TextDecoder().decode(assets1['/index.css'].data);
+          const className1 = runBundledScript(js1).__goatCssModuleClassName;
+          assertExists(
+            className1,
+            'Initial CSS Modules build must export a class name for foo',
+          );
+          assertTrue(
+            typeof className1 === 'string',
+            'Initial CSS Modules export for foo must be a string',
+          );
+          const exportedClassName1 = className1 as string;
+          assertTrue(
+            css1.includes(`.${exportedClassName1}`),
+            'Initial bundled CSS must include the exported CSS Modules class name',
+          );
+          assertTrue(
+            css1.includes('color: red'),
+            'Initial bundled CSS must include the first CSS Modules content',
+          );
+
+          await writeTextFile(cssPath, '.foo { color: blue; }\n');
+          const assets2 = await buildAssets(rebuildCtx, entryPoints, {
+            buildDir: dir,
+            jsPath: entryPath,
+          });
+          const js2 = new TextDecoder().decode(assets2['/app.js'].data);
+          const css2 = new TextDecoder().decode(assets2['/index.css'].data);
+          const className2 = runBundledScript(js2).__goatCssModuleClassName;
+          assertExists(
+            className2,
+            'Rebuilt CSS Modules output must export a class name for foo',
+          );
+          assertTrue(
+            typeof className2 === 'string',
+            'Rebuilt CSS Modules export for foo must be a string',
+          );
+          const exportedClassName2 = className2 as string;
+          assertTrue(
+            css2.includes(`.${exportedClassName2}`),
+            'Rebuilt bundled CSS must include the exported CSS Modules class name',
+          );
+          assertTrue(
+            css2.includes('color: blue'),
+            'Rebuilt CSS must include the updated CSS Modules content',
+          );
+          assertTrue(
+            !css2.includes('color: red'),
+            'Rebuilt CSS must not include stale CSS Modules content',
+          );
+        } finally {
+          rebuildCtx.close();
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (isDeno()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets with ReBuildContext prepends cssPath into /index.css',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-rebuild-csspath');
+        const globalCssPath = path.join(dir, 'global.css');
+        const entryPath = path.join(dir, 'entry.ts');
+        await writeTextFile(globalCssPath, ':root { --global-sentinel: 1; }');
+        await writeTextFile(entryPath, 'export {};');
+        const entryPoints = [{ in: entryPath, out: APP_ENTRY_POINT }];
+        const rebuildCtx = await createBuildContext(entryPoints);
+        try {
+          const assets = await buildAssets(rebuildCtx, entryPoints, {
+            buildDir: dir,
+            jsPath: entryPath,
+            cssPath: globalCssPath,
+          });
+          const css = new TextDecoder().decode(assets['/index.css'].data);
+          assertTrue(
+            css.includes('--global-sentinel'),
+            'cssPath must be included in /index.css when using ReBuildContext',
+          );
+        } finally {
+          rebuildCtx.close();
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets emits /index.css.map with correct sourceMappingURL reference',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-sourcemap-url');
+        await writeTextFile(
+          path.join(dir, 'style.css'),
+          ':root { --strip-test: 1; }',
+        );
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          "import './style.css';\nexport {};\n",
+        );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+          const css = new TextDecoder().decode(assets['/index.css'].data);
+          assertTrue(
+            css.includes('sourceMappingURL=/index.css.map'),
+            '/index.css must reference /index.css.map as its source map',
+          );
+          assertExists(
+            assets['/index.css.map'],
+            '/index.css.map must be served when CSS is bundled',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets /index.css.map is valid source map referencing original CSS files',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-cssmap-valid');
+        await writeTextFile(
+          path.join(dir, 'style.css'),
+          ':root { --cssmap-sentinel: 1; }',
+        );
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          "import './style.css';\nexport {};\n",
+        );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+          assertExists(assets['/index.css.map'], '/index.css.map must exist');
+          const mapJson = new TextDecoder().decode(
+            assets['/index.css.map'].data,
+          );
+          // deno-lint-ignore no-explicit-any
+          const map = JSON.parse(mapJson) as any;
+          assertEquals(map.version, 3, 'source map version must be 3');
+          const sources = getMapSources(map);
+          assertTrue(
+            Array.isArray(sources) &&
+              sources.some((s: string) => s.includes('style.css')),
+            'source map must reference the original style.css file',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets with cssPath and bundled CSS preserves source mapping to bundled CSS',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-cssmap-sections');
+        const globalCssContent = ':root { --global-cssmap-sentinel: 1; }\n';
+        await writeTextFile(
+          path.join(dir, 'global.css'),
+          globalCssContent,
+        );
+        await writeTextFile(
+          path.join(dir, 'bundled.css'),
+          ':root { --bundled-cssmap-sentinel: 2; }',
+        );
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          "import './bundled.css';\nexport {};\n",
+        );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            {
+              buildDir: dir,
+              jsPath: path.join(dir, 'entry.ts'),
+              cssPath: path.join(dir, 'global.css'),
+            },
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+          assertExists(assets['/index.css.map'], '/index.css.map must exist');
+          const cssText = new TextDecoder().decode(assets['/index.css'].data);
+          const mapJson = new TextDecoder().decode(
+            assets['/index.css.map'].data,
+          );
+          // deno-lint-ignore no-explicit-any
+          const map = JSON.parse(mapJson) as any;
+          assertTrue(
+            cssText.includes('--global-cssmap-sentinel'),
+            '/index.css must include the prepended cssPath content',
+          );
+          assertTrue(
+            cssText.includes('--bundled-cssmap-sentinel'),
+            '/index.css must include the bundled CSS content',
+          );
+          assertTrue(
+            cssText.indexOf('--global-cssmap-sentinel') <
+              cssText.indexOf('--bundled-cssmap-sentinel'),
+            'prepended cssPath content must appear before bundled CSS',
+          );
+          assertTrue(
+            cssText.includes('sourceMappingURL=/index.css.map'),
+            '/index.css must reference /index.css.map when a CSS map is emitted',
+          );
+          const sources = getMapSources(map);
+          assertTrue(
+            sources.some((s: string) => s.includes('bundled.css')),
+            'source map must reference the bundled CSS source file',
+          );
+          assertTrue(
+            !sources.some((s: string) => s.includes('global.css')),
+            'prepended cssPath content must remain unmapped',
+          );
+          const firstMappedLine = getFirstMappedGeneratedLine(map);
+          assertExists(
+            firstMappedLine,
+            'source map must expose a mapped generated line',
+          );
+          assertEquals(
+            firstMappedLine,
+            getCssChunkStartLine(globalCssContent),
+            'first mapped generated line must start at the bundled CSS chunk boundary',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets emits no /index.css.map when there is no CSS',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-no-cssmap');
+        await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+          assertTrue(
+            assets['/index.css.map'] === undefined,
+            '/index.css.map must not be emitted when there is no CSS',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets with cssPath only emits no /index.css.map and no sourceMappingURL',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-cssonly-no-map');
+        await writeTextFile(
+          path.join(dir, 'vendor.css'),
+          ':root { --cssonly-sentinel: 1; }\n',
+        );
+        // Entry point imports no CSS — only cssPath is set
+        await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            {
+              buildDir: dir,
+              jsPath: path.join(dir, 'entry.ts'),
+              cssPath: path.join(dir, 'vendor.css'),
+            },
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+          assertTrue(
+            assets['/index.css.map'] === undefined,
+            '/index.css.map must not be emitted when only cssPath (unmapped) is present',
+          );
+          const cssText = new TextDecoder().decode(assets['/index.css'].data);
+          assertTrue(
+            cssText.includes('--cssonly-sentinel'),
+            '/index.css must contain cssPath content',
+          );
+          assertTrue(
+            !cssText.includes('sourceMappingURL'),
+            '/index.css must not contain sourceMappingURL when no map is generated',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets with Node runtime collects CSS and sourceMappingURL on rebuild',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-node-rebuild-css');
+        const cssFile = path.join(dir, 'style.css');
+        const entryFile = path.join(dir, 'entry.ts');
+        await writeTextFile(cssFile, ':root { --node-rebuild-v1: 1; }');
+        await writeTextFile(entryFile, `import './style.css';\nexport {};\n`);
+        const entryPoints = [{ in: entryFile, out: APP_ENTRY_POINT }];
+        const appConfig = { buildDir: dir, jsPath: entryFile };
+        try {
+          // First build
+          const assets1 = await buildAssets(
+            undefined,
+            entryPoints,
+            appConfig,
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+          const css1 = new TextDecoder().decode(assets1['/index.css'].data);
+          assertTrue(
+            css1.includes('--node-rebuild-v1'),
+            'CSS v1 must appear on first build',
+          );
+          assertTrue(
+            css1.includes('sourceMappingURL=/index.css.map'),
+            '/index.css must reference /index.css.map on first build',
+          );
+          assertExists(
+            assets1['/index.css.map'],
+            '/index.css.map must exist on first build',
+          );
+
+          // Mutate CSS and rebuild
+          await writeTextFile(cssFile, ':root { --node-rebuild-v2: 1; }');
+          const assets2 = await buildAssets(
+            undefined,
+            entryPoints,
+            appConfig,
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+          const css2 = new TextDecoder().decode(assets2['/index.css'].data);
+          assertTrue(
+            css2.includes('--node-rebuild-v2'),
+            'CSS v2 must appear after rebuild',
+          );
+          assertTrue(
+            !css2.includes('--node-rebuild-v1'),
+            'Stale CSS must not appear after rebuild',
+          );
+          assertExists(
+            assets2['/index.css.map'],
+            '/index.css.map must exist after rebuild',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
 
   // Heavy E2E test — resource-intensive, recommended to run in isolation
   // This test is expensive as it:
@@ -1624,120 +1669,117 @@ export default function setupCliCompileTests() {
   // 5. Verifies HTTP responses
   //
   // To run: deno task test --test="should compile executable"
-  TEST(
-    'CLI-Compile',
-    'should compile executable',
-    async (ctx: TestSuite) => {
-      // Skip in browser - compilation not supported
-      if (isBrowser()) {
-        console.log('Skipping E2E compile test in browser');
-        return;
-      }
-      if (!getEnvVar('GOATDB_E2E')) {
-        console.log('Skipping E2E compile test (set GOATDB_E2E=1 to enable)');
-        return;
-      }
-
-      const runtime = getRuntime();
-
-      // This is a heavy E2E test - mark it as such
-      console.log('Running E2E compile test (this may take a while)...');
-
-      const testDir = await ctx.tempDir('compile-e2e');
-
-      // 1. Bootstrap a project
-      console.log('Bootstrapping project...');
-      const initModule = await import('../cli/init.ts');
-      await initModule.bootstrapProject({
-        targetDir: testDir,
-        skipDependencies: false, // Need deps for compilation
-      });
-
-      // Verify project was created
-      assertTrue(
-        await pathExists(path.join(testDir, 'client/index.tsx')),
-        'Project should be bootstrapped',
-      );
-
-      // 2. Link to local GoatDB sources instead of published package
-      // This ensures we test against the current codebase, not the published version
-      console.log('Linking to local GoatDB sources...');
-      const linkModule = await import('../cli/link.ts');
-
-      // Get path to GoatDB repo root
-      // In bundled Node.js, import.meta.url points to bundled code, not original source.
-      // Use the runtime's CWD which should be the goatdb repo root during tests.
-      const goatdbRoot = runtime.getCWD();
-
-      await linkModule.linkGoatDB(goatdbRoot, testDir);
-
-      // For Node.js, reinstall to update node_modules with local link
-      if (runtime.id === 'node') {
-        console.log('Reinstalling dependencies with local link...');
-        const installResult = await cli('npm', 'install', { cwd: testDir });
-        if (installResult.exitCode !== 0) {
-          throw new Error(`npm install failed: ${installResult.result}`);
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'should compile executable',
+      async (ctx: TestSuite) => {
+        if (!getEnvVar('GOATDB_E2E')) {
+          console.log('Skipping E2E compile test (set GOATDB_E2E=1 to enable)');
+          return;
         }
-      }
 
-      // 3. Compile the project
-      console.log('Compiling project...');
-      const { compile } = await import('../cli/compile.ts');
+        const runtime = getRuntime();
 
-      // Determine server entry based on runtime
-      const serverEntry = runtime.id === 'node'
-        ? path.join(testDir, 'server/server-sea.ts')
-        : path.join(testDir, 'server/server.ts');
+        // This is a heavy E2E test - mark it as such
+        console.log('Running E2E compile test (this may take a while)...');
 
-      await compile({
-        buildDir: path.join(testDir, 'build'),
-        serverEntry,
-        jsPath: path.join(testDir, 'client/index.tsx'),
-        htmlPath: path.join(testDir, 'client/index.html'),
-        outputName: 'test-app',
-        // Use deno.json or package.json based on runtime
-        ...(runtime.id === 'deno'
-          ? { denoJson: path.join(testDir, 'deno.json') }
-          : { packageJson: path.join(testDir, 'package.json') }),
-      });
+        const testDir = await ctx.tempDir('compile-e2e');
 
-      // 4. Verify binary exists
-      const osName = runtime.getOS();
+        // 1. Bootstrap a project
+        console.log('Bootstrapping project...');
+        const initModule = await import('../cli/init.ts');
+        await initModule.bootstrapProject({
+          targetDir: testDir,
+          skipDependencies: false, // Need deps for compilation
+        });
 
-      let binaryName: string;
-      if (runtime.id === 'deno') {
-        binaryName = `test-app-${targetFromOSArch()}`;
-      } else {
-        binaryName = osName === 'windows' ? 'test-app.exe' : 'test-app';
-      }
+        // Verify project was created
+        assertTrue(
+          await pathExists(path.join(testDir, 'client/index.tsx')),
+          'Project should be bootstrapped',
+        );
 
-      const binaryPath = path.join(testDir, 'build', binaryName);
-      assertTrue(
-        await pathExists(binaryPath),
-        `Binary should exist at ${binaryPath}`,
-      );
+        // 2. Link to local GoatDB sources instead of published package
+        // This ensures we test against the current codebase, not the published version
+        console.log('Linking to local GoatDB sources...');
+        const linkModule = await import('../cli/link.ts');
 
-      console.log(`Binary compiled successfully: ${binaryPath}`);
+        // Get path to GoatDB repo root
+        // In bundled Node.js, import.meta.url points to bundled code, not original source.
+        // Use the runtime's CWD which should be the goatdb repo root during tests.
+        const goatdbRoot = runtime.getCWD();
 
-      // 5. Verify binary is executable (basic sanity check)
-      const { result: helpOutput, exitCode } = await cli(
-        binaryPath,
-        '--help',
-        { timeout: 30_000 },
-      );
-      assertTrue(
-        exitCode === 0,
-        `Binary --help failed with exit code ${exitCode}`,
-      );
-      assertTrue(
-        helpOutput.includes('--help') || helpOutput.includes('Options'),
-        'Binary should respond to --help',
-      );
-      console.log(
-        'E2E compile test passed: Binary compiles and is executable',
-      );
-    },
-  );
+        await linkModule.linkGoatDB(goatdbRoot, testDir);
+
+        // For Node.js, reinstall to update node_modules with local link
+        if (runtime.id === 'node') {
+          console.log('Reinstalling dependencies with local link...');
+          const installResult = await cli('npm', 'install', { cwd: testDir });
+          if (installResult.exitCode !== 0) {
+            throw new Error(`npm install failed: ${installResult.result}`);
+          }
+        }
+
+        // 3. Compile the project
+        console.log('Compiling project...');
+        const { compile } = await import('../cli/compile.ts');
+
+        // Determine server entry based on runtime
+        const serverEntry = runtime.id === 'node'
+          ? path.join(testDir, 'server/server-sea.ts')
+          : path.join(testDir, 'server/server.ts');
+
+        await compile({
+          buildDir: path.join(testDir, 'build'),
+          serverEntry,
+          jsPath: path.join(testDir, 'client/index.tsx'),
+          htmlPath: path.join(testDir, 'client/index.html'),
+          outputName: 'test-app',
+          // Use deno.json or package.json based on runtime
+          ...(runtime.id === 'deno'
+            ? { denoJson: path.join(testDir, 'deno.json') }
+            : { packageJson: path.join(testDir, 'package.json') }),
+        });
+
+        // 4. Verify binary exists
+        const osName = runtime.getOS();
+
+        let binaryName: string;
+        if (runtime.id === 'deno') {
+          binaryName = `test-app-${targetFromOSArch()}`;
+        } else {
+          binaryName = osName === 'windows' ? 'test-app.exe' : 'test-app';
+        }
+
+        const binaryPath = path.join(testDir, 'build', binaryName);
+        assertTrue(
+          await pathExists(binaryPath),
+          `Binary should exist at ${binaryPath}`,
+        );
+
+        console.log(`Binary compiled successfully: ${binaryPath}`);
+
+        // 5. Verify binary is executable (basic sanity check)
+        const { result: helpOutput, exitCode } = await cli(
+          binaryPath,
+          '--help',
+          { timeout: 30_000 },
+        );
+        assertTrue(
+          exitCode === 0,
+          `Binary --help failed with exit code ${exitCode}`,
+        );
+        assertTrue(
+          helpOutput.includes('--help') || helpOutput.includes('Options'),
+          'Binary should respond to --help',
+        );
+        console.log(
+          'E2E compile test passed: Binary compiles and is executable',
+        );
+      },
+    );
+  }
 
   TEST(
     'CLI-Compile',
@@ -1803,144 +1845,409 @@ export default function setupCliCompileTests() {
     },
   );
 
-  TEST(
-    'CLI-Compile',
-    'getClientBuildPlugins rejects reserved node-stub plugin name',
-    async () => {
-      await assertThrows(
-        async () =>
-          getClientBuildPlugins('deno', [{
-            name: 'node-stub',
-            setup: () => {},
-          }]),
-        Error,
-        'node-stub',
-      );
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'getClientBuildPlugins rejects plugin without setup function',
-    async () => {
-      await assertThrows(
-        async () =>
-          getClientBuildPlugins('deno', [{
-            name: 'bad-plugin',
-            setup: undefined as unknown as () => void,
-          }]),
-        Error,
-        'bad-plugin',
-      );
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'getClientBuildPlugins rejects plugin with empty name',
-    async () => {
-      await assertThrows(
-        async () =>
-          getClientBuildPlugins('deno', [{
-            name: '',
-            setup: () => {},
-          }]),
-        Error,
-        'invalid name',
-      );
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'getClientBuildPlugins rejects plugin with non-string name',
-    async () => {
-      await assertThrows(
-        async () =>
-          // deno-lint-ignore no-explicit-any
-          getClientBuildPlugins('deno', [{
-            name: 123 as any,
-            setup: () => {},
-          }]),
-        Error,
-        'invalid name',
-      );
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'getClientBuildPlugins accepts valid plugins',
-    async () => {
-      const customPlugin: BuildPluginLike = {
-        name: 'custom-test',
-        setup: () => {},
-      };
-      const plugins = await getClientBuildPlugins('deno', [customPlugin]);
-      assertTrue(
-        plugins.some((p) => p.name === 'custom-test'),
-        'custom plugin should be included in returned plugins',
-      );
-    },
-  );
-
   TEST('CLI-Compile', 'buildCombinedCSS handles empty chunks array', () => {
     const result = buildCombinedCSS([], '/index.css.map');
     assertEquals(result.css, '');
     assertEquals(result.cssMap, undefined);
   });
 
-  TEST('CLI-Compile', 'getClientBuildPlugins rejects reserved goatdb-css-loader plugin name', async () => {
-    await assertThrows(
-      async () =>
-        getClientBuildPlugins('deno', [{
-          name: 'goatdb-css-loader',
-          setup: () => {},
-        }]),
-      Error,
-      'goatdb-css-loader',
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets throws for reserved plugin name',
+      async () => {
+        try {
+          await assertThrows(
+            async () =>
+              buildAssets(
+                undefined,
+                [{ in: '/fake.ts', out: 'fake' }],
+                kPlaceholderAppConfig,
+                {
+                  runtime: 'node',
+                  esbuildPlugins: [{ name: 'node-stub', setup: () => {} }],
+                },
+              ),
+            Error,
+            'node-stub',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
     );
-  });
-
-  TEST('CLI-Compile', 'getClientBuildPlugins rejects reserved adapter-stub plugin name', async () => {
-    await assertThrows(
-      async () =>
-        getClientBuildPlugins('deno', [{
-          name: 'adapter-stub',
-          setup: () => {},
-        }]),
-      Error,
-      'adapter-stub',
+    TEST(
+      'CLI-Compile',
+      'buildAssets throws for plugin missing setup',
+      async () => {
+        try {
+          await assertThrows(
+            async () =>
+              buildAssets(
+                undefined,
+                [{ in: '/fake.ts', out: 'fake' }],
+                kPlaceholderAppConfig,
+                {
+                  runtime: 'node',
+                  esbuildPlugins: [
+                    {
+                      name: 'bad-plugin',
+                      setup: undefined,
+                    } as unknown as BuildPluginLike,
+                  ],
+                },
+              ),
+            Error,
+            'bad-plugin',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
     );
-  });
 
-  TEST('CLI-Compile', 'getClientBuildPlugins rejects duplicate plugin names', async () => {
-    await assertThrows(
-      async () =>
-        getClientBuildPlugins('deno', [
-          { name: 'custom', setup: () => {} },
-          { name: 'custom', setup: () => {} },
-        ]),
-      Error,
-      'custom',
+    TEST(
+      'CLI-Compile',
+      'buildAssets throws for duplicate plugin names',
+      async () => {
+        try {
+          await assertThrows(
+            async () =>
+              buildAssets(
+                undefined,
+                [{ in: '/fake.ts', out: 'fake' }],
+                kPlaceholderAppConfig,
+                {
+                  runtime: 'node',
+                  esbuildPlugins: [
+                    { name: 'custom', setup: () => {} },
+                    { name: 'custom', setup: () => {} },
+                  ],
+                },
+              ),
+            Error,
+            'custom',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
     );
-  });
 
-  TEST('CLI-Compile', 'getClientBuildPlugins includes nodeStubPlugin for node runtime', async () => {
-    const plugins = await getClientBuildPlugins('node', []);
-    assertTrue(
-      plugins.some((p) => p.name === 'node-stub'),
-      'node-stub plugin should be included for node runtime',
+    TEST(
+      'CLI-Compile',
+      'buildAssets throws for empty plugin name',
+      async () => {
+        try {
+          await assertThrows(
+            async () =>
+              buildAssets(
+                undefined,
+                [{ in: '/fake.ts', out: 'fake' }],
+                kPlaceholderAppConfig,
+                {
+                  runtime: 'node',
+                  esbuildPlugins: [{ name: '', setup: () => {} }],
+                },
+              ),
+            Error,
+            'invalid name',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
     );
-  });
 
-  TEST('CLI-Compile', 'getClientBuildPlugins preserves user plugin ordering', async () => {
-    const plugins = await getClientBuildPlugins('deno', [
-      { name: 'first', setup: () => {} },
-      { name: 'second', setup: () => {} },
-    ]);
-    const firstIdx = plugins.findIndex((p) => p.name === 'first');
-    const secondIdx = plugins.findIndex((p) => p.name === 'second');
-    assertTrue(firstIdx < secondIdx, 'user plugins should preserve input order');
-  });
+    TEST(
+      'CLI-Compile',
+      'buildAssets throws for non-string plugin name',
+      async () => {
+        try {
+          await assertThrows(
+            async () =>
+              buildAssets(
+                undefined,
+                [{ in: '/fake.ts', out: 'fake' }],
+                kPlaceholderAppConfig,
+                {
+                  runtime: 'node',
+                  esbuildPlugins: [
+                    {
+                      name: 123,
+                      setup: () => {},
+                    } as unknown as BuildPluginLike,
+                  ],
+                },
+              ),
+            Error,
+            'invalid name',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+
+    TEST(
+      'CLI-Compile',
+      'buildAssets throws for reserved goatdb-css-loader plugin name',
+      async () => {
+        try {
+          await assertThrows(
+            async () =>
+              buildAssets(
+                undefined,
+                [{ in: '/fake.ts', out: 'fake' }],
+                kPlaceholderAppConfig,
+                {
+                  runtime: 'node',
+                  esbuildPlugins: [{
+                    name: 'goatdb-css-loader',
+                    setup: () => {},
+                  }],
+                },
+              ),
+            Error,
+            'goatdb-css-loader',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+
+    TEST(
+      'CLI-Compile',
+      'buildAssets throws for reserved adapter-stub plugin name',
+      async () => {
+        try {
+          await assertThrows(
+            async () =>
+              buildAssets(
+                undefined,
+                [{ in: '/fake.ts', out: 'fake' }],
+                kPlaceholderAppConfig,
+                {
+                  runtime: 'node',
+                  esbuildPlugins: [{ name: 'adapter-stub', setup: () => {} }],
+                },
+              ),
+            Error,
+            'adapter-stub',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (isNode()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets enforces Deno runtime for deno target',
+      async () => {
+        try {
+          await assertThrows(
+            async () =>
+              buildAssets(
+                undefined,
+                [{ in: '/fake.ts', out: 'fake' }],
+                kPlaceholderAppConfig,
+                { runtime: 'deno' },
+              ),
+            Error,
+            'cannot build Deno-target bundle',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets accepts valid plugins',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-valid-plugin');
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          `import { __sentinel__ } from 'testplugin:sentinel';\nexport const x = __sentinel__;\n`,
+        );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        const validPlugin: BuildPluginLike = {
+          name: 'valid-test-plugin',
+          setup(build) {
+            build.onResolve(
+              { filter: /^testplugin:/ },
+              (args: TestResolveArgs): TestResolveResult => ({
+                path: args.path,
+                namespace: 'testplugin',
+              }),
+            );
+            build.onLoad(
+              { filter: /.*/, namespace: 'testplugin' },
+              (): TestLoadResult => ({
+                contents: 'export const __sentinel__ = "valid-plugin-ok";',
+                loader: 'js',
+              }),
+            );
+          },
+        };
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            {
+              buildDir: dir,
+              jsPath: path.join(dir, 'entry.ts'),
+            },
+            {
+              runtime: 'node',
+              keepEsbuildAlive: false,
+              esbuildPlugins: [validPlugin],
+            },
+          );
+          const js = new TextDecoder().decode(assets['/app.js'].data);
+          assertTrue(
+            js.includes('valid-plugin-ok'),
+            'valid plugin should be accepted and executed',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets preserves user plugin ordering',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-plugins-order');
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          `import { x } from 'ordering-test:foo';\nexport const result = x;\n`,
+        );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        const firstPlugin: BuildPluginLike = {
+          name: 'first-plugin',
+          setup(build) {
+            build.onResolve(
+              { filter: /^ordering-test:/ },
+              (args: TestResolveArgs): TestResolveResult => ({
+                path: args.path,
+                namespace: 'ordering-test',
+              }),
+            );
+            build.onLoad(
+              { filter: /.*/, namespace: 'ordering-test' },
+              (): TestLoadResult => ({
+                contents: 'export const x = "first-plugin-won";',
+                loader: 'js',
+              }),
+            );
+          },
+        };
+        const secondPlugin: BuildPluginLike = {
+          name: 'second-plugin',
+          setup(build) {
+            build.onResolve(
+              { filter: /^ordering-test:/ },
+              (args: TestResolveArgs): TestResolveResult => ({
+                path: args.path,
+                namespace: 'ordering-test',
+              }),
+            );
+            build.onLoad(
+              { filter: /.*/, namespace: 'ordering-test' },
+              (): TestLoadResult => ({
+                contents: 'export const x = "second-plugin-won";',
+                loader: 'js',
+              }),
+            );
+          },
+        };
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            {
+              buildDir: dir,
+              jsPath: path.join(dir, 'entry.ts'),
+            },
+            {
+              runtime: 'node',
+              keepEsbuildAlive: false,
+              esbuildPlugins: [firstPlugin, secondPlugin],
+            },
+          );
+          const js = new TextDecoder().decode(assets['/app.js'].data);
+          assertTrue(
+            js.includes('first-plugin-won'),
+            'first plugin should win because it is earlier in the stack',
+          );
+          assertTrue(
+            !js.includes('second-plugin-won'),
+            'second plugin should not win when first plugin handles the import',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets includes node-stub plugin for node runtime',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-node-stub');
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          `import crypto from 'node:crypto';\nexport const x = crypto;\n`,
+        );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            {
+              buildDir: dir,
+              jsPath: path.join(dir, 'entry.ts'),
+            },
+            {
+              runtime: 'node',
+              keepEsbuildAlive: false,
+            },
+          );
+          const js = new TextDecoder().decode(assets['/app.js'].data);
+          assertTrue(
+            js.includes('node:crypto'),
+            'node-stub should polyfill node:crypto for browser bundle',
+          );
+          assertTrue(
+            js.includes('webcrypto'),
+            'node-stub should export webcrypto for node:crypto',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
 }
