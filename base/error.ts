@@ -46,7 +46,7 @@ export function formatNoMatchingTestsMessage(
     filters.push(`--test=${JSON.stringify(testName)}`);
   }
   if (filters.length === 0) {
-    return 'No tests matched the provided filters';
+    notReached('NoMatchError requires at least one filter');
   }
   return `No tests matched ${filters.join(' ')}`;
 }

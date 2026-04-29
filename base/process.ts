@@ -1,34 +1,24 @@
-import { isBrowser, isDeno, isNode } from './common.ts';
-import { notReached } from './error.ts';
+import { getRuntime } from './runtime/index.ts';
 
 /**
  * Exits the current process with the specified exit code.
  *
- * In browser test context, this signals test completion to automation
- * rather than terminating the browser process.
+ * Browser code must use signalBrowserTestCompletion() instead. Browser
+ * JavaScript cannot terminate the process, so exit has no browser meaning.
  *
  * @param code The exit code (0 for success, non-zero for failure)
  * @returns Never returns (process terminates or test execution halts)
  * @throws Error if on an unsupported platform
  */
 export async function exit(code: number): Promise<never> {
-  if (isNode()) {
-    const { exit } = await import('node:process');
-    exit(code);
-  } else if (isDeno()) {
-    Deno.exit(code);
-  } else if (isBrowser()) {
-    // In browser, "exit" means signal test completion
-    return await signalBrowserTestCompletion(code);
-  }
-  notReached('Platform not supported');
+  return getRuntime().exit(code);
 }
 
 /**
  * Signals test completion in browser environment.
- * This is what browser "exit" means - notify automation of completion.
+ * Browser tests cannot exit the process, so they notify automation explicitly.
  */
-function signalBrowserTestCompletion(code: number): Promise<never> {
+export function signalBrowserTestCompletion(code: number): Promise<never> {
   // Use existing test results if available, otherwise create minimal summary
   let summary = (globalThis as any).testResults;
   if (!summary) {
