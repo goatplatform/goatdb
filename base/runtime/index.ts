@@ -134,6 +134,35 @@ export interface RuntimeAdapter {
    * Platform-specific test configuration.
    */
   readonly testConfig: RuntimeTestConfig;
+
+  /**
+   * Opens a URL in the default browser.
+   * Uses platform-specific commands (open, xdg-open, start).
+   *
+   * @param url - The URL to open
+   */
+  openBrowser(url: string): Promise<void>;
+
+  /**
+   * Sets up a signal handler for the given signal.
+   * Common signals: 'SIGTERM', 'SIGINT'.
+   *
+   * @param signal - The signal name (e.g., 'SIGTERM')
+   * @param handler - The handler function to call
+   */
+  setupSignalHandler(
+    signal: string,
+    handler: () => Promise<void> | void,
+  ): void;
+
+  /**
+   * Exits the process with the given exit code.
+   * Throws in environments where process exit is not applicable (e.g., browser).
+   * Browser test completion must use an explicit browser signaling API instead.
+   *
+   * @param code - The exit code
+   */
+  exit(code: number): never;
 }
 
 // Registry state

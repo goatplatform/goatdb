@@ -152,4 +152,22 @@ export const BrowserAdapter: RuntimeAdapter = {
     // Default DB config for tests
     dbDefaults: { trusted: true },
   }) as RuntimeTestConfig,
+
+  async openBrowser(_url: string): Promise<void> {
+    // Browsers can't open new tabs/windows from JS reliably
+    // Could use window.open() but usually blocked by pop-up blockers
+    return;
+  },
+
+  setupSignalHandler(
+    _signal: string,
+    _handler: () => Promise<void> | void,
+  ): void {
+    // Browsers don't have Unix-style signals
+    return;
+  },
+
+  exit(_code: number): never {
+    return notReached('exit() is not available in browser');
+  },
 };

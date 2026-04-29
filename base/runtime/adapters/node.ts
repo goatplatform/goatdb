@@ -14,6 +14,7 @@ import type { OperatingSystem } from '../../os.ts';
 import { normalizeNodePlatform } from '../../os.ts';
 import type { FileImpl } from '../../json-log/file-impl-interface.ts';
 import { notReached } from '../../error.ts';
+import { log } from '../../../logging/log.ts';
 
 /**
  * Node.js-specific RuntimeAdapter implementation.
@@ -67,7 +68,7 @@ export const NodeAdapter: RuntimeAdapter = {
     // Dynamic import to avoid bundling node:worker_threads in browser builds
     // deno-lint-ignore no-explicit-any
     const { Worker } = (globalThis as any).require('node:worker_threads');
-    // deno-lint-ignore no-explicit-any no-process-global
+    // deno-lint-ignore no-process-global
     const inspect = process.execArgv.includes('--inspect-brk') ||
       // deno-lint-ignore no-process-global
       process.execArgv.includes('--inspect');
@@ -101,15 +102,17 @@ export const NodeAdapter: RuntimeAdapter = {
     return (globalThis as any).process?.cwd?.() || '/';
   },
 
-  async getTempDir(): Promise<string> {
+  getTempDir(): Promise<string> {
     // deno-lint-ignore no-explicit-any
     const os = (globalThis as any).require?.('node:os');
     if (os?.tmpdir) {
-      return os.tmpdir();
+      return Promise.resolve(os.tmpdir());
     }
     // deno-lint-ignore no-explicit-any
     const proc = (globalThis as any).process;
-    return proc?.env?.TMPDIR || proc?.env?.TMP || proc?.env?.TEMP || '/tmp';
+    return Promise.resolve(
+      proc?.env?.TMPDIR || proc?.env?.TMP || proc?.env?.TEMP || '/tmp',
+    );
   },
 
   getExecPath(): string {
@@ -124,8 +127,8 @@ export const NodeAdapter: RuntimeAdapter = {
   getOS(): OperatingSystem {
     // deno-lint-ignore no-explicit-any
     const os = (globalThis as any).require?.('node:os');
-    // deno-lint-ignore no-explicit-any
     const platform: string = os?.platform?.() ||
+      // deno-lint-ignore no-explicit-any
       (globalThis as any).process?.platform || 'unknown';
     return normalizeNodePlatform(platform);
   },
@@ -151,4 +154,78 @@ export const NodeAdapter: RuntimeAdapter = {
     supportsHttpServer: true,
     dbDefaults: { trusted: true },
   }) as RuntimeTestConfig,
+
+  async openBrowser(url: string): Promise<void> {
+    const os = this.getOS();
+    try {
+      // Lazy-load child_process
+      const { spawn } = await import('node:child_process');
+      let cmd: string;
+      let args: string[];
+
+      if (os === 'darwin') {
+        cmd = 'open';
+        args = [url];
+      } else if (os === 'linux') {
+        cmd = 'xdg-open';
+        args = [url];
+      } else if (os === 'windows') {
+        cmd = 'cmd';
+        args = ['/c', 'start', url];
+      } else {
+        log({
+          severity: 'WARNING',
+          error: 'MissingConfiguration',
+          message: `Unable to open browser on unsupported OS: ${os}`,
+        });
+        return;
+      }
+
+      const child = spawn(cmd, args, {
+        shell: os === 'windows',
+        stdio: 'ignore',
+      });
+      child.on('error', (err) => {
+        log({
+          severity: 'WARNING',
+          error: 'MissingConfiguration',
+          message: `Failed opening browser. Command: ${cmd}. Error: ${err}`,
+        });
+      });
+      child.unref();
+    } catch (err) {
+      log({
+        severity: 'WARNING',
+        error: 'MissingConfiguration',
+        message: `Failed opening browser. Error: ${err}`,
+      });
+    }
+  },
+
+  setupSignalHandler(
+    signal: string,
+    handler: () => Promise<void> | void,
+  ): void {
+    // deno-lint-ignore no-explicit-any
+    const proc = (globalThis as any).process;
+    proc.on(signal, () => {
+      const result = handler();
+      if (result instanceof Promise) {
+        result.catch((err) => {
+          log({
+            severity: 'ERROR',
+            error: 'UncaughtServerError',
+            message: `Signal handler for ${signal} failed: ${err}`,
+          });
+        });
+      }
+    });
+  },
+
+  exit(code: number): never {
+    // deno-lint-ignore no-explicit-any
+    const proc = (globalThis as any).process;
+    proc.exit(code);
+    return notReached('exit() should not return');
+  },
 };

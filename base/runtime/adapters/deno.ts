@@ -12,6 +12,7 @@ import type {
 } from '../index.ts';
 import type { OperatingSystem } from '../../os.ts';
 import type { FileImpl } from '../../json-log/file-impl-interface.ts';
+import { log } from '../../../logging/log.ts';
 
 /**
  * Deno-specific RuntimeAdapter implementation.
@@ -88,14 +89,14 @@ export const DenoAdapter: RuntimeAdapter = {
     return Deno.cwd();
   },
 
-  async getTempDir(): Promise<string> {
+  getTempDir(): Promise<string> {
     // Deno.makeTempDir would create a new dir each time
     // Instead return the system temp directory
     const tempDir = Deno.env.get('TMPDIR') ||
       Deno.env.get('TMP') ||
       Deno.env.get('TEMP') ||
       '/tmp';
-    return tempDir;
+    return Promise.resolve(tempDir);
   },
 
   getExecPath(): string {
@@ -124,4 +125,80 @@ export const DenoAdapter: RuntimeAdapter = {
     supportsHttpServer: true,
     dbDefaults: { trusted: true },
   }) as RuntimeTestConfig,
+
+  openBrowser(url: string): Promise<void> {
+    const os = this.getOS();
+    let cmd: string;
+    let args: string[];
+
+    if (os === 'darwin') {
+      cmd = 'open';
+      args = [url];
+    } else if (os === 'linux') {
+      cmd = 'xdg-open';
+      args = [url];
+    } else if (os === 'windows') {
+      cmd = 'cmd';
+      args = ['/c', 'start', url];
+    } else {
+      log({
+        severity: 'WARNING',
+        error: 'MissingConfiguration',
+        message: `Unable to open browser on unsupported OS: ${os}`,
+      });
+      return Promise.resolve();
+    }
+
+    try {
+      const process = new Deno.Command(cmd, {
+        args,
+        stdout: 'null',
+        stderr: 'null',
+      }).spawn();
+      process.status.then(({ success, code }) => {
+        if (!success) {
+          log({
+            severity: 'WARNING',
+            error: 'MissingConfiguration',
+            message: `Failed opening browser. Command: ${cmd}. Code: ${code}`,
+          });
+        }
+      }).catch((err) => {
+        log({
+          severity: 'WARNING',
+          error: 'MissingConfiguration',
+          message: `Failed opening browser. Command: ${cmd}. Error: ${err}`,
+        });
+      });
+    } catch (err) {
+      log({
+        severity: 'WARNING',
+        error: 'MissingConfiguration',
+        message: `Failed opening browser. Command: ${cmd}. Error: ${err}`,
+      });
+    }
+    return Promise.resolve();
+  },
+
+  setupSignalHandler(
+    signal: string,
+    handler: () => Promise<void> | void,
+  ): void {
+    Deno.addSignalListener(signal as Deno.Signal, () => {
+      const result = handler();
+      if (result instanceof Promise) {
+        result.catch((err) => {
+          log({
+            severity: 'ERROR',
+            error: 'UncaughtServerError',
+            message: `Signal handler for ${signal} failed: ${err}`,
+          });
+        });
+      }
+    });
+  },
+
+  exit(code: number): never {
+    Deno.exit(code);
+  },
 };
