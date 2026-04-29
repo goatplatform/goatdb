@@ -19,7 +19,7 @@ import {
   TestsRunner,
   type TestSummary,
 } from './mod.ts';
-import { exit } from '../base/process.ts';
+import { signalBrowserTestCompletion } from '../base/process.ts';
 import {
   type LogEntry,
   type LogStream,
@@ -43,6 +43,7 @@ import setupGoatRequest from './goat-request.test.ts';
 import setupStaticAssetsEndpoint from './static-assets-endpoint.test.ts';
 import setupHealthCheckEndpoint from './health-check-endpoint.test.ts';
 import setupLiveQuery from './live-query.test.ts';
+import setupRuntimeTests from './runtime.test.ts';
 import { getEnvVar } from '../base/os.ts';
 
 /**
@@ -77,6 +78,7 @@ export function registerBrowserTests(): void {
   setupAssertsTests(); // Assertion utility correctness
   setupOrderstamp(); // Utility functions for distributed timestamps
   setupItemPath(); // Path validation and parsing logic
+  setupRuntimeTests(); // Runtime abstraction layer invariants
   setupHealthCheckEndpoint(); // Simple HTTP endpoint check
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
@@ -142,7 +144,7 @@ async function main(): Promise<void> {
       globalThis.dispatchEvent(
         new CustomEvent('testsComplete', { detail: noMatchResult }),
       );
-      await exit(EXIT_CODE_NO_MATCH);
+      await signalBrowserTestCompletion(EXIT_CODE_NO_MATCH);
       return;
     }
     throw error;
@@ -162,9 +164,9 @@ async function main(): Promise<void> {
     );
   }
 
-  // Exit with appropriate code (handles browser signaling)
+  // Signal completion for browser automation.
   const exitCode = summary.failed > 0 ? 1 : 0;
-  exit(exitCode);
+  await signalBrowserTestCompletion(exitCode);
 }
 
 // Auto-run when used as entry point or in browser

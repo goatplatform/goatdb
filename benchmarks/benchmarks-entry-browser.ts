@@ -7,7 +7,7 @@
 import { isBrowser } from '../base/common.ts';
 import { BenchmarkRunner } from './mod.ts';
 import { getEnvVar } from '../base/os.ts';
-import { exit } from '../base/process.ts';
+import { signalBrowserTestCompletion } from '../base/process.ts';
 import { notReached } from '../base/error.ts';
 import { getSystemInfo } from '../base/system-info.ts';
 import {
@@ -86,9 +86,9 @@ async function main(): Promise<void> {
     );
   }
 
-  // Exit with appropriate code
+  // Signal completion for browser automation.
   const exitCode = summary.summary.failed > 0 ? 1 : 0;
-  await exit(exitCode);
+  await signalBrowserTestCompletion(exitCode);
 }
 
 // Auto-run when used as entry point in browser

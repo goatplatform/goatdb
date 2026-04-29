@@ -264,7 +264,11 @@ export default function setupTestRunnerTests(): void {
         '--suite=MissingSuite',
       ]);
 
-      assertTrue(code !== 0, 'CLI Node.js no-match path must exit non-zero');
+      assertEquals(
+        code,
+        EXIT_CODE_NO_MATCH,
+        'CLI Node.js no-match path must exit with EXIT_CODE_NO_MATCH',
+      );
       assertTrue(
         stderrText.includes(
           'Test execution failed: No tests matched --suite="MissingSuite"',
@@ -287,7 +291,11 @@ export default function setupTestRunnerTests(): void {
         '--test=missing',
       ]);
 
-      assertTrue(code !== 0, 'CLI Node.js no-match path must exit non-zero');
+      assertEquals(
+        code,
+        EXIT_CODE_NO_MATCH,
+        'CLI Node.js no-match path must exit with EXIT_CODE_NO_MATCH',
+      );
       assertTrue(
         stderrText.includes(
           'Test execution failed: No tests matched --test="missing"',
@@ -310,7 +318,11 @@ export default function setupTestRunnerTests(): void {
         '--suite=MissingSuite',
       ]);
 
-      assertTrue(code !== 0, 'CLI no-match path must exit non-zero');
+      assertEquals(
+        code,
+        EXIT_CODE_NO_MATCH,
+        'CLI no-match path must exit with EXIT_CODE_NO_MATCH',
+      );
       assertTrue(
         stderrText.includes(
           'Test execution failed: No tests matched --suite="MissingSuite"',
@@ -338,7 +350,11 @@ export default function setupTestRunnerTests(): void {
         '--test=missing',
       ]);
 
-      assertTrue(code !== 0, 'CLI no-match path must exit non-zero');
+      assertEquals(
+        code,
+        EXIT_CODE_NO_MATCH,
+        'CLI no-match path must exit with EXIT_CODE_NO_MATCH',
+      );
       assertTrue(
         stderrText.includes(
           'Test execution failed: No tests matched --test="missing"',
@@ -366,7 +382,11 @@ export default function setupTestRunnerTests(): void {
         '--suite=MissingSuite',
       ]);
 
-      assertTrue(code !== 0, 'CLI browser no-match path must exit non-zero');
+      assertEquals(
+        code,
+        EXIT_CODE_NO_MATCH,
+        'CLI browser no-match path must exit with EXIT_CODE_NO_MATCH',
+      );
       assertTrue(
         stderrText.includes(
           'Test execution failed: No tests matched --suite="MissingSuite"',

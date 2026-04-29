@@ -33,7 +33,11 @@ import {
   createBuildContext,
   stopBackgroundCompiler,
 } from '../build.ts';
-import { buildAssets, buildCombinedCSS } from '../cli/build-assets.ts';
+import {
+  buildAssets,
+  buildCombinedCSS,
+  countNewlines,
+} from '../cli/build-assets.ts';
 import { startDebugServer } from '../cli/debug-server.ts';
 import type { StaticAssets } from '../system-assets/system-assets.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
@@ -49,12 +53,6 @@ function runBundledScript(js: string): Record<string, unknown> {
     'self',
     `${js}\nreturn globalThis;`,
   )(scope, scope, scope) as Record<string, unknown>;
-}
-
-function countNewlines(s: string): number {
-  let n = 0;
-  for (const ch of s) if (ch === '\n') n++;
-  return n;
 }
 
 function getCssChunkStartLine(prependedCss: string): number {
@@ -107,7 +105,7 @@ const kPlaceholderAppConfig = {
 };
 
 export default function setupCliCompileTests() {
-  if (isNode()) {
+  if (getRuntime().id === 'node') {
     TEST(
       'CLI-Compile',
       'createBuildContext fails clearly on Node.js',
@@ -126,21 +124,29 @@ export default function setupCliCompileTests() {
     );
   }
 
-  if (isNode()) {
+  if (getRuntime().id === 'node') {
     TEST(
       'CLI-Compile',
       'startDebugServer fails clearly on Node.js',
       async () => {
+        let setupCalled = false;
         await assertThrows(
           async () => {
             await startDebugServer({
               buildDir: './build',
               jsPath: './client/index.tsx',
               path: './server-data',
+              setup: () => {
+                setupCalled = true;
+              },
             } as never);
           },
           Error,
           'startDebugServer() is only supported in Deno',
+        );
+        assertTrue(
+          !setupCalled,
+          'startDebugServer must fail before running user setup on Node.js',
         );
       },
     );
@@ -887,6 +893,69 @@ export default function setupCliCompileTests() {
           assertTrue(
             !css.includes(originalSentinel),
             'rewritten local CSS must replace the original import target',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'esbuildPlugins can load CSS before GoatDB fallback',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-css-onload-plugin');
+        const originalSentinel = '--css-fallback-original: 1;';
+        const pluginSentinel = '--css-plugin-loaded: 1;';
+        await writeTextFile(
+          path.join(dir, 'style.css'),
+          `:root { ${originalSentinel} }\n`,
+        );
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          "import './style.css';\nexport {};\n",
+        );
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+        // deno-lint-ignore no-explicit-any
+        const cssLoadPlugin: any = {
+          name: 'css-onload-plugin',
+          setup(build: any) {
+            build.onLoad(
+              { filter: /style\.css$/, namespace: 'file' },
+              () => ({
+                contents: `:root { ${pluginSentinel} }\n`,
+                loader: 'css',
+              }),
+            );
+          },
+        };
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            {
+              buildDir: dir,
+              jsPath: path.join(dir, 'entry.ts'),
+            },
+            {
+              runtime: 'node',
+              keepEsbuildAlive: false,
+              esbuildPlugins: [cssLoadPlugin],
+            },
+          );
+          const css = new TextDecoder().decode(assets['/index.css'].data);
+          assertTrue(
+            css.includes(pluginSentinel),
+            'user plugin must load CSS before GoatDB CSS fallback runs',
+          );
+          assertTrue(
+            !css.includes(originalSentinel),
+            'plugin-loaded CSS must replace fallback-loaded CSS',
           );
         } finally {
           await stopBackgroundCompiler();
@@ -1852,195 +1921,81 @@ export default function setupCliCompileTests() {
   });
 
   if (!isBrowser()) {
-    TEST(
-      'CLI-Compile',
-      'buildAssets throws for reserved plugin name',
-      async () => {
-        try {
-          await assertThrows(
-            async () =>
-              buildAssets(
-                undefined,
-                [{ in: '/fake.ts', out: 'fake' }],
-                kPlaceholderAppConfig,
-                {
-                  runtime: 'node',
-                  esbuildPlugins: [{ name: 'node-stub', setup: () => {} }],
-                },
-              ),
-            Error,
-            'node-stub',
-          );
-        } finally {
-          await stopBackgroundCompiler();
-        }
+    const kPluginValidationCases: {
+      name: string;
+      plugins: BuildPluginLike[];
+      expectedMsg: string;
+    }[] = [
+      {
+        name: 'reserved plugin name',
+        plugins: [{ name: 'node-stub', setup: () => {} }],
+        expectedMsg: 'node-stub',
       },
-    );
-    TEST(
-      'CLI-Compile',
-      'buildAssets throws for plugin missing setup',
-      async () => {
-        try {
-          await assertThrows(
-            async () =>
-              buildAssets(
-                undefined,
-                [{ in: '/fake.ts', out: 'fake' }],
-                kPlaceholderAppConfig,
-                {
-                  runtime: 'node',
-                  esbuildPlugins: [
-                    {
-                      name: 'bad-plugin',
-                      setup: undefined,
-                    } as unknown as BuildPluginLike,
-                  ],
-                },
-              ),
-            Error,
-            'bad-plugin',
-          );
-        } finally {
-          await stopBackgroundCompiler();
-        }
+      {
+        name: 'plugin missing setup',
+        plugins: [
+          { name: 'bad-plugin', setup: undefined },
+        ] as unknown as BuildPluginLike[],
+        expectedMsg: 'bad-plugin',
       },
-    );
+      {
+        name: 'duplicate plugin names',
+        plugins: [
+          { name: 'custom', setup: () => {} },
+          { name: 'custom', setup: () => {} },
+        ],
+        expectedMsg: 'custom',
+      },
+      {
+        name: 'empty plugin name',
+        plugins: [{ name: '', setup: () => {} }],
+        expectedMsg: 'invalid name',
+      },
+      {
+        name: 'non-string plugin name',
+        plugins: [
+          { name: 123, setup: () => {} },
+        ] as unknown as BuildPluginLike[],
+        expectedMsg: 'invalid name',
+      },
+      {
+        name: 'reserved goatdb-css-loader plugin name',
+        plugins: [{ name: 'goatdb-css-loader', setup: () => {} }],
+        expectedMsg: 'goatdb-css-loader',
+      },
+      {
+        name: 'reserved adapter-stub plugin name',
+        plugins: [{ name: 'adapter-stub', setup: () => {} }],
+        expectedMsg: 'adapter-stub',
+      },
+    ];
 
-    TEST(
-      'CLI-Compile',
-      'buildAssets throws for duplicate plugin names',
-      async () => {
-        try {
-          await assertThrows(
-            async () =>
-              buildAssets(
-                undefined,
-                [{ in: '/fake.ts', out: 'fake' }],
-                kPlaceholderAppConfig,
-                {
-                  runtime: 'node',
-                  esbuildPlugins: [
-                    { name: 'custom', setup: () => {} },
-                    { name: 'custom', setup: () => {} },
-                  ],
-                },
-              ),
-            Error,
-            'custom',
-          );
-        } finally {
-          await stopBackgroundCompiler();
-        }
-      },
-    );
-
-    TEST(
-      'CLI-Compile',
-      'buildAssets throws for empty plugin name',
-      async () => {
-        try {
-          await assertThrows(
-            async () =>
-              buildAssets(
-                undefined,
-                [{ in: '/fake.ts', out: 'fake' }],
-                kPlaceholderAppConfig,
-                {
-                  runtime: 'node',
-                  esbuildPlugins: [{ name: '', setup: () => {} }],
-                },
-              ),
-            Error,
-            'invalid name',
-          );
-        } finally {
-          await stopBackgroundCompiler();
-        }
-      },
-    );
-
-    TEST(
-      'CLI-Compile',
-      'buildAssets throws for non-string plugin name',
-      async () => {
-        try {
-          await assertThrows(
-            async () =>
-              buildAssets(
-                undefined,
-                [{ in: '/fake.ts', out: 'fake' }],
-                kPlaceholderAppConfig,
-                {
-                  runtime: 'node',
-                  esbuildPlugins: [
-                    {
-                      name: 123,
-                      setup: () => {},
-                    } as unknown as BuildPluginLike,
-                  ],
-                },
-              ),
-            Error,
-            'invalid name',
-          );
-        } finally {
-          await stopBackgroundCompiler();
-        }
-      },
-    );
-
-    TEST(
-      'CLI-Compile',
-      'buildAssets throws for reserved goatdb-css-loader plugin name',
-      async () => {
-        try {
-          await assertThrows(
-            async () =>
-              buildAssets(
-                undefined,
-                [{ in: '/fake.ts', out: 'fake' }],
-                kPlaceholderAppConfig,
-                {
-                  runtime: 'node',
-                  esbuildPlugins: [{
-                    name: 'goatdb-css-loader',
-                    setup: () => {},
-                  }],
-                },
-              ),
-            Error,
-            'goatdb-css-loader',
-          );
-        } finally {
-          await stopBackgroundCompiler();
-        }
-      },
-    );
-
-    TEST(
-      'CLI-Compile',
-      'buildAssets throws for reserved adapter-stub plugin name',
-      async () => {
-        try {
-          await assertThrows(
-            async () =>
-              buildAssets(
-                undefined,
-                [{ in: '/fake.ts', out: 'fake' }],
-                kPlaceholderAppConfig,
-                {
-                  runtime: 'node',
-                  esbuildPlugins: [{ name: 'adapter-stub', setup: () => {} }],
-                },
-              ),
-            Error,
-            'adapter-stub',
-          );
-        } finally {
-          await stopBackgroundCompiler();
-        }
-      },
-    );
+    for (const tc of kPluginValidationCases) {
+      TEST(
+        'CLI-Compile',
+        `buildAssets throws for ${tc.name}`,
+        async () => {
+          try {
+            await assertThrows(
+              async () =>
+                buildAssets(
+                  undefined,
+                  [{ in: '/fake.ts', out: 'fake' }],
+                  kPlaceholderAppConfig,
+                  {
+                    runtime: 'node',
+                    esbuildPlugins: tc.plugins,
+                  },
+                ),
+              Error,
+              tc.expectedMsg,
+            );
+          } finally {
+            await stopBackgroundCompiler();
+          }
+        },
+      );
+    }
   }
 
   if (isNode()) {
