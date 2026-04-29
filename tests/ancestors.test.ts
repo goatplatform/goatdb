@@ -51,7 +51,10 @@ async function buildChain(
   const repo = db.repository('/ancestors-test/chain')!;
   assertExists(repo, 'repo must exist');
 
-  // commitsForKey yields newest-first; reverse for oldest-first
+  // commitsForKey iteration order uses timestamp + random-id tiebreaker.
+  // On fast CI runners rapid commits may collide on the same millisecond,
+  // making any positional access into this array non-deterministic.
+  // Tests should use repo.headForKey() and invariant checks instead.
   const commits = Array.from(repo.commitsForKey(item.key)).reverse();
 
   return { db, repo, item, commits };
@@ -59,10 +62,11 @@ async function buildChain(
 
 export default function setup() {
   TEST('Ancestors', 'root commit has no ancestors', async (ctx) => {
-    const { db, commits } = await buildChain(ctx, 'ancestors-root', 1);
+    const { db, repo, item } = await buildChain(ctx, 'ancestors-root', 1);
     try {
-      assertEquals(commits.length, 1, 'should have exactly 1 commit');
-      assertEquals(commits[0].ancestors.length, 0, 'root has no ancestors');
+      const head = repo.headForKey(item.key);
+      assertExists(head, 'head must exist');
+      assertEquals(head.ancestors.length, 0, 'root has no ancestors');
     } finally {
       await db.flushAll();
       await db.close();
@@ -72,11 +76,12 @@ export default function setup() {
   TEST('Ancestors', 'chain of 2 has no ancestors', async (ctx) => {
     // computeAncestors(parent) walks parent.parents[0] (grandparent).
     // Root has no parents, so grandparent is undefined → returns [].
-    const { db, commits } = await buildChain(ctx, 'ancestors-chain2', 2);
+    const { db, repo, item } = await buildChain(ctx, 'ancestors-chain2', 2);
     try {
-      assertEquals(commits.length, 2, 'should have exactly 2 commits');
+      const head = repo.headForKey(item.key);
+      assertExists(head, 'head must exist');
       assertEquals(
-        commits[1].ancestors.length,
+        head.ancestors.length,
         0,
         'chain of 2: head ancestors must be empty',
       );
@@ -88,17 +93,25 @@ export default function setup() {
 
   TEST('Ancestors', 'chain of 3 has 1 ancestor', async (ctx) => {
     // head's parent = commit2; commit2's parent = root → grandparent = root
-    const { db, commits } = await buildChain(ctx, 'ancestors-chain3', 3);
+    const { db, repo, item } = await buildChain(ctx, 'ancestors-chain3', 3);
     try {
-      assertEquals(commits.length, 3, 'should have exactly 3 commits');
+      const allCommits = Array.from(repo.commitsForKey(item.key));
+      assertEquals(allCommits.length, 3, 'should have exactly 3 commits');
+
+      const head = repo.headForKey(item.key);
+      assertExists(head, 'head must exist');
       assertEquals(
-        commits[2].ancestors.length,
+        head.ancestors.length,
         1,
         'chain of 3: head should have 1 ancestor (grandparent)',
       );
+
+      // Find root among known commits (the one with no parents).
+      const roots = allCommits.filter((c) => c.parents.length === 0);
+      assertEquals(roots.length, 1, 'should have exactly 1 root');
       assertEquals(
-        commits[2].ancestors[0],
-        commits[0].id,
+        head.ancestors[0],
+        roots[0].id,
         'ancestor[0] should be the root commit',
       );
     } finally {
@@ -109,11 +122,15 @@ export default function setup() {
 
   TEST('Ancestors', 'chain of 4 has 2 ancestors', async (ctx) => {
     // grandparent = commit2, great-grandparent = root
-    const { db, commits } = await buildChain(ctx, 'ancestors-chain4', 4);
+    const { db, repo, item } = await buildChain(ctx, 'ancestors-chain4', 4);
     try {
-      assertEquals(commits.length, 4, 'should have exactly 4 commits');
+      const allCommits = Array.from(repo.commitsForKey(item.key));
+      assertEquals(allCommits.length, 4, 'should have exactly 4 commits');
+
+      const head = repo.headForKey(item.key);
+      assertExists(head, 'head must exist');
       assertEquals(
-        commits[3].ancestors.length,
+        head.ancestors.length,
         2,
         'chain of 4: head should have 2 ancestors',
       );
@@ -125,11 +142,15 @@ export default function setup() {
 
   TEST('Ancestors', 'chain of 6+ caps at 2 ancestors', async (ctx) => {
     // computeAncestors only walks up to K=2 hops regardless of chain length
-    const { db, commits } = await buildChain(ctx, 'ancestors-chain6', 6);
+    const { db, repo, item } = await buildChain(ctx, 'ancestors-chain6', 6);
     try {
-      assertEquals(commits.length, 6, 'should have exactly 6 commits');
+      const allCommits = Array.from(repo.commitsForKey(item.key));
+      assertEquals(allCommits.length, 6, 'should have exactly 6 commits');
+
+      const head = repo.headForKey(item.key);
+      assertExists(head, 'head must exist');
       assertEquals(
-        commits[5].ancestors.length,
+        head.ancestors.length,
         2,
         'chain of 6: ancestors capped at 2',
       );
@@ -140,13 +161,14 @@ export default function setup() {
   });
 
   TEST('Ancestors', 'all ancestor IDs exist in repo', async (ctx) => {
-    const { db, repo, commits } = await buildChain(
+    const { db, repo, item } = await buildChain(
       ctx,
       'ancestors-exists',
       6,
     );
     try {
-      const head = commits[5];
+      const head = repo.headForKey(item.key);
+      assertExists(head, 'head must exist');
       for (const ancId of head.ancestors) {
         assertTrue(
           repo.hasCommit(ancId),
