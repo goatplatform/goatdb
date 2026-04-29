@@ -3,7 +3,7 @@
 import * as path from './base/path.ts';
 import { APP_ENTRY_POINT } from './net/server/static-assets.ts';
 import { readFile } from './base/json-log/file-impl.ts';
-import { isDeno } from './base/common.ts';
+import { getRuntime } from './base/runtime/index.ts';
 
 // IMPORTANT: `esbuild` and `@luca/esbuild-deno-loader` MUST remain `import type`.
 // Runtime imports of these Deno/JSR-specific packages break Node.js SEA binaries.
@@ -225,7 +225,12 @@ export async function getClientBuildPlugins(
       `GoatDB: duplicate esbuild plugin names: ${duplicates.join(', ')}.`,
     );
   }
-  const reservedNames = new Set(['node-stub', 'goatdb-css-loader', 'adapter-stub']);
+  const adapterStub = adapterStubPlugin(['deno', 'node']);
+  const reservedNames = new Set([
+    adapterStub.name,
+    nodeStubPlugin.name,
+    cssLoaderPlugin.name,
+  ]);
   for (const p of extraPlugins) {
     if (!p.name || typeof p.name !== 'string') {
       throw new Error(
@@ -234,7 +239,9 @@ export async function getClientBuildPlugins(
     }
     if (reservedNames.has(p.name)) {
       throw new Error(
-        `GoatDB: esbuild plugin name '${p.name}' is reserved internally (${[...reservedNames].join(', ')}). Rename your plugin.`,
+        `GoatDB: esbuild plugin name '${p.name}' is reserved internally (${
+          [...reservedNames].join(', ')
+        }). Rename your plugin.`,
       );
     }
     if (typeof p.setup !== 'function') {
@@ -243,13 +250,13 @@ export async function getClientBuildPlugins(
       );
     }
   }
-  const plugins: Plugin[] = [adapterStubPlugin(['deno', 'node'])];
+  const plugins: Plugin[] = [adapterStub];
   if (targetRuntime === 'node') {
     plugins.push(nodeStubPlugin);
   }
   plugins.push(...extraPlugins as Plugin[], cssLoaderPlugin);
   if (targetRuntime === 'deno') {
-    if (!isDeno()) {
+    if (getRuntime().id !== 'deno') {
       throw new Error(
         'GoatDB: cannot build Deno-target bundle from Node.js. ' +
           'Deno loader plugins (@luca/esbuild-deno-loader) require the Deno runtime. ' +
@@ -271,7 +278,7 @@ export async function createBuildContext(
   entryPoints: { in: string; out: string }[],
   extraPlugins: BuildPluginLike[] = [],
 ): Promise<ReBuildContext> {
-  if (!isDeno()) {
+  if (getRuntime().id !== 'deno') {
     throw new Error(
       'createBuildContext() is only supported in Deno. GoatDB debug-server ' +
         'bundling uses @luca/esbuild-deno-loader; use buildAssets() or ' +

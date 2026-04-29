@@ -1,4 +1,5 @@
 import * as path from '../base/path.ts';
+import { log } from '../logging/log.ts';
 import {
   type BuildPluginLike,
   type BundleResult,
@@ -27,7 +28,7 @@ interface CSSChunk {
 }
 
 /** Counts '\n' characters in s — used to compute line offsets for the sections source map. */
-function countNewlines(s: string): number {
+export function countNewlines(s: string): number {
   let n = 0;
   for (const ch of s) if (ch === '\n') n++;
   return n;
@@ -124,11 +125,14 @@ export async function buildAssets(
   const targetRuntime = options?.runtime ?? 'deno';
   if (ctx && isReBuildContext(ctx)) {
     if (options?.esbuildPlugins?.length) {
-      console.warn(
-        'GoatDB: BuildAssetsOptions.esbuildPlugins is ignored when a pre-built ' +
+      log({
+        severity: 'WARNING',
+        error: 'MissingConfiguration',
+        message:
+          'BuildAssetsOptions.esbuildPlugins is ignored when a pre-built ' +
           'ReBuildContext is provided — plugins were already applied when the ' +
           'context was created.',
-      );
+      });
     }
     buildResults = await ctx.rebuild();
   } else {
