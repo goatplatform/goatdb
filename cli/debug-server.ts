@@ -21,9 +21,8 @@ import { buildAssets } from './build-assets.ts';
 import { notReached } from '../base/error.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
-import { isLinux, isMac, isWindows } from '../base/os.ts';
-import { isDeno, isNode } from '../base/common.ts';
-import { cli } from '../base/development.ts';
+import { getRuntime } from '../base/runtime/index.ts';
+import { log } from '../logging/log.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import type { AppConfig } from './app-config.ts';
 import {
@@ -114,43 +113,6 @@ export type DebugServerOptions<US extends Schema> =
     setup?: (server: Server<US>) => void | Promise<void>;
   };
 
-async function openBrowser(url: string): Promise<void> {
-  if (isDeno()) {
-    let cmd: Deno.Command;
-    if (isMac()) {
-      cmd = new Deno.Command('open', { args: [url] });
-    } else if (isLinux()) {
-      cmd = new Deno.Command('xdg-open', { args: [url] });
-    } else if (isWindows()) {
-      cmd = new Deno.Command('cmd', { args: ['/c', 'start', url] });
-    } else {
-      return;
-    }
-    const { success, code } = await cmd.output();
-    if (!success) {
-      console.error(`Failed opening browser. Code: ${code}`);
-    }
-  } else if (isNode()) {
-    // Node.js: use open command via CLI helper
-    if (isMac()) {
-      await cli('open', url);
-    } else if (isLinux()) {
-      await cli('xdg-open', url);
-    } else if (isWindows()) {
-      await cli('cmd', '/c', 'start', url);
-    }
-  }
-}
-
-function getCwd(): string {
-  if (isDeno()) {
-    return Deno.cwd();
-  } else if (isNode()) {
-    return process.cwd();
-  }
-  return '/';
-}
-
 /**
  * Starts a local debug server with live reload.
  *
@@ -165,7 +127,7 @@ function getCwd(): string {
 export async function startDebugServer<US extends Schema>(
   options: DebugServerOptions<US>,
 ): Promise<never> {
-  if (!isDeno()) {
+  if (getRuntime().id !== 'deno') {
     throw new Error(
       'startDebugServer() is only supported in Deno. GoatDB debug-server ' +
         'bundling uses @luca/esbuild-deno-loader; Node.js users should run ' +
@@ -174,7 +136,7 @@ export async function startDebugServer<US extends Schema>(
   }
   getGoatConfig().debug = true; // Turn on debug mode globally
 
-  const cwd = getCwd();
+  const cwd = getRuntime().getCWD();
   let configPath = options.denoJson || options.packageJson;
   if (!configPath) {
     const denoJsonPath = path.join(cwd, 'deno.json');
@@ -196,7 +158,7 @@ export async function startDebugServer<US extends Schema>(
     buildInfo,
   });
 
-  console.log('Bundling client code...');
+  log({ severity: 'INFO', message: 'Bundling client code...' });
   let bundlingStart = performance.now();
 
   const entryPoints = [
@@ -236,13 +198,14 @@ export async function startDebugServer<US extends Schema>(
   const serverUrl = `${
     options.https ? 'https' : 'http'
   }://localhost:${server.port}`;
-  openBrowser(serverUrl);
+  await getRuntime().openBrowser(serverUrl);
 
-  console.log(
-    `Bundling took ${
+  log({
+    severity: 'INFO',
+    message: `Bundling took ${
       ((performance.now() - bundlingStart) / 1000).toFixed(2)
     }sec`,
-  );
+  });
 
   // Declare cleanup variables
   let watcher: FileWatcher | undefined;
@@ -256,23 +219,25 @@ export async function startDebugServer<US extends Schema>(
     ctx.close();
   };
 
-  if (isDeno()) {
-    Deno.addSignalListener('SIGTERM', async () => {
+  getRuntime().setupSignalHandler('SIGTERM', async () => {
+    try {
       await cleanup();
-      Deno.exit(0);
-    });
-  } else if (isNode()) {
-    process.on('SIGTERM', async () => {
-      await cleanup();
-      process.exit(0);
-    });
-  }
+      getRuntime().exit(0);
+    } catch (err) {
+      log({
+        severity: 'ERROR',
+        error: 'UncaughtServerError',
+        message: `Debug server cleanup failed: ${err}`,
+      });
+      getRuntime().exit(1);
+    }
+  });
 
   if (options.watchDir) {
     watcher = await watchDirectory(path.resolve(options.watchDir));
 
     rebuildTimer = new SimpleTimer(300, false, async () => {
-      console.log('Bundling client code...');
+      log({ severity: 'INFO', message: 'Bundling client code...' });
       bundlingStart = performance.now();
       try {
         const config = getGoatConfig();
@@ -291,19 +256,28 @@ export async function startDebugServer<US extends Schema>(
         }
 
         config.version = version;
-        console.log(
-          `Bundling took ${
+        log({
+          severity: 'INFO',
+          message: `Bundling took ${
             ((performance.now() - bundlingStart) / 1000).toFixed(2)
           }sec`,
-        );
+        });
       } catch (err: unknown) {
-        console.error('Build failed. Will try again on next save.');
-        console.error(err);
+        log({
+          severity: 'ERROR',
+          error: 'UncaughtServerError',
+          message: 'Build failed. Will try again on next save.',
+        });
+        log({
+          severity: 'ERROR',
+          error: 'UncaughtServerError',
+          message: `Build error: ${err}`,
+        });
       }
     });
 
     const filterFunc = options.watchFilter || shouldRebuildAfterPathChange;
-    const cwd = getCwd();
+    const cwd = getRuntime().getCWD();
 
     for await (const event of watcher) {
       for (const p of event.paths) {
@@ -311,7 +285,10 @@ export async function startDebugServer<US extends Schema>(
           ? p.substring(cwd.length + 1)
           : p;
         if (filterFunc(relativePath)) {
-          console.log(`Detected change at ${relativePath}`);
+          log({
+            severity: 'INFO',
+            message: `Detected change at ${relativePath}`,
+          });
           rebuildTimer.schedule();
         }
       }
