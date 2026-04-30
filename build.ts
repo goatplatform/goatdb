@@ -44,6 +44,11 @@ export interface BundleResult {
   cssMap?: string; // corresponding CSS source map JSON string from esbuild .css.map output
 }
 
+export interface BuildOutput {
+  bundles: Record<string, BundleResult>;
+  assets: Record<string, Uint8Array>;
+}
+
 /**
  * Minimal public plugin shape for GoatDB's build-only APIs.
  * Keeps `esbuild` out of the root package's exported type surface while still
@@ -58,22 +63,55 @@ export interface BuildPluginLike {
   setup(build: any): void;
 }
 
+export const kAssetLoaders = {
+  '.gif': 'file',
+  '.png': 'file',
+  '.jpg': 'file',
+  '.jpeg': 'file',
+  '.svg': 'file',
+  '.webp': 'file',
+  '.woff': 'file',
+  '.woff2': 'file',
+  '.ttf': 'file',
+} as const;
+
+export const kAssetNamesPattern = 'assets/[name]-[hash]';
+
 export function bundleResultFromBuildResult(
-  buildResult: { outputFiles?: { path: string; text: string }[] },
-): Record<string, BundleResult> {
-  const result = {} as Record<string, BundleResult>;
+  buildResult: {
+    outputFiles?: { path: string; text: string; contents: Uint8Array }[];
+  },
+): BuildOutput {
+  const bundles = {} as Record<string, BundleResult>;
+  const assets = {} as Record<string, Uint8Array>;
   if (!buildResult.outputFiles) {
     throw new Error(
       'esbuild returned no output files. Ensure write: false is set.',
     );
   }
   for (const file of buildResult.outputFiles) {
+    if (
+      !file.path.endsWith('.js') &&
+      !file.path.endsWith('.js.map') &&
+      !file.path.endsWith('.css') &&
+      !file.path.endsWith('.css.map')
+    ) {
+      // Fallback: use the filename if the path doesn't contain an 'output/' segment.
+      const outputMatch = file.path.match(/(?:^|[/\\])output[/\\](.+)$/);
+      const assetPath = `/${
+        (outputMatch?.[1] ?? path.basename(file.path))
+          .replaceAll('\\', '/')
+      }`;
+      assets[assetPath] = file.contents;
+      continue;
+    }
+
     const entryPoint = path.basename(file.path)
       .replace(/\.(js\.map|css\.map|js|css)$/, '') as string;
-    let bundleResult: BundleResult | undefined = result[entryPoint];
+    let bundleResult: BundleResult | undefined = bundles[entryPoint];
     if (!bundleResult) {
       bundleResult = {} as BundleResult;
-      result[entryPoint] = bundleResult;
+      bundles[entryPoint] = bundleResult;
     }
     if (file.path.endsWith('.js')) {
       bundleResult.source = file.text;
@@ -92,7 +130,7 @@ export function bundleResultFromBuildResult(
       );
     }
   }
-  return result;
+  return { bundles, assets };
 }
 
 /**
@@ -130,7 +168,7 @@ export async function stopBackgroundCompiler(): Promise<void> {
 }
 
 export interface ReBuildContext {
-  rebuild(): Promise<Record<string, BundleResult>>;
+  rebuild(): Promise<BuildOutput>;
   close(): void;
 }
 
@@ -296,6 +334,8 @@ export async function createBuildContext(
     outdir: 'output',
     jsx: 'automatic',
     platform: 'browser',
+    loader: kAssetLoaders,
+    assetNames: kAssetNamesPattern,
     define: {
       '__BUNDLE_TARGET__': '"browser"',
       'import.meta.main': 'false',

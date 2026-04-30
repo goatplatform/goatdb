@@ -1,12 +1,14 @@
 import * as path from '../base/path.ts';
 import { log } from '../logging/log.ts';
 import {
+  type BuildOutput,
   type BuildPluginLike,
-  type BundleResult,
   bundleResultFromBuildResult,
   getClientBuildPlugins,
   getEsbuild,
   isReBuildContext,
+  kAssetLoaders,
+  kAssetNamesPattern,
   type ReBuildContext,
   stopBackgroundCompiler,
 } from '../build.ts';
@@ -120,7 +122,7 @@ export async function buildAssets(
   appConfig: AppConfig,
   options?: BuildAssetsOptions,
 ): Promise<StaticAssets> {
-  let buildResults: Record<string, BundleResult>;
+  let buildOutput: BuildOutput;
   let shouldStopEsbuild = false;
   const targetRuntime = options?.runtime ?? 'deno';
   if (ctx && isReBuildContext(ctx)) {
@@ -134,7 +136,7 @@ export async function buildAssets(
           'context was created.',
       });
     }
-    buildResults = await ctx.rebuild();
+    buildOutput = await ctx.rebuild();
   } else {
     // No context provided, use esbuild directly
     const esbuild = await getEsbuild();
@@ -162,11 +164,13 @@ export async function buildAssets(
       },
       minify: appConfig.minify,
       jsx: 'automatic',
+      loader: kAssetLoaders,
+      assetNames: kAssetNamesPattern,
       // Client code is always for browser
       platform: 'browser',
     };
 
-    buildResults = bundleResultFromBuildResult(
+    buildOutput = bundleResultFromBuildResult(
       await esbuild.build(buildOptions),
     );
     shouldStopEsbuild = true;
@@ -178,6 +182,7 @@ export async function buildAssets(
 
   // System assets are always included and are placed at the root
   const result: StaticAssets = {};
+  const buildResults = buildOutput.bundles;
 
   // User provided assets are always processed, regardless of app build success
   if (appConfig.assetsPath) {
@@ -190,6 +195,13 @@ export async function buildAssets(
         '/assets',
       ),
     );
+  }
+
+  for (const [assetPath, data] of Object.entries(buildOutput.assets)) {
+    result[assetPath] = {
+      data,
+      contentType: contentTypeForPath(assetPath),
+    };
   }
 
   // For app code, include html and css files
@@ -299,7 +311,17 @@ const ContentTypeMapping: Record<string, ContentType> = {
   html: 'text/html',
   css: 'text/css',
   wasm: 'application/wasm',
+  woff: 'font/woff',
+  woff2: 'font/woff2',
+  ttf: 'font/ttf',
+  gif: 'image/gif',
+  webp: 'image/webp',
 };
+
+function contentTypeForPath(filePath: string): ContentType {
+  const ext = path.extname(filePath).substring(1).toLowerCase();
+  return ContentTypeMapping[ext] || 'application/octet-stream';
+}
 
 export async function compileAssetsDirectory(
   dir: string,
@@ -327,7 +349,7 @@ export async function compileAssetsDirectory(
     }
     result[key] = {
       data: await readFile(filePath),
-      contentType: ContentTypeMapping[ext] || 'application/octet-stream',
+      contentType: contentTypeForPath(filePath),
     };
   }
   return result;

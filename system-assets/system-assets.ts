@@ -10,12 +10,17 @@ export type ContentType =
   | 'image/svg+xml'
   | 'image/png'
   | 'image/jpeg'
-  | 'image/jpeg'
   | 'application/json'
   | 'text/javascript'
   | 'text/html'
   | 'text/css'
-  | 'application/wasm';
+  | 'application/wasm'
+  | 'application/octet-stream'
+  | 'font/woff'
+  | 'font/woff2'
+  | 'font/ttf'
+  | 'image/gif'
+  | 'image/webp';
 
 /** @group Static Assets */
 export interface Asset {
