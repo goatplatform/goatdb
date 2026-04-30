@@ -10,7 +10,7 @@ import { sourceMapDecoder } from './browser/sourcemap-decoder.ts';
  * --node-inspect-brk: Enable Node.js debugger
  * --suite=<name> or -suite <name>: Run a suite by exact suite name
  * --test=<name> or -test <name>: Run tests by exact registered test name
- * --runtime=<deno|node|browser> or -runtime <deno|node|browser>: Run in specific runtime only
+ * --runtime=<deno|node|browser>[,...] or -runtime <deno|node|browser>[,...]: Run in specific runtime(s)
  *
  * @returns Promise that resolves when all tests complete
  */
@@ -68,7 +68,7 @@ async function runTests(): Promise<void> {
     console.error(
       'Unknown argument:',
       arg,
-      '\nUsage: deno task test [--deno-inspect-brk] [--node-inspect-brk] [-suite <exact-suite-name>] [--suite=<exact-suite-name>] [-test <exact-test-name>] [--test=<exact-test-name>] [-runtime <deno|node|browser>] [--debug]',
+      '\nUsage: deno task test [--deno-inspect-brk] [--node-inspect-brk] [-suite <exact-suite-name>] [--suite=<exact-suite-name>] [-test <exact-test-name>] [--test=<exact-test-name>] [-runtime <deno|node|browser>[,...]] [--debug]',
     );
     Deno.exit(1);
   }
@@ -76,15 +76,22 @@ async function runTests(): Promise<void> {
   // Determine which runtimes to run based on arguments
   let runtimes: Array<'deno' | 'node' | 'browser'>;
   if (runtime) {
-    if (runtime !== 'deno' && runtime !== 'node' && runtime !== 'browser') {
+    const requestedRuntimes = runtime.split(',');
+    if (
+      requestedRuntimes.some((r) =>
+        r !== 'deno' && r !== 'node' && r !== 'browser'
+      )
+    ) {
       console.error(
         'Invalid value for --runtime:',
         runtime,
-        '\nAllowed values: deno, node, browser',
+        '\nAllowed values: deno, node, browser, or a comma-separated list',
       );
       Deno.exit(1);
     }
-    runtimes = [runtime as 'deno' | 'node' | 'browser'];
+    runtimes = [...new Set(requestedRuntimes)] as Array<
+      'deno' | 'node' | 'browser'
+    >;
   } else {
     // Default to running all three runtimes (Deno, Node.js, Browser) unless specifically configured
     const runDeno = (denoInspectBrk && !nodeInspectBrk) ||

@@ -104,11 +104,16 @@ const kPlaceholderAppConfig = {
   jsPath: '/dev/null',
 };
 
+export const NODE_ONLY_FILTER_TEST =
+  'createBuildContext fails clearly on Node.js';
+export const DENO_ONLY_FILTER_TEST =
+  'buildAssets with runtime: deno bundles CSS into /index.css';
+
 export default function setupCliCompileTests() {
   if (getRuntime().id === 'node') {
     TEST(
       'CLI-Compile',
-      'createBuildContext fails clearly on Node.js',
+      NODE_ONLY_FILTER_TEST,
       async () => {
         await assertThrows(
           async () => {
@@ -353,12 +358,84 @@ export default function setupCliCompileTests() {
         }
       },
     );
+
+    TEST(
+      'CLI-Compile',
+      'buildAssets emits assets referenced from bundled CSS url values',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-css-url');
+        const fontText = 'fake-woff2-data';
+
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          `import './style.css';
+export {};
+`,
+        );
+        await writeTextFile(
+          path.join(dir, 'style.css'),
+          `@font-face {
+  font-family: GoatTest;
+  src: url('./goat-font.woff2') format('woff2');
+}
+`,
+        );
+        await writeTextFile(path.join(dir, 'goat-font.woff2'), fontText);
+
+        const entryPoints = [{
+          in: path.join(dir, 'entry.ts'),
+          out: APP_ENTRY_POINT,
+        }];
+
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+
+          const css = new TextDecoder().decode(assets['/index.css'].data);
+          const urlMatch = css.match(/url\((['"]?)([^)'"]+\.woff2)\1\)/);
+          assertExists(urlMatch, 'CSS must contain a rewritten font asset URL');
+
+          // Find the emitted woff2 asset from the assets map directly
+          const fontEntries = Object.entries(assets).filter(([k]) =>
+            k.endsWith('.woff2')
+          );
+          assertExists(fontEntries[0], 'a .woff2 asset must be emitted');
+          assertEquals(
+            fontEntries.length,
+            1,
+            'exactly one .woff2 asset must be emitted',
+          );
+          const [fontAssetKey, fontAsset] = fontEntries[0];
+
+          // Verify the CSS url() contains a reference to the emitted asset path
+          const expectedUrl = fontAssetKey.startsWith('/')
+            ? fontAssetKey.substring(1)
+            : fontAssetKey;
+          assertTrue(
+            css.includes(expectedUrl),
+            'CSS must contain a url() pointing to the emitted font asset',
+          );
+          assertTrue(
+            /^\/assets\/.*\.woff2$/.test(fontAssetKey),
+            'woff2 asset must be emitted under /assets/',
+          );
+          assertEquals(fontAsset.contentType, 'font/woff2');
+          assertEquals(new TextDecoder().decode(fontAsset.data), fontText);
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
   }
 
   if (isDeno()) {
     TEST(
       'CLI-Compile',
-      'buildAssets with runtime: deno bundles CSS into /index.css',
+      DENO_ONLY_FILTER_TEST,
       async (ctx: TestSuite) => {
         const dir = await ctx.tempDir('build-assets-deno-css');
         await writeTextFile(

@@ -1,5 +1,9 @@
 import { EXIT_CODE_NO_MATCH, NoMatchError, TEST, TestsRunner } from './mod.ts';
 import {
+  DENO_ONLY_FILTER_TEST,
+  NODE_ONLY_FILTER_TEST,
+} from './cli-compile.test.ts';
+import {
   assertEquals,
   assertLessThan,
   assertThrows,
@@ -144,6 +148,56 @@ export default function setupTestRunnerTests(): void {
         },
         NoMatchError,
         'No tests matched --test="missing"',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'tests/run.ts aggregate filters tolerate a Deno-only server match',
+    async () => {
+      if (typeof Deno === 'undefined') return;
+      const { code, stdoutText, stderrText } = await runDenoCommandWithTimeout([
+        'run',
+        '-A',
+        './tests/run.ts',
+        '--runtime=deno,node',
+        `--test=${DENO_ONLY_FILTER_TEST}`,
+      ]);
+
+      assertEquals(code, 0, stderrText);
+      assertTrue(
+        stdoutText.includes('=== 🦖 Deno: all passed ==='),
+        'aggregate run must execute the Deno runtime that owns the filtered test',
+      );
+      assertTrue(
+        stdoutText.includes('Node.js: no matching tests in this runtime'),
+        'aggregate run must tolerate Node.js no-match for a Deno-only test',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'tests/run.ts aggregate filters tolerate a Node-only server match',
+    async () => {
+      if (typeof Deno === 'undefined') return;
+      const { code, stdoutText, stderrText } = await runDenoCommandWithTimeout([
+        'run',
+        '-A',
+        './tests/run.ts',
+        '--runtime=deno,node',
+        `--test=${NODE_ONLY_FILTER_TEST}`,
+      ]);
+
+      assertEquals(code, 0, stderrText);
+      assertTrue(
+        stdoutText.includes('Deno: no matching tests in this runtime'),
+        'aggregate run must tolerate Deno no-match for a Node-only test',
+      );
+      assertTrue(
+        stdoutText.includes('=== ⚡️ Node.js: all passed ==='),
+        'aggregate run must report Node.js success when the filtered test passes',
       );
     },
   );
@@ -575,6 +629,60 @@ export default function setupTestRunnerTests(): void {
       assertEquals(err.name, 'NoMatchError');
       assertTrue(!err.message.includes('--suite='));
       assertTrue(err.message.includes('--test="myTest"'));
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'tests/run.ts deduplicates repeated runtimes in --runtime CSV',
+    async () => {
+      if (typeof Deno === 'undefined') return;
+      const { code, stderrText } = await runDenoCommandWithTimeout([
+        'run',
+        '-A',
+        './tests/run.ts',
+        '--runtime=deno,deno',
+        `--test=${DENO_ONLY_FILTER_TEST}`,
+      ]);
+      assertEquals(code, 0, stderrText);
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'tests/run.ts rejects --runtime CSV containing an invalid runtime name',
+    async () => {
+      if (typeof Deno === 'undefined') return;
+      const { code, stderrText } = await runDenoCommandWithTimeout([
+        'run',
+        '-A',
+        './tests/run.ts',
+        '--runtime=deno,invalid',
+      ]);
+      assertEquals(code, 1, 'invalid runtime name must exit with code 1');
+      assertTrue(
+        stderrText.includes('Invalid value for --runtime:'),
+        'error message must identify the invalid --runtime value',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'tests/run.ts rejects --runtime CSV containing an empty component',
+    async () => {
+      if (typeof Deno === 'undefined') return;
+      const { code, stderrText } = await runDenoCommandWithTimeout([
+        'run',
+        '-A',
+        './tests/run.ts',
+        '--runtime=deno,,node',
+      ]);
+      assertEquals(code, 1, 'empty runtime component must exit with code 1');
+      assertTrue(
+        stderrText.includes('Invalid value for --runtime:'),
+        'error message must identify the invalid --runtime value',
+      );
     },
   );
 }
