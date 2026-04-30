@@ -125,7 +125,10 @@ async function runDenoWithWorker(
 
           // Worker is ready with test counts
           totalTests = payload.testCount;
-          rootId = pm.create('Running Tests', payload.suiteCount);
+          // suiteCount can be 0 if a filter matches no suites: the worker sends
+          // this message before running (and throwing NoMatchError), so null
+          // (indeterminate) avoids crashing ProgressManager which rejects 0.
+          rootId = pm.create('Running Tests', payload.suiteCount > 0 ? payload.suiteCount : null);
           pm.update(rootId, 0);
           break;
         }
