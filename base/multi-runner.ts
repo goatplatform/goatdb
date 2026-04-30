@@ -7,7 +7,7 @@ import {
 import { EXIT_CODE_NO_MATCH, NoMatchError } from './error.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
 import { TestsRunner, type TestSummary } from '../tests/mod.ts';
-import { registerAllTests } from '../tests/test-registry.ts';
+import { countMatchingTests } from '../tests/test-registry.ts';
 
 /**
  * Worker message types for Deno test execution.
@@ -233,22 +233,6 @@ async function runDenoWithWorker(
   });
 }
 
-async function countServerTestsForFilter(
-  suite?: string,
-  test?: string,
-): Promise<number> {
-  const previousDefaultRunner = TestsRunner.default;
-  const countingRunner = new TestsRunner();
-  TestsRunner.default = countingRunner;
-
-  try {
-    await registerAllTests();
-    return countingRunner.getTestCount(suite, test).testCount;
-  } finally {
-    TestsRunner.default = previousDefaultRunner;
-  }
-}
-
 function recordRuntimeOutcome(
   outcomes: RuntimeFilterOutcome[],
   runtime: RuntimeFilterOutcome['runtime'],
@@ -337,7 +321,7 @@ export async function runAcrossPlatforms(
 
   let serverFilterTestCount: number | undefined;
   if (hasExactFilter && (runDeno || runNode)) {
-    serverFilterTestCount = await countServerTestsForFilter(
+    serverFilterTestCount = await countMatchingTests(
       config.suite,
       config.test,
     );

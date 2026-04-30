@@ -56,6 +56,7 @@ import setupMergeSync from './merge-sync.test.ts';
 import setupSecurityBoundaries from './security-boundaries.test.ts';
 import setupLiveQuery from './live-query.test.ts';
 import setupWriteFailure from './write-failure.test.ts';
+import { TestsRunner } from './mod.ts';
 
 /**
  * Registers all test suites with the default TestsRunner.
@@ -123,4 +124,19 @@ export async function registerAllTests(): Promise<void> {
   setupCliCompileTests(); // CLI compilation (includes E2E compile test)
   setupE2ELatency(); // Client-to-client sync latency measurement
   setupClusterLatency(); // Multi-server cluster sync performance
+}
+
+export async function countMatchingTests(
+  suite?: string,
+  test?: string,
+): Promise<number> {
+  const previousDefault = TestsRunner.default;
+  const countingRunner = new TestsRunner();
+  TestsRunner.default = countingRunner;
+  try {
+    await registerAllTests();
+    return countingRunner.getTestCount(suite, test).testCount;
+  } finally {
+    TestsRunner.default = previousDefault;
+  }
 }
