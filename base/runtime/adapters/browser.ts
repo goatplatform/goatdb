@@ -153,10 +153,10 @@ export const BrowserAdapter: RuntimeAdapter = {
     dbDefaults: { trusted: true },
   }) as RuntimeTestConfig,
 
-  async openBrowser(_url: string): Promise<void> {
+  openBrowser(_url: string): Promise<void> {
     // Browsers can't open new tabs/windows from JS reliably
     // Could use window.open() but usually blocked by pop-up blockers
-    return;
+    return Promise.resolve();
   },
 
   setupSignalHandler(
