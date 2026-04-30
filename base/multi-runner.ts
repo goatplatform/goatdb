@@ -7,7 +7,6 @@ import {
 import { EXIT_CODE_NO_MATCH, NoMatchError } from './error.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
 import { TestsRunner, type TestSummary } from '../tests/mod.ts';
-import { countMatchingTests } from '../tests/test-registry.ts';
 
 /**
  * Worker message types for Deno test execution.
@@ -128,7 +127,10 @@ async function runDenoWithWorker(
           // suiteCount can be 0 if a filter matches no suites: the worker sends
           // this message before running (and throwing NoMatchError), so null
           // (indeterminate) avoids crashing ProgressManager which rejects 0.
-          rootId = pm.create('Running Tests', payload.suiteCount > 0 ? payload.suiteCount : null);
+          rootId = pm.create(
+            'Running Tests',
+            payload.suiteCount > 0 ? payload.suiteCount : null,
+          );
           pm.update(rootId, 0);
           break;
         }
@@ -319,87 +321,85 @@ export async function runAcrossPlatforms(
   const isAggregateRun = config.runtimes.length > 1;
   const shouldAllowRuntimeNoMatch = hasExactFilter && isAggregateRun;
 
-  let serverFilterTestCount: number | undefined;
-  if (hasExactFilter && (runDeno || runNode)) {
-    serverFilterTestCount = await countMatchingTests(
-      config.suite,
-      config.test,
-    );
-  }
-
   // Run in Deno if configured
   if (runDeno) {
     console.log('=== 🦖 Running in Deno... ===');
 
-    if (shouldAllowRuntimeNoMatch && serverFilterTestCount === 0) {
-      console.log(
-        '=== 🦖 Deno: no matching tests in this runtime, skipping ===',
-      );
-      recordRuntimeOutcome(runtimeOutcomes, 'deno', 'no-match');
-    } else if (hasExactFilter && serverFilterTestCount === 0) {
-      throw new NoMatchError(config.suite, config.test);
-    } else {
-      // Use Worker for responsive TUI, unless debugging (debugger needs main process)
-      if (!config.denoInspectBrk && config.mode === 'test') {
-        // Worker-based execution for tests
-        try {
-          const result = await runDenoWithWorker(config.suite, config.test);
-          denoElapsed = result.elapsed;
-          TestsRunner.printSummary(result.summary);
-          recordRuntimeOutcome(runtimeOutcomes, 'deno', 'matched');
+    // Use Worker for responsive TUI, unless debugging (debugger needs main process)
+    if (!config.denoInspectBrk && config.mode === 'test') {
+      // Worker-based execution for tests
+      try {
+        const result = await runDenoWithWorker(config.suite, config.test);
+        denoElapsed = result.elapsed;
+        TestsRunner.printSummary(result.summary);
+        recordRuntimeOutcome(runtimeOutcomes, 'deno', 'matched');
 
-          if (result.summary.failed > 0) {
-            console.log(
-              `=== 🦖 Deno: ${result.summary.failed} failed ===`,
-            );
-          } else {
-            console.log(`=== 🦖 Deno: all passed ===`);
-          }
-        } catch (error) {
+        if (result.summary.failed > 0) {
+          console.log(
+            `=== 🦖 Deno: ${result.summary.failed} failed ===`,
+          );
+        } else {
+          console.log(`=== 🦖 Deno: all passed ===`);
+        }
+      } catch (error) {
+        if (error instanceof NoMatchError && shouldAllowRuntimeNoMatch) {
+          console.log(
+            '=== 🦖 Deno: no matching tests in this runtime, skipping ===',
+          );
+          recordRuntimeOutcome(runtimeOutcomes, 'deno', 'no-match');
+        } else {
           console.error('=== 🦖 Deno Worker execution failed ===');
           console.error('Error:', (error as Error).message);
           throw error;
         }
-      } else {
-        // Subprocess execution for debugging or benchmarks
-        const denoStart = performance.now();
+      }
+    } else {
+      // Subprocess execution for debugging or benchmarks
+      const denoStart = performance.now();
 
-        // Configure Deno command
-        const denoArgs = ['run', '-A'];
-        if (config.denoInspectBrk) {
-          denoArgs.push('--inspect-brk');
-        }
-        denoArgs.push(config.entryPointServer);
+      // Configure Deno command
+      const denoArgs = ['run', '-A'];
+      if (config.denoInspectBrk) {
+        denoArgs.push('--inspect-brk');
+      }
+      denoArgs.push(config.entryPointServer);
 
-        // Set up environment variables
-        const denoEnv: Record<string, string> = { ...Deno.env.toObject() };
-        if (config.suite) {
-          denoEnv['GOATDB_SUITE'] = config.suite;
-        }
-        if (config.test) {
-          denoEnv['GOATDB_TEST'] = config.test;
-        }
-        if (config.benchmark) {
-          denoEnv['GOATDB_BENCHMARK'] = config.benchmark;
-        }
+      // Set up environment variables
+      const denoEnv: Record<string, string> = { ...Deno.env.toObject() };
+      if (config.suite) {
+        denoEnv['GOATDB_SUITE'] = config.suite;
+      }
+      if (config.test) {
+        denoEnv['GOATDB_TEST'] = config.test;
+      }
+      if (config.benchmark) {
+        denoEnv['GOATDB_BENCHMARK'] = config.benchmark;
+      }
 
-        // Execute Deno
-        const denoCmd = new Deno.Command('deno', {
-          args: denoArgs,
-          stdout: 'inherit',
-          stderr: 'inherit',
-          env: denoEnv,
-        });
-        const denoResult = await denoCmd.output();
-        if (!denoResult.success) {
-          if (denoResult.code === EXIT_CODE_NO_MATCH) {
+      // Execute Deno
+      const denoCmd = new Deno.Command('deno', {
+        args: denoArgs,
+        stdout: 'inherit',
+        stderr: 'inherit',
+        env: denoEnv,
+      });
+      const denoResult = await denoCmd.output();
+      if (!denoResult.success) {
+        if (denoResult.code === EXIT_CODE_NO_MATCH) {
+          if (shouldAllowRuntimeNoMatch) {
+            console.log(
+              '=== 🦖 Deno: no matching tests in this runtime, skipping ===',
+            );
+            recordRuntimeOutcome(runtimeOutcomes, 'deno', 'no-match');
+          } else {
             throw new NoMatchError(config.suite, config.test);
           }
+        } else {
           throw new Error(
             `Deno execution failed with exit code ${denoResult.code}`,
           );
         }
-
+      } else {
         const denoEnd = performance.now();
         denoElapsed = (denoEnd - denoStart) / 1000;
         recordRuntimeOutcome(runtimeOutcomes, 'deno', 'matched');
@@ -411,58 +411,59 @@ export async function runAcrossPlatforms(
   if (runNode) {
     console.log('=== ⚡️ Running in Node.js... ===');
 
-    if (shouldAllowRuntimeNoMatch && serverFilterTestCount === 0) {
-      console.log(
-        '=== ⚡️ Node.js: no matching tests in this runtime, skipping ===',
-      );
-      recordRuntimeOutcome(runtimeOutcomes, 'node', 'no-match');
-    } else if (hasExactFilter && serverFilterTestCount === 0) {
-      throw new NoMatchError(config.suite, config.test);
-    } else {
-      // Set up environment variables
-      const nodeEnv: Record<string, string> = { ...Deno.env.toObject() };
-      if (config.suite) {
-        nodeEnv['GOATDB_SUITE'] = config.suite;
-      }
-      if (config.test) {
-        nodeEnv['GOATDB_TEST'] = config.test;
-      }
-      if (config.benchmark) {
-        nodeEnv['GOATDB_BENCHMARK'] = config.benchmark;
-      }
+    // Set up environment variables
+    const nodeEnv: Record<string, string> = { ...Deno.env.toObject() };
+    if (config.suite) {
+      nodeEnv['GOATDB_SUITE'] = config.suite;
+    }
+    if (config.test) {
+      nodeEnv['GOATDB_TEST'] = config.test;
+    }
+    if (config.benchmark) {
+      nodeEnv['GOATDB_BENCHMARK'] = config.benchmark;
+    }
 
-      // Compile with esbuild before timing
-      const outName = 'cross-platform-entry';
-      console.log('🛠️ Bundling with esbuild for Node.js...');
-      const esbuildStart = performance.now();
-      const esbuildResult = await compileForNodeWithEsbuild(
-        config.entryPointServer,
-        outName,
-      );
-      const esbuildEnd = performance.now();
-      esbuildElapsed = (esbuildEnd - esbuildStart) / 1000;
-      console.log(
-        `🛠️ esbuild bundling completed in ${esbuildElapsed.toFixed(2)}s`,
-      );
+    // esbuild always runs; no-match is detected reactively after Node executes.
+    const outName = 'cross-platform-entry';
+    console.log('🛠️ Bundling with esbuild for Node.js...');
+    const esbuildStart = performance.now();
+    const esbuildResult = await compileForNodeWithEsbuild(
+      config.entryPointServer,
+      outName,
+    );
+    const esbuildEnd = performance.now();
+    esbuildElapsed = (esbuildEnd - esbuildStart) / 1000;
+    console.log(
+      `🛠️ esbuild bundling completed in ${esbuildElapsed.toFixed(2)}s`,
+    );
 
-      const nodeStart = performance.now();
-      // Execute Node.js (timing only the Node.js phase)
-      const nodeResult = await nodeRun(
-        esbuildResult,
-        config.nodeInspectBrk,
-        nodeEnv,
-      );
-      if (!nodeResult.success) {
-        if (nodeResult.exitCode === EXIT_CODE_NO_MATCH) {
+    const nodeStart = performance.now();
+    // Execute Node.js (timing only the Node.js phase)
+    const nodeResult = await nodeRun(
+      esbuildResult,
+      config.nodeInspectBrk,
+      nodeEnv,
+    );
+    if (!nodeResult.success) {
+      if (nodeResult.exitCode === EXIT_CODE_NO_MATCH) {
+        if (shouldAllowRuntimeNoMatch) {
+          console.log(
+            '=== ⚡️ Node.js: no matching tests in this runtime, skipping ===',
+          );
+          recordRuntimeOutcome(runtimeOutcomes, 'node', 'no-match');
+        } else {
           throw new NoMatchError(config.suite, config.test);
         }
+      } else {
         throw new Error(
           `Node.js execution failed with exit code ${nodeResult.exitCode}`,
         );
       }
+    } else {
       const nodeEnd = performance.now();
       nodeElapsed = (nodeEnd - nodeStart) / 1000;
       recordRuntimeOutcome(runtimeOutcomes, 'node', 'matched');
+      console.log('=== ⚡️ Node.js: all passed ===');
     }
   }
 
