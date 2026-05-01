@@ -7,9 +7,8 @@ import {
   getClientBuildPlugins,
   getEsbuild,
   isReBuildContext,
-  kAssetLoaders,
-  kAssetNamesPattern,
   type ReBuildContext,
+  sharedClientBuildOptions,
   stopBackgroundCompiler,
 } from '../build.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
@@ -149,25 +148,8 @@ export async function buildAssets(
         targetRuntime,
         options?.esbuildPlugins ?? [],
       ),
-      bundle: true,
-      write: false,
-      sourcemap: 'linked',
-      outdir: 'output',
-      define: {
-        '__BUNDLE_TARGET__': '"browser"',
-        // Prevent CLI entry-point code (if (import.meta.main) {...}) from
-        // being bundled into the browser client bundle.
-        'import.meta.main': 'false',
-      },
-      logOverride: {
-        'empty-import-meta': 'silent',
-      },
+      ...sharedClientBuildOptions(),
       minify: appConfig.minify,
-      jsx: 'automatic',
-      loader: kAssetLoaders,
-      assetNames: kAssetNamesPattern,
-      // Client code is always for browser
-      platform: 'browser',
     };
 
     buildOutput = bundleResultFromBuildResult(

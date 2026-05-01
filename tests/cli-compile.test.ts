@@ -104,10 +104,10 @@ const kPlaceholderAppConfig = {
   jsPath: '/dev/null',
 };
 
-export const NODE_ONLY_FILTER_TEST =
-  'createBuildContext fails clearly on Node.js';
-export const DENO_ONLY_FILTER_TEST =
-  'buildAssets with runtime: deno bundles CSS into /index.css';
+import {
+  DENO_ONLY_FILTER_TEST,
+  NODE_ONLY_FILTER_TEST,
+} from './test-filter-constants.ts';
 
 export default function setupCliCompileTests() {
   if (getRuntime().id === 'node') {
@@ -420,8 +420,8 @@ export {};
             'CSS must contain a url() pointing to the emitted font asset',
           );
           assertTrue(
-            /^\/assets\/.*\.woff2$/.test(fontAssetKey),
-            'woff2 asset must be emitted under /assets/',
+            /^\/assets\/goat-font-[A-Z0-9]+\.woff2$/i.test(fontAssetKey),
+            'woff2 asset must preserve esbuild asset naming under /assets/',
           );
           assertEquals(fontAsset.contentType, 'font/woff2');
           assertEquals(new TextDecoder().decode(fontAsset.data), fontText);
@@ -497,6 +497,77 @@ export {};
           assertTrue(
             cssText.includes('sourceMappingURL=/index.css.map'),
             '/index.css must reference /index.css.map',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets preserves nested secondary entry output paths',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-nested-entry-css');
+
+        await writeTextFile(
+          path.join(dir, 'app.ts'),
+          'export {};\n',
+        );
+        await writeTextFile(
+          path.join(dir, 'panel.css'),
+          ':root { --nested-panel-css: 1; }',
+        );
+        await writeTextFile(
+          path.join(dir, 'panel.ts'),
+          "import './panel.css';\nexport {};\n",
+        );
+
+        const entryPoints = [
+          { in: path.join(dir, 'app.ts'), out: APP_ENTRY_POINT },
+          { in: path.join(dir, 'panel.ts'), out: 'nested/admin/panel' },
+        ];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            { buildDir: dir, jsPath: path.join(dir, 'app.ts') },
+            { runtime: 'node', keepEsbuildAlive: false },
+          );
+
+          assertExists(
+            assets['/nested/admin/panel.js'],
+            'nested secondary entry JS must preserve its output path',
+          );
+          assertExists(
+            assets['/nested/admin/panel.js.map'],
+            'nested secondary entry JS map must preserve its output path',
+          );
+          assertExists(
+            assets['/nested/admin/panel.css'],
+            'nested secondary entry CSS must preserve its output path',
+          );
+          assertExists(
+            assets['/nested/admin/panel.css.map'],
+            'nested secondary entry CSS map must preserve its output path',
+          );
+          assertTrue(
+            assets['/panel.js'] === undefined,
+            'nested secondary entry JS must not collapse to basename',
+          );
+          assertTrue(
+            assets['/panel.css'] === undefined,
+            'nested secondary entry CSS must not collapse to basename',
+          );
+
+          const css = new TextDecoder().decode(
+            assets['/nested/admin/panel.css'].data,
+          );
+          assertTrue(
+            css.includes('sourceMappingURL=/nested/admin/panel.css.map'),
+            'nested secondary entry CSS must reference its nested source map path',
           );
         } finally {
           await stopBackgroundCompiler();

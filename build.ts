@@ -77,6 +77,18 @@ export const kAssetLoaders = {
 
 export const kAssetNamesPattern = 'assets/[name]-[hash]';
 
+const textDecoder = new TextDecoder();
+
+function outputPathForFile(filePath: string): string {
+  const outputMatch = filePath.match(/(?:^|[/\\])output[/\\](.+)$/);
+  return (outputMatch?.[1] ?? path.basename(filePath)).replaceAll('\\', '/');
+}
+
+function bundleKeyForFile(filePath: string): string {
+  return outputPathForFile(filePath)
+    .replace(/\.(js\.map|css\.map|js|css)$/, '');
+}
+
 export function bundleResultFromBuildResult(
   buildResult: {
     outputFiles?: { path: string; text: string; contents: Uint8Array }[];
@@ -96,18 +108,12 @@ export function bundleResultFromBuildResult(
       !file.path.endsWith('.css') &&
       !file.path.endsWith('.css.map')
     ) {
-      // Fallback: use the filename if the path doesn't contain an 'output/' segment.
-      const outputMatch = file.path.match(/(?:^|[/\\])output[/\\](.+)$/);
-      const assetPath = `/${
-        (outputMatch?.[1] ?? path.basename(file.path))
-          .replaceAll('\\', '/')
-      }`;
+      const assetPath = `/${outputPathForFile(file.path)}`;
       assets[assetPath] = file.contents;
       continue;
     }
 
-    const entryPoint = path.basename(file.path)
-      .replace(/\.(js\.map|css\.map|js|css)$/, '') as string;
+    const entryPoint = bundleKeyForFile(file.path) as string;
     let bundleResult: BundleResult | undefined = bundles[entryPoint];
     if (!bundleResult) {
       bundleResult = {} as BundleResult;
@@ -188,7 +194,7 @@ export const cssLoaderPlugin: Plugin = {
     build.onLoad(
       { filter: /\.css$/, namespace: 'file' },
       async (args) => ({
-        contents: new TextDecoder().decode(await readFile(args.path)),
+        contents: textDecoder.decode(await readFile(args.path)),
         loader: args.path.endsWith('.module.css') ? 'local-css' : 'css',
         resolveDir: path.dirname(args.path),
         watchFiles: [args.path],
@@ -306,6 +312,24 @@ export async function getClientBuildPlugins(
   return plugins;
 }
 
+export function sharedClientBuildOptions() {
+  return {
+    bundle: true,
+    write: false,
+    sourcemap: 'linked' as const,
+    outdir: 'output',
+    jsx: 'automatic' as const,
+    platform: 'browser' as const,
+    loader: kAssetLoaders,
+    assetNames: kAssetNamesPattern,
+    define: {
+      '__BUNDLE_TARGET__': '"browser"',
+      'import.meta.main': 'false',
+    },
+    logOverride: { 'empty-import-meta': 'silent' as const },
+  };
+}
+
 /**
  * Creates an esbuild incremental context for the debug server (development,
  * hot-reload). Deno-only — uses `@luca/esbuild-deno-loader` which is not
@@ -328,21 +352,7 @@ export async function createBuildContext(
     entryPoints,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     plugins: await getClientBuildPlugins('deno', extraPlugins) as any,
-    bundle: true,
-    write: false,
-    sourcemap: 'linked',
-    outdir: 'output',
-    jsx: 'automatic',
-    platform: 'browser',
-    loader: kAssetLoaders,
-    assetNames: kAssetNamesPattern,
-    define: {
-      '__BUNDLE_TARGET__': '"browser"',
-      'import.meta.main': 'false',
-    },
-    logOverride: {
-      'empty-import-meta': 'silent',
-    },
+    ...sharedClientBuildOptions(),
   });
   return {
     rebuild: async () => bundleResultFromBuildResult(await ctx.rebuild()),
