@@ -1,8 +1,10 @@
-import { EXIT_CODE_NO_MATCH, NoMatchError, TEST, TestsRunner } from './mod.ts';
+import { EXIT_CODE_NO_MATCH, NoMatchError } from '../base/test-runner-error.ts';
+import { TEST, TestsRunner } from './mod.ts';
 import {
+  BROWSER_FAILURE_FILTER_TEST,
   DENO_ONLY_FILTER_TEST,
   NODE_ONLY_FILTER_TEST,
-} from './cli-compile.test.ts';
+} from './test-filter-constants.ts';
 import {
   assertEquals,
   assertLessThan,
@@ -215,7 +217,7 @@ export default function setupTestRunnerTests(): void {
           duration: 0,
           results: [],
           error: {
-            name: 'Error',
+            name: 'NoMatchError',
             message: 'No tests matched --test="missing"',
           },
           completed: true,
@@ -499,6 +501,34 @@ export default function setupTestRunnerTests(): void {
 
   TEST(
     'TestRunner',
+    'tests/run.ts browser failures exit non-zero',
+    async () => {
+      if (typeof Deno === 'undefined') return;
+      const { code, stderrText, elapsedMs } = await runDenoCommandWithTimeout([
+        'run',
+        '-A',
+        './tests/run.ts',
+        '--runtime=browser',
+        `--test=${BROWSER_FAILURE_FILTER_TEST}`,
+      ]);
+
+      assertEquals(code, 1, stderrText);
+      assertTrue(
+        stderrText.includes(
+          'Test execution failed: Browser tests failed: 1 failed',
+        ),
+        'CLI browser failure path must surface failed test count',
+      );
+      assertLessThan(
+        elapsedMs,
+        kPromptFailureThresholdMs,
+        'CLI browser failure path must fail promptly',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
     'finalizeFilteredRuntimeOutcomes is a no-op without filters',
     () => {
       const outcomes: RuntimeFilterOutcome[] = [{
@@ -559,7 +589,7 @@ export default function setupTestRunnerTests(): void {
           duration: 0,
           results: [],
           error: {
-            name: 'Error',
+            name: 'NoMatchError',
             message: 'No tests matched --test="missing"',
           },
           completed: true,

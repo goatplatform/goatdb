@@ -13,12 +13,8 @@
 
 import { isBrowser } from '../base/common.ts';
 import type { BrowserStructuredNoMatchResult } from '../base/runtime-filter.ts';
-import {
-  EXIT_CODE_NO_MATCH,
-  NoMatchError,
-  TestsRunner,
-  type TestSummary,
-} from './mod.ts';
+import { EXIT_CODE_NO_MATCH, NoMatchError } from '../base/test-runner-error.ts';
+import { TestsRunner, type TestSummary } from './mod.ts';
 import { signalBrowserTestCompletion } from '../base/process.ts';
 import {
   type LogEntry,
@@ -45,6 +41,7 @@ import setupHealthCheckEndpoint from './health-check-endpoint.test.ts';
 import setupLiveQuery from './live-query.test.ts';
 import setupRuntimeTests from './runtime.test.ts';
 import { getEnvVar } from '../base/os.ts';
+import setupBrowserFailureFixture from './browser-failure-fixture.ts';
 
 /**
  * Custom log stream for browser tests that filters out METRIC logs
@@ -92,6 +89,8 @@ export function registerBrowserTests(): void {
   setupLiveQuery(); // Live query membership updates on ManagedItem edits
   setupTrusted(); // Database operations in trusted mode - CRITICAL for browser
   setupStaticAssetsEndpoint(); // File serving and asset management
+
+  setupBrowserFailureFixture();
 }
 
 /**
