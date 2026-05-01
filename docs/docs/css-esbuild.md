@@ -89,7 +89,7 @@ Use `esbuildPlugins` when the client bundle needs custom resolution or loading.
 Plugins run before GoatDB's fallback CSS loader, so they can rewrite CSS imports
 or resolve package CSS.
 
-**Deno** — use `import.meta.resolve()` to convert a package specifier to a file path:
+**Deno** — return a filesystem path for `file` namespace resolutions:
 
 ```typescript
 import { fromFileUrl } from '@std/path';
@@ -100,13 +100,16 @@ const normalizeCssPlugin: BuildPluginLike = {
   setup(build) {
     build.onResolve({ filter: /^normalize\.css$/ }, () => ({
       path: fromFileUrl(
-        import.meta.resolve('npm:normalize.css/normalize.css'),
+        new URL('./vendor/normalize.css', import.meta.url),
       ),
       namespace: 'file',
     }));
   },
 };
 ```
+
+Do not pass `npm:` URLs to `fromFileUrl()`. If a Deno plugin resolves into the
+`file` namespace, it must return a real file path.
 
 **Node.js ESM** — use `createRequire` to resolve package CSS to a filesystem path:
 

@@ -4,8 +4,8 @@
  * environment via Playwright automation.
  */
 
-import { isBrowser } from '../base/common.ts';
 import { BenchmarkRunner } from './mod.ts';
+import { isBrowser } from '../base/common.ts';
 import { getEnvVar } from '../base/os.ts';
 import { signalBrowserTestCompletion } from '../base/process.ts';
 import { notReached } from '../base/error.ts';
