@@ -4,7 +4,11 @@ import {
   isBrowserStructuredNoMatchResult,
   type RuntimeFilterOutcome,
 } from './runtime-filter.ts';
-import { EXIT_CODE_NO_MATCH, NoMatchError } from './error.ts';
+import {
+  EXIT_CODE_NO_MATCH,
+  NO_MATCH_MESSAGE_PREFIX,
+  NoMatchError,
+} from './test-runner-error.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
 import { TestsRunner, type TestSummary } from '../tests/mod.ts';
 
@@ -235,14 +239,6 @@ async function runDenoWithWorker(
   });
 }
 
-function recordRuntimeOutcome(
-  outcomes: RuntimeFilterOutcome[],
-  runtime: RuntimeFilterOutcome['runtime'],
-  status: RuntimeFilterOutcome['status'],
-): void {
-  outcomes.push({ runtime, status });
-}
-
 /**
  * Configuration options for running code across multiple JavaScript runtimes.
  *
@@ -332,12 +328,13 @@ export async function runAcrossPlatforms(
         const result = await runDenoWithWorker(config.suite, config.test);
         denoElapsed = result.elapsed;
         TestsRunner.printSummary(result.summary);
-        recordRuntimeOutcome(runtimeOutcomes, 'deno', 'matched');
+        runtimeOutcomes.push({ runtime: 'deno', status: 'matched' });
 
         if (result.summary.failed > 0) {
           console.log(
             `=== 🦖 Deno: ${result.summary.failed} failed ===`,
           );
+          throw new Error(`Deno tests failed: ${result.summary.failed} failed`);
         } else {
           console.log(`=== 🦖 Deno: all passed ===`);
         }
@@ -346,7 +343,7 @@ export async function runAcrossPlatforms(
           console.log(
             '=== 🦖 Deno: no matching tests in this runtime, skipping ===',
           );
-          recordRuntimeOutcome(runtimeOutcomes, 'deno', 'no-match');
+          runtimeOutcomes.push({ runtime: 'deno', status: 'no-match' });
         } else {
           console.error('=== 🦖 Deno Worker execution failed ===');
           console.error('Error:', (error as Error).message);
@@ -390,7 +387,7 @@ export async function runAcrossPlatforms(
             console.log(
               '=== 🦖 Deno: no matching tests in this runtime, skipping ===',
             );
-            recordRuntimeOutcome(runtimeOutcomes, 'deno', 'no-match');
+            runtimeOutcomes.push({ runtime: 'deno', status: 'no-match' });
           } else {
             throw new NoMatchError(config.suite, config.test);
           }
@@ -402,7 +399,7 @@ export async function runAcrossPlatforms(
       } else {
         const denoEnd = performance.now();
         denoElapsed = (denoEnd - denoStart) / 1000;
-        recordRuntimeOutcome(runtimeOutcomes, 'deno', 'matched');
+        runtimeOutcomes.push({ runtime: 'deno', status: 'matched' });
       }
     }
   }
@@ -445,12 +442,15 @@ export async function runAcrossPlatforms(
       nodeEnv,
     );
     if (!nodeResult.success) {
-      if (nodeResult.exitCode === EXIT_CODE_NO_MATCH) {
+      if (
+        nodeResult.exitCode === EXIT_CODE_NO_MATCH &&
+        nodeResult.stderrText.includes(NO_MATCH_MESSAGE_PREFIX)
+      ) {
         if (shouldAllowRuntimeNoMatch) {
           console.log(
             '=== ⚡️ Node.js: no matching tests in this runtime, skipping ===',
           );
-          recordRuntimeOutcome(runtimeOutcomes, 'node', 'no-match');
+          runtimeOutcomes.push({ runtime: 'node', status: 'no-match' });
         } else {
           throw new NoMatchError(config.suite, config.test);
         }
@@ -462,7 +462,7 @@ export async function runAcrossPlatforms(
     } else {
       const nodeEnd = performance.now();
       nodeElapsed = (nodeEnd - nodeStart) / 1000;
-      recordRuntimeOutcome(runtimeOutcomes, 'node', 'matched');
+      runtimeOutcomes.push({ runtime: 'node', status: 'matched' });
       console.log('=== ⚡️ Node.js: all passed ===');
     }
   }
@@ -471,6 +471,7 @@ export async function runAcrossPlatforms(
   if (runBrowser) {
     console.log('=== 🌐 Running in Browser... ===');
 
+    let browserTestFailure: Error | undefined;
     try {
       const { runBrowserTests } = await import('./browser-runner.ts');
       const browserStart = performance.now();
@@ -490,9 +491,9 @@ export async function runAcrossPlatforms(
         console.log(
           '=== 🌐 Browser: no matching tests in this runtime, skipping ===',
         );
-        recordRuntimeOutcome(runtimeOutcomes, 'browser', 'no-match');
+        runtimeOutcomes.push({ runtime: 'browser', status: 'no-match' });
       } else {
-        recordRuntimeOutcome(runtimeOutcomes, 'browser', 'matched');
+        runtimeOutcomes.push({ runtime: 'browser', status: 'matched' });
       }
 
       if (config.onBrowserResult) await config.onBrowserResult(summary);
@@ -512,6 +513,9 @@ export async function runAcrossPlatforms(
         console.log(
           `=== 🌐 Browser: ${passed} passed, ${failed} failed ===`,
         );
+        browserTestFailure = new Error(
+          `Browser tests failed: ${failed} failed`,
+        );
       } else {
         console.log(
           `=== 🌐 Browser: ${passed} passed ===`,
@@ -522,6 +526,7 @@ export async function runAcrossPlatforms(
       console.error('Error:', (error as Error).message);
       throw error;
     }
+    if (browserTestFailure) throw browserTestFailure;
   }
 
   finalizeFilteredRuntimeOutcomes(

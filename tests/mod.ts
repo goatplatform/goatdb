@@ -26,13 +26,9 @@ import type { Schema } from '../cfds/base/schema.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
 import { Emitter } from '../base/emitter.ts';
-import {
-  EXIT_CODE_NO_MATCH,
-  formatNoMatchingTestsMessage,
-  NoMatchError,
-} from '../base/error.ts';
+import { EXIT_CODE_NO_MATCH, NoMatchError } from '../base/test-runner-error.ts';
 
-export { EXIT_CODE_NO_MATCH, formatNoMatchingTestsMessage, NoMatchError };
+export { EXIT_CODE_NO_MATCH, NoMatchError };
 
 /**
  * A test function that takes a TestSuite context and returns either void or a

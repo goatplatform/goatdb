@@ -30,37 +30,3 @@ export function assert(condition: boolean, msg?: string): asserts condition {
     throw error;
   }
 }
-
-/**
- * Formats a human-readable message for when no tests match the provided filters.
- */
-export function formatNoMatchingTestsMessage(
-  suiteName?: string,
-  testName?: string,
-): string {
-  const filters: string[] = [];
-  if (suiteName) {
-    filters.push(`--suite=${JSON.stringify(suiteName)}`);
-  }
-  if (testName) {
-    filters.push(`--test=${JSON.stringify(testName)}`);
-  }
-  if (filters.length === 0) {
-    notReached('NoMatchError requires at least one filter');
-  }
-  return `No tests matched ${filters.join(' ')}`;
-}
-
-/** Exit code used when no tests match the provided --suite/--test filters. */
-export const EXIT_CODE_NO_MATCH = 2;
-
-/**
- * Thrown when no tests match the provided --suite/--test filters.
- * Uses instanceof checks instead of string matching for reliable error handling.
- */
-export class NoMatchError extends Error {
-  constructor(suiteName?: string, testName?: string) {
-    super(formatNoMatchingTestsMessage(suiteName, testName));
-    this.name = 'NoMatchError';
-  }
-}

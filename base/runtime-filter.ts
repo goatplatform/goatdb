@@ -1,14 +1,13 @@
-import { EXIT_CODE_NO_MATCH, NoMatchError } from './error.ts';
-
-export type RuntimeName = 'deno' | 'node' | 'browser';
+import { EXIT_CODE_NO_MATCH, NoMatchError } from './test-runner-error.ts';
+import type { RuntimeId } from './runtime/index.ts';
 
 export interface RuntimeMatchedOutcome {
-  runtime: RuntimeName;
+  runtime: RuntimeId;
   status: 'matched';
 }
 
 export interface RuntimeNoMatchOutcome {
-  runtime: RuntimeName;
+  runtime: RuntimeId;
   status: 'no-match';
 }
 
@@ -49,7 +48,7 @@ export function isBrowserStructuredNoMatchResult(
     Array.isArray(result.results) &&
     typeof error === 'object' &&
     error !== null &&
-    typeof error.name === 'string' &&
+    error.name === 'NoMatchError' &&
     typeof error.message === 'string' &&
     (error.stack === undefined || typeof error.stack === 'string') &&
     result.completed === true &&

@@ -1,5 +1,5 @@
 import { runAcrossPlatforms } from '../base/multi-runner.ts';
-import { EXIT_CODE_NO_MATCH, NoMatchError } from './mod.ts';
+import { EXIT_CODE_NO_MATCH, NoMatchError } from '../base/test-runner-error.ts';
 import { sourceMapDecoder } from './browser/sourcemap-decoder.ts';
 
 /**
