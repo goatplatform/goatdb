@@ -30,3 +30,6 @@ benchmarks/results/
 
 # OpenCode
 opencode.json
+
+# Playwright browser cache (written by CI via PLAYWRIGHT_BROWSERS_PATH)
+.playwright/

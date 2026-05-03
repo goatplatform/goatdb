@@ -56,6 +56,8 @@ jobs:
   test-browser:
     name: Browser Tests
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright
     steps:
       - uses: actions/checkout@v4
 
@@ -72,13 +74,19 @@ jobs:
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ hashFiles('deno.json') }}
+          path: ${{ github.workspace }}/.playwright
+          key: playwright-${{ runner.os }}-1.48.0-${{ hashFiles('deno.json') }}
           restore-keys: |
-            playwright-
+            playwright-${{ runner.os }}-1.48.0-
 
       - name: Install Playwright browsers and system dependencies
         run: deno run -A npm:playwright@^1.48.0 install --with-deps chromium
+
+      - name: Run TestRunner browser CLI coverage
+        run: deno task test --runtime=deno --suite=TestRunner
+        env:
+          CI: true
+          GOATDB_REQUIRE_PLAYWRIGHT: 'true'
 
       - name: Run browser tests
         run: deno task test --runtime=browser
