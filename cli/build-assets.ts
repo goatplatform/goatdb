@@ -13,11 +13,11 @@ import {
 } from '../build.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import type { AppConfig } from './app-config.ts';
-import type {
-  Asset,
-  ContentType,
-  StaticAssets,
+import {
+  type Asset,
+  type StaticAssets,
 } from '../system-assets/system-assets.ts';
+import { ContentTypeMapping, type ContentType } from '../system-assets/content-type.ts';
 import { pathExists, readFile, walkDir } from '../base/json-log/file-impl.ts';
 
 const textDecoder = new TextDecoder();
@@ -281,24 +281,6 @@ export async function buildAssets(
   }
   return result;
 }
-
-const ContentTypeMapping: Record<string, ContentType> = {
-  svg: 'image/svg+xml',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  json: 'application/json',
-  js: 'text/javascript',
-  ts: 'text/javascript',
-  html: 'text/html',
-  css: 'text/css',
-  wasm: 'application/wasm',
-  woff: 'font/woff',
-  woff2: 'font/woff2',
-  ttf: 'font/ttf',
-  gif: 'image/gif',
-  webp: 'image/webp',
-};
 
 function contentTypeForPath(filePath: string): ContentType {
   const ext = path.extname(filePath).substring(1).toLowerCase();

@@ -1,26 +1,12 @@
 import { encodeBase64 } from '@std/encoding/base64';
 import { decodeBase64 } from '../base/buffer.ts';
 import type { JSONObject, ReadonlyJSONObject } from '../base/interfaces.ts';
+import { type ContentType } from './content-type.ts';
 import kEncodedSystemAssets from './assets.json' with {
   type: 'json',
 };
 
-/** @group Static Assets */
-export type ContentType =
-  | 'image/svg+xml'
-  | 'image/png'
-  | 'image/jpeg'
-  | 'application/json'
-  | 'text/javascript'
-  | 'text/html'
-  | 'text/css'
-  | 'application/wasm'
-  | 'application/octet-stream'
-  | 'font/woff'
-  | 'font/woff2'
-  | 'font/ttf'
-  | 'image/gif'
-  | 'image/webp';
+export type { ContentType } from './content-type.ts';
 
 /** @group Static Assets */
 export interface Asset {
