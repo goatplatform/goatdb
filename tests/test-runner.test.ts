@@ -12,6 +12,7 @@ import {
   assertTrue,
 } from './asserts.ts';
 import { getRuntime } from '../base/runtime/index.ts';
+import { log } from '../logging/log.ts';
 import {
   finalizeFilteredRuntimeOutcomes,
   isBrowserStructuredNoMatchResult,
@@ -19,6 +20,48 @@ import {
 } from '../base/runtime-filter.ts';
 
 const kPromptFailureThresholdMs = 15000;
+let _hasPlaywrightChromium: Promise<boolean> | undefined;
+let _didWarnMissingPlaywrightChromium = false;
+
+function hasPlaywrightChromium(): Promise<boolean> {
+  if (typeof Deno === 'undefined') return Promise.resolve(false);
+  _hasPlaywrightChromium ??= (async () => {
+    try {
+      // Variable prevents esbuild from statically resolving this import
+      // when bundling for Node.js (guard above ensures it never runs there).
+      const pkg = 'npm:playwright@^1.48.0';
+      const { chromium } = await import(pkg);
+      await Deno.stat(chromium.executablePath());
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  return _hasPlaywrightChromium;
+}
+
+async function shouldRunBrowserCliCoverage(): Promise<boolean> {
+  const hasChromium = await hasPlaywrightChromium();
+  if (!hasChromium) {
+    const requirePlaywright = typeof Deno !== 'undefined' &&
+      Deno.env.get('GOATDB_REQUIRE_PLAYWRIGHT') === 'true';
+    if (requirePlaywright) {
+      throw new Error(
+        'CI requires Playwright Chromium for browser CLI coverage tests',
+      );
+    }
+    if (!_didWarnMissingPlaywrightChromium) {
+      log({
+        severity: 'WARNING',
+        error: 'MissingConfiguration',
+        message:
+          'Playwright Chromium not found; browser CLI coverage tests skipped',
+      });
+      _didWarnMissingPlaywrightChromium = true;
+    }
+  }
+  return hasChromium;
+}
 
 async function runDenoCommandWithTimeout(args: string[]): Promise<{
   code: number;
@@ -76,6 +119,39 @@ export default function setupTestRunnerTests(): void {
       assertEquals(summary.passed, 2);
       assertEquals(summary.failed, 0);
       assertEquals(executed, ['Alpha/target', 'Beta/target']);
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'promise caching prevents duplicate concurrent registration',
+    async () => {
+      if (typeof Deno === 'undefined') return;
+      const code = `
+        import {
+          countMatchingTests,
+          getRegistrationCallCount,
+          registerAllTests,
+        } from './tests/test-registry.ts';
+
+        const [, lateSuiteCount] = await Promise.all([
+          registerAllTests(),
+          countMatchingTests('cluster-latency'),
+        ]);
+        if (lateSuiteCount === 0) {
+          throw new Error('late suite was not visible after concurrent registration');
+        }
+        if (getRegistrationCallCount() !== 1) {
+          throw new Error('registerAllTestsImpl ran more than once');
+        }
+      `;
+      const { code: exitCode, stderrText } = await runDenoCommandWithTimeout([
+        'eval',
+        '--ext=ts',
+        code,
+      ]);
+
+      assertEquals(exitCode, 0, stderrText);
     },
   );
 
@@ -200,6 +276,31 @@ export default function setupTestRunnerTests(): void {
       assertTrue(
         stdoutText.includes('=== ⚡️ Node.js: all passed ==='),
         'aggregate run must report Node.js success when the filtered test passes',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'tests/run.ts aggregate filters tolerate browser runtime no-match when Deno matched',
+    async () => {
+      if (!await shouldRunBrowserCliCoverage()) return;
+      const { code, stdoutText, stderrText } = await runDenoCommandWithTimeout([
+        'run',
+        '-A',
+        './tests/run.ts',
+        '--runtime=deno,browser',
+        `--test=${DENO_ONLY_FILTER_TEST}`,
+      ]);
+
+      assertEquals(code, 0, stderrText);
+      assertTrue(
+        stdoutText.includes('=== 🦖 Deno: all passed ==='),
+        'aggregate run must execute the Deno runtime that owns the filtered test',
+      );
+      assertTrue(
+        stdoutText.includes('Browser: no matching tests in this runtime'),
+        'aggregate run must tolerate Browser no-match for a Deno-only test',
       );
     },
   );
@@ -429,7 +530,7 @@ export default function setupTestRunnerTests(): void {
     'TestRunner',
     'tests/run.ts surfaces no-match errors through the browser path',
     async () => {
-      if (typeof Deno === 'undefined') return;
+      if (!await shouldRunBrowserCliCoverage()) return;
       const { code, stderrText, elapsedMs } = await runDenoCommandWithTimeout([
         'run',
         '-A',
@@ -503,7 +604,7 @@ export default function setupTestRunnerTests(): void {
     'TestRunner',
     'tests/run.ts browser failures exit non-zero',
     async () => {
-      if (typeof Deno === 'undefined') return;
+      if (!await shouldRunBrowserCliCoverage()) return;
       const { code, stderrText, elapsedMs } = await runDenoCommandWithTimeout([
         'run',
         '-A',
@@ -565,7 +666,7 @@ export default function setupTestRunnerTests(): void {
           duration: 0,
           results: [],
           error: {
-            name: 'Error',
+            name: 'NoMatchError',
             message: 'No tests matched',
           },
           completed: true,
@@ -612,7 +713,7 @@ export default function setupTestRunnerTests(): void {
         duration: 0,
         results: [],
         error: {
-          name: 'Error',
+          name: 'NoMatchError',
           message: 'No tests matched --test="missing"',
         },
         completed: true,

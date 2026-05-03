@@ -58,6 +58,9 @@ import setupLiveQuery from './live-query.test.ts';
 import setupWriteFailure from './write-failure.test.ts';
 import { TestsRunner } from './mod.ts';
 
+let _registrationPromise: Promise<void> | undefined;
+let _registrationCallCount = 0;
+
 /**
  * Registers all test suites with the default TestsRunner.
  *
@@ -68,7 +71,17 @@ import { TestsRunner } from './mod.ts';
  * 4. SYNC INTEGRATION TESTS (1-2s) - Network operations
  * 5. HEAVY E2E TESTS (10-30s) - Full system tests
  */
-export async function registerAllTests(): Promise<void> {
+export function registerAllTests(): Promise<void> {
+  // Cache the promise permanently so concurrent callers share one run.
+  // A rejection permanently poisons the cache — registration failures are
+  // fatal programming errors that retrying cannot recover from.
+  _registrationPromise ??= registerAllTestsImpl();
+  return _registrationPromise;
+}
+
+async function registerAllTestsImpl(): Promise<void> {
+  _registrationCallCount++;
+
   // FAST UNIT TESTS (0-1ms each) - Pure logic, no I/O
   setupAssertsTests(); // Assertion utility correctness
   setupOrderstamp(); // Utility functions for distributed timestamps
@@ -126,17 +139,18 @@ export async function registerAllTests(): Promise<void> {
   setupClusterLatency(); // Multi-server cluster sync performance
 }
 
+export function getRegistrationCallCount(): number {
+  return _registrationCallCount;
+}
+
+/**
+ * Note: calls registerAllTests(), which populates TestsRunner.default as a
+ * side-effect. Safe for concurrent callers due to promise caching.
+ */
 export async function countMatchingTests(
   suite?: string,
   test?: string,
 ): Promise<number> {
-  const previousDefault = TestsRunner.default;
-  const countingRunner = new TestsRunner();
-  TestsRunner.default = countingRunner;
-  try {
-    await registerAllTests();
-    return countingRunner.getTestCount(suite, test).testCount;
-  } finally {
-    TestsRunner.default = previousDefault;
-  }
+  await registerAllTests();
+  return TestsRunner.default.getTestCount(suite, test).testCount;
 }

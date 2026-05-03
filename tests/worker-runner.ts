@@ -9,11 +9,12 @@
  *   Main → Worker:
  *     { type: 'run', payload: { suiteName?: string, testName?: string } }
  *
- *   Worker → Main:
- *     { type: 'ready', payload: { suiteCount, testCount } }
- *     { type: 'testStart', payload: { suiteName, testName, current, total } }
- *     { type: 'testComplete', payload: { suiteName, testName, passed, duration, error? } }
- *     { type: 'done', payload: { exitCode, summary } }
+ *   Worker → Main (mutually exclusive paths):
+ *     No-match path: { type: 'no-match', payload: { suiteName?, testName? } }
+ *     Run path:      { type: 'ready', payload: { suiteCount, testCount } }
+ *                    { type: 'testStart', payload: { suiteName, testName, current, total } }* (zero or more)
+ *                    { type: 'testComplete', payload: { suiteName, testName, passed, duration, error? } }* (zero or more)
+ *                    { type: 'done', payload: { exitCode, summary } }
  */
 
 import { type TestResult, TestsRunner, type TestSummary } from './mod.ts';
@@ -63,6 +64,14 @@ interface TestCompleteMessage {
   };
 }
 
+interface NoMatchMessage {
+  type: 'no-match';
+  payload: {
+    suiteName?: string;
+    testName?: string;
+  };
+}
+
 interface DoneMessage {
   type: 'done';
   payload: {
@@ -73,6 +82,7 @@ interface DoneMessage {
 
 type OutgoingMessage =
   | ReadyMessage
+  | NoMatchMessage
   | TestStartMessage
   | TestCompleteMessage
   | DoneMessage;
@@ -91,24 +101,6 @@ function serializeError(
 }
 
 /**
- * Registers all test suites with the default TestsRunner.
- * Delegates to central test-registry.ts for consistency.
- */
-async function setupAllTests(): Promise<void> {
-  await registerAllTests();
-}
-
-/**
- * Counts tests matching the filter.
- */
-function countTests(suiteName?: string, testName?: string): {
-  suiteCount: number;
-  testCount: number;
-} {
-  return TestsRunner.default.getTestCount(suiteName, testName);
-}
-
-/**
  * Runs tests and sends progress via postMessage.
  */
 async function runTests(
@@ -119,7 +111,7 @@ async function runTests(
   const allResults: TestResult[] = [];
   const runStart = performance.now();
 
-  const { testCount } = countTests(suiteName, testName);
+  const { testCount } = TestsRunner.default.getTestCount(suiteName, testName);
   let currentTest = 0;
 
   const suites = runner.getSuites();
@@ -209,13 +201,26 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
   const { type, payload } = event.data;
 
   if (type === 'run') {
-    // Setup all tests first
-    await setupAllTests();
+    await registerAllTests();
 
-    const { suiteCount, testCount } = countTests(
+    const { suiteCount, testCount } = TestsRunner.default.getTestCount(
       payload.suiteName,
       payload.testName,
     );
+
+    // No tests match the filter — notify main thread and stop before posting
+    // ready. This avoids creating a transient progress root that would get
+    // immediately torn down by the no-match handler.
+    if (testCount === 0 && (payload.suiteName || payload.testName)) {
+      self.postMessage({
+        type: 'no-match',
+        payload: {
+          suiteName: payload.suiteName,
+          testName: payload.testName,
+        },
+      } satisfies NoMatchMessage);
+      return;
+    }
 
     // Notify main thread: ready with counts
     self.postMessage(
@@ -224,11 +229,6 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         payload: { suiteCount, testCount },
       } satisfies ReadyMessage,
     );
-
-    // No tests match the filter — main thread will reject; nothing to run.
-    if (testCount === 0 && (payload.suiteName || payload.testName)) {
-      return;
-    }
 
     // Run the tests
     const summary = await runTests(payload.suiteName, payload.testName);

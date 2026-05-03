@@ -20,6 +20,11 @@ interface WorkerReadyMessage {
   payload: { suiteCount: number; testCount: number };
 }
 
+interface WorkerNoMatchMessage {
+  type: 'no-match';
+  payload: { suiteName?: string; testName?: string };
+}
+
 interface WorkerTestStartMessage {
   type: 'testStart';
   payload: {
@@ -48,6 +53,7 @@ interface WorkerDoneMessage {
 
 type WorkerOutgoingMessage =
   | WorkerReadyMessage
+  | WorkerNoMatchMessage
   | WorkerTestStartMessage
   | WorkerTestCompleteMessage
   | WorkerDoneMessage;
@@ -113,29 +119,24 @@ async function runDenoWithWorker(
 
       switch (type) {
         case 'ready': {
-          if (payload.testCount === 0 && (suite || test)) {
-            if (timeoutId) {
-              clearTimeout(timeoutId);
-            }
-            if (animationInterval) {
-              clearInterval(animationInterval);
-            }
-            pm.finish();
-            worker.terminate();
-            reject(new NoMatchError(suite, test));
-            break;
-          }
-
           // Worker is ready with test counts
           totalTests = payload.testCount;
-          // suiteCount can be 0 if a filter matches no suites: the worker sends
-          // this message before running (and throwing NoMatchError), so null
-          // (indeterminate) avoids crashing ProgressManager which rejects 0.
+          // suiteCount is expected > 0 at this point (no-match is caught earlier),
+          // but null guards against an empty registry to avoid crashing ProgressManager.
           rootId = pm.create(
             'Running Tests',
             payload.suiteCount > 0 ? payload.suiteCount : null,
           );
           pm.update(rootId, 0);
+          break;
+        }
+
+        case 'no-match': {
+          if (timeoutId) clearTimeout(timeoutId);
+          if (animationInterval) clearInterval(animationInterval);
+          pm.finish();
+          worker.terminate();
+          reject(new NoMatchError(payload.suiteName, payload.testName));
           break;
         }
 
@@ -177,15 +178,10 @@ async function runDenoWithWorker(
 
           // Update root progress
           if (rootId) {
-            const suitesDone = new Set(
-              [...testTaskIds.keys()]
-                .filter((k) => {
-                  const id = testTaskIds.get(k);
-                  return id !== undefined;
-                })
-                .map((k) => k.split('::')[0]),
+            const startedSuites = new Set(
+              [...testTaskIds.keys()].map((k) => k.split('::')[0]),
             );
-            pm.update(rootId, suitesDone.size);
+            pm.update(rootId, startedSuites.size);
           }
           break;
         }
@@ -488,9 +484,7 @@ export async function runAcrossPlatforms(
       browserElapsed = (browserEnd - browserStart) / 1000;
 
       if (config.mode === 'test' && isBrowserStructuredNoMatchResult(summary)) {
-        console.log(
-          '=== 🌐 Browser: no matching tests in this runtime, skipping ===',
-        );
+        console.log('=== 🌐 Browser: no matching tests in this runtime, skipping ===');
         runtimeOutcomes.push({ runtime: 'browser', status: 'no-match' });
       } else {
         runtimeOutcomes.push({ runtime: 'browser', status: 'matched' });
