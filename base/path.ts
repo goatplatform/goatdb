@@ -20,6 +20,10 @@ function normalizeSlashes(p: string): string {
   return p.replace(/\\/g, '/');
 }
 
+function isUncPath(p: string): boolean {
+  return /^\/\/[^/]/.test(p);
+}
+
 /**
  * Normalizes a path by resolving `.` and `..` segments and collapsing
  * multiple slashes.
@@ -186,6 +190,43 @@ export function toAbsolutePath(p: string): string {
 }
 
 /**
+ * Converts an absolute filesystem path to a file:// URL.
+ *
+ * Supports POSIX absolute paths (e.g. /foo/bar) and Windows drive-letter
+ * absolute paths (e.g. C:/foo/bar), plus UNC paths
+ * (e.g. \\server\share\foo or //server/share/foo).
+ *
+ * @param path The absolute path to convert
+ * @returns The file URL
+ * @throws {TypeError} If the path is not absolute or is an invalid UNC path
+ */
+export function toFileUrl(path: string): URL {
+  const normalizedPath = normalizeSlashes(path);
+  if (isUncPath(normalizedPath)) {
+    const uncBody = normalizedPath.slice(2);
+    const firstSlash = uncBody.indexOf('/');
+    if (firstSlash <= 0 || firstSlash === uncBody.length - 1) {
+      throw new TypeError('UNC paths must include host and share');
+    }
+    const host = uncBody.slice(0, firstSlash);
+    const sharePath = uncBody.slice(firstSlash);
+    const url = new URL(`file://${host}/`);
+    url.pathname = sharePath;
+    return url;
+  }
+  if (!isAbsolute(normalizedPath)) {
+    throw new TypeError('Must be an absolute path');
+  }
+
+  const url = new URL('file:///');
+  // Windows drive-letter paths must keep the drive segment in the pathname.
+  url.pathname = /^[A-Za-z]:\//.test(normalizedPath)
+    ? '/' + normalizedPath
+    : normalizedPath;
+  return url;
+}
+
+/**
  * Converts a file:// URL to a filesystem path.
  * Only works in Deno and Node.js environments.
  *
@@ -201,6 +242,10 @@ export function fromFileUrl(url: string | URL): string {
     throw new TypeError('Must be a file URL');
   }
   let path = decodeURIComponent(urlObj.pathname);
+  // Per RFC 8089, file://localhost/path is equivalent to file:///path.
+  if (urlObj.host && urlObj.host !== 'localhost') {
+    return `//${urlObj.host}${path}`;
+  }
   // Windows: file:///C:/path -> C:/path
   if (/^\/[A-Za-z]:/.test(path)) {
     path = path.slice(1);

@@ -10,6 +10,7 @@ import {
   normalize,
   resolve,
   toAbsolutePath,
+  toFileUrl,
 } from '../base/path.ts';
 import { assertThrows } from './asserts.ts';
 
@@ -166,11 +167,70 @@ export default function setupPathTests(): void {
     assertEquals(fromFileUrl('file:///foo/bar/baz.txt'), '/foo/bar/baz.txt');
   });
 
+  TEST('Path', 'toFileUrl converts Unix absolute paths', () => {
+    assertEquals(toFileUrl('/path/to/file').href, 'file:///path/to/file');
+    assertEquals(
+      toFileUrl('/path/with spaces/and#hash').href,
+      'file:///path/with%20spaces/and%23hash',
+    );
+  });
+
+  TEST('Path', 'toFileUrl converts Windows absolute paths', () => {
+    const sep = '\\';
+    const windowsPath =
+      `C:${sep}Users${sep}foo${sep}dir#name${sep}entry file.ts`;
+    assertEquals(toFileUrl('C:/Users/foo').href, 'file:///C:/Users/foo');
+    assertEquals(
+      toFileUrl(windowsPath).href,
+      'file:///C:/Users/foo/dir%23name/entry%20file.ts',
+    );
+  });
+
+  TEST('Path', 'toFileUrl throws for relative paths', () => {
+    assertThrows(() => toFileUrl('foo/bar'));
+    assertThrows(() => toFileUrl('../foo/bar'));
+  });
+
+  TEST('Path', 'toFileUrl converts UNC absolute paths', () => {
+    assertEquals(
+      toFileUrl('\\\\server\\share\\file').href,
+      'file://server/share/file',
+    );
+    assertEquals(
+      toFileUrl('//server/share/dir name/file#1').href,
+      'file://server/share/dir%20name/file%231',
+    );
+  });
+
+  TEST('Path', 'toFileUrl rejects invalid UNC paths', () => {
+    assertThrows(() => toFileUrl('\\\\server'));
+    assertThrows(() => toFileUrl('//server'));
+  });
+
   TEST('Path', 'fromFileUrl converts Windows file URLs', () => {
     assertEquals(fromFileUrl('file:///C:/Users/foo'), 'C:/Users/foo');
     assertEquals(
       fromFileUrl('file:///D:/path/to/file.txt'),
       'D:/path/to/file.txt',
+    );
+  });
+
+  TEST('Path', 'fromFileUrl converts UNC file URLs', () => {
+    assertEquals(
+      fromFileUrl('file://server/share/file.txt'),
+      '//server/share/file.txt',
+    );
+    assertEquals(
+      fromFileUrl('file://server/share/dir%20name/file%231.txt'),
+      '//server/share/dir name/file#1.txt',
+    );
+  });
+
+  TEST('Path', 'fromFileUrl treats localhost as local', () => {
+    assertEquals(fromFileUrl('file://localhost/path'), '/path');
+    assertEquals(
+      fromFileUrl('file://localhost/C:/Users/foo'),
+      'C:/Users/foo',
     );
   });
 
@@ -190,5 +250,30 @@ export default function setupPathTests(): void {
   TEST('Path', 'fromFileUrl throws for non-file protocols', () => {
     assertThrows(() => fromFileUrl('https://example.com/path'));
     assertThrows(() => fromFileUrl('http://localhost/path'));
+  });
+
+  // toFileUrl/fromFileUrl roundtrip invariants
+  TEST('Path', 'toFileUrl and fromFileUrl roundtrip correctly', () => {
+    assertEquals(fromFileUrl(toFileUrl('/path/to/file').href), '/path/to/file');
+    assertEquals(
+      fromFileUrl(toFileUrl('/path/with spaces').href),
+      '/path/with spaces',
+    );
+    assertEquals(
+      fromFileUrl(toFileUrl('/path/with#hash').href),
+      '/path/with#hash',
+    );
+    assertEquals(
+      fromFileUrl(toFileUrl('C:/Users/foo').href),
+      'C:/Users/foo',
+    );
+    assertEquals(
+      fromFileUrl(toFileUrl('C:/path/with spaces/and#hash').href),
+      'C:/path/with spaces/and#hash',
+    );
+    assertEquals(
+      fromFileUrl(toFileUrl('\\\\server\\share\\dir name\\file#1').href),
+      '//server/share/dir name/file#1',
+    );
   });
 }
