@@ -7,6 +7,7 @@ import {
   getClientBuildPlugins,
   getEsbuild,
   isReBuildContext,
+  normalizeEntryForDeno,
   type ReBuildContext,
   sharedClientBuildOptions,
   stopBackgroundCompiler,
@@ -17,7 +18,10 @@ import {
   type Asset,
   type StaticAssets,
 } from '../system-assets/system-assets.ts';
-import { ContentTypeMapping, type ContentType } from '../system-assets/content-type.ts';
+import {
+  type ContentType,
+  ContentTypeMapping,
+} from '../system-assets/content-type.ts';
 import { pathExists, readFile, walkDir } from '../base/json-log/file-impl.ts';
 
 const textDecoder = new TextDecoder();
@@ -143,7 +147,12 @@ export async function buildAssets(
     // Build options for client-side code (always browser target)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buildOptions: any = {
-      entryPoints,
+      entryPoints: targetRuntime === 'deno'
+        ? entryPoints.map((ep) => ({
+          ...ep,
+          in: normalizeEntryForDeno(ep.in),
+        }))
+        : entryPoints,
       plugins: await getClientBuildPlugins(
         targetRuntime,
         options?.esbuildPlugins ?? [],

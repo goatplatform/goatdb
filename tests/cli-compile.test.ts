@@ -98,6 +98,33 @@ interface TestLoadResult {
   loader: string;
 }
 
+function createVirtualEntryPlugin(
+  name: string,
+  onEntryPoint: (entryPoint: string | undefined) => void,
+): BuildPluginLike {
+  return {
+    name,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setup(build: any) {
+      const entryPoints = build.initialOptions.entryPoints as
+        | { in: string; out: string }[]
+        | undefined;
+      onEntryPoint(entryPoints?.[0]?.in);
+
+      build.onResolve({ filter: /.*/ }, (args: TestResolveArgs) => {
+        if (args.path.startsWith('file://')) {
+          return { path: args.path, namespace: 'virtual-entry' };
+        }
+        return null;
+      });
+      build.onLoad(
+        { filter: /.*/, namespace: 'virtual-entry' },
+        (): TestLoadResult => ({ contents: 'export default 1;', loader: 'ts' }),
+      );
+    },
+  };
+}
+
 const kPlaceholderAppConfig = {
   buildDir: '/tmp',
   htmlPath: '/dev/null',
@@ -1166,6 +1193,74 @@ export {};
           );
         } finally {
           await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (isDeno()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets normalizes UNC entry points before esbuild in deno runtime',
+      async () => {
+        let capturedEntryPoint: string | undefined;
+        const entryPoints = [{
+          in: '\\\\server\\share\\entry.ts',
+          out: APP_ENTRY_POINT,
+        }];
+        try {
+          const assets = await buildAssets(
+            undefined,
+            entryPoints,
+            kPlaceholderAppConfig,
+            {
+              runtime: 'deno',
+              keepEsbuildAlive: false,
+              esbuildPlugins: [createVirtualEntryPlugin(
+                'capture-unc-entry-build-assets',
+                (entryPoint) => {
+                  capturedEntryPoint = entryPoint;
+                },
+              )],
+            },
+          );
+          assertEquals(capturedEntryPoint, 'file://server/share/entry.ts');
+          assertExists(assets['/app.js']);
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (isDeno()) {
+    TEST(
+      'CLI-Compile',
+      'createBuildContext normalizes UNC entry points before esbuild',
+      async () => {
+        let capturedEntryPoint: string | undefined;
+        const entryPoints = [{
+          in: '\\\\server\\share\\entry.ts',
+          out: APP_ENTRY_POINT,
+        }];
+        const rebuildCtx = await createBuildContext(entryPoints, [
+          createVirtualEntryPlugin(
+            'capture-unc-entry-build-context',
+            (entryPoint) => {
+              capturedEntryPoint = entryPoint;
+            },
+          ),
+        ]);
+        try {
+          const assets = await buildAssets(
+            rebuildCtx,
+            entryPoints,
+            kPlaceholderAppConfig,
+          );
+          assertEquals(capturedEntryPoint, 'file://server/share/entry.ts');
+          assertExists(assets['/app.js']);
+        } finally {
+          rebuildCtx.close();
         }
       },
     );

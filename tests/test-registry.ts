@@ -31,6 +31,7 @@ import setupClusterLatency from './cluster-latency.test.ts';
 import setupCliInitTests from './cli-init.test.ts';
 import setupCliCompileTests from './cli-compile.test.ts';
 import setupPathTests from './path.test.ts';
+import setupBuildTests from './build.test.ts';
 import setupRuntimeTests from './runtime.test.ts';
 import setupProgressTests from './progress.test.ts';
 import setupTestRunnerTests from './test-runner.test.ts';
@@ -87,6 +88,7 @@ async function registerAllTestsImpl(): Promise<void> {
   setupOrderstamp(); // Utility functions for distributed timestamps
   setupItemPath(); // Path validation and parsing logic
   setupPathTests(); // Cross-platform path utilities
+  setupBuildTests(); // Build utility contracts (normalizeEntryForDeno, etc.)
   setupRuntimeTests(); // Runtime abstraction layer invariants
   setupProgressTests(); // TUI progress tracking - Task state machine, aggregation
   setupTestRunnerTests(); // Test filtering and no-match error behavior

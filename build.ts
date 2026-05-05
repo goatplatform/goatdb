@@ -331,6 +331,23 @@ export function sharedClientBuildOptions() {
 }
 
 /**
+ * Converts Windows absolute paths to file:// URLs before passing them to the
+ * Deno esbuild loader. Drive-letter paths (e.g. C:/foo) need this because the
+ * @luca/esbuild-deno-loader WASM resolver misparses the drive letter C: as a
+ * URL scheme and strips it. UNC paths must also use file://host/share/... URL
+ * form so the host/share boundary remains intact.
+ *
+ * POSIX absolute paths, relative paths, and existing file:// URLs are returned
+ * unchanged.
+ */
+export function normalizeEntryForDeno(entryPath: string): string {
+  if (/^[A-Za-z]:[/\\]/.test(entryPath) || /^[/\\]{2}[^/\\]/.test(entryPath)) {
+    return path.toFileUrl(entryPath).href;
+  }
+  return entryPath;
+}
+
+/**
  * Creates an esbuild incremental context for the debug server (development,
  * hot-reload). Deno-only — uses `@luca/esbuild-deno-loader` which is not
  * available on Node.js. Production builds go through `buildAssets()` in
@@ -349,7 +366,10 @@ export async function createBuildContext(
   }
   const esbuild = await getEsbuild();
   const ctx = await esbuild.context({
-    entryPoints,
+    entryPoints: entryPoints.map((ep) => ({
+      ...ep,
+      in: normalizeEntryForDeno(ep.in),
+    })),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     plugins: await getClientBuildPlugins('deno', extraPlugins) as any,
     ...sharedClientBuildOptions(),
