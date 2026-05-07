@@ -5,36 +5,56 @@ import { APP_ENTRY_POINT } from './net/server/static-assets.ts';
 import { readFile } from './base/json-log/file-impl.ts';
 import { getRuntime } from './base/runtime/index.ts';
 
-// IMPORTANT: `esbuild` and `@luca/esbuild-deno-loader` MUST remain `import type`.
+// IMPORTANT: `esbuild` and `@deno/esbuild-plugin` MUST remain `import type`.
 // Runtime imports of these Deno/JSR-specific packages break Node.js SEA binaries.
 // `readFile` is a GoatDB-internal utility and is safe as a runtime import.
 import type { Plugin } from 'esbuild';
-import type { denoPlugins } from '@luca/esbuild-deno-loader';
+import type { denoPlugin } from '@deno/esbuild-plugin';
+
+/** Specifier for the Deno esbuild plugin — used in imports and external lists. */
+export const kDenoEsbuildPluginSpecifier = '@deno/esbuild-plugin';
+/** JSR npm-proxy specifier for the Deno esbuild plugin. */
+export const kJsrDenoEsbuildPluginSpecifier = '@jsr/deno__esbuild-plugin';
 
 // Lazy-loaded modules to avoid bundling build-time dependencies into runtime code.
-// These packages (esbuild, @luca/esbuild-deno-loader) are Deno/JSR-specific and
+// These packages (esbuild, @deno/esbuild-plugin) are Deno/JSR-specific and
 // cannot be resolved by Node.js at runtime.
 // We assign specifiers to variables so bundlers (esbuild) won't statically
 // resolve and inline these imports, which would break SEA binaries.
 // deno-lint-ignore no-explicit-any
 let esbuildModule: any;
 // deno-lint-ignore no-explicit-any
-let denoPluginsModule: any;
+let denoPluginModule: any;
 
-export async function getEsbuild(): Promise<typeof import('esbuild')> {
-  if (!esbuildModule) {
-    const specifier = 'esbuild';
-    esbuildModule = await import(specifier);
+// deno-lint-ignore no-explicit-any
+function lazyLoad(moduleRef: { value: any }, specifier: string): Promise<any> {
+  if (!moduleRef.value) {
+    moduleRef.value = import(specifier);
   }
-  return esbuildModule as typeof import('esbuild');
+  return moduleRef.value;
 }
 
-export async function getDenoPlugins(): Promise<typeof denoPlugins> {
-  if (!denoPluginsModule) {
-    const specifier = '@luca/esbuild-deno-loader';
-    denoPluginsModule = await import(specifier);
+export async function getEsbuild(): Promise<typeof import('esbuild')> {
+  const mod = await lazyLoad({ value: esbuildModule }, 'esbuild');
+  esbuildModule = mod;
+  return mod as typeof import('esbuild');
+}
+
+export async function getDenoPlugin(): Promise<typeof denoPlugin> {
+  const mod = await lazyLoad(
+    { value: denoPluginModule },
+    kDenoEsbuildPluginSpecifier,
+  );
+  denoPluginModule = mod;
+  const plugin = (mod.denoPlugin || mod.default) as
+    | typeof denoPlugin
+    | undefined;
+  if (!plugin) {
+    throw new Error(
+      `${kDenoEsbuildPluginSpecifier} is missing the expected 'denoPlugin' export.`,
+    );
   }
-  return denoPluginsModule.denoPlugins as typeof denoPlugins;
+  return plugin;
 }
 
 export interface BundleResult {
@@ -169,7 +189,7 @@ export async function stopBackgroundCompiler(): Promise<void> {
   if (esbuildModule) {
     await esbuildModule.stop();
     esbuildModule = undefined;
-    denoPluginsModule = undefined;
+    denoPluginModule = undefined;
   }
 }
 
@@ -303,11 +323,14 @@ export async function getClientBuildPlugins(
     if (getRuntime().id !== 'deno') {
       throw new Error(
         'GoatDB: cannot build Deno-target bundle from Node.js. ' +
-          'Deno loader plugins (@luca/esbuild-deno-loader) require the Deno runtime. ' +
+          'Deno loader plugin (@deno/esbuild-plugin) requires the Deno runtime. ' +
           'Use runtime: "node" or run the build under Deno.',
       );
     }
-    plugins.push(...(await getDenoPlugins())() as unknown as Plugin[]);
+    // Structural cast: @deno/esbuild-plugin's Plugin type may differ nominally
+    // from our installed esbuild version due to JSR/npm version skew, but they
+    // are structurally compatible at runtime.
+    plugins.push((await getDenoPlugin())() as Plugin);
   }
   return plugins;
 }
@@ -331,16 +354,14 @@ export function sharedClientBuildOptions() {
 }
 
 /**
- * Converts Windows absolute paths to file:// URLs before passing them to the
- * Deno esbuild loader. Drive-letter paths (e.g. C:/foo) need this because the
- * @luca/esbuild-deno-loader WASM resolver misparses the drive letter C: as a
- * URL scheme and strips it. UNC paths must also use file://host/share/... URL
- * form so the host/share boundary remains intact.
+ * Canonicalizes build entry paths before they cross into the bundling layer.
+ * Windows drive-letter paths (for example, C:/foo) and UNC paths must use
+ * file:// URL form so loaders preserve the host/share boundary.
  *
  * POSIX absolute paths, relative paths, and existing file:// URLs are returned
  * unchanged.
  */
-export function normalizeEntryForDeno(entryPath: string): string {
+export function normalizeBuildEntryPath(entryPath: string): string {
   if (/^[A-Za-z]:[/\\]/.test(entryPath) || /^[/\\]{2}[^/\\]/.test(entryPath)) {
     return path.toFileUrl(entryPath).href;
   }
@@ -349,7 +370,7 @@ export function normalizeEntryForDeno(entryPath: string): string {
 
 /**
  * Creates an esbuild incremental context for the debug server (development,
- * hot-reload). Deno-only — uses `@luca/esbuild-deno-loader` which is not
+ * hot-reload). Deno-only — uses `@deno/esbuild-plugin` which is not
  * available on Node.js. Production builds go through `buildAssets()` in
  * `cli/build-assets.ts` directly.
  */
@@ -360,7 +381,7 @@ export async function createBuildContext(
   if (getRuntime().id !== 'deno') {
     throw new Error(
       'createBuildContext() is only supported in Deno. GoatDB debug-server ' +
-        'bundling uses @luca/esbuild-deno-loader; use buildAssets() or ' +
+        'bundling uses @deno/esbuild-plugin; use buildAssets() or ' +
         'compile() for Node.js production builds.',
     );
   }
@@ -368,7 +389,7 @@ export async function createBuildContext(
   const ctx = await esbuild.context({
     entryPoints: entryPoints.map((ep) => ({
       ...ep,
-      in: normalizeEntryForDeno(ep.in),
+      in: normalizeBuildEntryPath(ep.in),
     })),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     plugins: await getClientBuildPlugins('deno', extraPlugins) as any,

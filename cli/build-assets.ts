@@ -7,7 +7,7 @@ import {
   getClientBuildPlugins,
   getEsbuild,
   isReBuildContext,
-  normalizeEntryForDeno,
+  normalizeBuildEntryPath,
   type ReBuildContext,
   sharedClientBuildOptions,
   stopBackgroundCompiler,
@@ -147,12 +147,10 @@ export async function buildAssets(
     // Build options for client-side code (always browser target)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buildOptions: any = {
-      entryPoints: targetRuntime === 'deno'
-        ? entryPoints.map((ep) => ({
-          ...ep,
-          in: normalizeEntryForDeno(ep.in),
-        }))
-        : entryPoints,
+      entryPoints: entryPoints.map((ep) => ({
+        ...ep,
+        in: normalizeBuildEntryPath(ep.in),
+      })),
       plugins: await getClientBuildPlugins(
         targetRuntime,
         options?.esbuildPlugins ?? [],

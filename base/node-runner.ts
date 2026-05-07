@@ -1,5 +1,29 @@
-import * as esbuild from 'npm:esbuild';
-import { denoPlugins } from 'jsr:@luca/esbuild-deno-loader';
+import type * as esbuild from 'esbuild';
+
+// Lazy-load build-time dependencies so this module stays safe as a transitive
+// import inside runtime bundles that never call the build path.
+let esbuildModule: typeof import('esbuild') | undefined;
+let denoPluginModule:
+  | typeof import('@deno/esbuild-plugin')
+  | undefined;
+
+async function getEsbuild(): Promise<typeof import('esbuild')> {
+  if (!esbuildModule) {
+    const specifier = 'esbuild';
+    esbuildModule = await import(specifier);
+  }
+  return esbuildModule;
+}
+
+async function getDenoPlugin(): Promise<
+  typeof import('@deno/esbuild-plugin').denoPlugin
+> {
+  if (!denoPluginModule) {
+    const specifier = '@deno/esbuild-plugin';
+    denoPluginModule = await import(specifier);
+  }
+  return denoPluginModule.denoPlugin;
+}
 
 /**
  * Compiles a TypeScript file using esbuild for execution in Node.js and returns the build result.
@@ -12,6 +36,8 @@ export async function compileForNodeWithEsbuild(
   inputFile: string,
   outName: string,
 ) {
+  const esbuild = await getEsbuild();
+  const denoPlugin = await getDenoPlugin();
   return await esbuild.build({
     entryPoints: [
       {
@@ -19,7 +45,7 @@ export async function compileForNodeWithEsbuild(
         out: outName,
       },
     ],
-    plugins: denoPlugins() as unknown as esbuild.Plugin[],
+    plugins: [denoPlugin() as unknown as esbuild.Plugin],
     outfile: outName,
     bundle: true,
     platform: 'node',
@@ -30,7 +56,8 @@ export async function compileForNodeWithEsbuild(
     external: [
       'nodemailer',
       'esbuild',
-      '@luca/esbuild-deno-loader',
+      '@deno/esbuild-plugin',
+      '@jsr/deno__esbuild-plugin',
       'chokidar',
       'postject',
     ],
@@ -130,6 +157,7 @@ export async function nodeRun(
       stderrText: error instanceof Error ? error.message : String(error),
     };
   } finally {
-    await esbuild.stop();
+    await esbuildModule?.stop();
+    esbuildModule = undefined;
   }
 }

@@ -1,20 +1,55 @@
 import * as path from '@std/path';
-import * as esbuild from 'esbuild';
-import { denoPlugins } from '@luca/esbuild-deno-loader';
 import { getRepositoryPath } from '../base/git-root.ts';
+import { getRuntime } from '../base/runtime/index.ts';
+import { normalizeBuildEntryPath } from '../build.ts';
 import { type StaticAssets, staticAssetsToJS } from './system-assets.ts';
 
-export async function buildSysAssets(): Promise<void> {
+// Lazy-loaded build-time dependencies to avoid breaking Node.js bundles.
+// These are Deno/JSR-specific and cannot be resolved by Node.js at runtime.
+// deno-lint-ignore no-explicit-any
+let esbuildModule: any;
+// deno-lint-ignore no-explicit-any
+let denoPluginModule: any;
+
+async function getEsbuild(): Promise<typeof import('esbuild')> {
+  if (!esbuildModule) {
+    esbuildModule = await import('esbuild');
+  }
+  return esbuildModule as typeof import('esbuild');
+}
+
+async function getDenoPlugin(): Promise<
+  typeof import('@deno/esbuild-plugin').denoPlugin
+> {
+  if (!denoPluginModule) {
+    denoPluginModule = await import('@deno/esbuild-plugin');
+  }
+  return denoPluginModule.denoPlugin;
+}
+
+export async function buildSysAssetsBundle(): Promise<StaticAssets> {
+  if (getRuntime().id !== 'deno') {
+    throw new Error(
+      'buildSysAssetsBundle() requires Deno runtime. ' +
+        'It uses @deno/esbuild-plugin which is Deno-only.',
+    );
+  }
+  const esbuild = await getEsbuild();
+  const denoPlugin = await getDenoPlugin();
   const repoPath = await getRepositoryPath();
   const outputDir = path.join(repoPath, 'system-assets');
   const result = await esbuild.build({
     entryPoints: [
       {
-        in: path.join(repoPath, 'base', 'json-log', 'json-log-worker-entry.ts'),
+        in: normalizeBuildEntryPath(
+          path.join(repoPath, 'base', 'json-log', 'json-log-worker-entry.ts'),
+        ),
         out: 'json-log-worker',
       },
     ],
-    plugins: [...denoPlugins()],
+    // Let esbuild transpile TypeScript so the final bundle map is composed from
+    // file-relative sources instead of the loader's repo-relative inline maps.
+    plugins: [denoPlugin({ noTranspile: true })],
     bundle: true,
     write: false,
     sourcemap: 'external',
@@ -35,28 +70,23 @@ export async function buildSysAssets(): Promise<void> {
         : 'text/javascript',
     };
   }
-  assets['/system-assets/bloom_filter.js'] = {
-    data: await Deno.readFile(
-      path.join(repoPath, 'system-assets', 'bloom_filter.js'),
-    ),
-    contentType: 'text/javascript',
-  };
-  assets['/system-assets/bloom-filter.wasm'] = {
-    data: await Deno.readFile(
-      path.join(repoPath, 'system-assets', 'bloom_filter.wasm'),
-    ),
-    contentType: 'application/wasm',
-  };
-  assets['/system-assets/bloom_filter.wasm.map'] = {
-    data: await Deno.readFile(
-      path.join(repoPath, 'system-assets', 'bloom_filter.wasm.map'),
-    ),
-    contentType: 'application/json',
-  };
+  return assets;
+}
+
+export async function buildSysAssetsJSON(): Promise<string> {
+  const assets = await buildSysAssetsBundle();
+  return JSON.stringify(staticAssetsToJS(assets));
+}
+
+export async function buildSysAssets(): Promise<void> {
+  const repoPath = await getRepositoryPath();
+  const outputDir = path.join(repoPath, 'system-assets');
   await Deno.writeTextFile(
     path.join(outputDir, 'assets.json'),
-    JSON.stringify(staticAssetsToJS(assets)),
+    await buildSysAssetsJSON(),
   );
 }
 
-buildSysAssets();
+if (import.meta.main) {
+  await buildSysAssets();
+}

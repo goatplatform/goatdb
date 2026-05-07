@@ -118,7 +118,7 @@ export type DebugServerOptions<US extends Schema> =
  *
  * The debug server automatically transpiles TypeScript and JSX using ESBuild
  * and watches for file changes to trigger rebuilds. Deno-only: the client
- * build context uses `@luca/esbuild-deno-loader`.
+ * build context uses `@deno/esbuild-plugin`.
  *
  * @param options Options for running the debug server.
  * @returns Never returns - runs until the process is terminated.
@@ -130,7 +130,7 @@ export async function startDebugServer<US extends Schema>(
   if (getRuntime().id !== 'deno') {
     throw new Error(
       'startDebugServer() is only supported in Deno. GoatDB debug-server ' +
-        'bundling uses @luca/esbuild-deno-loader; Node.js users should run ' +
+        'bundling uses @deno/esbuild-plugin; Node.js users should run ' +
         'the scaffolded dev server or use compile() for production builds.',
     );
   }

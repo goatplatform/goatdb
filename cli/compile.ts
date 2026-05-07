@@ -3,6 +3,8 @@ import {
   adapterStubPlugin,
   type BuildPluginLike,
   getEsbuild,
+  kDenoEsbuildPluginSpecifier,
+  kJsrDenoEsbuildPluginSpecifier,
   stopBackgroundCompiler,
 } from '../build.ts';
 import type { AppConfig } from './app-config.ts';
@@ -549,8 +551,8 @@ export async function bundleServerForSEA(
     external: [
       'node:*',
       'esbuild', // Defense-in-depth: also hidden via eval() import
-      '@luca/esbuild-deno-loader', // Deno-specific build plugin
-      '@jsr/luca__esbuild-deno-loader', // JSR-imported version
+      kDenoEsbuildPluginSpecifier, // Deno-specific build plugin
+      kJsrDenoEsbuildPluginSpecifier, // JSR-imported version
     ],
     logLevel: 'warning',
   });
