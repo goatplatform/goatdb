@@ -29,10 +29,11 @@ import {
   targetFromOSArch,
 } from '../cli/compile.ts';
 import {
-  type BuildPluginLike,
   createBuildContext,
   stopBackgroundCompiler,
+  type BuildPluginLike,
 } from '../build.ts';
+
 import {
   buildAssets,
   buildCombinedCSS,
@@ -98,36 +99,9 @@ interface TestLoadResult {
   loader: string;
 }
 
-function createVirtualEntryPlugin(
-  name: string,
-  onEntryPoint: (entryPoint: string | undefined) => void,
-): BuildPluginLike {
-  return {
-    name,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setup(build: any) {
-      const entryPoints = build.initialOptions.entryPoints as
-        | { in: string; out: string }[]
-        | undefined;
-      onEntryPoint(entryPoints?.[0]?.in);
-
-      build.onResolve({ filter: /.*/ }, (args: TestResolveArgs) => {
-        if (args.path.startsWith('file://')) {
-          return { path: args.path, namespace: 'virtual-entry' };
-        }
-        return null;
-      });
-      build.onLoad(
-        { filter: /.*/, namespace: 'virtual-entry' },
-        (): TestLoadResult => ({ contents: 'export default 1;', loader: 'ts' }),
-      );
-    },
-  };
-}
-
 const kPlaceholderAppConfig = {
   buildDir: '/tmp',
-  htmlPath: '/dev/null',
+  htmlPath: undefined,
   jsPath: '/dev/null',
 };
 
@@ -351,7 +325,7 @@ export default function setupCliCompileTests() {
               jsPath: path.join(dir, 'entry.ts'),
               cssPath: path.join(dir, 'global.css'),
             },
-            // Node path only — Deno path requires a deno.json in CWD for @luca/esbuild-deno-loader and is
+            // Node path only — Deno path requires a deno.json in CWD for @deno/esbuild-plugin and is
             // not covered by the unit suite. The full E2E test (opt-in, see below) exercises it.
             { runtime: 'node', keepEsbuildAlive: false },
           );
@@ -1193,74 +1167,6 @@ export {};
           );
         } finally {
           await stopBackgroundCompiler();
-        }
-      },
-    );
-  }
-
-  if (isDeno()) {
-    TEST(
-      'CLI-Compile',
-      'buildAssets normalizes UNC entry points before esbuild in deno runtime',
-      async () => {
-        let capturedEntryPoint: string | undefined;
-        const entryPoints = [{
-          in: '\\\\server\\share\\entry.ts',
-          out: APP_ENTRY_POINT,
-        }];
-        try {
-          const assets = await buildAssets(
-            undefined,
-            entryPoints,
-            kPlaceholderAppConfig,
-            {
-              runtime: 'deno',
-              keepEsbuildAlive: false,
-              esbuildPlugins: [createVirtualEntryPlugin(
-                'capture-unc-entry-build-assets',
-                (entryPoint) => {
-                  capturedEntryPoint = entryPoint;
-                },
-              )],
-            },
-          );
-          assertEquals(capturedEntryPoint, 'file://server/share/entry.ts');
-          assertExists(assets['/app.js']);
-        } finally {
-          await stopBackgroundCompiler();
-        }
-      },
-    );
-  }
-
-  if (isDeno()) {
-    TEST(
-      'CLI-Compile',
-      'createBuildContext normalizes UNC entry points before esbuild',
-      async () => {
-        let capturedEntryPoint: string | undefined;
-        const entryPoints = [{
-          in: '\\\\server\\share\\entry.ts',
-          out: APP_ENTRY_POINT,
-        }];
-        const rebuildCtx = await createBuildContext(entryPoints, [
-          createVirtualEntryPlugin(
-            'capture-unc-entry-build-context',
-            (entryPoint) => {
-              capturedEntryPoint = entryPoint;
-            },
-          ),
-        ]);
-        try {
-          const assets = await buildAssets(
-            rebuildCtx,
-            entryPoints,
-            kPlaceholderAppConfig,
-          );
-          assertEquals(capturedEntryPoint, 'file://server/share/entry.ts');
-          assertExists(assets['/app.js']);
-        } finally {
-          rebuildCtx.close();
         }
       },
     );
@@ -2445,6 +2351,45 @@ export {};
         } finally {
           await stopBackgroundCompiler();
         }
+      },
+    );
+  }
+
+  if (isDeno()) {
+    TEST(
+      'CLI-Compile',
+      'compileForNodeWithEsbuild resolves JSR imports and runs in Node.js',
+      async (ctx: TestSuite) => {
+        const { compileForNodeWithEsbuild, nodeRun } = await import(
+          '../base/node-runner.ts'
+        );
+        const dir = await ctx.tempDir('node-esbuild-plugin');
+        await writeTextFile(
+          path.join(dir, 'entry.ts'),
+          `import { assertEquals } from "jsr:@std/assert";\nexport { assertEquals };`,
+        );
+        const result = await compileForNodeWithEsbuild(
+          path.join(dir, 'entry.ts'),
+          'output',
+        );
+        assertEquals(
+          result.errors.length,
+          0,
+          'Node.js compilation with @deno/esbuild-plugin must produce no errors',
+        );
+        assertExists(
+          result.outputFiles,
+          'compilation must produce output files',
+        );
+        assertTrue(
+          result.outputFiles!.length > 0,
+          'compilation must produce at least one output file',
+        );
+        const nodeResult = await nodeRun(result);
+        assertTrue(
+          nodeResult.success,
+          `compiled bundle must execute successfully in Node.js: ${nodeResult.stderrText}`,
+        );
       },
     );
   }

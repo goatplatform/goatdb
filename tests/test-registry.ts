@@ -57,6 +57,8 @@ import setupMergeSync from './merge-sync.test.ts';
 import setupSecurityBoundaries from './security-boundaries.test.ts';
 import setupLiveQuery from './live-query.test.ts';
 import setupWriteFailure from './write-failure.test.ts';
+import setupBuildDenoTests from './build-deno.test.ts';
+import { isDeno } from '../base/common.ts';
 import { TestsRunner } from './mod.ts';
 
 let _registrationPromise: Promise<void> | undefined;
@@ -88,7 +90,10 @@ async function registerAllTestsImpl(): Promise<void> {
   setupOrderstamp(); // Utility functions for distributed timestamps
   setupItemPath(); // Path validation and parsing logic
   setupPathTests(); // Cross-platform path utilities
-  setupBuildTests(); // Build utility contracts (normalizeEntryForDeno, etc.)
+  setupBuildTests(); // Build utility contracts (normalizeBuildEntryPath, etc.)
+  if (isDeno()) {
+    setupBuildDenoTests(); // Deno-only build coverage that imports Deno-only modules
+  }
   setupRuntimeTests(); // Runtime abstraction layer invariants
   setupProgressTests(); // TUI progress tracking - Task state machine, aggregation
   setupTestRunnerTests(); // Test filtering and no-match error behavior
