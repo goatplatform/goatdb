@@ -14,6 +14,7 @@ import {
   type BuildPluginLike,
   createBuildContext,
   type ReBuildContext,
+  resolveBuildEntryPath,
 } from '../build.ts';
 import { getGoatConfig } from '../base/config.ts';
 import { Server, type ServerOptions } from '../net/server/server.ts';
@@ -163,7 +164,7 @@ export async function startDebugServer<US extends Schema>(
 
   const entryPoints = [
     {
-      in: path.resolve(options.jsPath),
+      in: resolveBuildEntryPath(options.jsPath),
       out: APP_ENTRY_POINT,
     },
   ];

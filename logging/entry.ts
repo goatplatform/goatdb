@@ -98,7 +98,7 @@ export interface TechnicalLogData extends JSONObject {
 }
 
 export interface GenericLogEntry extends BaseLogEntry {
-  severity: 'INFO' | 'DEBUG' | 'DEFAULT';
+  severity: 'INFO' | 'WARNING' | 'NOTICE' | 'DEBUG' | 'DEFAULT';
   message: string;
 }
 

@@ -41,6 +41,7 @@ export async function buildSysAssetsBundle(): Promise<StaticAssets> {
   const result = await esbuild.build({
     entryPoints: [
       {
+        // path.join(repoPath, ...) produces an already-absolute path; no resolve step needed
         in: normalizeBuildEntryPath(
           path.join(repoPath, 'base', 'json-log', 'json-log-worker-entry.ts'),
         ),

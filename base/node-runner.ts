@@ -1,4 +1,5 @@
 import type * as esbuild from 'esbuild';
+import { resolveBuildEntryPath } from '../build.ts';
 
 // Lazy-load build-time dependencies so this module stays safe as a transitive
 // import inside runtime bundles that never call the build path.
@@ -41,7 +42,7 @@ export async function compileForNodeWithEsbuild(
   return await esbuild.build({
     entryPoints: [
       {
-        in: inputFile,
+        in: resolveBuildEntryPath(inputFile),
         out: outName,
       },
     ],

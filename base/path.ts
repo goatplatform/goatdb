@@ -20,8 +20,30 @@ function normalizeSlashes(p: string): string {
   return p.replace(/\\/g, '/');
 }
 
+// Post-normalize UNC check (forward slashes only, used internally)
 function isUncPath(p: string): boolean {
   return /^\/\/[^/]/.test(p);
+}
+
+/**
+ * Pre-normalize UNC check that accepts both forward and backslash separators.
+ * Use this for raw user input before slash normalization.
+ *
+ * @param p The path to check
+ * @returns True if the path starts with // or \\ followed by a non-separator
+ */
+export function isUncPathRaw(p: string): boolean {
+  return /^[/\\]{2}[^/\\]/.test(p);
+}
+
+/**
+ * Checks if a string is a file:// URL.
+ *
+ * @param p The string to check
+ * @returns True if the string starts with file://
+ */
+export function isFileUrlPath(p: string): boolean {
+  return p.startsWith('file://');
 }
 
 /**
@@ -34,14 +56,27 @@ function isUncPath(p: string): boolean {
 export function normalize(p: string): string {
   if (!p) return '.';
   p = normalizeSlashes(p);
+  const isUNC = isUncPath(p);
 
   const isAbs = p[0] === '/';
   const segments = p.split('/').filter(Boolean);
   const result: string[] = [];
+  let startIndex = 0;
+  let minSegments = 0;
 
-  for (const seg of segments) {
+  if (isUNC) {
+    // Preserve the //host/share root: '..' segments may collapse descendants
+    // but must not escape above the share component.
+    if (segments[0]) result.push(segments[0]);
+    if (segments[1]) result.push(segments[1]);
+    startIndex = result.length;
+    minSegments = result.length;
+  }
+
+  for (let i = startIndex; i < segments.length; i++) {
+    const seg = segments[i];
     if (seg === '..') {
-      if (result.length && result[result.length - 1] !== '..') {
+      if (result.length > minSegments && result[result.length - 1] !== '..') {
         result.pop();
       } else if (!isAbs) {
         result.push('..');
@@ -52,7 +87,8 @@ export function normalize(p: string): string {
   }
 
   let normalized = result.join('/');
-  if (isAbs) normalized = '/' + normalized;
+  if (isUNC) normalized = '//' + normalized;
+  else if (isAbs) normalized = '/' + normalized;
   return normalized || '.';
 }
 

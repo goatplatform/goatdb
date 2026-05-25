@@ -7,8 +7,8 @@ import {
   getClientBuildPlugins,
   getEsbuild,
   isReBuildContext,
-  normalizeBuildEntryPath,
   type ReBuildContext,
+  resolveBuildEntryPath,
   sharedClientBuildOptions,
   stopBackgroundCompiler,
 } from '../build.ts';
@@ -119,6 +119,20 @@ export interface BuildAssetsOptions {
   esbuildPlugins?: BuildPluginLike[];
 }
 
+/**
+ * Bundles client-side assets using esbuild and assembles the complete
+ * {@link StaticAssets} map served by GoatDB's HTTP layer.
+ *
+ * @param ctx Pre-built {@link ReBuildContext} for incremental rebuilds. When
+ *   provided, `options.esbuildPlugins` is ignored (plugins were registered at
+ *   context-creation time — a warning is logged if plugins are also supplied).
+ * @param entryPoints Entry-point descriptors forwarded to esbuild.
+ *   `entryPoints[].in` accepts any path form (native absolute, `file://` URL,
+ *   relative) — normalized to an esbuild entry specifier internally
+ *   (filesystem path for local entries, `file://` URL for UNC).
+ * @param appConfig Application configuration (HTML template, CSS, assets dir…).
+ * @param options Optional runtime and plugin overrides.
+ */
 export async function buildAssets(
   ctx: ReBuildContext | undefined,
   entryPoints: EntryPoint[],
@@ -149,7 +163,7 @@ export async function buildAssets(
     const buildOptions: any = {
       entryPoints: entryPoints.map((ep) => ({
         ...ep,
-        in: normalizeBuildEntryPath(ep.in),
+        in: resolveBuildEntryPath(ep.in),
       })),
       plugins: await getClientBuildPlugins(
         targetRuntime,

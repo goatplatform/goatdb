@@ -484,7 +484,9 @@ export async function runAcrossPlatforms(
       browserElapsed = (browserEnd - browserStart) / 1000;
 
       if (config.mode === 'test' && isBrowserStructuredNoMatchResult(summary)) {
-        console.log('=== 🌐 Browser: no matching tests in this runtime, skipping ===');
+        console.log(
+          '=== 🌐 Browser: no matching tests in this runtime, skipping ===',
+        );
         runtimeOutcomes.push({ runtime: 'browser', status: 'no-match' });
       } else {
         runtimeOutcomes.push({ runtime: 'browser', status: 'matched' });

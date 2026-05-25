@@ -355,17 +355,66 @@ export function sharedClientBuildOptions() {
 
 /**
  * Canonicalizes build entry paths before they cross into the bundling layer.
- * Windows drive-letter paths (for example, C:/foo) and UNC paths must use
- * file:// URL form so loaders preserve the host/share boundary.
+ * Existing `file://` URLs are preserved as-is. UNC paths must use `file://`
+ * URL form so loaders preserve the host/share boundary. Drive-letter paths
+ * are normalized to forward slashes for esbuild compatibility on Windows.
  *
- * POSIX absolute paths, relative paths, and existing file:// URLs are returned
- * unchanged.
+ * POSIX absolute paths are returned unchanged. Relative paths are returned
+ * unchanged — this function does NOT resolve them; see
+ * {@link resolveBuildEntryPath} for inputs that may be relative or in local
+ * `file://` URL form.
+ *
+ * @remarks Use {@link resolveBuildEntryPath} for user-facing inputs (config
+ *   values, CLI arguments) that may be relative or need local `file://` URLs
+ *   decoded to filesystem paths. Use this function only for already-decoded
+ *   path strings when format conversion (UNC ↔ `file://`, backslash ↔ forward
+ *   slash) is the only concern.
  */
 export function normalizeBuildEntryPath(entryPath: string): string {
-  if (/^[A-Za-z]:[/\\]/.test(entryPath) || /^[/\\]{2}[^/\\]/.test(entryPath)) {
+  // Existing file:// specifiers are already valid build-entry inputs.
+  if (path.isFileUrlPath(entryPath)) {
+    return entryPath;
+  }
+  // UNC paths must use file:// URL form to preserve host/share boundary
+  if (path.isUncPathRaw(entryPath)) {
     return path.toFileUrl(entryPath).href;
   }
+  // Drive-letter paths: normalize to forward slashes for esbuild
+  if (/^[A-Za-z]:[/\\]/.test(entryPath)) {
+    return entryPath.replace(/\\/g, '/');
+  }
   return entryPath;
+}
+
+/**
+ * Resolves public build entry inputs into absolute build-entry specifiers.
+ *
+ * Accepts relative paths, `file://` URLs, Windows drive-letter paths, and
+ * UNC paths. Relative paths are resolved against the current working
+ * directory. Local `file://` URLs are decoded to filesystem paths before the
+ * format-conversion rules in {@link normalizeBuildEntryPath} are applied.
+ *
+ * The returned value is intended for build tooling such as esbuild:
+ * - POSIX paths and Windows drive-letter paths become absolute filesystem
+ *   paths.
+ * - UNC inputs become `file://` URLs so the host/share boundary is preserved.
+ *
+ * @remarks Use this function for any entry path originating from user input
+ *   (config files, CLI arguments, environment variables). Use
+ *   {@link normalizeBuildEntryPath} directly when you already have an
+ *   absolute path and only need format conversion.
+ */
+export function resolveBuildEntryPath(entryPath: string): string {
+  if (path.isFileUrlPath(entryPath)) {
+    const fsPath = path.fromFileUrl(entryPath);
+    // UNC file:// URL decodes to a //host/share path which must stay a file://
+    // specifier so esbuild preserves the host/share boundary.
+    if (path.isUncPathRaw(fsPath)) {
+      return entryPath;
+    }
+    return normalizeBuildEntryPath(fsPath);
+  }
+  return normalizeBuildEntryPath(path.resolve(entryPath));
 }
 
 /**
@@ -373,6 +422,14 @@ export function normalizeBuildEntryPath(entryPath: string): string {
  * hot-reload). Deno-only — uses `@deno/esbuild-plugin` which is not
  * available on Node.js. Production builds go through `buildAssets()` in
  * `cli/build-assets.ts` directly.
+ *
+ * @param entryPoints Entry-point descriptors passed to esbuild.
+ *   `entryPoints[].in` accepts any of: POSIX absolute path, Windows
+ *   drive-letter path, UNC path, `file://` URL, or relative path —
+ *   normalized to an esbuild entry specifier internally before esbuild
+ *   receives it (filesystem path for local entries, `file://` URL for UNC).
+ * @param extraPlugins Optional esbuild-compatible plugins injected between
+ *   GoatDB's stub plugins and the CSS fallback loader.
  */
 export async function createBuildContext(
   entryPoints: { in: string; out: string }[],
@@ -389,7 +446,7 @@ export async function createBuildContext(
   const ctx = await esbuild.context({
     entryPoints: entryPoints.map((ep) => ({
       ...ep,
-      in: normalizeBuildEntryPath(ep.in),
+      in: resolveBuildEntryPath(ep.in),
     })),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     plugins: await getClientBuildPlugins('deno', extraPlugins) as any,

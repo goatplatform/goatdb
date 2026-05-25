@@ -212,13 +212,15 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
     // ready. This avoids creating a transient progress root that would get
     // immediately torn down by the no-match handler.
     if (testCount === 0 && (payload.suiteName || payload.testName)) {
-      self.postMessage({
-        type: 'no-match',
-        payload: {
-          suiteName: payload.suiteName,
-          testName: payload.testName,
-        },
-      } satisfies NoMatchMessage);
+      self.postMessage(
+        {
+          type: 'no-match',
+          payload: {
+            suiteName: payload.suiteName,
+            testName: payload.testName,
+          },
+        } satisfies NoMatchMessage,
+      );
       return;
     }
 

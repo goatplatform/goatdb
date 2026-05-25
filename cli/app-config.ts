@@ -13,6 +13,10 @@ export type AppConfig = {
    * automatically transpiles the client code for the browser code using
    * ESBuild.
    *
+   * Accepted forms: relative paths, absolute filesystem paths, local
+   * `file://` URLs, Windows drive-letter paths, and UNC paths.
+   * Prefer `file://server/share/...` for UNC inputs.
+   *
    * Supported files: .js .jsx .ts .tsx.
    * Accessible at `/app.js`
    */

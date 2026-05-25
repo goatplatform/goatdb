@@ -5,6 +5,7 @@ import {
   getEsbuild,
   kDenoEsbuildPluginSpecifier,
   kJsrDenoEsbuildPluginSpecifier,
+  resolveBuildEntryPath,
   stopBackgroundCompiler,
 } from '../build.ts';
 import type { AppConfig } from './app-config.ts';
@@ -16,6 +17,7 @@ import { getRuntime } from '../base/runtime/index.ts';
 import type { OperatingSystem } from '../base/os.ts';
 import { cli } from '../base/development.ts';
 import { pathExists } from '../base/json-log/file-impl.ts';
+import { log } from '../logging/log.ts';
 
 /** Minimum supported Node.js major version. Update here when raising the engine floor. */
 export const kMinNodeMajor = 24;
@@ -91,7 +93,11 @@ export type SigningOptions = {
 /** @group Compilation */
 export type ExecutableOptions = {
   /**
-   * Path to main server entry file.
+   * Path to the main server entry file.
+   *
+   * Accepted forms: relative paths, absolute filesystem paths, local
+   * `file://` URLs, Windows drive-letter paths, and UNC paths.
+   * Prefer `file://server/share/...` for UNC inputs.
    */
   serverEntry: string;
   /**
@@ -194,6 +200,13 @@ export async function compile(options: CompileOptions): Promise<void> {
   }
 }
 
+/** Converts a resolved build entry to a native filesystem path (for file checks / CLI args). */
+function buildEntryToFsPath(resolvedEntry: string): string {
+  return path.isFileUrlPath(resolvedEntry)
+    ? path.fromFileUrl(resolvedEntry)
+    : resolvedEntry;
+}
+
 /**
  * Bundles client assets and generates build info for embedding into executables.
  * Shared by both Deno and Node.js compile paths.
@@ -203,10 +216,10 @@ async function bundleClientAssets(
   runtime?: 'deno' | 'node',
   keepEsbuildAlive?: boolean,
 ): Promise<{ assetsJson: string; buildInfoJson: string }> {
-  console.log('Bundling client code...');
+  log({ severity: 'INFO', message: 'Bundling client code...' });
   const bundlingStart = performance.now();
   const entryPoints = [
-    { in: path.resolve(options.jsPath), out: APP_ENTRY_POINT },
+    { in: resolveBuildEntryPath(options.jsPath), out: APP_ENTRY_POINT },
   ];
   const minify = options.minify !== false;
   const buildAssetsOpts: BuildAssetsOptions = {
@@ -236,11 +249,12 @@ async function bundleClientAssets(
   }
   const buildInfo = await generateBuildInfo(configPath);
 
-  console.log(
-    `Done. Bundling took ${
+  log({
+    severity: 'INFO',
+    message: `Done. Bundling took ${
       ((performance.now() - bundlingStart) / 1000).toFixed(2)
     }sec`,
-  );
+  });
   return {
     assetsJson: JSON.stringify(assets),
     buildInfoJson: JSON.stringify(buildInfo),
@@ -252,13 +266,17 @@ async function bundleClientAssets(
  * Supports cross-compilation to different OS/architecture targets.
  */
 async function compileDeno(options: CompileOptions): Promise<string> {
-  const resolvedEntry = path.resolve(options.serverEntry);
-  if (!(await pathExists(resolvedEntry))) {
-    throw new Error(`Server entry not found: ${resolvedEntry}`);
+  const resolvedEntry = resolveBuildEntryPath(options.serverEntry);
+  const entryFsPath = buildEntryToFsPath(resolvedEntry);
+  if (!(await pathExists(entryFsPath))) {
+    throw new Error(`Server entry not found: ${entryFsPath}`);
   }
 
   const targetOsArch = targetFromOSArch(options.os, options.arch);
-  console.log(`Starting Deno compilation for ${targetOsArch}`);
+  log({
+    severity: 'INFO',
+    message: `Starting Deno compilation for ${targetOsArch}`,
+  });
 
   // keepEsbuildAlive defaults to false — esbuild self-terminates after bundling.
   const { assetsJson, buildInfoJson } = await bundleClientAssets(
@@ -283,7 +301,7 @@ async function compileDeno(options: CompileOptions): Promise<string> {
   try {
     await Deno.writeTextFile(assetsJsonPath, assetsJson);
     await Deno.writeTextFile(buildInfoJsonPath, buildInfoJson);
-    console.log(`Compiling server executable...`);
+    log({ severity: 'INFO', message: 'Compiling server executable...' });
     const compileStart = performance.now();
     const compileArgs = [
       'compile',
@@ -297,7 +315,7 @@ async function compileDeno(options: CompileOptions): Promise<string> {
     if (options.denoJson) {
       compileArgs.push(`--config=${options.denoJson}`);
     }
-    compileArgs.push(path.resolve(options.serverEntry));
+    compileArgs.push(entryFsPath);
     const compileLocalCmd = new Deno.Command(Deno.execPath(), {
       args: compileArgs,
     });
@@ -310,11 +328,12 @@ async function compileDeno(options: CompileOptions): Promise<string> {
         }" for diagnostics.\n${stderr}`,
       );
     }
-    console.log(
-      `Done. Compilation took ${
+    log({
+      severity: 'INFO',
+      message: `Done. Compilation took ${
         ((performance.now() - compileStart) / 1000).toFixed(2)
       }sec. Binary placed at ${outputFile}`,
-    );
+    });
     success = true;
   } finally {
     const cleanupPaths = [assetsJsonPath, buildInfoJsonPath];
@@ -363,15 +382,19 @@ interface SEAConfig {
  * postject is installed automatically as an optional dependency of `@goatdb/goatdb`.
  */
 async function compileNodeSEA(options: CompileOptions): Promise<string> {
-  const resolvedEntry = path.resolve(options.serverEntry);
-  if (!(await pathExists(resolvedEntry))) {
-    throw new Error(`Server entry not found: ${resolvedEntry}`);
+  const resolvedEntry = resolveBuildEntryPath(options.serverEntry);
+  const entryFsPath = buildEntryToFsPath(resolvedEntry);
+  if (!(await pathExists(entryFsPath))) {
+    throw new Error(`Server entry not found: ${entryFsPath}`);
   }
 
   const runtime = getRuntime();
   const osName = runtime.getOS();
 
-  console.log(`Starting Node.js SEA compilation for ${osName}`);
+  log({
+    severity: 'INFO',
+    message: `Starting Node.js SEA compilation for ${osName}`,
+  });
 
   if (options.os || options.arch) {
     throw new Error(
@@ -441,11 +464,11 @@ async function compileNodeSEA(options: CompileOptions): Promise<string> {
     await fs.writeFile(buildInfoJsonPath, buildInfoJson);
 
     // Bundle server entry to CJS
-    console.log('Bundling server for SEA...');
-    await bundleServerForSEA(options.serverEntry, serverBundlePath);
+    log({ severity: 'INFO', message: 'Bundling server for SEA...' });
+    await bundleServerForSEA(resolvedEntry, serverBundlePath);
 
     // Generate SEA config
-    console.log('Generating SEA configuration...');
+    log({ severity: 'INFO', message: 'Generating SEA configuration...' });
     const seaConfig: SEAConfig = {
       main: serverBundlePath,
       output: seaBlobPath,
@@ -460,7 +483,7 @@ async function compileNodeSEA(options: CompileOptions): Promise<string> {
     await fs.writeFile(seaConfigPath, JSON.stringify(seaConfig, null, 2));
 
     // Generate SEA blob
-    console.log('Generating SEA blob...');
+    log({ severity: 'INFO', message: 'Generating SEA blob...' });
     const seaResult = await cli(
       'node',
       '--experimental-sea-config',
@@ -472,7 +495,7 @@ async function compileNodeSEA(options: CompileOptions): Promise<string> {
     }
 
     // Copy Node.js binary
-    console.log('Creating executable...');
+    log({ severity: 'INFO', message: 'Creating executable...' });
     await fs.copyFile(runtime.getExecPath(), outputFile);
     if (osName !== 'windows') {
       await fs.chmod(outputFile, 0o755);
@@ -507,11 +530,12 @@ async function compileNodeSEA(options: CompileOptions): Promise<string> {
     }
   }
 
-  console.log(
-    `Done. Compilation took ${
+  log({
+    severity: 'INFO',
+    message: `Done. Compilation took ${
       ((performance.now() - compileStart) / 1000).toFixed(2)
     }sec. Binary placed at ${outputFile}`,
-  );
+  });
   return outputFile;
 }
 
@@ -525,11 +549,16 @@ export async function bundleServerForSEA(
   output: string,
 ): Promise<void> {
   const esbuild = await getEsbuild();
+  // Re-resolve: this function is a public/test-facing API that accepts
+  // file:// URLs directly (see cli-compile.test.ts). Callers that already
+  // resolved (e.g. compileNodeSEA) are unaffected — resolve is idempotent
+  // for absolute paths.
+  const resolvedEntry = resolveBuildEntryPath(entry);
   // Defensive fallback — version is always present in a running Node.js process.
   const nodeMajor = getRuntime().getSystemInfo().version?.split('.')[0] ||
     String(kMinNodeMajor);
   const result = await esbuild.build({
-    entryPoints: [path.resolve(entry)],
+    entryPoints: [resolvedEntry],
     plugins: [adapterStubPlugin(['deno', 'browser'])],
     bundle: true,
     platform: 'node',
@@ -577,7 +606,10 @@ async function injectBlob(
 
   if (osName === 'darwin') {
     // macOS: Remove existing signature before injection
-    console.log('Removing macOS code signature for injection...');
+    log({
+      severity: 'INFO',
+      message: 'Removing macOS code signature for injection...',
+    });
     const removeResult = await cli('codesign', '--remove-signature', execPath, {
       timeout: 120_000,
     });
@@ -594,7 +626,7 @@ async function injectBlob(
     });
 
     // Ad-hoc sign after injection
-    console.log('Ad-hoc signing macOS executable...');
+    log({ severity: 'INFO', message: 'Ad-hoc signing macOS executable...' });
     const adHocResult = await cli('codesign', '--sign', '-', execPath, {
       timeout: 120_000,
     });
@@ -612,8 +644,10 @@ async function injectBlob(
 /**
  * Signs the compiled executable for distribution.
  * Supports macOS codesign/notarization and Windows signtool.
+ *
+ * @internal — exported for testing only; not part of the public API.
  */
-async function signExecutable(
+export async function signExecutable(
   execPath: string,
   options: SigningOptions,
 ): Promise<void> {
@@ -633,9 +667,12 @@ async function signExecutable(
       );
     }
     if (!options.identity) {
-      console.warn(
-        'Warning: No signing identity provided. Using ad-hoc signing (not suitable for distribution).',
-      );
+      log({
+        severity: 'WARNING',
+        error: 'MissingConfiguration',
+        message:
+          'No signing identity provided. Using ad-hoc signing (not suitable for distribution).',
+      });
     }
     const identity = options.identity || '-'; // Ad-hoc if not specified
     const args = ['--sign', identity];
@@ -658,7 +695,7 @@ async function signExecutable(
     }
     args.push(execPath);
 
-    console.log('Signing macOS executable...');
+    log({ severity: 'INFO', message: 'Signing macOS executable...' });
     const signResult = await cli('codesign', ...args, { timeout: 120_000 });
     if (signResult.exitCode !== 0) {
       throw new Error(`Code signing failed: ${signResult.result}`);
@@ -666,7 +703,7 @@ async function signExecutable(
 
     // Notarization (optional)
     if (options.notarize) {
-      console.log('Submitting for notarization...');
+      log({ severity: 'INFO', message: 'Submitting for notarization...' });
       const notarizeResult = await cli(
         'xcrun',
         'notarytool',
@@ -683,14 +720,16 @@ async function signExecutable(
 
       // Staple by default unless explicitly disabled
       if (options.notarize.staple !== false) {
-        console.log('Stapling notarization ticket...');
+        log({ severity: 'INFO', message: 'Stapling notarization ticket...' });
         const stapleResult = await cli('xcrun', 'stapler', 'staple', execPath, {
           timeout: 120_000,
         });
         if (stapleResult.exitCode !== 0) {
-          console.warn(
-            `Warning: Stapling failed. Binary is notarized but offline verification won't work: ${stapleResult.result}`,
-          );
+          log({
+            severity: 'WARNING',
+            message:
+              `Stapling failed. Binary is notarized but offline verification won't work: ${stapleResult.result}`,
+          });
         }
       }
     }
@@ -699,7 +738,10 @@ async function signExecutable(
 
     if (windowsOpts?.thumbprint) {
       // Thumbprint-based signing (certificate store)
-      console.log('Signing Windows executable via certificate store...');
+      log({
+        severity: 'INFO',
+        message: 'Signing Windows executable via certificate store...',
+      });
       const args = ['sign', '/fd', 'SHA256', '/sha1', windowsOpts.thumbprint];
       args.push('/s', windowsOpts.storeName || 'MY');
       if (windowsOpts.timestampUrl) {
@@ -717,13 +759,18 @@ async function signExecutable(
           `Certificate file not found at "${windowsOpts.certFile}".`,
         );
       }
-      console.log('Signing Windows executable via certificate file...');
+      log({
+        severity: 'INFO',
+        message: 'Signing Windows executable via certificate file...',
+      });
       const args = ['sign', '/fd', 'SHA256', '/f', windowsOpts.certFile];
       if (windowsOpts.certPassword) {
-        console.warn(
-          'Warning: certPassword is passed as a CLI argument and may be visible in process listings. ' +
+        log({
+          severity: 'WARNING',
+          message:
+            'certPassword is passed as a CLI argument and may be visible in process listings. ' +
             'Prefer thumbprint-based signing via certificate store for production.',
-        );
+        });
         args.push('/p', windowsOpts.certPassword);
       }
       if (windowsOpts.timestampUrl) {
@@ -735,15 +782,20 @@ async function signExecutable(
         throw new Error(`Code signing failed: ${signResult.result}`);
       }
     } else {
-      console.warn(
-        'Warning: Signing requested for Windows but no certificate configuration provided. ' +
+      log({
+        severity: 'WARNING',
+        error: 'MissingConfiguration',
+        message:
+          'Signing requested for Windows but no certificate configuration provided. ' +
           'Set signing.windows.thumbprint or signing.windows.certFile.',
-      );
+      });
     }
   } else {
-    console.warn(
-      `Warning: Code signing is not supported on ${osName}. The signing options will be ignored.`,
-    );
+    log({
+      severity: 'WARNING',
+      message:
+        `Code signing is not supported on ${osName}. The signing options will be ignored.`,
+    });
   }
 }
 
