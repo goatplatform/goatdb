@@ -3,28 +3,12 @@
   "specifiers": {
     "jsr:@deno-library/compress@*": "0.5.6",
     "jsr:@deno-library/crc32@1.0.2": "1.0.2",
-    "jsr:@goatdb/orderstamp@^1.1.1": "1.1.1",
-    "jsr:@luca/esbuild-deno-loader@~0.11.1": "0.11.1",
-    "jsr:@std/assert@^1.0.19": "1.0.19",
     "jsr:@std/bytes@^1.0.2": "1.0.6",
-    "jsr:@std/data-structures@^1.0.8": "1.0.11",
-    "jsr:@std/encoding@^1.0.10": "1.0.10",
-    "jsr:@std/encoding@^1.0.5": "1.0.10",
-    "jsr:@std/expect@^1.0.16": "1.0.19",
-    "jsr:@std/fs@*": "1.0.19",
     "jsr:@std/fs@1.0.5": "1.0.5",
-    "jsr:@std/internal@^1.0.12": "1.0.13",
-    "jsr:@std/internal@^1.0.13": "1.0.13",
-    "jsr:@std/internal@^1.0.9": "1.0.10",
     "jsr:@std/io@0.225.0": "0.225.0",
-    "jsr:@std/path@*": "1.1.1",
     "jsr:@std/path@1.0.8": "1.0.8",
-    "jsr:@std/path@^1.0.6": "1.1.4",
-    "jsr:@std/path@^1.0.7": "1.1.1",
-    "jsr:@std/path@^1.0.9": "1.1.1",
-    "jsr:@std/path@^1.1.1": "1.1.1",
-    "jsr:@std/path@^1.1.4": "1.1.4",
-    "jsr:@std/streams@^1.0.7": "1.0.10",
+    "jsr:@std/path@^1.0.7": "1.0.8",
+    "jsr:@std/streams@^1.0.7": "1.1.0",
     "jsr:@std/tar@0.1.3": "0.1.3",
     "jsr:@zip-js/zip-js@2.7.53": "2.7.53",
     "npm:@docusaurus/core@3.10.0": "3.10.0_@docusaurus+faster@3.10.0__@docusaurus+types@3.10.0___react@19.1.0___react-dom@19.1.0____react@19.1.0__react@19.1.0__react-dom@19.1.0___react@19.1.0_@mdx-js+react@3.1.0__@types+react@19.1.9__react@19.1.0_react@19.1.0_react-dom@19.1.0__react@19.1.0_@docusaurus+types@3.10.0__react@19.1.0__react-dom@19.1.0___react@19.1.0_typescript@5.9.3",
@@ -34,41 +18,22 @@
     "npm:@docusaurus/preset-classic@3.10.0": "3.10.0_react@19.1.0_react-dom@19.1.0__react@19.1.0_@algolia+client-search@5.50.2_@docusaurus+faster@3.10.0__@docusaurus+types@3.10.0___react@19.1.0___react-dom@19.1.0____react@19.1.0__react@19.1.0__react-dom@19.1.0___react@19.1.0_@mdx-js+react@3.1.0__@types+react@19.1.9__react@19.1.0_@types+react@19.1.9_search-insights@2.17.3_typescript@5.9.3",
     "npm:@docusaurus/tsconfig@3.10.0": "3.10.0",
     "npm:@docusaurus/types@3.10.0": "3.10.0_react@19.1.0_react-dom@19.1.0__react@19.1.0",
-    "npm:@jsr/goatdb__orderstamp@^1.1.1": "1.1.1",
-    "npm:@jsr/std__data-structures@^1.0.8": "1.0.10",
-    "npm:@jsr/std__encoding@^1.0.10": "1.0.10",
-    "npm:@jsr/std__path@^1.0.9": "1.1.4",
     "npm:@mdx-js/react@3": "3.1.0_@types+react@19.1.9_react@19.1.0",
-    "npm:@types/node@24": "24.12.2",
-    "npm:@types/nodemailer@^6.4.17": "6.4.23",
-    "npm:@types/react@19": "19.1.9",
     "npm:clsx@2": "2.1.1",
-    "npm:elen@^1.0.10": "1.0.10",
-    "npm:esbuild@~0.25.4": "0.25.12",
-    "npm:nodemailer@^6.10.0": "6.10.1",
-    "npm:playwright@^1.48.0": "1.59.1",
-    "npm:postject@1.0.0-alpha.6": "1.0.0-alpha.6",
     "npm:prism-react-renderer@^2.3.0": "2.4.1_react@19.1.0",
     "npm:react-dom@19": "19.1.0_react@19.1.0",
-    "npm:react@19": "19.1.0",
-    "npm:react@^19.1.0": "19.1.0",
     "npm:rehype-katex@^7.0.1": "7.0.1",
     "npm:remark-math@6": "6.0.0",
-    "npm:source-map@~0.7.4": "0.7.6",
-    "npm:sql.js@^1.11.0": "1.14.1",
-    "npm:tsup@8": "8.5.1_@swc+core@1.15.24_postcss@8.5.9_typescript@5.9.3",
     "npm:typedoc-plugin-markdown@^4.10.0": "4.11.0_typedoc@0.28.19__typescript@5.9.3_typescript@5.9.3",
     "npm:typedoc@~0.28.8": "0.28.19_typescript@5.9.3",
-    "npm:typescript@^5.9.3": "5.9.3",
-    "npm:typescript@~5.6.2": "5.6.3",
-    "npm:yargs@^17.7.2": "17.7.2"
+    "npm:typescript@~5.6.2": "5.6.3"
   },
   "jsr": {
     "@deno-library/compress@0.5.6": {
       "integrity": "9d76e37e7682fc8d3d99d5641a7af454ce4689b1df3fd3062141a1deb64453cd",
       "dependencies": [
         "jsr:@deno-library/crc32",
-        "jsr:@std/fs@1.0.5",
+        "jsr:@std/fs",
         "jsr:@std/io",
         "jsr:@std/path@1.0.8",
         "jsr:@std/tar",
@@ -78,64 +43,14 @@
     "@deno-library/crc32@1.0.2": {
       "integrity": "d2061bfee30c87c97f285dfca0fdc4458e632dc072a33ecfc73ca5177a5a39a0"
     },
-    "@goatdb/orderstamp@1.1.1": {
-      "integrity": "7b88569a27f7e5423f19bc42ed727eb3bdee60f2afa8472aa66f5cdb75f46714",
-      "dependencies": [
-        "npm:elen"
-      ]
-    },
-    "@luca/esbuild-deno-loader@0.11.1": {
-      "integrity": "dc020d16d75b591f679f6b9288b10f38bdb4f24345edb2f5732affa1d9885267",
-      "dependencies": [
-        "jsr:@std/bytes",
-        "jsr:@std/encoding@^1.0.5",
-        "jsr:@std/path@^1.0.6"
-      ]
-    },
-    "@std/assert@1.0.19": {
-      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
-      "dependencies": [
-        "jsr:@std/internal@^1.0.12"
-      ]
-    },
     "@std/bytes@1.0.6": {
       "integrity": "f6ac6adbd8ccd99314045f5703e23af0a68d7f7e58364b47d2c7f408aeb5820a"
-    },
-    "@std/data-structures@1.0.11": {
-      "integrity": "53b98ed7efa61f107dfc14244bd2ec5557f7f7ee0bbaef6d449d7937facacb89",
-      "dependencies": [
-        "jsr:@std/assert"
-      ]
-    },
-    "@std/encoding@1.0.10": {
-      "integrity": "8783c6384a2d13abd5e9e87a7ae0520a30e9f56aeeaa3bdf910a3eaaf5c811a1"
-    },
-    "@std/expect@1.0.19": {
-      "integrity": "25271785688c7ff902fa54875d6aa4001f552c5578f7f0fefb5b5aac1fc2ed8a",
-      "dependencies": [
-        "jsr:@std/assert",
-        "jsr:@std/internal@^1.0.13",
-        "jsr:@std/path@^1.1.4"
-      ]
     },
     "@std/fs@1.0.5": {
       "integrity": "41806ad6823d0b5f275f9849a2640d87e4ef67c51ee1b8fb02426f55e02fd44e",
       "dependencies": [
         "jsr:@std/path@^1.0.7"
       ]
-    },
-    "@std/fs@1.0.19": {
-      "integrity": "051968c2b1eae4d2ea9f79a08a3845740ef6af10356aff43d3e2ef11ed09fb06",
-      "dependencies": [
-        "jsr:@std/internal@^1.0.9",
-        "jsr:@std/path@^1.1.1"
-      ]
-    },
-    "@std/internal@1.0.10": {
-      "integrity": "e3be62ce42cab0e177c27698e5d9800122f67b766a0bea6ca4867886cbde8cf7"
-    },
-    "@std/internal@1.0.13": {
-      "integrity": "2f9546691d4ac2d32859c82dff284aaeac980ddeca38430d07941e7e288725c0"
     },
     "@std/io@0.225.0": {
       "integrity": "c1db7c5e5a231629b32d64b9a53139445b2ca640d828c26bf23e1c55f8c079b3",
@@ -146,20 +61,8 @@
     "@std/path@1.0.8": {
       "integrity": "548fa456bb6a04d3c1a1e7477986b6cffbce95102d0bb447c67c4ee70e0364be"
     },
-    "@std/path@1.1.1": {
-      "integrity": "fe00026bd3a7e6a27f73709b83c607798be40e20c81dde655ce34052fd82ec76",
-      "dependencies": [
-        "jsr:@std/internal@^1.0.9"
-      ]
-    },
-    "@std/path@1.1.4": {
-      "integrity": "1d2d43f39efb1b42f0b1882a25486647cb851481862dc7313390b2bb044314b5",
-      "dependencies": [
-        "jsr:@std/internal@^1.0.12"
-      ]
-    },
-    "@std/streams@1.0.10": {
-      "integrity": "75c0b1431873cd0d8b3d679015220204d36d3c7420d93b60acfc379eb0dc30af"
+    "@std/streams@1.1.0": {
+      "integrity": "2f7024d841f343fd478afe0c958a3f0f068ef2a0d2bcc954f550f97ac1fa22e3"
     },
     "@std/tar@0.1.3": {
       "integrity": "531270fc707b37ab9b5f051aa4943e7b16b86905e0398a4ebe062983b0c93115",
@@ -9621,61 +9524,28 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@goatdb/orderstamp@^1.1.1",
-      "jsr:@luca/esbuild-deno-loader@~0.11.1",
-      "jsr:@std/data-structures@^1.0.8",
-      "jsr:@std/encoding@^1.0.10",
-      "jsr:@std/expect@^1.0.16",
-      "jsr:@std/path@^1.0.9",
-      "npm:@types/nodemailer@^6.4.17",
-      "npm:esbuild@~0.25.4",
-      "npm:nodemailer@^6.10.0",
-      "npm:playwright@^1.48.0",
-      "npm:postject@1.0.0-alpha.6",
-      "npm:react@^19.1.0",
-      "npm:source-map@~0.7.4",
-      "npm:sql.js@^1.11.0",
-      "npm:yargs@^17.7.2"
+      "npm:typedoc-plugin-markdown@^4.10.0",
+      "npm:typedoc@~0.28.8"
     ],
     "packageJson": {
       "dependencies": [
-        "npm:@jsr/goatdb__orderstamp@^1.1.1",
-        "npm:@jsr/std__data-structures@^1.0.8",
-        "npm:@jsr/std__encoding@^1.0.10",
-        "npm:@jsr/std__path@^1.0.9",
-        "npm:@types/node@24",
-        "npm:@types/nodemailer@^6.4.17",
-        "npm:@types/react@19",
-        "npm:tsup@8",
-        "npm:typescript@^5.9.3"
+        "npm:@docusaurus/core@3.10.0",
+        "npm:@docusaurus/faster@3.10.0",
+        "npm:@docusaurus/module-type-aliases@3.10.0",
+        "npm:@docusaurus/plugin-content-docs@3.10.0",
+        "npm:@docusaurus/plugin-google-gtag@3.10.0",
+        "npm:@docusaurus/preset-classic@3.10.0",
+        "npm:@docusaurus/tsconfig@3.10.0",
+        "npm:@docusaurus/types@3.10.0",
+        "npm:@mdx-js/react@3",
+        "npm:clsx@2",
+        "npm:prism-react-renderer@^2.3.0",
+        "npm:react-dom@19",
+        "npm:react@19",
+        "npm:rehype-katex@^7.0.1",
+        "npm:remark-math@6",
+        "npm:typescript@~5.6.2"
       ]
-    },
-    "members": {
-      "docs": {
-        "dependencies": [
-          "npm:typedoc-plugin-markdown@^4.10.0",
-          "npm:typedoc@~0.28.8"
-        ],
-        "packageJson": {
-          "dependencies": [
-            "npm:@docusaurus/core@3.10.0",
-            "npm:@docusaurus/faster@3.10.0",
-            "npm:@docusaurus/module-type-aliases@3.10.0",
-            "npm:@docusaurus/plugin-google-gtag@3.10.0",
-            "npm:@docusaurus/preset-classic@3.10.0",
-            "npm:@docusaurus/tsconfig@3.10.0",
-            "npm:@docusaurus/types@3.10.0",
-            "npm:@mdx-js/react@3",
-            "npm:clsx@2",
-            "npm:prism-react-renderer@^2.3.0",
-            "npm:react-dom@19",
-            "npm:react@19",
-            "npm:rehype-katex@^7.0.1",
-            "npm:remark-math@6",
-            "npm:typescript@~5.6.2"
-          ]
-        }
-      }
     }
   }
 }
