@@ -5,7 +5,6 @@ sidebar_position: 12
 slug: /faq
 ---
 
-
 # GoatDB FAQ
 
 ## What is GoatDB?
@@ -34,31 +33,37 @@ adhering to the same principles as cloud-first applications.
 
 GoatDB is optimized for read-heavy workloads, where reads significantly
 outnumber writes. For the occasional writes, GoatDB supports concurrent
-operations with distributed, lockless [concurrency control](/docs/architecture). It
-is ideal for use cases that naturally segment into logical data repositories.
+operations with distributed, lockless [concurrency control](/docs/architecture).
+It is ideal for use cases that naturally segment into logical data repositories.
 
 ## Can you delete data from GoatDB?
 
 Yes. Although the underlying structure is an
-[append-only commit graph](/docs/commit-graph), GoatDB employs garbage collection.
-Data deletion involves marking items as deleted, with garbage collection
-handling eventual removal. Note that the garbage collection feature is still a
-work in progress and will be fully implemented in upcoming releases.
+[append-only commit graph](/docs/commit-graph), GoatDB employs garbage
+collection. Data deletion involves marking items as deleted, with garbage
+collection handling eventual removal. Note that the garbage collection feature
+is still a work in progress and will be fully implemented in upcoming releases.
 
 ## How does synchronization work in GoatDB?
 
-GoatDB employs a soft [real-time synchronization](/docs/sync) mechanism that captures
-in-memory states of peers up to three times per second. These states are
-packaged into signed commits and appended to an append-only commit graph.
+GoatDB employs a soft [real-time synchronization](/docs/sync) mechanism that
+captures in-memory states of peers up to three times per second. These states
+are packaged into signed commits and appended to an append-only commit graph.
 Synchronization uses a probabilistic protocol with Bloom Filters to minimize
 data comparison overhead, ensuring efficient and consistent propagation of
 updates across peers.
 
 ## What sync latency should I expect?
 
-Typical synchronization latency is **700-1000ms** between peers in real-world deployments. This represents application-perceived latency (when data becomes available via API) rather than pure network transmission time.
+Typical synchronization latency is **700-1000ms** between peers in real-world
+deployments. This represents application-perceived latency (when data becomes
+available via API) rather than pure network transmission time.
 
-GoatDB prioritizes data consistency and offline-first capabilities over minimal latency. The architecture uses polling-based synchronization with adaptive timing that balances performance with reliability. For applications requiring sub-100ms sync times, evaluate whether GoatDB's consistency guarantees align with your performance requirements.
+GoatDB prioritizes data consistency and offline-first capabilities over minimal
+latency. The architecture uses polling-based synchronization with adaptive
+timing that balances performance with reliability. For applications requiring
+sub-100ms sync times, evaluate whether GoatDB's consistency guarantees align
+with your performance requirements.
 
 ## Can GoatDB operate offline?
 
@@ -126,8 +131,8 @@ precise analysis of data changes over time.
 
 ## How does GoatDB ensure compliance and auditability?
 
-The append-only signed [commit graph](/docs/commit-graph) acts as a built-in audit
-log. This log provides full traceability for data modifications, ensuring
+The append-only signed [commit graph](/docs/commit-graph) acts as a built-in
+audit log. This log provides full traceability for data modifications, ensuring
 transparency and compliance with regulatory requirements. Additionally, it
 allows reversion to the last valid state if needed.
 
@@ -161,16 +166,17 @@ tolerance.
 ## Does GoatDB support Node.js?
 
 Yes. Node.js is a fully supported, first-class runtime alongside Deno. GoatDB
-provides a complete Node.js adapter including HTTP server (`node:http`/`node:https`),
-file I/O, crypto, workers, and Single Executable Application (SEA) compilation.
-Node.js 24+ is required. See the [installation guide](/docs/install) for setup
-instructions and the [examples](https://github.com/goatplatform/goatdb/tree/main/examples)
-for working Node.js projects.
+provides a complete Node.js adapter including HTTP server
+(`node:http`/`node:https`), file I/O, crypto, workers, and Single Executable
+Application (SEA) compilation. Node.js 24+ is required. See the
+[installation guide](/docs/install) for setup instructions and the
+[examples](https://github.com/goatplatform/goatdb/tree/main/examples) for
+working Node.js projects.
 
 ## What licensing options does GoatDB offer?
 
-GoatDB is released under the MIT License, a permissive open-source license
-that provides:
+GoatDB is released under the MIT License, a permissive open-source license that
+provides:
 
 - Freedom to use the software for any purpose
 - Freedom to modify and distribute the software

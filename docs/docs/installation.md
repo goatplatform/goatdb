@@ -5,7 +5,6 @@ sidebar_position: 0
 slug: /install
 ---
 
-
 ## GoatDB Installation
 
 GoatDB runs on both Deno and Node.js as fully supported, first-class runtimes.
@@ -30,7 +29,8 @@ anywhere), but Node.js is equally capable for production use.
    and dev tooling — then installs all dependencies. Skip this step if you're
    adding GoatDB to an existing project.
 
-   See the [CLI & Build Tools](./cli) for the generated file structure, all options, and Node.js usage.
+   See the [CLI & Build Tools](./cli) for the generated file structure, all
+   options, and Node.js usage.
 
 ### Node.js Installation
 
@@ -40,7 +40,11 @@ Install using one of the following package managers:
 
 :::tip[Building Standalone Executables]
 
-To compile Node.js applications to standalone executables using SEA (Single Executable Applications), GoatDB uses [postject](https://github.com/nicolo-ribaudo/postject), which is installed automatically as an optional dependency. No manual setup required. See [Node.js SEA docs](https://nodejs.org/api/single-executable-applications.html).
+To compile Node.js applications to standalone executables using SEA (Single
+Executable Applications), GoatDB uses
+[postject](https://github.com/nicolo-ribaudo/postject), which is installed
+automatically as an optional dependency. No manual setup required. See
+[Node.js SEA docs](https://nodejs.org/api/single-executable-applications.html).
 
 :::
 

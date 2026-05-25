@@ -40,12 +40,12 @@ with the rest of the entry's stylesheet.
 
 The main app entry emits:
 
-| Asset | When it exists |
-|---|---|
-| `/app.js` | Always, for the browser JavaScript bundle |
-| `/app.js.map` | Always, for the browser JavaScript source map |
-| `/index.css` | Always after the app entry builds, even when empty |
-| `/index.css.map` | Only when bundled CSS has source maps |
+| Asset            | When it exists                                     |
+| ---------------- | -------------------------------------------------- |
+| `/app.js`        | Always, for the browser JavaScript bundle          |
+| `/app.js.map`    | Always, for the browser JavaScript source map      |
+| `/index.css`     | Always after the app entry builds, even when empty |
+| `/index.css.map` | Only when bundled CSS has source maps              |
 
 Secondary entries emit JavaScript and source maps at `/{entry}.js` and
 `/{entry}.js.map`. If a secondary entry imports CSS, GoatDB also emits
@@ -111,7 +111,8 @@ const normalizeCssPlugin: BuildPluginLike = {
 Do not pass `npm:` URLs to `fromFileUrl()`. If a Deno plugin resolves into the
 `file` namespace, it must return a real file path.
 
-**Node.js ESM** — use `createRequire` to resolve package CSS to a filesystem path:
+**Node.js ESM** — use `createRequire` to resolve package CSS to a filesystem
+path:
 
 ```typescript
 import { createRequire } from 'node:module';

@@ -12,15 +12,15 @@ import DistributedSecurity from '@site/src/components/diagrams/DistributedSecuri
 # Sessions and Users
 
 [GoatDB](/) implements a robust session-based authentication system that
-provides secure and flexible [user management](/docs/authorization). This document
-explains how sessions work, their security implications, and how they integrate
-with [user management](/docs/authorization).
+provides secure and flexible [user management](/docs/authorization). This
+document explains how sessions work, their security implications, and how they
+integrate with [user management](/docs/authorization).
 
 ## Understanding Session-Based Authentication
 
 At its core, GoatDB's authentication system revolves around sessions - secure
-connections to the database that are represented by **Ed25519 public/private
-key pairs**. The private key is generated and stored exclusively on the peer's
+connections to the database that are represented by **Ed25519 public/private key
+pairs**. The private key is generated and stored exclusively on the peer's
 machine, never leaving its local storage. Only the corresponding public key is
 shared with the GoatDB network.
 
@@ -78,8 +78,8 @@ For applications where security is handled at a different layer or in trusted
 environments (such as microservices running in the cloud without direct client
 interaction), [GoatDB](/) offers a trusted mode that bypasses cryptographic
 verification and security controls. This mode can significantly
-[improve performance](/docs/benchmarks#operational-modes) by skipping commit signing and
-verification.
+[improve performance](/docs/benchmarks#operational-modes) by skipping commit
+signing and verification.
 
 :::note
 

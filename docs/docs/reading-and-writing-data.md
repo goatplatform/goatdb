@@ -5,15 +5,14 @@ sidebar_position: 3
 slug: /read-write-data
 ---
 
-
 # Reading and Writing Data in GoatDB
 
 :::tip
 
-If you're writing UI code, we recommend using the [React Hooks](/docs/react) instead
-of working with ManagedItems directly. The hooks provide a more ergonomic
-interface for [React](/docs/react) components and handle all the complexity of data
-[synchronization](/docs/sync) and updates.
+If you're writing UI code, we recommend using the [React Hooks](/docs/react)
+instead of working with ManagedItems directly. The hooks provide a more
+ergonomic interface for [React](/docs/react) components and handle all the
+complexity of data [synchronization](/docs/sync) and updates.
 
 :::
 
@@ -25,26 +24,28 @@ to effectively [read and write data](/docs/read-write-data).
 
 The data model is built around three key [concepts](/docs/concepts):
 
-1. [**Items**](/docs/concepts#item): The basic building blocks that store your data
-2. [**Managed Items**](/docs/concepts/#manageditem): A higher-level interface that
-   handles data synchronization
+1. [**Items**](/docs/concepts#item): The basic building blocks that store your
+   data
+2. [**Managed Items**](/docs/concepts/#manageditem): A higher-level interface
+   that handles data synchronization
 3. [**Repositories**](/docs/concepts#repository): The fundamental unit of data
    organization, managing collections of related items
 
 Think of [Items](/docs/concepts#item) as the raw data containers,
 [Managed Items](/docs/concepts#manageditem) as smart wrappers that handle data
-[synchronization](/docs/sync) and updates, and [Repositories](/docs/concepts#repository)
-as the containers that organize and store collections of related
-[Items](/docs/concepts#item) efficiently and [durably](/docs/repositories/#durability).
+[synchronization](/docs/sync) and updates, and
+[Repositories](/docs/concepts#repository) as the containers that organize and
+store collections of related [Items](/docs/concepts#item) efficiently and
+[durably](/docs/repositories/#durability).
 
 ## The Data Model
 
 ### Items: The Foundation
 
 At its core, GoatDB uses [Items](/docs/concepts#item) to represent data. An
-[Item](/docs/concepts#item) combines data with its [schema](/docs/schema) definition and
-can be either mutable or immutable depending on its lock state. This design
-provides flexibility while maintaining data integrity.
+[Item](/docs/concepts#item) combines data with its [schema](/docs/schema)
+definition and can be either mutable or immutable depending on its lock state.
+This design provides flexibility while maintaining data integrity.
 
 :::note
 
@@ -55,8 +56,8 @@ For information about schemas and how to define them, see the
 
 ### Managed Items: The Live Interface
 
-[ManagedItem](/docs/concepts#manageditem) provides a high-level interface for working
-with data. It maintains an in-memory, mutable Item and handles
+[ManagedItem](/docs/concepts#manageditem) provides a high-level interface for
+working with data. It maintains an in-memory, mutable Item and handles
 [synchronization](/docs/sync) with both local storage and remote peers.
 
 Here's how you typically work with [Managed Items](/docs/concepts#manageditem):
@@ -76,10 +77,11 @@ userProfile.set('name', 'John Smith');
 
 [ManagedItem](/docs/concepts#manageditem) maintains an in-memory, mutable
 [Item](/docs/concepts#item) that can be modified directly. In the background, it
-periodically computes diffs to track changes and [synchronize](/docs/sync) them with
-both local storage and remote peers. When remote changes are received, they are
-merged back into the in-memory Item. This [design](/docs/architecture) provides
-immediate local updates while ensuring eventual consistency across all peers.
+periodically computes diffs to track changes and [synchronize](/docs/sync) them
+with both local storage and remote peers. When remote changes are received, they
+are merged back into the in-memory Item. This [design](/docs/architecture)
+provides immediate local updates while ensuring eventual consistency across all
+peers.
 
 :::
 
@@ -87,8 +89,8 @@ immediate local updates while ensuring eventual consistency across all peers.
 
 ### Reading Data
 
-Reading data is straightforward with [ManagedItem](/docs/concepts#manageditem). Here
-are some common patterns:
+Reading data is straightforward with [ManagedItem](/docs/concepts#manageditem).
+Here are some common patterns:
 
 ```typescript
 // Get a specific item
@@ -170,11 +172,11 @@ todoItem.isDeleted = false;
 
 :::note
 
-Deletion in GoatDB is soft-delete by default. [Items](/docs/concepts#item) marked as
-deleted are not immediately removed but are instead hidden from
+Deletion in GoatDB is soft-delete by default. [Items](/docs/concepts#item)
+marked as deleted are not immediately removed but are instead hidden from
 [queries](/docs/query) and prepared for future
-[garbage collection](/docs/repositories#durability). This design allows for
-easy [recovery](/docs/repositories/#durability) of accidentally deleted items and
+[garbage collection](/docs/repositories#durability). This design allows for easy
+[recovery](/docs/repositories/#durability) of accidentally deleted items and
 maintains data history.
 
 :::
@@ -195,15 +197,17 @@ await db.flushAll();
 :::tip
 
 The `flush()` operation should be used sparingly as it can impact
-[performance](/docs/benchmarks). The system is designed to handle writes efficiently
-in the background, and forcing immediate persistence is typically only needed in
-specific scenarios like application shutdown or critical data updates.
+[performance](/docs/benchmarks). The system is designed to handle writes
+efficiently in the background, and forcing immediate persistence is typically
+only needed in specific scenarios like application shutdown or critical data
+updates.
 
 :::
 
 ## Change Notifications
 
-[ManagedItems](/docs/concepts#manageditem) emit change events that you can listen to:
+[ManagedItems](/docs/concepts#manageditem) emit change events that you can
+listen to:
 
 ```typescript
 const todoItem = db.item('/todos/work/1');
@@ -257,8 +261,8 @@ todoItem.on('change', (mutations) => {
 
 The mutation system is primarily used internally for change tracking and
 synchronization. Most applications will use the higher-level
-[ManagedItem](/docs/concepts#manageditem) API or [React Hooks](/docs/react) instead of
-working with mutations directly.
+[ManagedItem](/docs/concepts#manageditem) API or [React Hooks](/docs/react)
+instead of working with mutations directly.
 
 :::
 
@@ -281,8 +285,9 @@ console.log(userProfile.get('age')); // Shows 150 temporarily
 
 :::note
 
-Validation rules are defined in your [schema](/docs/schema). GoatDB uses these rules
-to automatically prevent invalid data from being persisted or
-[synchronized](/docs/sync), ensuring your data always meets the defined constraints.
+Validation rules are defined in your [schema](/docs/schema). GoatDB uses these
+rules to automatically prevent invalid data from being persisted or
+[synchronized](/docs/sync), ensuring your data always meets the defined
+constraints.
 
 :::

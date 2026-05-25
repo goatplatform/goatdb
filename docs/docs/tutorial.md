@@ -5,13 +5,12 @@ sidebar_position: 2
 slug: /tutorial
 ---
 
-
 # Building a Todo List App with GoatDB
 
 This tutorial walks you through building a Todo List app with
 [GoatDB](https://goatdb.dev/) using [React](/docs/react). It demonstrates how to
-leverage GoatDB's distributed, edge-native [architecture](/docs/architecture) and
-real-time [synchronization](/docs/sync) features.
+leverage GoatDB's distributed, edge-native [architecture](/docs/architecture)
+and real-time [synchronization](/docs/sync) features.
 
 ## Prerequisites
 
@@ -307,8 +306,9 @@ deno task build
 npm run build
 ```
 
-> **Node.js SEA builds** use `postject` (installed automatically with GoatDB). See the
-> [CLI & Build Tools](./cli#building-standalone-executables) for details.
+> **Node.js SEA builds** use `postject` (installed automatically with GoatDB).
+> See the [CLI & Build Tools](./cli#building-standalone-executables) for
+> details.
 
 ### Configuring the Build
 
@@ -329,7 +329,8 @@ Deno supports cross-compilation for different environments:
 - Operating Systems: macOS, Linux, Windows
 - Architectures: x64 (Intel/AMD), arm64 (Apple Silicon/ARM)
 
-Node.js uses [Single Executable Applications (SEA)](https://nodejs.org/api/single-executable-applications.html)
+Node.js uses
+[Single Executable Applications (SEA)](https://nodejs.org/api/single-executable-applications.html)
 for compilation. SEA does not support cross-compilation — you must build on the
 same platform you intend to deploy to.
 

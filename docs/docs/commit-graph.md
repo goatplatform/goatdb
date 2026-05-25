@@ -5,7 +5,8 @@ sidebar_position: 11
 slug: /commit-graph
 ---
 
-import CommitGraphIllustration from '@site/src/components/diagrams/CommitGraphIllustration';
+import CommitGraphIllustration from
+'@site/src/components/diagrams/CommitGraphIllustration';
 
 # Commit Graph
 
@@ -26,8 +27,9 @@ Simply put, all data creation and editing operations in GoatDB append new
 commits to the replicated commit graph. The commit graph is then synchronized in
 the background, in real-time, with other peers in the network.
 
-Each commit in the graph is [signed with the private key](/docs/sessions) of the peer
-that created it. This enables the network to verify the graph and ensures that:
+Each commit in the graph is [signed with the private key](/docs/sessions) of the
+peer that created it. This enables the network to verify the graph and ensures
+that:
 
 1. All commits were created by known, trusted peers.
 2. Each commit edited only what was allowed, effectively enforcing permissions
@@ -55,8 +57,8 @@ When creating a new commit, a peer follows the procedure below:
 In addition to its direct parents, each commit stores references to K ancestors
 further up the commit history. These ancestor pointers serve two purposes:
 
-1. **Bridging sync gaps.** The [bloom-filter sync protocol](/docs/sync)
-   may temporarily miss consecutive commits, creating gaps in the local graph.
+1. **Bridging sync gaps.** The [bloom-filter sync protocol](/docs/sync) may
+   temporarily miss consecutive commits, creating gaps in the local graph.
    Ancestor pointers let the system see past these gaps. A commit that appears
    in another commit's ancestor list is recognized as part of the graph and is
    not treated as a leaf — even if its direct parent link is missing locally.
@@ -68,8 +70,8 @@ further up the commit history. These ancestor pointers serve two purposes:
 
 The probability of missing K consecutive commits during sync is approximately
 FPR^K, where FPR is the bloom filter's false-positive rate. With GoatDB's
-minimum FPR cap of 0.001, gaps larger than three commits are extremely
-unlikely. See the [synchronization page](/docs/sync) for the full analysis.
+minimum FPR cap of 0.001, gaps larger than three commits are extremely unlikely.
+See the [synchronization page](/docs/sync) for the full analysis.
 
 ## Delta Compression
 

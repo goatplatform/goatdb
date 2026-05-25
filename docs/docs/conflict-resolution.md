@@ -5,7 +5,6 @@ sidebar_position: 9
 slug: /conflict-resolution
 ---
 
-
 # Conflict Resolution
 
 Whenever a peer in the network detects more than one differing value at the
@@ -22,21 +21,21 @@ Lowest Common Ancestor (LCA) of the two leaf commits in the
 [commit graph](/docs/commit-graph).
 
 The LCA algorithm walks the graph from both leaves simultaneously, expanding
-through both parent links and [ancestor pointers](/docs/commit-graph#ancestor-pointers).
-It tracks the depth (number of hops) from each leaf to every reachable commit
-and builds an intersection of commits reachable from both sides. Among
-candidates in the intersection, the one with the lowest combined depth from
-both leaves is selected — this is the closest common ancestor.
+through both parent links and
+[ancestor pointers](/docs/commit-graph#ancestor-pointers). It tracks the depth
+(number of hops) from each leaf to every reachable commit and builds an
+intersection of commits reachable from both sides. Among candidates in the
+intersection, the one with the lowest combined depth from both leaves is
+selected — this is the closest common ancestor.
 
 When the closest candidate exists in the intersection but has not yet been
 synced to the local peer, the merge is **deferred** rather than falling back to
-a farther ancestor. A farther base would produce a wider diff and risk
-reverting intermediate changes. The deferred leaf stays in the graph and is
-retried on the next merge attempt, after the [sync protocol](/docs/sync)
-delivers the missing commit. See the
-[sync page](/docs/sync#merge-deferral-on-incomplete-graphs) for how ancestor
-pointers and bloom-filter false-positive rates interact to keep deferrals rare
-in practice.
+a farther ancestor. A farther base would produce a wider diff and risk reverting
+intermediate changes. The deferred leaf stays in the graph and is retried on the
+next merge attempt, after the [sync protocol](/docs/sync) delivers the missing
+commit. See the [sync page](/docs/sync#merge-deferral-on-incomplete-graphs) for
+how ancestor pointers and bloom-filter false-positive rates interact to keep
+deferrals rare in practice.
 
 ## CRDTs
 

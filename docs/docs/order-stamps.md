@@ -5,7 +5,6 @@ sidebar_position: 8
 slug: /ordering-items
 ---
 
-
 # Ordering Items in [GoatDB](https://goatdb.dev)
 
 [Order stamps](https://github.com/goatplatform/orderstamp-js) provide an
@@ -31,19 +30,20 @@ with any database, they were originally created alongside
 
 ## API Reference
 
-| Function    | Purpose                           | Use Case                                    |
-| ----------- | --------------------------------- | ------------------------------------------- |
+| Function    | Purpose                           | Use Case                                         |
+| ----------- | --------------------------------- | ------------------------------------------------ |
 | `start()`   | Stamp for the start of the list   | Prepend [item](/docs/concepts/#item)             |
 | `end()`     | Stamp for the end of the list     | Append [item](/docs/concepts/#item)              |
-| `from()`    | Encode a number as an order stamp | Numeric ordering, custom keys               |
+| `from()`    | Encode a number as an order stamp | Numeric ordering, custom keys                    |
 | `between()` | Stamp between two existing stamps | Insert between two [items](/docs/concepts/#item) |
 
 - **`start()`**: Returns a
   [stamp](https://github.com/goatplatform/orderstamp-js) for the start of the
-  list, ensuring new [items](/docs/concepts/#item) are ordered before existing ones.
+  list, ensuring new [items](/docs/concepts/#item) are ordered before existing
+  ones.
 - **`end()`**: Returns a [stamp](https://github.com/goatplatform/orderstamp-js)
-  for the end of the list, ensuring new [items](/docs/concepts/#item) are ordered
-  after existing ones.
+  for the end of the list, ensuring new [items](/docs/concepts/#item) are
+  ordered after existing ones.
 - **`from()`**: Encodes a numeric value (and optional key) as an
   [order stamp](https://github.com/goatplatform/orderstamp-js), maintaining
   numeric order in string form.

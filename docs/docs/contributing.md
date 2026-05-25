@@ -3,32 +3,53 @@ id: contributing
 title: Contributing
 sidebar_position: 99
 description: Join GoatDB's mission to revolutionize collaborative applications
-keywords: [contributing, development, open source, distributed databases, collaboration]
+keywords: [
+  contributing,
+  development,
+  open source,
+  distributed databases,
+  collaboration,
+]
 ---
 
 # Contributing to GoatDB
 
-Your contributions power the next generation of collaborative applications. Every feature you add, bug you fix, and optimization you make helps developers worldwide build better real-time, offline-capable apps.
+Your contributions power the next generation of collaborative applications.
+Every feature you add, bug you fix, and optimization you make helps developers
+worldwide build better real-time, offline-capable apps.
 
-:::tip[Ready to Start?]
-Check out our [Good First Issues](https://github.com/goatplatform/goatdb/labels/good%20first%20issue) to find your first contribution opportunity.
-:::
+:::tip[Ready to Start?] Check out our
+[Good First Issues](https://github.com/goatplatform/goatdb/labels/good%20first%20issue)
+to find your first contribution opportunity. :::
 
 ## What You're Building
 
-**Simplicity for Complex Problems**: Your code eliminates the complexity of custom sync servers, [conflict resolution](/docs/conflict-resolution), and state management that traditionally plague collaborative apps.
+**Simplicity for Complex Problems**: Your code eliminates the complexity of
+custom sync servers, [conflict resolution](/docs/conflict-resolution), and state
+management that traditionally plague collaborative apps.
 
-**Cutting-Edge Distributed Systems**: Work on [Bloom filter synchronization](/docs/sync), ephemeral [CRDTs](/docs/conflict-resolution), and [cryptographically signed commit graphs](/docs/commit-graph)—techniques pushing the boundaries of database design.
+**Cutting-Edge Distributed Systems**: Work on
+[Bloom filter synchronization](/docs/sync), ephemeral
+[CRDTs](/docs/conflict-resolution), and
+[cryptographically signed commit graphs](/docs/commit-graph)—techniques pushing
+the boundaries of database design.
 
-**Cross-Runtime Innovation**: Build features that work identically across [Deno, Node.js, and browsers](/docs/architecture#repository-system) with a single TypeScript codebase.
+**Cross-Runtime Innovation**: Build features that work identically across
+[Deno, Node.js, and browsers](/docs/architecture#repository-system) with a
+single TypeScript codebase.
 
 ## Getting Started
 
-**Prerequisites**: **Deno v2.4+** ([install here](https://deno.com/)) and **Node.js v24+** for [cross-runtime testing](/docs/architecture).
+**Prerequisites**: **Deno v2.x** ([install here](https://deno.com/)) and
+**Node.js v24+** for [cross-runtime testing](/docs/architecture).
 
-**AI-Enhanced Development**: GoatDB is optimized for AI-assisted development with [Claude Code](https://www.anthropic.com/claude-code), [Cursor](https://cursor.com/), and [ChunkHound](https://github.com/ofriw/chunkhound).
+**AI-Enhanced Development**: GoatDB is optimized for AI-assisted development
+with [Claude Code](https://www.anthropic.com/claude-code),
+[Cursor](https://cursor.com/), and
+[ChunkHound](https://github.com/ofriw/chunkhound).
 
 **Setup**:
+
 ```bash
 git clone https://github.com/goatplatform/goatdb.git
 cd goatdb
@@ -44,7 +65,8 @@ deno task docs:serve  # Docusaurus docs server
 
 ## Testing & Performance
 
-**Cross-Platform Testing**: Ensure your changes work identically across all runtimes:
+**Cross-Platform Testing**: Ensure your changes work identically across all
+runtimes:
 
 ```bash
 # All platforms
@@ -59,7 +81,8 @@ deno task test --suite=DB --test="conflict resolution"
 deno task test --debug --deno-inspect-brk
 ```
 
-**Performance Validation**: Maintain GoatDB's real-time performance characteristics:
+**Performance Validation**: Maintain GoatDB's real-time performance
+characteristics:
 
 ```bash
 # Full benchmark suite
@@ -70,18 +93,21 @@ deno task bench --benchmark="GoatDB Sync Protocol"
 deno task bench --runtime=browser --headless
 ```
 
-**Features**: Single-process debugging, real-world metrics (P95, P99), source map support across all platforms.
+**Features**: Single-process debugging, real-world metrics (P95, P99), source
+map support across all platforms.
 
-:::tip[Quality Gate]
-Run `deno task test && deno task bench` before submitting to ensure no regressions.
-:::
+:::tip[Quality Gate] Run `deno task test && deno task bench` before submitting
+to ensure no regressions. :::
 
 ## Code Standards
 
-- **Formatting** — `deno fmt` (2-space indent, single quotes, 80-char line width)
-- **Naming** — `camelCase` for variables/functions, `PascalCase` for classes, `_prefix` for private fields
+- **Formatting** — `deno fmt` (2-space indent, single quotes, 80-char line
+  width)
+- **Naming** — `camelCase` for variables/functions, `PascalCase` for classes,
+  `_prefix` for private fields
 - **Imports** — explicit `.ts` extensions required
-- **Cross-platform** — code must work identically across Deno, Node.js, and browsers
+- **Cross-platform** — code must work identically across Deno, Node.js, and
+  browsers
 
 ## Pull Request Checklist
 
@@ -92,22 +118,31 @@ Run `deno task test && deno task bench` before submitting to ensure no regressio
 
 ## Issues & Ideas
 
-**Bug Reports**: Include GoatDB version, target runtime, reproduction steps, and error messages.
+**Bug Reports**: Include GoatDB version, target runtime, reproduction steps, and
+error messages.
 
-**Feature Requests**: Check [existing issues](https://github.com/goatplatform/goatdb/issues) first, then use our [feature request template](https://github.com/goatplatform/goatdb/issues/new).
+**Feature Requests**: Check
+[existing issues](https://github.com/goatplatform/goatdb/issues) first, then use
+our
+[feature request template](https://github.com/goatplatform/goatdb/issues/new).
 
 **Security**: Email security issues privately to ofri [at] goatdb [dot] com.
 
 ## Community
 
-- **[Discord](https://discord.gg/SAt3cbUqxr)** - Real-time chat and collaboration
-- **[GitHub Discussions](https://github.com/goatplatform/goatdb/discussions)** - Technical conversations and proposals
-- **[Reddit](https://www.reddit.com/r/zbdb/s/jx1jAbEqtj)** - Share projects and get feedback
-- **[GitHub Issues](https://github.com/goatplatform/goatdb/issues)** - Bug reports and feature coordination
+- **[Discord](https://discord.gg/SAt3cbUqxr)** - Real-time chat and
+  collaboration
+- **[GitHub Discussions](https://github.com/goatplatform/goatdb/discussions)** -
+  Technical conversations and proposals
+- **[Reddit](https://www.reddit.com/r/zbdb/s/jx1jAbEqtj)** - Share projects and
+  get feedback
+- **[GitHub Issues](https://github.com/goatplatform/goatdb/issues)** - Bug
+  reports and feature coordination
 
 ## License
 
-All contributions are licensed under the [MIT license](https://github.com/goatplatform/goatdb/blob/main/LICENSE).
+All contributions are licensed under the
+[MIT license](https://github.com/goatplatform/goatdb/blob/main/LICENSE).
 
 ---
 

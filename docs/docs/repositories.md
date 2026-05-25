@@ -39,8 +39,8 @@ This design takes advantage of modern SSD characteristics:
 
 The storage format can be selected via the `storageFormat` config option:
 
-- **`'goat'` (default)**: Compact binary with 4-byte length prefix per record
-  — best for production; fast I/O
+- **`'goat'` (default)**: Compact binary with 4-byte length prefix per record —
+  best for production; fast I/O
 - **`'jsonl'`**: [JSON Lines](https://jsonlines.org/) — one JSON object per
   line; human-readable, useful for debugging
 
@@ -82,10 +82,10 @@ back to its authorized source.
 
 For performance-critical applications or trusted environments (like backend
 services), GoatDB offers a trusted mode that bypasses cryptographic
-verification. This mode can significantly [improve performance](/docs/benchmarks)
-by skipping commit signing and verification. However, it should only be used
-in controlled, trusted environments where [security](/docs/sessions) is handled at
-a different layer.
+verification. This mode can significantly
+[improve performance](/docs/benchmarks) by skipping commit signing and
+verification. However, it should only be used in controlled, trusted
+environments where [security](/docs/sessions) is handled at a different layer.
 
 :::
 
@@ -142,12 +142,12 @@ use and avoids delays during user interactions.
 
 :::note
 
-When preloading a repository, you usually don't need to `await` the
-result—just call `db.open()` and continue. It's safe to call `open()` multiple
-times for the same repository; only the first call will actually start
-loading. If the repository isn't fully loaded by the time you access its data,
-GoatDB will automatically wait for loading to finish. This approach ensures
-your application remains responsive and avoids unnecessary delays for users.
+When preloading a repository, you usually don't need to `await` the result—just
+call `db.open()` and continue. It's safe to call `open()` multiple times for the
+same repository; only the first call will actually start loading. If the
+repository isn't fully loaded by the time you access its data, GoatDB will
+automatically wait for loading to finish. This approach ensures your application
+remains responsive and avoids unnecessary delays for users.
 
 :::
 
@@ -171,11 +171,10 @@ are no longer in use.
 
 :::note
 
-In most cases, you don't need to `await` the result of `db.close()`. It's
-common to simply call `db.close()` and let GoatDB handle the process in the
-background. The system will ensure all changes are safely written to disk, so
-you can keep your application responsive without waiting for the close
-operation to finish.
+In most cases, you don't need to `await` the result of `db.close()`. It's common
+to simply call `db.close()` and let GoatDB handle the process in the background.
+The system will ensure all changes are safely written to disk, so you can keep
+your application responsive without waiting for the close operation to finish.
 
 :::
 
@@ -188,20 +187,20 @@ GoatDB provides strong durability through:
 2. **Parallel Writes**: Changes are written simultaneously to both local storage
    and replicated to other peers
 3. **Automatic Recovery**: After a crash, the system automatically recovers
-   missing commits through the [synchronization protocol](/docs/sync), ensuring all
-   peers converge to the same state. The P2P design enables both clients and
+   missing commits through the [synchronization protocol](/docs/sync), ensuring
+   all peers converge to the same state. The P2P design enables both clients and
    servers to act as active replicas, providing redundancy and resilience
 
 :::note
 
 Traditional database durability often focuses on server-side guarantees -
 ensuring data survives server crashes. But in GoatDB, we recognize that client
-durability is fundamentally different. Modern SSDs in laptops and phones
-rarely fail, and when they do, it's typically due to physical damage rather
-than data corruption. More importantly, user expectations differ between
-client and server operations - if your phone dies mid-click, you wouldn't
-expect that click's effect to be saved, but when a server acknowledges an API
-call, you rightfully expect that operation to be durable.
+durability is fundamentally different. Modern SSDs in laptops and phones rarely
+fail, and when they do, it's typically due to physical damage rather than data
+corruption. More importantly, user expectations differ between client and server
+operations - if your phone dies mid-click, you wouldn't expect that click's
+effect to be saved, but when a server acknowledges an API call, you rightfully
+expect that operation to be durable.
 
 :::
 

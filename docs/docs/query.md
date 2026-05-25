@@ -15,10 +15,10 @@ import IncrementalUpdates from '@site/src/components/diagrams/IncrementalUpdates
 :::tip
 
 If you're building a [React](/docs/react) UI, we recommend using the
-[React Hooks](/docs/react) instead of working with [queries](/docs/query) directly. The
-[hooks](/docs/react) provide a more ergonomic interface for [React](/docs/react)
-components and handle all the complexity of data [synchronization](/docs/sync) and
-updates.
+[React Hooks](/docs/react) instead of working with [queries](/docs/query)
+directly. The [hooks](/docs/react) provide a more ergonomic interface for
+[React](/docs/react) components and handle all the complexity of data
+[synchronization](/docs/sync) and updates.
 
 :::
 
@@ -266,8 +266,10 @@ activeUsers.onResultsChanged(() => {
 
 ## Technical Details
 
-GoatDB's query system is designed for responsiveness and efficiency while being easy to use without explicit indexing. The [architecture](/docs/architecture)
-prioritizes developer experience without sacrificing [performance](/docs/benchmarks):
+GoatDB's query system is designed for responsiveness and efficiency while being
+easy to use without explicit indexing. The [architecture](/docs/architecture)
+prioritizes developer experience without sacrificing
+[performance](/docs/benchmarks):
 
 - **No Manual Indexing**: Unlike traditional databases, GoatDB doesn't require
   developers to define and maintain explicit indexes
@@ -278,8 +280,8 @@ prioritizes developer experience without sacrificing [performance](/docs/benchma
 <LocalCopy />
 
 Each peer maintains a complete local copy of the database, enabling offline
-operation and low-latency access. The local copy is [synchronized](/docs/sync) with
-the network when online, ensuring consistency across all peers.
+operation and low-latency access. The local copy is [synchronized](/docs/sync)
+with the network when online, ensuring consistency across all peers.
 
 <CommitStorage />
 
@@ -291,8 +293,8 @@ across the network.
 <QueryCache />
 
 When persisting query results, we store both the results and the age of the
-latest commit processed by the query. This allows us to efficiently track
-which commits have already been processed.
+latest commit processed by the query. This allows us to efficiently track which
+commits have already been processed.
 
 <IncrementalUpdates />
 
