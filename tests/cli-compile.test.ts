@@ -25,13 +25,15 @@ import {
 import { getEnvVar } from '../base/os.ts';
 import {
   bundleServerForSEA,
+  compile,
   denoTarget,
+  signExecutable,
   targetFromOSArch,
 } from '../cli/compile.ts';
 import {
+  type BuildPluginLike,
   createBuildContext,
   stopBackgroundCompiler,
-  type BuildPluginLike,
 } from '../build.ts';
 
 import {
@@ -45,6 +47,12 @@ import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { goatEntryPoints } from '../cli/link.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 import { cli } from '../base/development.ts';
+import {
+  getGlobalLoggerStreams,
+  setGlobalLoggerStreams,
+} from '../logging/log.ts';
+import type { LogEntry } from '../logging/log.ts';
+import type { NormalizedLogEntry } from '../logging/entry.ts';
 
 function runBundledScript(js: string): Record<string, unknown> {
   const scope: Record<string, unknown> = {};
@@ -105,6 +113,19 @@ const kPlaceholderAppConfig = {
   jsPath: '/dev/null',
 };
 
+function withLogCapture<T>(
+  fn: (captured: NormalizedLogEntry<LogEntry>[]) => Promise<T>,
+): Promise<T> {
+  const captured: NormalizedLogEntry<LogEntry>[] = [];
+  const previousStreams = getGlobalLoggerStreams();
+  setGlobalLoggerStreams([{
+    appendEntry(e: NormalizedLogEntry<LogEntry>): void {
+      captured.push(e);
+    },
+  }]);
+  return fn(captured).finally(() => setGlobalLoggerStreams(previousStreams));
+}
+
 import {
   DENO_ONLY_FILTER_TEST,
   NODE_ONLY_FILTER_TEST,
@@ -154,6 +175,128 @@ export default function setupCliCompileTests() {
           !setupCalled,
           'startDebugServer must fail before running user setup on Node.js',
         );
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'compile resolves file:// serverEntry inputs before public validation errors',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('compile-file-url-entry');
+        const missingEntry = path.join(dir, 'missing-server.ts');
+        const expectedEntry = /^[A-Za-z]:[\\/]/.test(missingEntry)
+          ? missingEntry.replaceAll('\\', '/')
+          : missingEntry;
+        await assertThrows(
+          async () => {
+            await compile({
+              ...kPlaceholderAppConfig,
+              buildDir: path.join(dir, 'build'),
+              serverEntry: path.toFileUrl(missingEntry).href,
+            });
+          },
+          Error,
+          `Server entry not found: ${expectedEntry}`,
+        );
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'compile resolves UNC file:// serverEntry inputs before public validation errors',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('compile-unc-file-url-entry');
+        await assertThrows(
+          async () => {
+            await compile({
+              ...kPlaceholderAppConfig,
+              buildDir: path.join(dir, 'build'),
+              serverEntry: 'file://server/share/missing-server.ts',
+            });
+          },
+          Error,
+          'Server entry not found: //server/share/missing-server.ts',
+        );
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'signExecutable warns and ignores signing on unsupported platforms',
+      async (ctx: TestSuite) => {
+        const runtime = getRuntime();
+        const osName = runtime.getOS();
+        if (osName === 'darwin' || osName === 'windows') return;
+
+        const dir = await ctx.tempDir('sign-unsupported-platform');
+        const execPath = path.join(dir, 'app');
+        await writeTextFile(execPath, 'stub');
+
+        await withLogCapture(async (captured) => {
+          await signExecutable(execPath, { windows: { thumbprint: 'abc' } });
+          const warning = captured.find((e) =>
+            e.severity === 'WARNING' &&
+            e.message?.includes(`Code signing is not supported on ${osName}`)
+          );
+          assertExists(warning, 'unsupported signing should emit a warning');
+          assertEquals(
+            warning?.error,
+            undefined,
+            'unsupported-platform warning should not be misclassified as an error code',
+          );
+        });
+      },
+    );
+  }
+
+  if (isNode()) {
+    TEST(
+      'CLI-Compile',
+      'signExecutable warns about certPassword visibility before signtool failure',
+      async (ctx: TestSuite) => {
+        const runtime = getRuntime() as { getOS: () => string };
+        const originalGetOS = runtime.getOS;
+        const dir = await ctx.tempDir('sign-windows-cert-password');
+        const execPath = path.join(dir, 'app.exe');
+        const certPath = path.join(dir, 'cert.pfx');
+        await writeTextFile(execPath, 'stub');
+        await writeTextFile(certPath, 'stub');
+
+        try {
+          runtime.getOS = () => 'windows';
+          await withLogCapture(async (captured) => {
+            await assertThrows(
+              async () => {
+                await signExecutable(execPath, {
+                  windows: {
+                    certFile: certPath,
+                    certPassword: 'secret',
+                  },
+                });
+              },
+              Error,
+              'Code signing failed:',
+            );
+            const warning = captured.find((e) =>
+              e.severity === 'WARNING' &&
+              e.message?.includes('certPassword is passed as a CLI argument')
+            );
+            assertExists(warning, 'certPassword usage should emit a warning');
+            assertEquals(
+              warning?.error,
+              undefined,
+              'certPassword warning should not be misclassified as missing configuration',
+            );
+          });
+        } finally {
+          runtime.getOS = originalGetOS;
+        }
       },
     );
   }
@@ -249,6 +392,33 @@ export default function setupCliCompileTests() {
             `goatEntryPoints should have entry for deno.json export "${exportKey}"`,
           );
         }
+      },
+    );
+  }
+
+  if (isNode()) {
+    TEST(
+      'CLI-Compile',
+      'bundleServerForSEA accepts file:// URL entry points',
+      async (ctx) => {
+        const dir = await ctx.tempDir('bundle-sea-file-url');
+        const entryPath = path.join(dir, 'entry.ts');
+        await writeTextFile(entryPath, 'export const value = 42;\n');
+        const outPath = path.join(dir, 'bundle.cjs');
+
+        try {
+          await bundleServerForSEA(path.toFileUrl(entryPath).href, outPath);
+        } finally {
+          await stopBackgroundCompiler();
+        }
+
+        assertTrue(await pathExists(outPath), 'output file must be written');
+        const content = await readTextFile(outPath);
+        assertExists(content, 'output file should be readable');
+        assertTrue(
+          content!.includes('module.exports'),
+          'file:// entry points must still produce CJS output',
+        );
       },
     );
   }
@@ -814,18 +984,30 @@ export {};
       'buildAssets forwards esbuildPlugins to esbuild',
       async (ctx: TestSuite) => {
         const dir = await ctx.tempDir('build-assets-plugins');
+        const entryPath = path.join(dir, 'entry.ts');
         await writeTextFile(
-          path.join(dir, 'entry.ts'),
+          entryPath,
           `import { __sentinel__ } from 'testplugin:sentinel';\nexport const x = __sentinel__;\n`,
         );
         const entryPoints = [{
-          in: path.join(dir, 'entry.ts'),
+          in: path.toFileUrl(entryPath).href,
           out: APP_ENTRY_POINT,
         }];
+        let seenEntryPoint = '';
         // deno-lint-ignore no-explicit-any
         const testPlugin: any = {
           name: 'test-plugin',
           setup(build: any) {
+            build.onStart(() => {
+              const initialEntryPoint = build.initialOptions.entryPoints?.[0];
+              if (
+                initialEntryPoint &&
+                typeof initialEntryPoint === 'object' &&
+                'in' in initialEntryPoint
+              ) {
+                seenEntryPoint = initialEntryPoint.in;
+              }
+            });
             build.onResolve({ filter: /^testplugin:/ }, (args: any) => ({
               path: args.path,
               namespace: 'testplugin',
@@ -845,7 +1027,7 @@ export {};
             entryPoints,
             {
               buildDir: dir,
-              jsPath: path.join(dir, 'entry.ts'),
+              jsPath: entryPoints[0].in,
             },
             {
               runtime: 'node',
@@ -857,6 +1039,97 @@ export {};
           assertTrue(
             js.includes('plugin-was-here'),
             'esbuildPlugins must be dispatched through the full resolution chain',
+          );
+          assertEquals(
+            seenEntryPoint,
+            entryPath,
+            'buildAssets must hand esbuild a native filesystem entry path, not a file URL',
+          );
+        } finally {
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (!isBrowser()) {
+    TEST(
+      'CLI-Compile',
+      'buildAssets normalizes Windows file URL entry points before esbuild',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-assets-windows-file-url');
+        const windowsFileUrl = 'file:///C:/Users/foo/entry.ts';
+        const expectedEntryPath = 'C:/Users/foo/entry.ts';
+        let seenEntryPoint = '';
+        // deno-lint-ignore no-explicit-any
+        const testPlugin: any = {
+          name: 'windows-entry-plugin',
+          setup(build: any) {
+            build.onStart(() => {
+              const initialEntryPoint = build.initialOptions.entryPoints?.[0];
+              if (
+                initialEntryPoint &&
+                typeof initialEntryPoint === 'object' &&
+                'in' in initialEntryPoint
+              ) {
+                seenEntryPoint = initialEntryPoint.in;
+              }
+            });
+            // esbuild dispatches onResolve for entry points before any filesystem access,
+            // so this plugin intercepts 'C:/Users/foo/entry.ts' (the normalized form of
+            // the file:// URL) without the file needing to exist on disk.
+            build.onResolve(
+              { filter: /^C:\/Users\/foo\/entry\.ts$/ },
+              (args: any) => ({
+                path: args.path,
+                namespace: 'windows-entry',
+              }),
+            );
+            build.onResolve({ filter: /^testplugin:/ }, (args: any) => ({
+              path: args.path,
+              namespace: 'testplugin',
+            }));
+            build.onLoad(
+              { filter: /.*/, namespace: 'windows-entry' },
+              () => ({
+                contents:
+                  `import { __sentinel__ } from 'testplugin:sentinel';\nexport const x = __sentinel__;\n`,
+                loader: 'js',
+              }),
+            );
+            build.onLoad(
+              { filter: /.*/, namespace: 'testplugin' },
+              () => ({
+                contents:
+                  'export const __sentinel__ = "windows-plugin-was-here";',
+                loader: 'js',
+              }),
+            );
+          },
+        };
+        try {
+          const assets = await buildAssets(
+            undefined,
+            [{ in: windowsFileUrl, out: APP_ENTRY_POINT }],
+            {
+              buildDir: dir,
+              jsPath: 'C:/Users/foo/entry.ts', // appConfig.jsPath is not read by buildAssets
+            },
+            {
+              runtime: 'node',
+              keepEsbuildAlive: false,
+              esbuildPlugins: [testPlugin],
+            },
+          );
+          const js = new TextDecoder().decode(assets['/app.js'].data);
+          assertTrue(
+            js.includes('windows-plugin-was-here'),
+            'Windows file URL entries must be normalized before plugin resolution runs',
+          );
+          assertEquals(
+            seenEntryPoint,
+            expectedEntryPath,
+            'Windows file URL entries must reach esbuild as native filesystem paths',
           );
         } finally {
           await stopBackgroundCompiler();
@@ -1211,6 +1484,36 @@ export {};
           assertTrue(
             !css2.includes('--rebuild-v1'),
             'Stale CSS must not appear after rebuild',
+          );
+        } finally {
+          rebuildCtx.close();
+          await stopBackgroundCompiler();
+        }
+      },
+    );
+  }
+
+  if (isDeno()) {
+    TEST(
+      'CLI-Compile',
+      'createBuildContext (debug-server wiring) normalizes file:// URL entry points to native paths',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('build-ctx-file-url-entry');
+        const entryPath = path.join(dir, 'entry.ts');
+        await writeTextFile(entryPath, 'export {};\n');
+        const entryPoints = [{
+          in: path.toFileUrl(entryPath).href,
+          out: APP_ENTRY_POINT,
+        }];
+        const rebuildCtx = await createBuildContext(entryPoints);
+        try {
+          const assets = await buildAssets(rebuildCtx, entryPoints, {
+            buildDir: dir,
+            jsPath: entryPath,
+          });
+          assertExists(
+            assets['/app.js'],
+            '/app.js must be produced from a file:// URL entry point',
           );
         } finally {
           rebuildCtx.close();
@@ -2358,18 +2661,19 @@ export {};
   if (isDeno()) {
     TEST(
       'CLI-Compile',
-      'compileForNodeWithEsbuild resolves JSR imports and runs in Node.js',
+      'compileForNodeWithEsbuild accepts file:// entries, resolves JSR imports, and runs in Node.js',
       async (ctx: TestSuite) => {
         const { compileForNodeWithEsbuild, nodeRun } = await import(
           '../base/node-runner.ts'
         );
         const dir = await ctx.tempDir('node-esbuild-plugin');
+        const entryPath = path.join(dir, 'entry.ts');
         await writeTextFile(
-          path.join(dir, 'entry.ts'),
+          entryPath,
           `import { assertEquals } from "jsr:@std/assert";\nexport { assertEquals };`,
         );
         const result = await compileForNodeWithEsbuild(
-          path.join(dir, 'entry.ts'),
+          path.toFileUrl(entryPath).href,
           'output',
         );
         assertEquals(

@@ -6,6 +6,8 @@ import {
   extname,
   fromFileUrl,
   isAbsolute,
+  isFileUrlPath,
+  isUncPathRaw,
   join,
   normalize,
   resolve,
@@ -39,6 +41,37 @@ export default function setupPathTests(): void {
   TEST('Path', 'normalize collapses multiple slashes', () => {
     assertEquals(normalize('foo//bar///baz'), 'foo/bar/baz');
     assertEquals(normalize('/foo//bar'), '/foo/bar');
+  });
+
+  TEST('Path', 'normalize preserves UNC root semantics', () => {
+    assertEquals(normalize('//server/share/file.ts'), '//server/share/file.ts');
+    assertEquals(
+      normalize('//server/share/../other/file.ts'),
+      '//server/share/other/file.ts',
+    );
+    assertEquals(
+      normalize('//server/share/foo/../../other/file.ts'),
+      '//server/share/other/file.ts',
+    );
+    assertEquals(
+      normalize('\\\\server\\share\\file.ts'),
+      '//server/share/file.ts',
+    );
+  });
+
+  // isUncPathRaw tests
+  TEST('Path', 'isUncPathRaw detects UNC paths with both slash forms', () => {
+    assertEquals(isUncPathRaw('//server/share/file.ts'), true);
+    assertEquals(isUncPathRaw('\\\\server\\share\\file.ts'), true);
+    assertEquals(isUncPathRaw('//host'), true);
+  });
+
+  TEST('Path', 'isUncPathRaw rejects non-UNC paths', () => {
+    assertEquals(isUncPathRaw('/absolute/path'), false);
+    assertEquals(isUncPathRaw('C:/path'), false);
+    assertEquals(isUncPathRaw('relative/path'), false);
+    assertEquals(isUncPathRaw(''), false);
+    assertEquals(isUncPathRaw('///triple'), false);
   });
 
   // dirname tests
@@ -158,6 +191,23 @@ export default function setupPathTests(): void {
     const result = toAbsolutePath('foo/bar');
     assertEquals(isAbsolute(result), true);
     assertEquals(result.endsWith('foo/bar'), true);
+  });
+
+  // isFileUrlPath tests
+  TEST('Path', 'isFileUrlPath detects file:// URLs', () => {
+    assertEquals(isFileUrlPath('file:///path'), true);
+    assertEquals(isFileUrlPath('file:///C:/path'), true);
+    assertEquals(isFileUrlPath('file://server/share'), true);
+    assertEquals(isFileUrlPath('file://'), true);
+  });
+
+  TEST('Path', 'isFileUrlPath rejects non-file paths', () => {
+    assertEquals(isFileUrlPath('/absolute/path'), false);
+    assertEquals(isFileUrlPath('C:/path'), false);
+    assertEquals(isFileUrlPath('https://example.com'), false);
+    assertEquals(isFileUrlPath(''), false);
+    assertEquals(isFileUrlPath('file:/x'), false); // single slash — not file://
+    assertEquals(isFileUrlPath('FILE:///path'), false); // case-sensitive: scheme must be lowercase
   });
 
   // fromFileUrl tests
