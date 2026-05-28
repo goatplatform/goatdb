@@ -1318,9 +1318,14 @@ export default function setupCliCompileTests() {
         );
         // The thrown error is the listen error, not a cleanup error,
         // proving stop() swallows flush/close failures.
+        // Check structured error identity (name/code), not message text,
+        // which varies by platform ("address already in use" on Unix vs
+        // "Only one usage of each socket address…" on Windows under Deno).
         assertTrue(
-          thrown instanceof Error &&
-            /address already in use/i.test(thrown.message),
+          thrown instanceof Error && (
+            thrown.name === 'AddrInUse' ||
+            (thrown as any).code === 'EADDRINUSE'
+          ),
           `startDebugServer must reject with listen error, got: ${thrown}`,
         );
         assertEquals(
