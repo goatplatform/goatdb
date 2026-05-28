@@ -419,9 +419,11 @@ export function resolveBuildEntryPath(entryPath: string): string {
 
 /**
  * Creates an esbuild incremental context for the debug server (development,
- * hot-reload). Deno-only — uses `@deno/esbuild-plugin` which is not
- * available on Node.js. Production builds go through `buildAssets()` in
- * `cli/build-assets.ts` directly.
+ * hot-reload).
+ *
+ * Deno contexts use `@deno/esbuild-plugin`; Node.js contexts use GoatDB's
+ * browser-target plugin stack without the Deno loader. Production builds still
+ * go through `buildAssets()` in `cli/build-assets.ts` directly.
  *
  * @param entryPoints Entry-point descriptors passed to esbuild.
  *   `entryPoints[].in` accepts any of: POSIX absolute path, Windows
@@ -435,11 +437,11 @@ export async function createBuildContext(
   entryPoints: { in: string; out: string }[],
   extraPlugins: BuildPluginLike[] = [],
 ): Promise<ReBuildContext> {
-  if (getRuntime().id !== 'deno') {
+  const runtime = getRuntime().id;
+  if (runtime !== 'deno' && runtime !== 'node') {
     throw new Error(
-      'createBuildContext() is only supported in Deno. GoatDB debug-server ' +
-        'bundling uses @deno/esbuild-plugin; use buildAssets() or ' +
-        'compile() for Node.js production builds.',
+      'createBuildContext() is only supported in Deno or Node.js. ' +
+        'Use compile() for production builds targeting other runtimes.',
     );
   }
   const esbuild = await getEsbuild();
@@ -449,7 +451,10 @@ export async function createBuildContext(
       in: resolveBuildEntryPath(ep.in),
     })),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    plugins: await getClientBuildPlugins('deno', extraPlugins) as any,
+    plugins: await getClientBuildPlugins(
+      runtime as 'deno' | 'node',
+      extraPlugins,
+    ) as any,
     ...sharedClientBuildOptions(),
   });
   return {
