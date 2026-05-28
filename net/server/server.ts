@@ -342,6 +342,7 @@ export class Server<US extends Schema> {
   private _abortController: AbortController | undefined;
   private _httpServer?: HttpServerInstance;
   private _stopping = false;
+  private _stopPromise: Promise<void> | undefined;
 
   constructor(options: ServerOptions<US>) {
     this._endpoints = [];
@@ -626,11 +627,22 @@ export class Server<US extends Schema> {
    * @returns Promise that resolves when server is fully started
    */
   async start(): Promise<void> {
-    this._stopping = false; // Reset from prior stop()
-
-    // Return early if server is already running
-    if (this._abortController) {
+    // Detach any prior stop promise before awaiting it. By clearing
+    // _stopPromise before the await, a concurrent stop() call during
+    // that await cannot return a stale promise from an old cycle — it
+    // will create its own fresh _stopPromise with _stopping = true.
+    this._stopping = false;
+    const priorStop = this._stopPromise;
+    this._stopPromise = undefined;
+    if (priorStop) {
+      await priorStop;
+    }
+    // If a concurrent stop() won the race during the await, bail out.
+    if (this._stopping) {
       return;
+    }
+    if (this._abortController) {
+      return; // Already running
     }
 
     // Handle self-signed certificate generation if needed
@@ -649,6 +661,13 @@ export class Server<US extends Schema> {
           await v.start();
         }
       }
+    }
+
+    // stop() may win while start() is still awaiting service startup.
+    // In that case, do not bind the HTTP server after cleanup has begun.
+    if (this._stopping) {
+      await this._stopPromise;
+      return;
     }
 
     // Log server start metric
@@ -695,51 +714,79 @@ export class Server<US extends Schema> {
    * there is no request-draining mechanism.
    */
   async stop(): Promise<void> {
-    if (!this._abortController) {
-      return;
+    if (this._stopPromise) {
+      return this._stopPromise;
     }
-    // Capture and clear immediately to prevent concurrent stop() calls
+
+    // Debug-server setup may initialize DB/services before start() finishes.
+    // Stop must still release those resources, but only once.
     const ac = this._abortController;
+    if (
+      !ac && this._pendingServices.size === 0 && this._servicesByOrg.size === 0
+    ) {
+      this._stopping = true;
+      this._stopPromise = Promise.resolve();
+      return this._stopPromise;
+    }
     this._abortController = undefined;
     this._stopping = true;
 
-    // Stop HTTP server first so no new requests hit closing DBs
-    this._httpServer?.stop();
-
-    // Await any in-flight service creation before cleanup
-    for (const pending of this._pendingServices.values()) {
-      try {
-        await pending;
-      } catch {
-        // Creation failed — nothing to clean up
+    this._stopPromise = (async () => {
+      // Stop HTTP server first so no new requests hit closing DBs.
+      if (ac) {
+        this._httpServer?.stop();
       }
-    }
-    this._pendingServices.clear();
 
-    // Stop all services for each org
-    for (const services of this._servicesByOrg.values()) {
-      for (const v of Object.values(services)) {
-        if (v instanceof BaseService) {
-          v.stop();
+      // Await any in-flight service creation before cleanup
+      for (const pending of this._pendingServices.values()) {
+        try {
+          await pending;
+        } catch {
+          // Creation failed — nothing to clean up
         }
       }
-    }
+      this._pendingServices.clear();
 
-    // Flush and close all databases before aborting
-    for (const services of this._servicesByOrg.values()) {
-      try {
-        await services.db.flushAll();
-      } catch (e) {
-        console.error('Error flushing database during shutdown:', e);
+      // Stop all services for each org
+      for (const services of this._servicesByOrg.values()) {
+        for (const v of Object.values(services)) {
+          if (v instanceof BaseService) {
+            v.stop();
+          }
+        }
       }
-      try {
-        await services.db.close();
-      } catch (e) {
-        console.error('Error closing database during shutdown:', e);
-      }
-    }
 
-    ac.abort();
-    this._servicesByOrg.clear();
+      // Flush and close all databases before aborting.
+      for (const [orgId, services] of this._servicesByOrg.entries()) {
+        try {
+          await services.db.flushAll();
+        } catch (e) {
+          log({
+            severity: 'ERROR',
+            error: 'UncaughtServerError',
+            message:
+              `Error flushing database during shutdown for org ${orgId}: ${e}`,
+            trace: e instanceof Error ? e.stack : undefined,
+            orgId,
+          });
+        }
+        try {
+          await services.db.close();
+        } catch (e) {
+          log({
+            severity: 'ERROR',
+            error: 'UncaughtServerError',
+            message:
+              `Error closing database during shutdown for org ${orgId}: ${e}`,
+            trace: e instanceof Error ? e.stack : undefined,
+            orgId,
+          });
+        }
+      }
+
+      ac?.abort();
+      this._servicesByOrg.clear();
+    })();
+    return this._stopPromise;
   }
 }
