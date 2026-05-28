@@ -97,10 +97,12 @@ export default function setup(): void {
         await serverDb.open('/test/sync-repo');
         const serverItem = serverDb.item('/test/sync-repo', item.key);
 
-        // Wait for the server item to finish loading
+        // Wait for the server item to finish loading from local DB.
+        // Once loaded, the item's schema is populated (exists === true)
+        // if the sync data has arrived. Polling with a generous timeout
+        // handles the race between client.sync() completing and the
+        // server-side DB write being visible via the open reference.
         await serverItem.readyPromise();
-
-        // Wait for the item to actually exist (have non-null schema)
         const sleepStart = performance.now();
         while (!serverItem.exists) {
           await sleep(10);
@@ -124,6 +126,53 @@ export default function setup(): void {
           await client.close();
         }
 
+        await server.stop();
+      }
+    },
+  );
+
+  TEST(
+    'MinimalSync',
+    'server start does not bind after stop wins during service startup',
+    async (ctx) => {
+      const serverPath = await ctx.tempDir('sync-server-stop-during-start');
+      const { domain } = createTestDomainConfig();
+      const buildInfo = await generateBuildInfo(
+        path.join((await FileImplGet()).getCWD(), 'deno.json'),
+      );
+      const server = new Server<Schema>({
+        path: serverPath,
+        orgId: 'test-org',
+        port: 0,
+        registry: testRegistry,
+        buildInfo,
+        domain,
+      });
+      let releaseEmailStart: (() => void) | undefined;
+
+      try {
+        const services = await server.servicesForOrganization('test-org');
+        const originalEmailStart = services.email.start.bind(services.email);
+        const emailStartGate = new Promise<void>((resolve) => {
+          releaseEmailStart = resolve;
+        });
+        services.email.start = async () => {
+          await emailStartGate;
+          originalEmailStart();
+        };
+
+        const startPromise = server.start();
+        const stopPromise = server.stop();
+        releaseEmailStart?.();
+        await Promise.all([startPromise, stopPromise]);
+
+        assertEquals(
+          server.port,
+          undefined,
+          'start() must not bind after stop() wins during service startup',
+        );
+      } finally {
+        releaseEmailStart?.();
         await server.stop();
       }
     },
