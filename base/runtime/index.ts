@@ -153,7 +153,7 @@ export interface RuntimeAdapter {
   setupSignalHandler(
     signal: string,
     handler: () => Promise<void> | void,
-  ): void;
+  ): () => void;
 
   /**
    * Exits the process with the given exit code.

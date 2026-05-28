@@ -205,10 +205,10 @@ export const NodeAdapter: RuntimeAdapter = {
   setupSignalHandler(
     signal: string,
     handler: () => Promise<void> | void,
-  ): void {
+  ): () => void {
     // deno-lint-ignore no-explicit-any
     const proc = (globalThis as any).process;
-    proc.on(signal, () => {
+    const wrapped = () => {
       const result = handler();
       if (result instanceof Promise) {
         result.catch((err) => {
@@ -219,7 +219,15 @@ export const NodeAdapter: RuntimeAdapter = {
           });
         });
       }
-    });
+    };
+    proc.on(signal, wrapped);
+    return () => {
+      try {
+        proc.off(signal, wrapped);
+      } catch {
+        // Ignore cleanup races during shutdown.
+      }
+    };
   },
 
   exit(code: number): never {

@@ -162,9 +162,9 @@ export const BrowserAdapter: RuntimeAdapter = {
   setupSignalHandler(
     _signal: string,
     _handler: () => Promise<void> | void,
-  ): void {
+  ): () => void {
     // Browsers don't have Unix-style signals
-    return;
+    return () => {};
   },
 
   exit(_code: number): never {

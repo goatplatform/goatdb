@@ -183,8 +183,8 @@ export const DenoAdapter: RuntimeAdapter = {
   setupSignalHandler(
     signal: string,
     handler: () => Promise<void> | void,
-  ): void {
-    Deno.addSignalListener(signal as Deno.Signal, () => {
+  ): () => void {
+    const wrapped = () => {
       const result = handler();
       if (result instanceof Promise) {
         result.catch((err) => {
@@ -195,7 +195,15 @@ export const DenoAdapter: RuntimeAdapter = {
           });
         });
       }
-    });
+    };
+    Deno.addSignalListener(signal as Deno.Signal, wrapped);
+    return () => {
+      try {
+        Deno.removeSignalListener(signal as Deno.Signal, wrapped);
+      } catch {
+        // Ignore cleanup races during shutdown.
+      }
+    };
   },
 
   exit(code: number): never {
