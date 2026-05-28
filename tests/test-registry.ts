@@ -58,7 +58,7 @@ import setupSecurityBoundaries from './security-boundaries.test.ts';
 import setupLiveQuery from './live-query.test.ts';
 import setupWriteFailure from './write-failure.test.ts';
 import setupBuildDenoTests from './build-deno.test.ts';
-import { isDeno } from '../base/common.ts';
+import { isBrowser, isDeno } from '../base/common.ts';
 import { TestsRunner } from './mod.ts';
 
 let _registrationPromise: Promise<void> | undefined;
@@ -141,7 +141,9 @@ async function registerAllTestsImpl(): Promise<void> {
   setupMergeSync(); // Merge behavior during sync
 
   // HEAVY END-TO-END TESTS (10-30s each) - Full system, network latency, multi-node
-  setupCliCompileTests(); // CLI compilation (includes E2E compile test)
+  if (!isBrowser()) {
+    setupCliCompileTests(); // CLI compilation (includes E2E compile test)
+  }
   setupE2ELatency(); // Client-to-client sync latency measurement
   setupClusterLatency(); // Multi-server cluster sync performance
 }
