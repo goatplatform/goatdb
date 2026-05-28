@@ -108,3 +108,42 @@ export default function setup() {
   });
 }
 ```
+
+### Runtime-Specific Tests
+
+Tests must NEVER have platform checks (`if (!isBrowser())`, `if (isNode())`,
+etc.) inside their bodies or wrapped around individual `TEST()` calls.
+Instead, gate test **registration** at the caller level:
+
+```typescript
+// ✅ CORRECT — setup function is pure, caller decides which runtimes use it
+// tests/my-server.test.ts
+export default function setupMyServerTests() {
+  TEST('Server', 'works', async (ctx) => {
+    // No platform checks — runs on any registered runtime
+  });
+}
+
+// tests/test-registry.ts — ENTRY POINT, caller gates registration
+import { isBrowser } from '../base/common.ts';
+import setupMyServerTests from './my-server.test.ts';
+
+if (!isBrowser()) {
+  setupMyServerTests(); // ← one gate per setup function
+}
+```
+
+❌ WRONG — platform check in test body (silent no-op, wastes execution):
+```typescript
+TEST('Node', 'works', async (ctx) => {
+  if (!isNode()) return;
+  // ...
+});
+```
+
+❌ WRONG — platform check around each TEST() (repetitive, noisy):
+```typescript
+if (!isBrowser()) {
+  TEST('Server', 'works', async (ctx) => { ... });
+}
+```

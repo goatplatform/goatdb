@@ -88,6 +88,44 @@ export default function setup() {
 
 Then register in `tests/tests-entry-server.ts`.
 
+### Runtime-Specific Tests
+
+DO NOT put platform checks inside test bodies or around individual `TEST()`
+calls. Instead, gate TEST registration at the setup-function or entry-point
+level:
+
+```typescript
+// ✅ CORRECT — registration gated, test body is pure
+export default function setupServerTests() {
+  TEST('Suite', 'works', async (ctx) => {
+    // No platform checks here — pure test logic
+  });
+}
+
+// tests-entry.ts or test-registry.ts — caller decides which runtimes
+// register which suites. Only ONE gate per test file.
+import { isBrowser } from '../base/common.ts';
+import setupServerTests from './server.test.ts';
+
+if (!isBrowser()) {
+  setupServerTests(); // ← gate here, not inside the setup function
+}
+```
+
+❌ WRONG — platform check in test body:
+```typescript
+TEST('Suite', 'name', async (ctx) => {
+  if (!isNode()) return; // ← silently no-ops, wastes resources
+});
+```
+
+❌ WRONG — platform check around each TEST():
+```typescript
+if (!isBrowser()) {        // ← repetitive, 59 copies in one file
+  TEST('Suite', 'name', ...);
+}
+```
+
 ### Schema Registration
 
 Schemas must be registered before use:
