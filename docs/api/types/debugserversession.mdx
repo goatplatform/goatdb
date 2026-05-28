@@ -1,0 +1,21 @@
+---
+title: DebugServerSession
+sidebar_label: DebugServerSession
+---
+
+# DebugServerSession
+
+Active debug-server session handle, exposed via the `onReady` callback.
+`stop()` is safe to call more than once (idempotent).
+
+## Definition
+
+**Type:** <code>DebugServerSession&lt;US&gt; = &#123; server: [Server](/api/classes/server)&lt;US&gt;; url: string; stop(): Promise&lt;void&gt; &#125;</code>
+
+## Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `server` | `Server<US>` | The started server instance |
+| `url` | `string` | The debug-server origin URL for this run (e.g. `http://localhost:8080`) |
+| `stop()` | `() => Promise<void>` | Stops the debug server and releases its watcher/build resources. Safe to call multiple times. |

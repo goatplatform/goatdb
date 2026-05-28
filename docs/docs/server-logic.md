@@ -165,7 +165,10 @@ class LoggingMiddleware implements Middleware<typeof kUserSchema> {
     _info: ServeHandlerInfo,
     resp: Response,
   ): Promise<Response> {
-    console.log(`${req.method} ${req.url} → ${resp.status}`);
+    services.logger.log({
+      severity: 'INFO',
+      message: `${req.method} ${req.url} -> ${resp.status}`,
+    });
     return Promise.resolve(resp);
   }
 }
@@ -220,7 +223,9 @@ await server.start();
 When using
 [`startDebugServer`](/api/GoatDB/Server/Build/functions/startDebugServer), use
 the `setup` callback. It runs after the database is initialized but before HTTP
-listening begins:
+listening begins. `startDebugServer()` works on both Deno and Node.js, using
+runtime-specific config discovery (`deno.json` on Deno, `package.json` on
+Node.js unless overridden):
 
 ```typescript
 import { startDebugServer } from '@goatdb/goatdb/server/build';

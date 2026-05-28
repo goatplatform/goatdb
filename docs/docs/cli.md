@@ -223,8 +223,16 @@ deno task dev   # or: npm run dev
 
 If you need to embed a debug server in a custom script:
 
-`startDebugServer()` is Deno-only. Its development build pipeline uses the Deno
-loader, so the `esbuildPlugins` hook below is also Deno-only.
+`startDebugServer()` supports Deno and Node.js. On Deno it uses the Deno loader;
+on Node.js it uses GoatDB's browser-target plugin stack. Runtime config
+selection is runtime-specific: Deno reads `deno.json`, Node.js reads
+`package.json`, unless you pass `denoJson` or `packageJson` explicitly. By
+default it opens the local URL in your browser after startup; pass
+`openBrowser: false` for embedded or test usage.
+`onReady({ server, url,
+stop })` runs after listening begins, `url` is the
+chosen server origin, and `stop()` is safe to call more than once. Only one
+active debug server instance is supported at a time.
 
 ```typescript
 import { startDebugServer } from '@goatdb/goatdb/server/build';
@@ -233,19 +241,25 @@ import { registerSchemas } from './common/schema.ts';
 registerSchemas();
 
 await startDebugServer({
+  path: './server-data',
   jsPath: './client/index.tsx',
   htmlPath: './client/index.html',
   // Import application CSS from JS. Use cssPath only for prepended static CSS.
   // cssPath: './client/fonts.css',  // optional: prepend a static CSS file (resets, fonts, etc.)
   // assetsPath: './client/assets',  // optional: directory of static assets served at /assets/*
-  // esbuildPlugins: [],               // optional: Deno-only custom esbuild plugins
+  // esbuildPlugins: [],               // optional: custom esbuild plugins
   buildDir: './build',
   watchDir: '.', // directory to watch for changes
   port: 8080,
   orgId: 'dev-org', // simulate a specific org's environment (optional)
   setup: async (server) => { // called after init, before HTTP listening (optional)
-    // access server.db here for event handlers, background tasks, etc.
+    // event handlers, background tasks, custom endpoints, etc.
   },
+  // onReady: async ({ server, url, stop }) => { // optional: runs before browser launch
+  //   const services = await server.servicesForOrganization('dev-org');
+  //   services.logger.log({ severity: 'INFO', message: `Debug server ready at ${url}` });
+  //   await stop();
+  // },
 });
 ```
 

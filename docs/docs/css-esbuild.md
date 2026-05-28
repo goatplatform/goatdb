@@ -142,6 +142,8 @@ await compile({
 });
 ```
 
-Production `compile()` supports `esbuildPlugins` on Deno and Node.js. The
-development `startDebugServer()` build pipeline is Deno-only, so its
-`esbuildPlugins` hook is also Deno-only.
+Both `compile()` and `startDebugServer()` support `esbuildPlugins` on Deno and
+Node.js. Deno uses the Deno loader in development; Node.js uses GoatDB's
+browser-target plugin stack. Runtime config discovery stays runtime-specific:
+`startDebugServer()` reads `deno.json` on Deno and `package.json` on Node.js
+unless overridden explicitly.

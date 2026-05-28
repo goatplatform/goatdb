@@ -19,10 +19,27 @@ This function performs the following steps:
 
 ## startDebugServer
 
-**<code>startDebugServer(options: [DebugServerOptions](/api/types/debugserveroptions)&lt;US&gt;): Promise&lt;never&gt;</code>**
+**<code>startDebugServer(options: [DebugServerOptions](/api/types/debugserveroptions)&lt;US&gt;): Promise&lt;void&gt;</code>**
 
-Starts a local debug server. The debug server implements a live reload that
-automatically transpiles TypeScript and JSX using ESBuild.
+Starts a local debug server. The debug server implements live reload and
+automatically transpiles TypeScript and JSX using ESBuild on both Deno and
+Node.js. By default it opens the local URL in a browser, but embedded callers
+can disable that with `openBrowser: false`. `onReady` runs after HTTP listening
+begins, receives `{ server, url, stop }`, and `url` is the server origin
+(`scheme://host:port`) chosen for that run. `stop()` is safe to call more than
+once. The promise resolves after shutdown. Only one active debug server
+instance is supported at a time. Runtime config discovery is runtime-specific:
+Deno uses `deno.json`, Node.js uses `package.json`.
+
+> **Breaking change:** `startDebugServer` previously returned `Promise<never>`;
+> it now returns `Promise<void>` and resolves after shutdown. Code that relied
+> on the `never` return type for control-flow narrowing will need updating.
+> `config.debug` is now saved on entry and restored on exit, so the global
+> debug flag is no longer leaked after the server stops. Additionally, config
+> file auto-detection is now runtime-specific: Deno requires `deno.json` and
+> Node.js requires `package.json` (no cross-runtime fallback). Deno projects
+> that previously relied on automatic `package.json` detection must either add
+> a `deno.json` or pass `denoJson` explicitly.
 
 ## staticAssetsFromJS
 

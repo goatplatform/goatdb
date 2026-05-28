@@ -53,6 +53,15 @@ and GoatDB adheres to
   on upgrade and be lazily rebuilt -- no data loss, but expect a one-time
   re-scan on first open.
 
+- **`startDebugServer` returns `Promise<void>` now (was `Promise<never>`)**:
+  Resolves after shutdown. Callers relying on `never` for control-flow narrowing
+  need updating.
+- **`config.debug` is now saved on entry and restored on exit**: No longer
+  leaked after server stops.
+- **Config file auto-detection is runtime-specific**: Deno imports `deno.json`;
+  Node.js imports `package.json`. No cross-runtime fallback. Explicit
+  `denoJson`/`packageJson` options work as before.
+
 ### Added
 
 - `GoatDB.insert()` — bulk API for batch item creation without ancestor
@@ -63,6 +72,18 @@ and GoatDB adheres to
   the storage worker for zero-copy encode/decode
 - `esbuildPlugins` option on `compile()` and `startDebugServer()` for custom
   esbuild plugins in the client bundle pipeline
+
+- `DebugServerSession` type with `{ server, url, stop }` — exposed via `onReady`
+  callback on `startDebugServer`
+- `onReady` option on `startDebugServer` — runs after HTTP listening begins,
+  before browser launch
+- `openBrowser` option on `startDebugServer` — defaults to `true`; set `false`
+  for headless/embedded usage
+- Concurrent-call guard on `startDebugServer` — rejects if another instance is
+  already running
+- `Server.stop()` idempotency — cached promise, safe to call multiple times
+- `startDebugServer` now supports Node.js alongside Deno
+- `createBuildContext` now supports Node.js alongside Deno
 
 ### Changed
 
@@ -79,6 +100,14 @@ and GoatDB adheres to
   builds
 - CSS bundling documented in dedicated [CSS and esbuild](/docs/css-esbuild)
   guide
+- Build failure severity during watch-mode rebuilds downgraded from `ERROR`
+  to `WARNING` — transient build failures in development are not application
+  errors
+
+- `Server.start()` now awaits a prior `stop()` promise and checks `_stopping`
+  flag for clean start/stop race handling
+- `Server.stop()` uses promise caching for idempotency and handles early-exit
+  cleanup when services are initialized without an HTTP listener
 
 ## [0.5.1] - 2026-03-05
 

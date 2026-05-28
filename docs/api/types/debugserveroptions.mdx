@@ -5,7 +5,14 @@ sidebar_label: DebugServerOptions
 
 # DebugServerOptions
 
+Debug-server options extend the normal server options with SPA build settings,
+live-reload hooks, custom `esbuildPlugins`, optional `openBrowser` control,
+the pre-listen `setup(server)` hook, and the post-listen
+`onReady({ server, url, stop })` hook. `url` is the chosen server origin,
+`stop()` is idempotent, `startDebugServer()` resolves after shutdown, and only
+one active debug server instance is supported at a time.
+
 ## Definition
 
-**Type:** <code>DebugServerOptions = any</code>
+**Type:** <code>DebugServerOptions = Omit&lt;ServerOptions, 'staticAssets' | 'buildInfo' | 'domain'&gt; &amp; Partial&lt;Pick&lt;ServerOptions, 'domain'&gt;&gt; &amp; LiveReloadOptions &amp; AppConfig &amp; &#123; esbuildPlugins?: BuildPluginLike[]; setup?: (server) =&gt; void | Promise&lt;void&gt;; openBrowser?: boolean; onReady?: (session) =&gt; void | Promise&lt;void&gt; &#125;</code>
 
