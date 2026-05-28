@@ -9,6 +9,7 @@
 
 export {
   type DebugServerOptions,
+  type DebugServerSession,
   type LiveReloadOptions,
   startDebugServer,
 } from './cli/debug-server.ts';
