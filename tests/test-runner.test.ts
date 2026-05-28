@@ -3,7 +3,7 @@ import { TEST, TestsRunner } from './mod.ts';
 import {
   BROWSER_FAILURE_FILTER_TEST,
   DENO_ONLY_FILTER_TEST,
-  NODE_ONLY_FILTER_TEST,
+  SHARED_SERVER_FILTER_TEST,
 } from './test-filter-constants.ts';
 import {
   assertEquals,
@@ -190,9 +190,9 @@ export default function setupTestRunnerTests(): void {
   TEST(
     'TestRunner',
     'aggregate filtered run fails clearly when no selected runtime matches suite',
-    async () => {
-      await assertThrows(
-        async () => {
+    () => {
+      assertThrows(
+        () => {
           finalizeFilteredRuntimeOutcomes(
             [
               { runtime: 'deno', status: 'no-match' },
@@ -211,9 +211,9 @@ export default function setupTestRunnerTests(): void {
   TEST(
     'TestRunner',
     'aggregate filtered run fails clearly when no selected runtime matches test',
-    async () => {
-      await assertThrows(
-        async () => {
+    () => {
+      assertThrows(
+        () => {
           finalizeFilteredRuntimeOutcomes(
             [
               { runtime: 'deno', status: 'no-match' },
@@ -257,7 +257,7 @@ export default function setupTestRunnerTests(): void {
 
   TEST(
     'TestRunner',
-    'tests/run.ts aggregate filters tolerate a Node-only server match',
+    'tests/run.ts aggregate filters execute shared server tests on Deno and Node',
     async () => {
       if (typeof Deno === 'undefined') return;
       const { code, stdoutText, stderrText } = await runDenoCommandWithTimeout([
@@ -265,17 +265,17 @@ export default function setupTestRunnerTests(): void {
         '-A',
         './tests/run.ts',
         '--runtime=deno,node',
-        `--test=${NODE_ONLY_FILTER_TEST}`,
+        `--test=${SHARED_SERVER_FILTER_TEST}`,
       ]);
 
       assertEquals(code, 0, stderrText);
       assertTrue(
-        stdoutText.includes('Deno: no matching tests in this runtime'),
-        'aggregate run must tolerate Deno no-match for a Node-only test',
+        stdoutText.includes('=== 🦖 Deno: all passed ==='),
+        'aggregate run must report Deno success when the shared server test passes',
       );
       assertTrue(
         stdoutText.includes('=== ⚡️ Node.js: all passed ==='),
-        'aggregate run must report Node.js success when the filtered test passes',
+        'aggregate run must report Node.js success when the shared server test passes',
       );
     },
   );
