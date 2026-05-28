@@ -33,3 +33,6 @@ opencode.json
 
 # Playwright browser cache (written by CI via PLAYWRIGHT_BROWSERS_PATH)
 .playwright/
+
+# MCP server configuration (local AI tooling config)
+.mcp.json
