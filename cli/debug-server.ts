@@ -19,7 +19,6 @@ import {
 import { getGoatConfig } from '../base/config.ts';
 import { Server, type ServerOptions } from '../net/server/server.ts';
 import { buildAssets } from './build-assets.ts';
-import { notReached } from '../base/error.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
 import { getRuntime } from '../base/runtime/index.ts';
@@ -32,9 +31,61 @@ import {
   watchDirectory,
 } from '../base/file-watcher.ts';
 import { pathExists } from '../base/json-log/file-impl.ts';
+import { notReached } from '../base/error.ts';
+
+/** Guards startDebugServer against concurrent calls that would corrupt config.debug save/restore. */
+let _debugServerActive = false;
 
 function incrementBuildNumber(version: VersionNumber): VersionNumber {
   return tuple4Set(version, 0, tuple4Get(version, 0) + 1);
+}
+
+function setupDebugServerSignalHandlers(
+  handler: () => Promise<void>,
+): () => void {
+  const runtime = getRuntime();
+  const cleanup1 = runtime.setupSignalHandler('SIGTERM', handler);
+  const cleanup2 = runtime.setupSignalHandler('SIGINT', handler);
+  return () => {
+    try {
+      cleanup1();
+    } catch {
+      // Ignore cleanup races during shutdown.
+    }
+    try {
+      cleanup2();
+    } catch {
+      // Ignore cleanup races during shutdown.
+    }
+  };
+}
+
+function debugServerOrigin<US extends Schema>(
+  server: Server<US>,
+  options: DebugServerOptions<US>,
+): string {
+  const protocol = options.https ? 'https:' : 'http:';
+  const resolved = options.domain?.resolveOrg(options.orgId || 'localhost');
+  if (resolved) {
+    try {
+      const url = new URL(resolved);
+      url.protocol = protocol;
+      if (!url.port || url.port === '0') {
+        url.port = String(server.port);
+      }
+      url.pathname = '';
+      url.search = '';
+      url.hash = '';
+      return url.toString().replace(/\/$/, '');
+    } catch {
+      // Fall through to the local default below.
+    }
+  }
+  const hostname = options.https && 'selfSigned' in options.https &&
+      options.https.hostname
+    ? options.https.hostname
+    : 'localhost';
+  return `${protocol}//${hostname}:${server.port}`;
 }
 
 /**
@@ -84,8 +135,30 @@ export type LiveReloadOptions = {
 };
 
 /**
- * Options for the debug server, combining server options with live reload
- * and app configuration.
+ * Active debug-server session handle, exposed via the `onReady` callback.
+ * Provides the running server, its local URL, and an idempotent `stop()` for
+ * programmatic shutdown.
+ * @group Debug Server
+ */
+export type DebugServerSession<US extends Schema> = {
+  /**
+   * The started server instance.
+   */
+  server: Server<US>;
+  /**
+   * The origin URL (`scheme://host:port`) chosen for this debug-server run.
+   */
+  url: string;
+  /**
+   * Stops the debug server and releases its watcher/build resources.
+   * Safe to call multiple times.
+   */
+  stop(): Promise<void>;
+};
+
+/**
+ * Options for the debug server, combining server options with live reload,
+ * app configuration, and development hooks.
  * @group Debug Server
  */
 export type DebugServerOptions<US extends Schema> =
@@ -96,13 +169,14 @@ export type DebugServerOptions<US extends Schema> =
   & {
     /**
      * Custom esbuild plugins injected into the client bundle pipeline.
-     * Deno-only. In development (`startDebugServer`), plugins are baked into
-     * the build context at startup, run before GoatDB's fallback CSS loader,
-     * and require a restart to change. Use them to rewrite CSS imports, resolve
-     * package CSS, or provide other browser bundle transforms.
+     * In development (`startDebugServer`), plugins are baked into the build
+     * context at startup, run before GoatDB's fallback CSS loader, and require
+     * a restart to change. Use them to rewrite CSS imports, resolve package
+     * CSS, or provide other browser bundle transforms.
      *
-     * @remarks The namespace `'node-stub'` is reserved by GoatDB internally.
-     * User-supplied plugins must not register that name.
+     * @remarks GoatDB reserves the plugin names `'adapter-stub'`,
+     * `'node-stub'`, and `'goatdb-css-loader'` internally.
+     * User-supplied plugins must use a different name.
      */
     esbuildPlugins?: BuildPluginLike[];
     /**
@@ -112,189 +186,280 @@ export type DebugServerOptions<US extends Schema> =
      * processes, custom endpoints).
      */
     setup?: (server: Server<US>) => void | Promise<void>;
+    /**
+     * If false, suppresses the automatic browser launch after startup.
+     * Defaults to true.
+     */
+    openBrowser?: boolean;
+    /**
+     * Called after HTTP listening begins and before the automatic browser
+     * launch. Use this for embedded tooling or tests that need the final URL
+     * and an explicit shutdown hook.
+     */
+    onReady?: (
+      session: DebugServerSession<US>,
+    ) => void | Promise<void>;
   };
 
 /**
  * Starts a local debug server with live reload.
  *
- * The debug server automatically transpiles TypeScript and JSX using ESBuild
- * and watches for file changes to trigger rebuilds. Deno-only: the client
- * build context uses `@deno/esbuild-plugin`.
+ * The debug server automatically transpiles TypeScript and JSX using ESBuild,
+ * watches for file changes to trigger rebuilds, and opens the local URL in a
+ * browser unless `openBrowser` is false.
  *
  * @param options Options for running the debug server.
- * @returns Never returns - runs until the process is terminated.
+ * @returns Resolves after the debug server is shut down.
  * @group Debug Server
  */
 export async function startDebugServer<US extends Schema>(
   options: DebugServerOptions<US>,
-): Promise<never> {
-  if (getRuntime().id !== 'deno') {
+): Promise<void> {
+  const config = getGoatConfig();
+  const originalDebug = config.debug;
+  const runtime = getRuntime().id;
+  if (runtime !== 'deno' && runtime !== 'node') {
     throw new Error(
-      'startDebugServer() is only supported in Deno. GoatDB debug-server ' +
-        'bundling uses @deno/esbuild-plugin; Node.js users should run ' +
-        'the scaffolded dev server or use compile() for production builds.',
+      'startDebugServer() is only supported in Deno or Node.js. ' +
+        'Use compile() for production builds targeting other runtimes.',
     );
   }
-  getGoatConfig().debug = true; // Turn on debug mode globally
-
   const cwd = getRuntime().getCWD();
-  let configPath = options.denoJson || options.packageJson;
-  if (!configPath) {
-    const denoJsonPath = path.join(cwd, 'deno.json');
-    const packageJsonPath = path.join(cwd, 'package.json');
-    configPath = await pathExists(denoJsonPath)
-      ? denoJsonPath
-      : packageJsonPath;
-  }
-  if (!await pathExists(configPath)) {
+
+  // Guard against concurrent calls before any async work that would
+  // corrupt config.debug save/restore.
+  if (_debugServerActive) {
     throw new Error(
-      `No config file found. Expected deno.json or package.json in "${cwd}".`,
+      'startDebugServer is already running. Only one instance at a time is supported.',
     );
   }
-  const buildInfo = await generateBuildInfo(configPath);
-  buildInfo.debugBuild = true;
+  _debugServerActive = true;
 
-  const server = new Server({
-    ...(options as unknown as ServerOptions<US>),
-    buildInfo,
-  });
+  let removeSignalHandlers = () => {};
+  let cleanup: () => Promise<void> = async () => {};
+  try {
+    // Keep this runtime-specific config choice aligned with compile().
+    const configPath = runtime === 'node'
+      ? (options.packageJson || path.join(cwd, 'package.json'))
+      : (options.denoJson || path.join(cwd, 'deno.json'));
+    if (!await pathExists(configPath)) {
+      throw new Error(
+        `Config file not found at "${configPath}". Provide ${
+          runtime === 'node' ? 'packageJson' : 'denoJson'
+        } or run from a directory containing one.`,
+      );
+    }
 
-  log({ severity: 'INFO', message: 'Bundling client code...' });
-  let bundlingStart = performance.now();
+    const buildInfo = await generateBuildInfo(configPath);
+    buildInfo.debugBuild = true;
+    config.debug = true; // Turn on debug mode only for the active debug-server run
 
-  const entryPoints = [
-    {
-      in: resolveBuildEntryPath(options.jsPath),
-      out: APP_ENTRY_POINT,
-    },
-  ];
+    const server = new Server({
+      ...(options as unknown as ServerOptions<US>),
+      buildInfo,
+    });
 
-  await server.servicesForOrganization(options.orgId || 'localhost');
+    let ctx: ReBuildContext | undefined;
+    let watcher: FileWatcher | undefined;
+    let rebuildTimer: SimpleTimer | undefined;
+    let shuttingDown = false;
+    let resolveStopped!: () => void;
+    const stopped = new Promise<void>((resolve) => {
+      resolveStopped = resolve;
+    });
+    let cleanupPromise: Promise<void> | undefined;
+    cleanup = (): Promise<void> => {
+      // Cached promise: cleanup may be called from multiple paths (signal
+      // handler, error handler, onReady stop()) — return the in-flight
+      // promise instead of re-executing.
+      // Single-shot: after this completes no new services should start.
+      // If the lifecycle changes, clear the cache on service creation.
+      if (cleanupPromise) {
+        return cleanupPromise;
+      }
+      shuttingDown = true;
+      cleanupPromise = (async () => {
+        try {
+          watcher?.close();
+          rebuildTimer?.unschedule();
+          try {
+            await server.stop();
+          } finally {
+            ctx?.close();
+          }
+        } finally {
+          resolveStopped();
+        }
+      })();
+      return cleanupPromise;
+    };
+    const signalHandler = async () => {
+      try {
+        await cleanup();
+        getRuntime().exit(0);
+      } catch (err) {
+        log({
+          severity: 'ERROR',
+          error: 'UncaughtServerError',
+          message: `Debug server cleanup failed: ${err}`,
+          trace: err instanceof Error ? err.stack : undefined,
+        });
+        getRuntime().exit(1);
+      }
+    };
+    removeSignalHandlers = setupDebugServerSignalHandlers(signalHandler);
 
-  if (options.setup) {
-    await options.setup(server);
-  }
+    log({ severity: 'INFO', message: 'Bundling client code...' });
+    let bundlingStart = performance.now();
 
-  if (options.beforeBuild) {
-    await options.beforeBuild();
-  }
+    const entryPoints = [
+      {
+        in: resolveBuildEntryPath(options.jsPath),
+        out: APP_ENTRY_POINT,
+      },
+    ];
 
-  // createBuildContext is development-only and never minifies;
-  // appConfig.minify is intentionally not forwarded here.
-  const ctx = await createBuildContext(
-    entryPoints,
-    options.esbuildPlugins,
-  );
-  const { esbuildPlugins: _ignoredEsbuildPlugins, ...buildOptions } = options;
-  server.updateStaticAssets(
-    await buildAssets(ctx, entryPoints, buildOptions),
-  );
+    await server.servicesForOrganization(options.orgId || 'localhost');
 
-  if (options.afterBuild) {
-    await options.afterBuild();
-  }
+    if (options.setup) {
+      await options.setup(server);
+    }
 
-  await server.start();
+    if (options.beforeBuild) {
+      await options.beforeBuild();
+    }
 
-  const serverUrl = `${
-    options.https ? 'https' : 'http'
-  }://localhost:${server.port}`;
-  await getRuntime().openBrowser(serverUrl);
+    // createBuildContext is development-only and never minifies;
+    // appConfig.minify is intentionally not forwarded here.
+    ctx = await createBuildContext(
+      entryPoints,
+      options.esbuildPlugins,
+    );
+    const { esbuildPlugins: _ignoredEsbuildPlugins, ...buildOptions } = options;
+    server.updateStaticAssets(
+      await buildAssets(ctx, entryPoints, buildOptions),
+    );
 
-  log({
-    severity: 'INFO',
-    message: `Bundling took ${
-      ((performance.now() - bundlingStart) / 1000).toFixed(2)
-    }sec`,
-  });
+    if (options.afterBuild) {
+      await options.afterBuild();
+    }
 
-  // Declare cleanup variables
-  let watcher: FileWatcher | undefined;
-  let rebuildTimer: SimpleTimer | undefined;
+    await server.start();
 
-  // Setup signal handler for graceful shutdown
-  const cleanup = async () => {
-    watcher?.close();
-    rebuildTimer?.unschedule();
-    await server.stop();
-    ctx.close();
-  };
+    const serverUrl = debugServerOrigin(server, options);
 
-  getRuntime().setupSignalHandler('SIGTERM', async () => {
-    try {
-      await cleanup();
-      getRuntime().exit(0);
-    } catch (err) {
+    if (options.onReady) {
+      await options.onReady({
+        server,
+        url: serverUrl,
+        stop: cleanup,
+      });
+    }
+    if (options.openBrowser !== false && !shuttingDown) {
+      await getRuntime().openBrowser(serverUrl);
+    }
+    if (shuttingDown) {
+      await stopped;
+      return;
+    }
+
+    log({
+      severity: 'INFO',
+      message: `Bundling took ${
+        ((performance.now() - bundlingStart) / 1000).toFixed(2)
+      }sec`,
+    });
+
+    if (options.watchDir) {
+      watcher = await watchDirectory(path.resolve(options.watchDir));
+      // If onReady called stop() before we created the watcher, close it now.
+      if (shuttingDown) {
+        watcher.close();
+        await stopped;
+        return;
+      }
+
+      rebuildTimer = new SimpleTimer(300, false, async () => {
+        if (shuttingDown) return;
+        log({ severity: 'INFO', message: 'Bundling client code...' });
+        bundlingStart = performance.now();
+        try {
+          const config = getGoatConfig();
+          const version = incrementBuildNumber(config.version);
+
+          if (options.beforeBuild) {
+            await options.beforeBuild();
+          }
+
+          server.updateStaticAssets(
+            await buildAssets(ctx, entryPoints, buildOptions),
+          );
+
+          if (options.afterBuild) {
+            await options.afterBuild();
+          }
+
+          config.version = version;
+          log({
+            severity: 'INFO',
+            message: `Bundling took ${
+              ((performance.now() - bundlingStart) / 1000).toFixed(2)
+            }sec`,
+          });
+        } catch (err: unknown) {
+          log({
+            severity: 'WARNING',
+            error: 'BuildFailure',
+            message: 'Build failed. Will try again on next save.',
+          });
+          log({
+            severity: 'WARNING',
+            error: 'BuildFailure',
+            message: err instanceof Error ? err.message : String(err),
+            trace: err instanceof Error ? err.stack : undefined,
+          });
+        }
+      });
+
+      const filterFunc = options.watchFilter || shouldRebuildAfterPathChange;
+
+      for await (const event of watcher) {
+        for (const p of event.paths) {
+          const relativePath = p.startsWith(cwd)
+            ? p.substring(cwd.length + 1)
+            : p;
+          if (filterFunc(relativePath)) {
+            log({
+              severity: 'INFO',
+              message: `Detected change at ${relativePath}`,
+            });
+            rebuildTimer.schedule();
+          }
+        }
+      }
+      if (shuttingDown) {
+        await cleanup();
+        return;
+      }
+      notReached('Debug server file watcher exited unexpectedly.');
+    }
+
+    // No watcher configured: wait until a signal or embedded caller stops us.
+    await stopped;
+  } catch (err) {
+    await cleanup().catch((cleanupErr) => {
       log({
         severity: 'ERROR',
         error: 'UncaughtServerError',
-        message: `Debug server cleanup failed: ${err}`,
+        message:
+          `Debug server cleanup after failure also failed: ${cleanupErr}`,
+        trace: cleanupErr instanceof Error ? cleanupErr.stack : undefined,
       });
-      getRuntime().exit(1);
-    }
-  });
-
-  if (options.watchDir) {
-    watcher = await watchDirectory(path.resolve(options.watchDir));
-
-    rebuildTimer = new SimpleTimer(300, false, async () => {
-      log({ severity: 'INFO', message: 'Bundling client code...' });
-      bundlingStart = performance.now();
-      try {
-        const config = getGoatConfig();
-        const version = incrementBuildNumber(config.version);
-
-        if (options.beforeBuild) {
-          await options.beforeBuild();
-        }
-
-        server.updateStaticAssets(
-          await buildAssets(ctx, entryPoints, buildOptions),
-        );
-
-        if (options.afterBuild) {
-          await options.afterBuild();
-        }
-
-        config.version = version;
-        log({
-          severity: 'INFO',
-          message: `Bundling took ${
-            ((performance.now() - bundlingStart) / 1000).toFixed(2)
-          }sec`,
-        });
-      } catch (err: unknown) {
-        log({
-          severity: 'ERROR',
-          error: 'UncaughtServerError',
-          message: 'Build failed. Will try again on next save.',
-        });
-        log({
-          severity: 'ERROR',
-          error: 'UncaughtServerError',
-          message: `Build error: ${err}`,
-        });
-      }
     });
-
-    const filterFunc = options.watchFilter || shouldRebuildAfterPathChange;
-    const cwd = getRuntime().getCWD();
-
-    for await (const event of watcher) {
-      for (const p of event.paths) {
-        const relativePath = p.startsWith(cwd)
-          ? p.substring(cwd.length + 1)
-          : p;
-        if (filterFunc(relativePath)) {
-          log({
-            severity: 'INFO',
-            message: `Detected change at ${relativePath}`,
-          });
-          rebuildTimer.schedule();
-        }
-      }
-    }
+    throw err;
+  } finally {
+    removeSignalHandlers();
+    _debugServerActive = false;
+    config.debug = originalDebug;
   }
-
-  notReached();
 }
