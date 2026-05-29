@@ -1,5 +1,6 @@
 import type * as esbuild from 'esbuild';
 import { resolveBuildEntryPath } from '../build.ts';
+import { log } from '../logging/log.ts';
 
 // Lazy-load build-time dependencies so this module stays safe as a transitive
 // import inside runtime bundles that never call the build path.
@@ -13,7 +14,7 @@ async function getEsbuild(): Promise<typeof import('esbuild')> {
     const specifier = 'esbuild';
     esbuildModule = await import(specifier);
   }
-  return esbuildModule;
+  return esbuildModule!;
 }
 
 async function getDenoPlugin(): Promise<
@@ -23,7 +24,7 @@ async function getDenoPlugin(): Promise<
     const specifier = '@deno/esbuild-plugin';
     denoPluginModule = await import(specifier);
   }
-  return denoPluginModule.denoPlugin;
+  return denoPluginModule!.denoPlugin;
 }
 
 /**
@@ -75,6 +76,42 @@ export async function compileForNodeWithEsbuild(
   });
 }
 
+/** Timeout for Node.js subprocess execution (matching Deno worker timeout). */
+const NODE_RUN_TIMEOUT_MS = 5 * 60 * 1000;
+
+/**
+ * Races `promise` against a timeout. If the timeout fires first, calls
+ * `onTimeout` (for cleanup like killing a subprocess) and then rejects with
+ * the timeout error. Returns the original promise's resolution if it wins.
+ *
+ * @internal — exported for testing only; not part of the public API.
+ */
+export async function raceWithTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  onTimeout: () => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      try {
+        onTimeout();
+      } catch {
+        // Must not prevent the timeout rejection from executing.
+      }
+      reject(new Error(`Timed out after ${ms}ms`));
+    }, ms);
+    promise
+      .then((val) => {
+        clearTimeout(timer);
+        resolve(val);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
 export interface NodeRunResult {
   success: boolean;
   exitCode: number;
@@ -83,6 +120,7 @@ export interface NodeRunResult {
 
 async function forwardAndCaptureStream(
   stream: ReadableStream<Uint8Array> | null,
+  onChunk?: (text: string) => void,
 ): Promise<string> {
   if (!stream) {
     return '';
@@ -98,10 +136,9 @@ async function forwardAndCaptureStream(
       if (done) {
         break;
       }
-      if (!value) {
-        continue;
-      }
-      captured += decoder.decode(value, { stream: true });
+      const text = decoder.decode(value, { stream: true });
+      captured += text;
+      onChunk?.(text);
       await Deno.stderr.write(value);
     }
     captured += decoder.decode();
@@ -124,6 +161,11 @@ export async function nodeRun(
   inspectBrk?: boolean,
   env?: Record<string, string>,
 ): Promise<NodeRunResult> {
+  let nodeProcess: Deno.ChildProcess | undefined;
+  let stderrPromise: Promise<string> | undefined;
+  let stderrText = '';
+  let didTimeout = false;
+  let killTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     const nodeCmd = new Deno.Command('node', {
       stdin: 'piped',
@@ -139,26 +181,66 @@ export async function nodeRun(
         ...env,
       },
     });
-    const nodeProcess = nodeCmd.spawn();
-    const stderrPromise = forwardAndCaptureStream(nodeProcess.stderr);
+    nodeProcess = nodeCmd.spawn();
+    const child = nodeProcess;
+    stderrPromise = forwardAndCaptureStream(nodeProcess.stderr, (text) => {
+      stderrText += text;
+    });
     const writer = nodeProcess.stdin.getWriter();
     await writer.write(result.outputFiles![0].contents);
     await writer.close();
-    const status = await nodeProcess.status;
-    const stderrText = await stderrPromise;
+
+    // WHY: timeout must not leave a live child behind while the parent moves
+    // on to later tests; wait for process teardown before returning failure.
+    const status = await raceWithTimeout(
+      nodeProcess.status,
+      NODE_RUN_TIMEOUT_MS,
+      () => {
+        didTimeout = true;
+        log({
+          severity: 'WARNING',
+          message:
+            'Node.js subprocess timed out while executing `node` — sending SIGTERM',
+        });
+        try {
+          child.kill('SIGTERM');
+        } catch {
+          // Process may already have exited.
+        }
+        // SIGKILL fallback: if SIGTERM doesn't terminate, force kill after 2s.
+        killTimer = setTimeout(() => {
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            // Process may already have exited.
+          }
+        }, 2_000);
+      },
+    );
+    stderrText = await stderrPromise;
     return {
       success: status.success,
       exitCode: status.code,
       stderrText,
     };
   } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (didTimeout && nodeProcess) {
+      await nodeProcess.status.catch(() => undefined);
+      if (killTimer !== undefined) clearTimeout(killTimer);
+    }
+    const capturedStderr = await stderrPromise?.catch(() => stderrText) ??
+      stderrText;
     return {
       success: false,
       exitCode: -1,
-      stderrText: error instanceof Error ? error.message : String(error),
+      stderrText: capturedStderr
+        ? `${message}\n${capturedStderr}`.trim()
+        : message,
     };
   } finally {
+    if (killTimer !== undefined) clearTimeout(killTimer);
     await esbuildModule?.stop();
-    esbuildModule = undefined;
+    // Keep the cache alive for subsequent calls.
   }
 }
