@@ -1,5 +1,6 @@
 import { isDeno, isNode } from './common.ts';
 import { isWindows } from './os.ts';
+import { log } from '../logging/log.ts';
 
 // Minimal type for objects with a toString method (used in Node.js streams)
 type Stringable = { toString(): string };
@@ -109,6 +110,12 @@ export async function cli(
       return { result: output, exitCode: code };
     } catch (e: unknown) {
       if (ac?.signal.aborted) {
+        log({
+          severity: 'WARNING',
+          message:
+            `CLI subprocess timed out after ${options.timeout}ms (Deno): ` +
+            `${cmd} ${cmdArgs.join(' ')}`,
+        });
         return {
           result: `Process timed out after ${options.timeout}ms`,
           exitCode: 124,
@@ -154,6 +161,12 @@ export async function cli(
           // Windows has no POSIX signals, so we skip the SIGTERM grace period
           // and go straight to forced kill via taskkill.
           if (onWindows) {
+            log({
+              severity: 'WARNING',
+              message:
+                `CLI subprocess timed out after ${options.timeout}ms — killing via taskkill: ` +
+                `${cmd} ${cmdArgs.join(' ')}`,
+            });
             // With shell:true, proc is cmd.exe; taskkill /t kills the entire
             // process tree so the real child doesn't become orphaned.
             try {
@@ -166,6 +179,12 @@ export async function cli(
               // regardless and settle() handles the timeout result.
             }
           } else {
+            log({
+              severity: 'WARNING',
+              message:
+                `CLI subprocess timed out after ${options.timeout}ms — sending SIGTERM: ` +
+                `${cmd} ${cmdArgs.join(' ')}`,
+            });
             try {
               proc.kill('SIGTERM');
             } catch (_) {
