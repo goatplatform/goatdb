@@ -27,10 +27,10 @@ function hasPlaywrightChromium(): Promise<boolean> {
   if (typeof Deno === 'undefined') return Promise.resolve(false);
   _hasPlaywrightChromium ??= (async () => {
     try {
-      // Variable prevents esbuild from statically resolving this import
-      // when bundling for Node.js (guard above ensures it never runs there).
-      const pkg = 'npm:playwright@^1.48.0';
-      const { chromium } = await import(pkg);
+      // Construct the specifier dynamically so non-Deno bundles never treat
+      // Playwright as a required static dependency.
+      const ns = 'npm';
+      const { chromium } = await import(`${ns}:playwright@^1.48.0`);
       await Deno.stat(chromium.executablePath());
       return true;
     } catch {

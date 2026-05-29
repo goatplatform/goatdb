@@ -166,7 +166,9 @@ export async function runBrowserTests(
   try {
     // Dynamic import Playwright (optional dependency)
     console.log('Launching browser...');
-    const { chromium } = await import('playwright');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ns = 'npm'; // construct specifier to avoid Deno's npm scanner
+    const { chromium } = await import(`${ns}:playwright@^1.48.0`);
 
     // Detect if running in Docker/CI environment
     const isDocker = await Deno.stat('/.dockerenv').then(() => true).catch(() =>
