@@ -27,8 +27,10 @@ import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
 import { Emitter } from '../base/emitter.ts';
 import { EXIT_CODE_NO_MATCH, NoMatchError } from '../base/test-runner-error.ts';
+import { printSummary, TestResult, TestSummary } from '../base/test-summary.ts';
 
 export { EXIT_CODE_NO_MATCH, NoMatchError };
+export * from '../base/test-summary.ts';
 
 /**
  * A test function that takes a TestSuite context and returns either void or a
@@ -41,28 +43,6 @@ export { EXIT_CODE_NO_MATCH, NoMatchError };
  * asynchronous
  */
 export type TestFunc = (ctx: TestSuite) => Promise<void> | void;
-
-/**
- * Result of a single test execution.
- */
-export interface TestResult {
-  readonly suiteName: string;
-  readonly testName: string;
-  readonly passed: boolean;
-  readonly duration: number;
-  readonly error?: Error;
-}
-
-/**
- * Summary of all test execution results.
- */
-export interface TestSummary {
-  readonly totalTests: number;
-  readonly passed: number;
-  readonly failed: number;
-  readonly duration: number;
-  readonly results: TestResult[];
-}
 
 /**
  * Represents a collection of related test cases that can be run together.
@@ -485,41 +465,11 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
 
   /**
    * Prints a summary of test results.
+   * Delegates to the shared implementation in base/test-summary.ts.
    * @param summary - The test summary to print
    */
   static printSummary(summary: TestSummary) {
-    if (summary.totalTests === 0) return;
-
-    console.log();
-    console.log('=== Test Summary ===');
-    console.log(`Total: ${summary.totalTests} tests`);
-    console.log(`Passed: ${summary.passed}`);
-    if (summary.failed > 0) {
-      console.log(`Failed: ${summary.failed}`);
-      console.log();
-      console.log('Failed tests:');
-      const failures = summary.results.filter((r) => !r.passed);
-      for (let i = 0; i < failures.length; i++) {
-        const result = failures[i];
-        console.log(
-          `${i + 1}. ${result.suiteName}/${result.testName} (${
-            Math.round(result.duration)
-          }ms)`,
-        );
-        if (result.error) {
-          console.log(`   ${result.error.name}: ${result.error.message}`);
-          if (result.error.stack) {
-            const stackLines = result.error.stack.split('\n').slice(1);
-            for (const line of stackLines) {
-              console.log(`   ${line}`);
-            }
-          }
-          console.log();
-        }
-      }
-    }
-    console.log(`Duration: ${(summary.duration / 1000).toFixed(2)}s`);
-    console.log();
+    printSummary(summary);
   }
 }
 

@@ -10,7 +10,7 @@ import {
   NoMatchError,
 } from './test-runner-error.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
-import { TestsRunner, type TestSummary } from '../tests/mod.ts';
+import { printSummary, type TestSummary } from './test-summary.ts';
 
 /**
  * Worker message types for Deno test execution.
@@ -323,7 +323,7 @@ export async function runAcrossPlatforms(
       try {
         const result = await runDenoWithWorker(config.suite, config.test);
         denoElapsed = result.elapsed;
-        TestsRunner.printSummary(result.summary);
+        printSummary(result.summary);
         runtimeOutcomes.push({ runtime: 'deno', status: 'matched' });
 
         if (result.summary.failed > 0) {
@@ -451,8 +451,11 @@ export async function runAcrossPlatforms(
           throw new NoMatchError(config.suite, config.test);
         }
       } else {
+        const detail = nodeResult.stderrText.trim();
         throw new Error(
-          `Node.js execution failed with exit code ${nodeResult.exitCode}`,
+          detail
+            ? `Node.js execution failed: ${detail}`
+            : `Node.js execution failed with exit code ${nodeResult.exitCode}`,
         );
       }
     } else {
@@ -500,7 +503,7 @@ export async function runAcrossPlatforms(
       const passed = browserSummary.passed ?? 0;
 
       if (!isBrowserStructuredNoMatchResult(summary)) {
-        TestsRunner.printSummary(browserSummary);
+        printSummary(browserSummary);
       }
 
       if (isBrowserStructuredNoMatchResult(summary)) {
