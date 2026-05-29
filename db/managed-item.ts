@@ -1,4 +1,4 @@
-import type { Schema, SchemaDataType } from '../cfds/base/schema.ts';
+import { SchemaGetFieldDef, type Schema, type SchemaDataType } from '../cfds/base/schema.ts';
 import type { Commit } from '../repo/commit.ts';
 import type { Repository } from '../repo/repo.ts';
 import { itemPathGetPart, itemPathGetRepoId, itemPathIsValid } from './path.ts';
@@ -352,10 +352,15 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     if (changedFields.length > 0) {
       let mutations: MutationPack;
       for (const f of changedFields) {
+        // f may exist in doc.schema but not in this._item.schema
+        // (e.g. V2 'tags' on a V1 local item). Use undefined as the
+        // old value for fields the local schema doesn't define.
         mutations = mutationPackAppend(mutations, [
           f,
           false,
-          this._item.get(f),
+          SchemaGetFieldDef(this._item.schema, f)
+            ? this._item.get(f)
+            : undefined,
         ]);
       }
       this._item = doc;
