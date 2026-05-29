@@ -55,6 +55,7 @@ import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { goatEntryPoints } from '../cli/link.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 import { cli } from '../base/development.ts';
+import { runAcrossPlatforms } from '../base/multi-runner.ts';
 import { createTestDomainConfig } from './merge-test-utils.ts';
 import {
   getGlobalLoggerStreams,
@@ -1028,9 +1029,7 @@ export default function setupCliCompileTests() {
       );
       const overrideConfigPath = path.join(
         dir,
-        runtime.id === 'node'
-          ? 'package.override.json'
-          : 'deno.override.json',
+        runtime.id === 'node' ? 'package.override.json' : 'deno.override.json',
       );
       await writeTextFile(
         defaultConfigPath,
@@ -4016,6 +4015,104 @@ src: url('./goat-font.woff2') format('woff2');
           nodeResult.success,
           `compiled bundle must execute successfully in Node.js: ${nodeResult.stderrText}`,
         );
+      },
+    );
+
+    TEST(
+      'CLI-Compile',
+      'runAcrossPlatforms surfaces Node.js stderr details on failure',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('node-runner-surface-stderr');
+        const entryPath = path.join(dir, 'entry.ts');
+        await writeTextFile(
+          entryPath,
+          "throw new Error('node-runner-sentinel');\n",
+        );
+
+        await assertThrows(
+          async () => {
+            await runAcrossPlatforms({
+              entryPointServer: entryPath,
+              entryPointBrowser: entryPath,
+              runtimes: ['node'],
+            });
+          },
+          Error,
+          'node-runner-sentinel',
+        );
+      },
+    );
+
+    TEST(
+      'CLI-Compile',
+      'nodeRun returns timeout failure after child teardown settles',
+      async (ctx: TestSuite) => {
+        const { compileForNodeWithEsbuild, nodeRun } = await import(
+          '../base/node-runner.ts'
+        );
+        const dir = await ctx.tempDir('node-runner-timeout');
+        const entryPath = path.join(dir, 'entry.ts');
+        await writeTextFile(entryPath, 'setInterval(() => {}, 1000);\n');
+        const result = await compileForNodeWithEsbuild(entryPath, 'output');
+        const originalSetTimeout = globalThis.setTimeout;
+        try {
+          globalThis.setTimeout = ((handler, timeout, ...args) =>
+            originalSetTimeout(
+              handler,
+              typeof timeout === 'number' && timeout > 100 ? 20 : timeout,
+              ...args,
+            )) as typeof setTimeout;
+          const nodeResult = await nodeRun(result);
+          assertFalse(nodeResult.success, 'timed out node run must fail');
+          assertEquals(
+            nodeResult.exitCode,
+            -1,
+            'timeout returns wrapper failure',
+          );
+          assertTrue(
+            nodeResult.stderrText.includes('Timed out after 300000ms'),
+            `timeout error should be surfaced, got: ${nodeResult.stderrText}`,
+          );
+        } finally {
+          globalThis.setTimeout = originalSetTimeout;
+        }
+      },
+    );
+
+  }
+
+  if (isNode()) {
+    TEST(
+      'CLI-Compile',
+      'cli returns timeout result and warning log in Node runtime',
+      async (ctx: TestSuite) => {
+        const dir = await ctx.tempDir('cli-timeout-node');
+        const entryPath = path.join(dir, 'hang.ts');
+        await writeTextFile(entryPath, 'setInterval(() => {}, 1000);\n');
+        await withLogCapture(async (captured) => {
+          const { result, exitCode } = await cli(
+            'deno',
+            'run',
+            entryPath,
+            { timeout: 50 },
+          );
+          assertEquals(exitCode, 124, 'timed out cli() must return 124');
+          assertEquals(
+            result,
+            'Process timed out after 50ms',
+            'cli() timeout result must be explicit',
+          );
+          const warnings = captured.filter((e) =>
+            e.severity === 'WARNING' &&
+            e.message?.includes('CLI subprocess timed out after 50ms') &&
+            e.message?.includes('sending SIGTERM')
+          );
+          assertEquals(
+            warnings.length,
+            1,
+            'Node cli timeout should emit one warning log',
+          );
+        });
       },
     );
   }
