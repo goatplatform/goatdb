@@ -113,8 +113,8 @@ export interface BuildAssetsOptions {
   /**
    * Custom esbuild plugins injected between GoatDB's stub plugins and the CSS
    * fallback loader.
-   * Ignored when a pre-built ReBuildContext is passed because plugins must be
-   * registered when that context is created.
+   * Throws when a pre-built ReBuildContext is also passed because plugins must
+   * be registered when that context is created.
    */
   esbuildPlugins?: BuildPluginLike[];
 }
@@ -124,8 +124,8 @@ export interface BuildAssetsOptions {
  * {@link StaticAssets} map served by GoatDB's HTTP layer.
  *
  * @param ctx Pre-built {@link ReBuildContext} for incremental rebuilds. When
- *   provided, `options.esbuildPlugins` is ignored (plugins were registered at
- *   context-creation time — a warning is logged if plugins are also supplied).
+ *   provided, `options.esbuildPlugins` must be omitted because plugins are
+ *   fixed at context-creation time; passing both throws.
  * @param entryPoints Entry-point descriptors forwarded to esbuild.
  *   `entryPoints[].in` accepts any path form (native absolute, `file://` URL,
  *   relative) — normalized to an esbuild entry specifier internally
@@ -144,14 +144,11 @@ export async function buildAssets(
   const targetRuntime = options?.runtime ?? 'deno';
   if (ctx && isReBuildContext(ctx)) {
     if (options?.esbuildPlugins?.length) {
-      log({
-        severity: 'WARNING',
-        error: 'MissingConfiguration',
-        message:
-          'BuildAssetsOptions.esbuildPlugins is ignored when a pre-built ' +
-          'ReBuildContext is provided — plugins were already applied when the ' +
-          'context was created.',
-      });
+      throw new Error(
+        'BuildAssetsOptions.esbuildPlugins cannot be provided together with a ' +
+          'pre-built ReBuildContext — plugins must be registered when the ' +
+          'context is created via createBuildContext().',
+      );
     }
     buildOutput = await ctx.rebuild();
   } else {

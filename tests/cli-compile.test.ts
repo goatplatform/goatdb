@@ -2990,9 +2990,9 @@ src: url('./goat-font.woff2') format('woff2');
 
   TEST(
     'CLI-Compile',
-    'buildAssets ignores BuildAssetsOptions.esbuildPlugins when ReBuildContext is provided',
+    'buildAssets throws when esbuildPlugins provided with ReBuildContext',
     async (ctx: TestSuite) => {
-      const dir = await ctx.tempDir('build-assets-ctx-plugin-ignored');
+      const dir = await ctx.tempDir('build-assets-ctx-plugin-error');
       await writeTextFile(path.join(dir, 'entry.ts'), 'export {};\n');
       const entryPoints = [{
         in: path.join(dir, 'entry.ts'),
@@ -3000,23 +3000,19 @@ src: url('./goat-font.woff2') format('woff2');
       }];
       const rebuildCtx = await createBuildContext(entryPoints);
 
-      let pluginSetupCalled = false;
-      // deno-lint-ignore no-explicit-any
-      const sentinelPlugin: any = {
-        name: 'sentinel',
-        setup() {
-          pluginSetupCalled = true;
-        },
-      };
-
       try {
         await buildAssets(rebuildCtx, entryPoints, {
           buildDir: dir,
           jsPath: path.join(dir, 'entry.ts'),
-        }, { esbuildPlugins: [sentinelPlugin] });
+        }, { esbuildPlugins: [{ name: 'sentinel', setup() {} }] });
+        throw new Error('Expected buildAssets to throw');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
         assertTrue(
-          !pluginSetupCalled,
-          'esbuildPlugins must not be applied when a ReBuildContext is passed',
+          msg.includes(
+            'esbuildPlugins cannot be provided together with a pre-built ReBuildContext',
+          ),
+          `Expected plugin-with-context error, got: ${msg}`,
         );
       } finally {
         rebuildCtx.close();

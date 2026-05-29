@@ -327,10 +327,11 @@ export async function getClientBuildPlugins(
           'Use runtime: "node" or run the build under Deno.',
       );
     }
-    // Structural cast: @deno/esbuild-plugin's Plugin type may differ nominally
-    // from our installed esbuild version due to JSR/npm version skew, but they
-    // are structurally compatible at runtime.
-    plugins.push((await getDenoPlugin())() as Plugin);
+    // Double cast via unknown: @deno/esbuild-plugin's Plugin type may differ
+    // nominally from our installed esbuild version due to JSR/npm version
+    // skew, but they are structurally compatible at runtime.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    plugins.push((await getDenoPlugin())() as unknown as any);
   }
   return plugins;
 }

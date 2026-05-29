@@ -21,6 +21,7 @@ import { Server, type ServerOptions } from '../net/server/server.ts';
 import { buildAssets } from './build-assets.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
+import { exit } from '../base/process.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 import { log } from '../logging/log.ts';
 import type { Schema } from '../cfds/base/schema.ts';
@@ -296,7 +297,7 @@ export async function startDebugServer<US extends Schema>(
     const signalHandler = async () => {
       try {
         await cleanup();
-        getRuntime().exit(0);
+        await exit(0);
       } catch (err) {
         log({
           severity: 'ERROR',
@@ -304,7 +305,7 @@ export async function startDebugServer<US extends Schema>(
           message: `Debug server cleanup failed: ${err}`,
           trace: err instanceof Error ? err.stack : undefined,
         });
-        getRuntime().exit(1);
+        await exit(1);
       }
     };
     removeSignalHandlers = setupDebugServerSignalHandlers(signalHandler);

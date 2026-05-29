@@ -48,12 +48,6 @@ export function signalBrowserTestCompletion(code: number): Promise<never> {
   // Update DOM if test runner page exists
   updateBrowserTestDisplay(summary);
 
-  // For browser, we throw to halt execution since we can't actually exit
-  // if (code === 0) {
-  //   throw new Error('TEST_COMPLETION_SUCCESS');
-  // } else {
-  //   throw new Error(`TEST_COMPLETION_FAILURE: exit code ${code}`);
-  // }
   return Promise.resolve(undefined as never);
 }
 

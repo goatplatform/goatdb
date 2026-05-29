@@ -12,6 +12,7 @@ import type {
 } from '../index.ts';
 import type { OperatingSystem } from '../../os.ts';
 import type { FileImpl } from '../../json-log/file-impl-interface.ts';
+import { log } from '../../../logging/log.ts';
 import { notReached } from '../../error.ts';
 
 /**
@@ -155,7 +156,13 @@ export const BrowserAdapter: RuntimeAdapter = {
 
   openBrowser(_url: string): Promise<void> {
     // Browsers can't open new tabs/windows from JS reliably
-    // Could use window.open() but usually blocked by pop-up blockers
+    log({
+      severity: 'WARNING',
+      error: 'MissingConfiguration',
+      message:
+        'openBrowser() is not supported in browser environment — ' +
+        'browsers cannot programmatically open new windows reliably.',
+    });
     return Promise.resolve();
   },
 
