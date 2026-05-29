@@ -188,7 +188,15 @@ function createNativeFsWatcher(
   fs: typeof import('node:fs'),
   dir: string,
 ): FileWatcher {
-  const underlying = fs.watch(dir, { recursive: true });
+  // Resolve 8.3 short names to long paths on Windows to prevent libuv
+  // assertion crash at src/win/fs-event.c:72 (_wcsnicmp mismatch).
+  let watchDir = dir;
+  try {
+    watchDir = fs.realpathSync(dir);
+  } catch {
+    // Fall through to original dir if resolution fails.
+  }
+  const underlying = fs.watch(watchDir, { recursive: true });
 
   const { pushEvent, watcher } = createQueuedWatcher(() => underlying.close());
 
