@@ -32,7 +32,10 @@ import setupCliInitTests from './cli-init.test.ts';
 import setupCliCompileTests from './cli-compile.test.ts';
 import setupPathTests from './path.test.ts';
 import setupBuildTests from './build.test.ts';
-import setupRuntimeTests from './runtime.test.ts';
+import setupRuntimeTests, {
+  setupRuntimeDenoTests,
+  setupRuntimeNodeTests,
+} from './runtime.test.ts';
 import setupProgressTests from './progress.test.ts';
 import setupTestRunnerTests from './test-runner.test.ts';
 import setupMergeAdjList from './merge-adjlist.test.ts';
@@ -58,7 +61,7 @@ import setupSecurityBoundaries from './security-boundaries.test.ts';
 import setupLiveQuery from './live-query.test.ts';
 import setupWriteFailure from './write-failure.test.ts';
 import setupBuildDenoTests from './build-deno.test.ts';
-import { isBrowser, isDeno } from '../base/common.ts';
+import { isBrowser, isDeno, isNode } from '../base/common.ts';
 import { TestsRunner } from './mod.ts';
 
 let _registrationPromise: Promise<void> | undefined;
@@ -95,6 +98,12 @@ async function registerAllTestsImpl(): Promise<void> {
     setupBuildDenoTests(); // Deno-only build coverage that imports Deno-only modules
   }
   setupRuntimeTests(); // Runtime abstraction layer invariants
+  if (isDeno()) {
+    setupRuntimeDenoTests(); // Deno-only runtime tests (signals, unsupported browser opening)
+  }
+  if (isNode()) {
+    setupRuntimeNodeTests(); // Node-only runtime tests (signals, unsupported browser opening)
+  }
   setupProgressTests(); // TUI progress tracking - Task state machine, aggregation
   setupTestRunnerTests(); // Test filtering and no-match error behavior
   setupHealthCheckEndpointTest(); // Simple HTTP endpoint check

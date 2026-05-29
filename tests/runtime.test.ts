@@ -105,37 +105,85 @@ export default function setupRuntimeTests(): void {
     );
   });
 
-  TEST('Runtime', 'browser adapter openBrowser is a no-op', async () => {
-    await BrowserAdapter.openBrowser('http://localhost:1234');
+  TEST('Runtime', 'browser adapter logs unsupported browser opening', async () => {
+    const captured = await withCapturedLogs(() =>
+      BrowserAdapter.openBrowser('http://localhost:1234')
+    );
+    const warnings = captured.filter((e) =>
+      e.severity === 'WARNING' &&
+      e.error === 'MissingConfiguration' &&
+      e.message?.includes('openBrowser() is not supported in browser')
+    );
+    assertEquals(
+      warnings.length,
+      1,
+      'Browser adapter should report unsupported browser opening',
+    );
   });
 
-  if (getRuntime().id !== 'browser') {
-    TEST(
-      'Runtime',
-      'process adapters log unsupported browser opening',
-      async () => {
-        const captured: NormalizedLogEntry<LogEntry>[] = [];
-        const stream: LogStream = {
-          appendEntry(e) {
-            captured.push(e);
-          },
-        };
-        const previousStreams = getGlobalLoggerStreams();
-        const originalDenoGetOS = DenoAdapter.getOS;
-        const originalNodeGetOS = NodeAdapter.getOS;
-        try {
-          setGlobalLoggerStreams([stream]);
-          DenoAdapter.getOS = () => 'unknown';
-          NodeAdapter.getOS = () => 'unknown';
+  // setupSignalHandler tests
 
-          await DenoAdapter.openBrowser('http://localhost:1234');
-          await NodeAdapter.openBrowser('http://localhost:1234');
-        } finally {
-          DenoAdapter.getOS = originalDenoGetOS;
-          NodeAdapter.getOS = originalNodeGetOS;
-          setGlobalLoggerStreams(previousStreams);
-        }
+  TEST(
+    'Runtime',
+    'browser adapter setupSignalHandler returns no-op cleanup',
+    () => {
+      const cleanup = BrowserAdapter.setupSignalHandler('SIGTERM', () => {});
+      assertTrue(typeof cleanup === 'function', 'cleanup should be a function');
+      // Calling the no-op cleanup should never throw.
+      cleanup();
+      cleanup(); // idempotent
+    },
+  );
 
+  // The async handler rejection logging path (used by Deno/Node adapters)
+  // is exercised indirectly through the debug-server lifecycle tests in
+  // cli-compile.test.ts. Direct testing would require sending real OS signals
+  // or accessing internal closure state, which is invasive.
+}
+
+function withCapturedLogs<T>(
+  fn: () => Promise<T>,
+): Promise<NormalizedLogEntry<LogEntry>[]> {
+  const captured: NormalizedLogEntry<LogEntry>[] = [];
+  const stream: LogStream = {
+    appendEntry(e) {
+      captured.push(e);
+    },
+  };
+  const previousStreams = getGlobalLoggerStreams();
+  setGlobalLoggerStreams([stream]);
+  return fn().finally(() => setGlobalLoggerStreams(previousStreams)).then(() =>
+    captured
+  );
+}
+
+/**
+ * Runtime tests that only apply to the Deno runtime.
+ * Gated at the registry/entry-point level.
+ */
+export function setupRuntimeDenoTests(): void {
+  TEST(
+    'Runtime',
+    'deno adapter setupSignalHandler returns callable cleanup',
+    () => {
+      const cleanup = DenoAdapter.setupSignalHandler('SIGINT', () => {});
+      assertTrue(typeof cleanup === 'function', 'cleanup should be a function');
+      // Register and immediately unregister — no signal is sent.
+      cleanup();
+      cleanup(); // idempotent (second call must not throw)
+    },
+  );
+
+  TEST(
+    'Runtime',
+    'deno adapter logs unsupported browser opening',
+    async () => {
+      const originalGetOS = DenoAdapter.getOS;
+      try {
+        DenoAdapter.getOS = () => 'unknown';
+        const captured = await withCapturedLogs(() =>
+          DenoAdapter.openBrowser('http://localhost:1234')
+        );
         const warnings = captured.filter((e) =>
           e.severity === 'WARNING' &&
           e.error === 'MissingConfiguration' &&
@@ -143,10 +191,55 @@ export default function setupRuntimeTests(): void {
         );
         assertEquals(
           warnings.length,
-          2,
-          'Deno and Node adapters should report unsupported browser opening',
+          1,
+          'Deno adapter should report unsupported browser opening',
         );
-      },
-    );
-  }
+      } finally {
+        DenoAdapter.getOS = originalGetOS;
+      }
+    },
+  );
+}
+
+/**
+ * Runtime tests that only apply to the Node.js runtime.
+ * Gated at the registry/entry-point level.
+ */
+export function setupRuntimeNodeTests(): void {
+  TEST(
+    'Runtime',
+    'node adapter setupSignalHandler returns callable cleanup',
+    () => {
+      const cleanup = NodeAdapter.setupSignalHandler('SIGINT', () => {});
+      assertTrue(typeof cleanup === 'function', 'cleanup should be a function');
+      cleanup();
+      cleanup(); // idempotent
+    },
+  );
+
+  TEST(
+    'Runtime',
+    'node adapter logs unsupported browser opening',
+    async () => {
+      const originalGetOS = NodeAdapter.getOS;
+      try {
+        NodeAdapter.getOS = () => 'unknown';
+        const captured = await withCapturedLogs(() =>
+          NodeAdapter.openBrowser('http://localhost:1234')
+        );
+        const warnings = captured.filter((e) =>
+          e.severity === 'WARNING' &&
+          e.error === 'MissingConfiguration' &&
+          e.message?.includes('Unable to open browser on unsupported OS')
+        );
+        assertEquals(
+          warnings.length,
+          1,
+          'Node adapter should report unsupported browser opening',
+        );
+      } finally {
+        NodeAdapter.getOS = originalGetOS;
+      }
+    },
+  );
 }
