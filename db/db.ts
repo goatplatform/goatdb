@@ -292,11 +292,16 @@ export class GoatDB<US extends Schema = Schema>
         : Array.from(new Set(config.peers));
       this._repoClients = new Map();
     }
-    this._trustPoolPromise = this._getTrustPoolImpl().catch((err) => {
-      // Store the error but don't let it become an unhandled rejection
-      // It will be re-thrown when readyPromise() is called
-      return Promise.reject(err);
-    });
+    this._trustPoolPromise = this._getTrustPoolImpl()
+      .then((result) => {
+        this._ready = true;
+        return result;
+      })
+      .catch((err) => {
+        // Store the error but don't let it become an unhandled rejection
+        // It will be re-thrown when readyPromise() is called
+        return Promise.reject(err);
+      });
   }
 
   /**
@@ -984,7 +989,6 @@ export class GoatDB<US extends Schema = Schema>
     // Open /sys/users so we can perform login and basic operations without
     // waiting
     await this.open('/sys/users');
-    this._ready = true;
     return this._trustPool!;
   }
 
