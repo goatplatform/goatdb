@@ -1,6 +1,12 @@
-import type * as esbuild from 'esbuild';
 import { resolveBuildEntryPath } from '../build.ts';
 import { log } from '../logging/log.ts';
+
+// Minimal esbuild Plugin type — avoids static npm import that would trigger
+// @deno/loader WASM initialization in Worker contexts.
+interface EsbuildPlugin {
+  name: string;
+  setup: (build: Record<string, unknown>) => void | Promise<void>;
+}
 
 // Lazy-load build-time dependencies so this module stays safe as a transitive
 // import inside runtime bundles that never call the build path.
@@ -47,7 +53,7 @@ export async function compileForNodeWithEsbuild(
         out: outName,
       },
     ],
-    plugins: [denoPlugin() as unknown as esbuild.Plugin],
+    plugins: [denoPlugin() as unknown as EsbuildPlugin],
     outfile: outName,
     bundle: true,
     platform: 'node',
