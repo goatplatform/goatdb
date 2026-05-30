@@ -20,11 +20,16 @@ jobs:
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+          cache: true
+          cache-hash: ${{ hashFiles('deno.json') }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24.x'
+
+      - name: Static analysis (type check + module graph)
+        run: deno check mod.ts
 
       - name: Run Deno tests
         run: deno task test --runtime=deno
@@ -65,6 +70,8 @@ jobs:
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+          cache: true
+          cache-hash: ${{ hashFiles('deno.json') }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -81,6 +88,9 @@ jobs:
 
       - name: Install Playwright browsers and system dependencies
         run: deno run -A npm:playwright@^1.48.0 install --with-deps chromium
+
+      - name: Static analysis (type check + module graph)
+        run: deno check mod.ts
 
       - name: Run TestRunner browser CLI coverage
         run: deno task test --runtime=deno --suite=TestRunner
