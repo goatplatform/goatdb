@@ -36,6 +36,7 @@ import setupRuntimeTests, {
   setupRuntimeDenoTests,
   setupRuntimeNodeTests,
 } from './runtime.test.ts';
+import setupEmailServiceTests from './email-service.test.ts';
 import setupProgressTests from './progress.test.ts';
 import setupTestRunnerTests from './test-runner.test.ts';
 import setupMergeAdjList from './merge-adjlist.test.ts';
@@ -98,6 +99,7 @@ async function registerAllTestsImpl(): Promise<void> {
     setupBuildDenoTests(); // Deno-only build coverage that imports Deno-only modules
   }
   setupRuntimeTests(); // Runtime abstraction layer invariants
+  setupEmailServiceTests(); // Lazy email transport init and logging contracts
   if (isDeno()) {
     setupRuntimeDenoTests(); // Deno-only runtime tests (signals, unsupported browser opening)
   }

@@ -1,8 +1,22 @@
-// deno-types="@types/nodemailer"
-import nodemailer from 'nodemailer';
+import type { ServerServices } from './server.ts';
+import type { SendMailOptions } from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
 import type SESTransport from 'nodemailer/lib/ses-transport/index.js';
-import type { ServerServices } from './server.ts';
+
+// Lazy nodemailer — defers npm resolution until email is actually sent,
+// avoiding @deno/loader WASM initialization in contexts that never send email.
+type NodemailerModule = typeof import('nodemailer') & {
+  default?: Pick<typeof import('nodemailer'), 'createTransport'>;
+};
+
+let _nodemailer: typeof import('nodemailer') | undefined;
+async function getNodemailer(): Promise<typeof import('nodemailer')> {
+  if (!_nodemailer) {
+    const specifier = 'nodemailer';
+    _nodemailer = await import(specifier);
+  }
+  return _nodemailer!;
+}
 import { BaseService } from './service.ts';
 import type { EmailType } from '../../logging/metrics.ts';
 import {
@@ -75,48 +89,65 @@ export type EmailConfig = NodeMailerConfig & {
 
 /**
  * Interface for email message configuration.
- * Extends NodeMailer's SendMailOptions with additional email type tracking.
+ * Extends SendMailOptions with additional email type tracking.
  *
- * @extends nodemailer.SendMailOptions
  * @property emailType - Optional type identifier for the email being sent.
  *                      Used for metrics tracking and logging.
  */
-export interface EmailMessage extends nodemailer.SendMailOptions {
+export interface EmailMessage extends SendMailOptions {
   emailType?: EmailType;
+}
+
+type EmailInitError = Error & { emailInitFailed: true };
+
+function toError(err: unknown): Error {
+  return err instanceof Error ? err : new Error(String(err));
+}
+
+function asEmailInitError(err: unknown): EmailInitError {
+  const error = toError(err) as EmailInitError;
+  error.emailInitFailed = true;
+  return error;
 }
 
 export class EmailService<US extends Schema>
   extends BaseService<ServerServices<US>> {
   private readonly _config: EmailConfig | undefined;
-  private readonly _transporter?: nodemailer.Transporter;
+  private _transporter: import('nodemailer').Transporter | undefined;
+  private _initPromise: Promise<void> | undefined;
 
   constructor(config?: EmailConfig) {
     super();
-    if (config) {
-      this._transporter = nodemailer.createTransport(config);
-    }
     this._config = config;
   }
 
   async send(info: EmailInfo): Promise<boolean> {
-    // Disable email sending on development machines
+    // No config — email disabled
     if (!this._config) {
       return false;
     }
-    if (!this._transporter) {
-      this.services.logger.log({
-        severity: 'INFO',
-        error: 'MissingConfiguration',
-        message: 'Email service not configured',
-      });
-      if (this.services.buildInfo.isDevelopment) {
-        console.log(
-          'Email service not configured. Did you forget to configure the email service?',
-        );
-      }
-      return false;
-    }
+
     try {
+      // Lazy init transporter on first send. Sentinel promise deduplicates
+      // concurrent callers so only one createTransport fires. Cleared on
+      // rejection so transient failures don't permanently poison the service.
+      if (!this._transporter) {
+        if (!this._initPromise) {
+          this._initPromise = getNodemailer().then((nm) => {
+            const nodemailer = nm as NodemailerModule;
+            // CJS/ESM interop: dynamic import may expose createTransport
+            // under .default depending on the module resolution strategy.
+            const createTransport = nodemailer.default?.createTransport ||
+              nodemailer.createTransport;
+            this._transporter = createTransport(this._config!);
+          }).catch((err) => {
+            this._initPromise = undefined;
+            throw asEmailInitError(err);
+          });
+        }
+        await this._initPromise;
+      }
+
       const builder = (this._config.builder ||
         DefaultEmailBuilder) as unknown as EmailBuilder<US>;
       const msg = {
@@ -145,14 +176,14 @@ export class EmailService<US extends Schema>
       }
       return success;
     } catch (err: unknown) {
-      if (this.services.buildInfo.isDevelopment) {
-        console.error(err);
-      }
+      const error = toError(err);
       this.services.logger.log({
         severity: 'ERROR',
-        error: 'EmailSendFailed',
+        error: 'emailInitFailed' in error && error.emailInitFailed
+          ? 'EmailInitFailed'
+          : 'EmailSendFailed',
         type: info.type,
-        trace: (err as Error).stack,
+        trace: error.stack,
       });
       return false;
     }
