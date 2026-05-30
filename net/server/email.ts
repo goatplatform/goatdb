@@ -158,7 +158,7 @@ export class EmailService<US extends Schema>
         replyTo: this._config.replyTo,
         ...builder(info, this.services),
       };
-      const success = await this._transporter.sendMail(msg);
+      const success = await this._transporter!.sendMail(msg);
       if (success) {
         this.services.logger.log({
           severity: 'METRIC',
