@@ -3979,6 +3979,104 @@ src: url('./goat-font.woff2') format('woff2');
     },
   );
 
+  // --- Shared test helpers for cli() timeout behavior ---
+
+  function makeTimeoutTest(
+    name: string,
+    cmd: string,
+    evalFlag: string,
+    timeoutMs: number,
+  ): (ctx: TestSuite) => Promise<void> {
+    return async (ctx: TestSuite) => {
+      await withLogCapture(async (captured) => {
+        const cliResult = await cli(
+          cmd,
+          evalFlag,
+          'setInterval(() => {}, 1000)',
+          { timeout: timeoutMs },
+        );
+        assertEquals(
+          cliResult.exitCode,
+          124,
+          'timed out cli() must return 124',
+        );
+        assertTrue(
+          cliResult.result.startsWith('Process timed out after'),
+          'cli() timeout result must start with "Process timed out after"',
+        );
+        const warnings = captured.filter((e) => e.severity === 'WARNING');
+        assertEquals(
+          warnings.length,
+          1,
+          `${name} cli timeout should emit one warning log`,
+        );
+        const message = warnings[0].message ?? '';
+        assertTrue(
+          /^CLI subprocess timed out after \d+ms: /.test(message),
+          `${name} cli timeout warning must use the generic timeout prefix`,
+        );
+        assertTrue(
+          !message.includes('(Deno)') && !message.includes('SIGTERM') &&
+            !message.includes('SIGKILL') && !message.includes('taskkill'),
+          `${name} cli timeout warning must not leak runtime kill details`,
+        );
+      });
+    };
+  }
+
+  function makeNormalTest(
+    cmd: string,
+    evalFlag: string,
+  ): (ctx: TestSuite) => Promise<void> {
+    return async (_ctx: TestSuite) => {
+      await withLogCapture(async (captured) => {
+        const { result, exitCode } = await cli(
+          cmd,
+          evalFlag,
+          'console.log("hello")',
+        );
+        assertEquals(exitCode, 0, 'normal cli() must return exit code 0');
+        assertEquals(
+          result.trim(),
+          'hello',
+          'normal cli() must capture stdout',
+        );
+        assertEquals(
+          captured.filter((e) => e.severity === 'WARNING').length,
+          0,
+          'non-timeout cli() must not emit timeout warnings',
+        );
+      });
+    };
+  }
+
+  function makeOrphanTest(
+    cmd: string,
+    evalFlag: string,
+    code: (sentinel: string) => string,
+    suffix: string,
+  ): (ctx: TestSuite) => Promise<void> {
+    return async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir(`cli-timeout-kill-${suffix}`);
+      const sentinel = path.join(dir, 'sentinel');
+      // Subprocess schedules a file write at 5s — well past the 200ms timeout.
+      // The 25x margin (200ms timeout vs 5000ms sentinel write) ensures the
+      // direct timed-out subprocess cannot reach its delayed callback before
+      // cli() returns, even under CI load.
+      const { exitCode } = await cli(
+        cmd,
+        evalFlag,
+        code(sentinel),
+        { timeout: 200 },
+      );
+      assertEquals(exitCode, 124, 'timeout must produce exit code 124');
+      assertFalse(
+        await pathExists(sentinel),
+        'timeout must prevent the delayed sentinel write before cli() returns',
+      );
+    };
+  }
+
   if (isDeno()) {
     TEST(
       'CLI-Compile',
@@ -4079,41 +4177,89 @@ src: url('./goat-font.woff2') format('woff2');
       },
     );
 
-  }
-
-  if (isNode()) {
+    // Deno tests
     TEST(
       'CLI-Compile',
-      'cli returns timeout result and warning log in Node runtime',
-      async (ctx: TestSuite) => {
-        const dir = await ctx.tempDir('cli-timeout-node');
-        const entryPath = path.join(dir, 'hang.ts');
-        await writeTextFile(entryPath, 'setInterval(() => {}, 1000);\n');
+      'cli returns timeout result and warning log in Deno runtime',
+      makeTimeoutTest('Deno', 'deno', 'eval', 2000),
+    );
+
+    TEST(
+      'CLI-Compile',
+      'cli rethrows Deno spawn failures that are not timeouts',
+      async (_ctx: TestSuite) => {
         await withLogCapture(async (captured) => {
-          const { result, exitCode } = await cli(
-            'deno',
-            'run',
-            entryPath,
-            { timeout: 50 },
-          );
-          assertEquals(exitCode, 124, 'timed out cli() must return 124');
-          assertEquals(
-            result,
-            'Process timed out after 50ms',
-            'cli() timeout result must be explicit',
-          );
-          const warnings = captured.filter((e) =>
-            e.severity === 'WARNING' &&
-            e.message?.includes('CLI subprocess timed out after 50ms') &&
-            e.message?.includes('sending SIGTERM')
+          await assertThrows(
+            async () => {
+              await cli('goatdb-definitely-missing-cli-command');
+            },
+            Error,
           );
           assertEquals(
-            warnings.length,
-            1,
-            'Node cli timeout should emit one warning log',
+            captured.filter((e) => e.severity === 'WARNING').length,
+            0,
+            'non-timeout Deno cli() failures must not emit timeout warnings',
           );
         });
       },
+    );
+
+    TEST(
+      'CLI-Compile',
+      'cli returns normal output and exit code on non-timeout execution',
+      makeNormalTest('deno', 'eval'),
+    );
+
+    TEST(
+      'CLI-Compile',
+      'cli timeout prevents delayed side effects before returning',
+      makeOrphanTest(
+        'deno',
+        'eval',
+        (s) =>
+          `setTimeout(() => Deno.writeTextFileSync(${
+            JSON.stringify(s)
+          }, 'x'), 5000)`,
+        'deno',
+      ),
+    );
+  }
+
+  if (isNode()) {
+    // Node tests
+    TEST(
+      'CLI-Compile',
+      'cli returns timeout result and warning log in Node runtime',
+      makeTimeoutTest('Node', 'node', '-e', 500),
+    );
+
+    TEST(
+      'CLI-Compile',
+      'cli returns normal output and exit code on non-timeout execution',
+      makeNormalTest('node', '-e'),
+    );
+
+    TEST(
+      'CLI-Compile',
+      'cli timeout prevents delayed side effects before returning',
+      makeOrphanTest(
+        'node',
+        '-e',
+        (s) =>
+          `setTimeout(() => require('fs').writeFileSync(${
+            JSON.stringify(s)
+          }, 'x'), 5000)`,
+        'node',
+      ),
+    );
+
+    // Cross-runtime test: Node spawning Deno (restores coverage that was lost
+    // when the old timeout test changed from `cli('deno', 'run', ...)` to
+    // `cli('node', '-e', ...)`).
+    TEST(
+      'CLI-Compile',
+      'cli returns timeout result when Node spawns a Deno subprocess',
+      makeTimeoutTest('CrossRuntime', 'deno', 'eval', 500),
     );
   }
 }
