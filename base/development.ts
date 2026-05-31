@@ -110,7 +110,7 @@ export async function cli(
         log({
           severity: 'WARNING',
           message:
-            `CLI subprocess timed out after ${options.timeout}ms (Deno): ` +
+            `CLI subprocess timed out after ${options.timeout}ms: ` +
             `${cmd} ${cmdArgs.join(' ')}`,
         });
         return {
@@ -128,7 +128,7 @@ export async function cli(
         log({
           severity: 'WARNING',
           message:
-            `CLI subprocess timed out after ${options.timeout}ms (Deno): ` +
+            `CLI subprocess timed out after ${options.timeout}ms: ` +
             `${cmd} ${cmdArgs.join(' ')}`,
         });
         return {
@@ -179,7 +179,7 @@ export async function cli(
             log({
               severity: 'WARNING',
               message:
-                `CLI subprocess timed out after ${options.timeout}ms — killing via taskkill: ` +
+                `CLI subprocess timed out after ${options.timeout}ms: ` +
                 `${cmd} ${cmdArgs.join(' ')}`,
             });
             // With shell:true, proc is cmd.exe; taskkill /t kills the entire
@@ -197,7 +197,7 @@ export async function cli(
             log({
               severity: 'WARNING',
               message:
-                `CLI subprocess timed out after ${options.timeout}ms — sending SIGTERM: ` +
+                `CLI subprocess timed out after ${options.timeout}ms: ` +
                 `${cmd} ${cmdArgs.join(' ')}`,
             });
             try {
