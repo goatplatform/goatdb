@@ -22,6 +22,7 @@ import setupBinaryEncoding from './binary-encoding.test.ts';
 import setupServerArchitectureTest from './server-architecture.test.ts';
 import setupStaticAssetsEndpointTest from './static-assets-endpoint.test.ts';
 import setupFileImplTests from './file-impl.test.ts';
+import setupFileWatcherUnitTests, { setupFileWatcherTests } from './file-watcher.test.ts';
 import setupJsonLogFormats from './json-log-formats.test.ts';
 import setupNodeHttpServerTests from './node-http-server.test.ts';
 import setupHealthCheckEndpointTest from './health-check-endpoint.test.ts';
@@ -95,6 +96,7 @@ async function registerAllTestsImpl(): Promise<void> {
   setupItemPath(); // Path validation and parsing logic
   setupPathTests(); // Cross-platform path utilities
   setupBuildTests(); // Build utility contracts (normalizeBuildEntryPath, etc.)
+  setupFileWatcherUnitTests(); // File watcher path-filtering logic (pure logic, no I/O)
   if (isDeno()) {
     setupBuildDenoTests(); // Deno-only build coverage that imports Deno-only modules
   }
@@ -137,6 +139,9 @@ async function registerAllTestsImpl(): Promise<void> {
   setupJsonLogFormats(); // JSONLog storage format (GOAT binary + JSONL)
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
+  if (isNode()) {
+    setupFileWatcherTests(); // Polling watcher tests (~500ms each)
+  }
   setupLiveQuery(); // Live query membership updates on ManagedItem edits
   setupWriteFailure(); // WriteFailure event after 3 consecutive I/O failures
   setupTrusted(); // Database operations in trusted mode
