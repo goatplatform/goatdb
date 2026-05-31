@@ -8,6 +8,7 @@
  */
 import { isDeno, isNode } from './common.ts';
 import { notReached } from './error.ts';
+import { log } from '../logging/log.ts';
 
 /**
  * Represents a file system change event.
@@ -99,12 +100,8 @@ async function createNodeWatcher(dir: string): Promise<FileWatcher> {
   try {
     chokidarModule = await import('chokidar');
   } catch {
-    // chokidar not available, fall back to native fs.watch
-    console.warn(
-      'chokidar not available, using native fs.watch (may be unreliable on some platforms)',
-    );
     const fs = await import('node:fs');
-    return createNativeFsWatcher(fs, dir);
+    return await createNativeFsWatcher(fs, dir);
   }
   return createChokidarWatcher(chokidarModule.default || chokidarModule, dir);
 }
@@ -184,12 +181,32 @@ function createChokidarWatcher(
   return watcher;
 }
 
-function createNativeFsWatcher(
+async function createNativeFsWatcher(
   fs: typeof import('node:fs'),
   dir: string,
-): FileWatcher {
+): Promise<FileWatcher> {
+  const process = globalThis.process;
+  // On Windows, recursive fs.watch via libuv has a known assertion crash
+  // (src/win/fs-event.c:72, _wcsnicmp mismatch) due to short-path name
+  // normalization. This is a regression in Node.js 24.16.0, tracked at
+  // https://github.com/libuv/libuv/issues/5010. Use polling instead.
+  if (process.platform === 'win32') {
+    log({
+      severity: 'WARNING',
+      message: 'chokidar not available, using polling fallback on Windows',
+    });
+    return await createPollingWatcher(fs, dir);
+  }
+
+  log({
+    severity: 'WARNING',
+    message:
+      'chokidar not available, using native fs.watch (may be unreliable on some platforms)',
+  });
+
   // Resolve 8.3 short names to long paths on Windows to prevent libuv
-  // assertion crash at src/win/fs-event.c:72 (_wcsnicmp mismatch).
+  // assertion crash. Currently unreachable since Windows uses polling,
+  // but kept for defense-in-depth if the branch above changes.
   let watchDir = dir;
   try {
     watchDir = fs.realpathSync(dir);
@@ -210,3 +227,135 @@ function createNativeFsWatcher(
 
   return watcher;
 }
+
+/**
+ * Polling-based file watcher for Windows.
+ *
+ * Recursive fs.watch on Windows is unreliable due to a libuv assertion crash
+ * (Node.js 24.16.0 regression, libuv#5010). This fallback periodically scans
+ * the directory tree and emits events for new, modified, and deleted files.
+ *
+ * @param fs The node:fs module
+ * @param dir The directory to watch
+ * @param pollMs Polling interval in milliseconds (default 1000)
+ * @returns A FileWatcher instance
+ */
+export async function createPollingWatcher(
+  fs: typeof import('node:fs'),
+  dir: string,
+  pollMs: number = 1000,
+  onPollCycle?: () => void,
+): Promise<FileWatcher> {
+  const { join } = await import('node:path');
+
+  let pollerClosed = false;
+  let previousState: Map<string, number>;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  // Throttle per-path to at most one DEBUG log per 60s to avoid log floods
+  // from persistently broken paths (e.g., permission denied, raced deletion).
+  const lastFailureLog = new Map<string, number>();
+  function logFailureThrottled(path: string, msg: string): void {
+    const now = Date.now();
+    const last = lastFailureLog.get(path) ?? 0;
+    if (now - last >= 60_000) {
+      lastFailureLog.set(path, now);
+      log({ severity: 'DEBUG', message: msg });
+    }
+  }
+
+  const { pushEvent, watcher } = createQueuedWatcher(() => {
+    pollerClosed = true;
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+      timeoutId = undefined;
+    }
+  });
+
+  // Walk the directory tree and return a map of absolute path -> mtimeMs
+  function scan(): Map<string, number> {
+    const result = new Map<string, number>();
+    const walk = (currentDir: string): void => {
+      let entries: string[];
+      try {
+        entries = fs.readdirSync(currentDir);
+      } catch {
+        logFailureThrottled(currentDir, `Failed to read directory: ${currentDir}`);
+        return; // deleted or permission denied
+      }
+      for (const entry of entries) {
+        if (kDefaultIgnored.includes(entry)) continue;
+        const fullPath = join(currentDir, entry);
+        try {
+          const stat = fs.lstatSync(fullPath);
+          if (stat.isSymbolicLink()) continue; // skip symlinks to prevent escape/cycle
+          if (stat.isDirectory()) {
+            walk(fullPath);
+          } else {
+            result.set(fullPath, stat.mtimeMs);
+          }
+        } catch {
+          logFailureThrottled(fullPath, `Failed to stat file: ${fullPath}`);
+          // raced with deletion
+        }
+      }
+    };
+    walk(dir);
+    return result;
+  }
+
+  // Use recursive setTimeout instead of setInterval to prevent concurrent
+  // scan() executions if one cycle takes longer than pollMs.
+  function poll(): void {
+    if (pollerClosed) return;
+    const currentState = scan();
+
+    // If scan returns empty but previously had files, check if the root dir was
+    // deleted or became unreadable. If so, emit one high-level event instead of
+    // N remove events. Otherwise let the normal loop handle individual deletions.
+    if (previousState.size > 0 && currentState.size === 0) {
+      try {
+        fs.readdirSync(dir); // dir still exists, fall through to normal handling
+      } catch {
+        // dir deleted or unreadable
+        pushEvent({ paths: [dir], kind: 'any' });
+        previousState = currentState;
+        onPollCycle?.();
+        if (!pollerClosed) {
+          timeoutId = setTimeout(poll, pollMs);
+        }
+        return;
+      }
+    }
+
+    // New or modified files
+    for (const [filePath, mtime] of currentState) {
+      const prev = previousState.get(filePath);
+      if (prev === undefined) {
+        pushEvent({ paths: [filePath], kind: 'create' });
+      } else if (mtime !== prev) {
+        pushEvent({ paths: [filePath], kind: 'modify' });
+      }
+    }
+
+    // Deleted files
+    for (const filePath of previousState.keys()) {
+      if (!currentState.has(filePath)) {
+        pushEvent({ paths: [filePath], kind: 'remove' });
+      }
+    }
+
+    previousState = currentState;
+    onPollCycle?.();
+    if (!pollerClosed) {
+      timeoutId = setTimeout(poll, pollMs);
+    }
+  }
+
+  // Initial snapshot + start polling
+  previousState = scan();
+  timeoutId = setTimeout(poll, pollMs);
+
+  return watcher;
+}
+
+
