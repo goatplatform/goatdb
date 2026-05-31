@@ -91,24 +91,21 @@ export async function cli(
     const ac = options.timeout ? new AbortController() : undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     if (ac && options.timeout) {
-      timer = setTimeout(
-        () => ac.abort(),
-        options.timeout,
-      );
+      timer = setTimeout(() => ac.abort(), options.timeout);
     }
-    const process = new Deno.Command(cmd, {
-      args: cmdArgs,
-      stdout: 'piped',
-      stderr: 'piped',
-      cwd: options.cwd,
-      signal: ac?.signal,
-    });
     try {
+      const process = new Deno.Command(cmd, {
+        args: cmdArgs,
+        stdout: 'piped',
+        stderr: 'piped',
+        cwd: options.cwd,
+        signal: ac?.signal,
+      }).spawn();
+      // Note: must use .spawn().output() — Deno.Command.output() does not
+      // propagate AbortSignal to the internal spawn, causing hangs on abort.
       const { stdout, stderr, code } = await process.output();
-      const decoder = new TextDecoder();
-      const output = decoder.decode(stdout) + decoder.decode(stderr);
-      return { result: output, exitCode: code };
-    } catch (e: unknown) {
+      // process.output() resolves even when killed by signal (no throw), so
+      // check the signal state after resolution to detect timeouts.
       if (ac?.signal.aborted) {
         log({
           severity: 'WARNING',
@@ -121,7 +118,25 @@ export async function cli(
           exitCode: 124,
         };
       }
-      throw e;
+      const decoder = new TextDecoder();
+      return {
+        result: decoder.decode(stdout) + decoder.decode(stderr),
+        exitCode: code,
+      };
+    } catch (err: unknown) {
+      if (ac?.signal.aborted) {
+        log({
+          severity: 'WARNING',
+          message:
+            `CLI subprocess timed out after ${options.timeout}ms (Deno): ` +
+            `${cmd} ${cmdArgs.join(' ')}`,
+        });
+        return {
+          result: `Process timed out after ${options.timeout}ms`,
+          exitCode: 124,
+        };
+      }
+      throw err;
     } finally {
       if (timer !== undefined) clearTimeout(timer);
     }
