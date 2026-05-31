@@ -43,7 +43,7 @@ export function shouldRebuildAfterPathChange(
   p: string,
   ignored: string[] = kDefaultIgnored,
 ): boolean {
-  // Ignore Deno's temporary files
+  // Deno writes .tmp during live-reload before atomic swap; skip to avoid spurious rebuilds
   if (p.endsWith('.tmp')) {
     return false;
   }
@@ -76,6 +76,7 @@ export async function watchDirectory(dir: string): Promise<FileWatcher> {
 function createDenoWatcher(dir: string): FileWatcher {
   const watcher = Deno.watchFs(dir);
   let closed = false;
+  let watcherClosed = false;
 
   return {
     async *[Symbol.asyncIterator]() {
@@ -88,6 +89,8 @@ function createDenoWatcher(dir: string): FileWatcher {
       }
     },
     close() {
+      if (watcherClosed) return;
+      watcherClosed = true;
       closed = true;
       watcher.close();
     },
@@ -116,6 +119,18 @@ function createQueuedWatcher(
   const eventQueue: FileWatchEvent[] = [];
   let resolveNext: ((value: FileWatchEvent) => void) | null = null;
   let closed = false;
+  let cleanedUp = false;
+
+  function cleanup(): void {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    closed = true;
+    if (resolveNext) {
+      resolveNext({ paths: [], kind: 'any' });
+      resolveNext = null;
+    }
+    onClose();
+  }
 
   return {
     pushEvent(event: FileWatchEvent) {
