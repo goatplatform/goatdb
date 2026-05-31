@@ -31,7 +31,9 @@ jobs:
           node-version: '24.15.0'
 
       - name: Static analysis (type check + module graph)
-        run: deno check mod.ts
+        run: |
+          deno check mod.ts
+          deno check cli/debug-server.ts
 
       - name: Run Deno tests
         run: deno task test --runtime=deno
