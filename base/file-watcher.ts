@@ -144,25 +144,25 @@ function createQueuedWatcher(
     },
     watcher: {
       async *[Symbol.asyncIterator]() {
-        while (!closed) {
-          if (eventQueue.length > 0) {
-            yield eventQueue.shift()!;
-          } else {
-            const event = await new Promise<FileWatchEvent>((resolve) => {
-              resolveNext = resolve;
-            });
-            if (!closed) {
-              yield event;
+        try {
+          while (!closed) {
+            if (eventQueue.length > 0) {
+              yield eventQueue.shift()!;
+            } else {
+              const event = await new Promise<FileWatchEvent>((resolve) => {
+                resolveNext = resolve;
+              });
+              if (!closed) {
+                yield event;
+              }
             }
           }
+        } finally {
+          cleanup();
         }
       },
       close() {
-        closed = true;
-        if (resolveNext) {
-          resolveNext({ paths: [], kind: 'any' });
-        }
-        onClose();
+        cleanup();
       },
     },
   };
