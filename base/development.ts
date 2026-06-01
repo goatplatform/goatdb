@@ -109,8 +109,7 @@ export async function cli(
       if (ac?.signal.aborted) {
         log({
           severity: 'WARNING',
-          message:
-            `CLI subprocess timed out after ${options.timeout}ms: ` +
+          message: `CLI subprocess timed out after ${options.timeout}ms: ` +
             `${cmd} ${cmdArgs.join(' ')}`,
         });
         return {
@@ -127,8 +126,7 @@ export async function cli(
       if (ac?.signal.aborted) {
         log({
           severity: 'WARNING',
-          message:
-            `CLI subprocess timed out after ${options.timeout}ms: ` +
+          message: `CLI subprocess timed out after ${options.timeout}ms: ` +
             `${cmd} ${cmdArgs.join(' ')}`,
         });
         return {
@@ -178,12 +176,11 @@ export async function cli(
           if (onWindows) {
             log({
               severity: 'WARNING',
-              message:
-                `CLI subprocess timed out after ${options.timeout}ms: ` +
+              message: `CLI subprocess timed out after ${options.timeout}ms: ` +
                 `${cmd} ${cmdArgs.join(' ')}`,
             });
-            // With shell:true, proc is cmd.exe; taskkill /t kills the entire
-            // process tree so the real child doesn't become orphaned.
+            // With shell:true, proc is cmd.exe; taskkill /t kills the tree
+            // so no orphaned subprocesses remain.
             try {
               if (proc.pid) {
                 spawn('taskkill', ['/pid', String(proc.pid), '/t', '/f']);
@@ -196,8 +193,7 @@ export async function cli(
           } else {
             log({
               severity: 'WARNING',
-              message:
-                `CLI subprocess timed out after ${options.timeout}ms: ` +
+              message: `CLI subprocess timed out after ${options.timeout}ms: ` +
                 `${cmd} ${cmdArgs.join(' ')}`,
             });
             try {
