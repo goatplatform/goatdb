@@ -34,5 +34,12 @@ opencode.json
 # Playwright browser cache (written by CI via PLAYWRIGHT_BROWSERS_PATH)
 .playwright/
 
+# Generated JS from TypeScript compilation (deno task build)
+base/*.js
+base/json-log/*.js
+base/runtime/*.js
+base/runtime/adapters/*.js
+logging/*.js
+
 # MCP server configuration (local AI tooling config)
 .mcp.json
