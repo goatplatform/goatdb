@@ -54,7 +54,7 @@ import { createHttpServer } from '../net/server/http-compat.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { goatEntryPoints } from '../cli/link.ts';
 import { getRuntime } from '../base/runtime/index.ts';
-import { cli } from '../base/development.ts';
+import { cli, type CliOptions } from '../base/development.ts';
 import { runAcrossPlatforms } from '../base/multi-runner.ts';
 import { createTestDomainConfig } from './merge-test-utils.ts';
 import {
@@ -3984,17 +3984,17 @@ src: url('./goat-font.woff2') format('woff2');
   function makeTimeoutTest(
     name: string,
     cmd: string,
-    evalFlag: string,
     timeoutMs: number,
   ): (ctx: TestSuite) => Promise<void> {
     return async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('cli-timeout');
+      const scriptPath = path.join(dir, 'script.js');
+      await writeTextFile(scriptPath, 'setInterval(() => {}, 1000)');
       await withLogCapture(async (captured) => {
-        const cliResult = await cli(
-          cmd,
-          evalFlag,
-          'setInterval(() => {}, 1000)',
-          { timeout: timeoutMs },
-        );
+        const cliArgs: (string | CliOptions)[] = cmd === 'deno'
+          ? ['run', scriptPath, { timeout: timeoutMs }]
+          : [scriptPath, { timeout: timeoutMs }];
+        const cliResult = await cli(cmd, ...cliArgs);
         assertEquals(
           cliResult.exitCode,
           124,
@@ -4026,15 +4026,16 @@ src: url('./goat-font.woff2') format('woff2');
 
   function makeNormalTest(
     cmd: string,
-    evalFlag: string,
   ): (ctx: TestSuite) => Promise<void> {
-    return async (_ctx: TestSuite) => {
+    return async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('cli-normal');
+      const scriptPath = path.join(dir, 'script.js');
+      await writeTextFile(scriptPath, 'console.log("hello")');
       await withLogCapture(async (captured) => {
-        const { result, exitCode } = await cli(
-          cmd,
-          evalFlag,
-          'console.log("hello")',
-        );
+        const cliArgs: (string | CliOptions)[] = cmd === 'deno'
+          ? ['run', scriptPath]
+          : [scriptPath];
+        const { result, exitCode } = await cli(cmd, ...cliArgs);
         assertEquals(exitCode, 0, 'normal cli() must return exit code 0');
         assertEquals(
           result.trim(),
@@ -4052,23 +4053,22 @@ src: url('./goat-font.woff2') format('woff2');
 
   function makeOrphanTest(
     cmd: string,
-    evalFlag: string,
     code: (sentinel: string) => string,
     suffix: string,
   ): (ctx: TestSuite) => Promise<void> {
     return async (ctx: TestSuite) => {
       const dir = await ctx.tempDir(`cli-timeout-kill-${suffix}`);
       const sentinel = path.join(dir, 'sentinel');
+      const scriptPath = path.join(dir, 'script.js');
+      await writeTextFile(scriptPath, code(sentinel));
       // Subprocess schedules a file write at 5s — well past the 200ms timeout.
       // The 25x margin (200ms timeout vs 5000ms sentinel write) ensures the
       // direct timed-out subprocess cannot reach its delayed callback before
       // cli() returns, even under CI load.
-      const { exitCode } = await cli(
-        cmd,
-        evalFlag,
-        code(sentinel),
-        { timeout: 200 },
-      );
+      const cliArgs: (string | CliOptions)[] = cmd === 'deno'
+        ? ['run', scriptPath, { timeout: 200 }]
+        : [scriptPath, { timeout: 200 }];
+      const { exitCode } = await cli(cmd, ...cliArgs);
       assertEquals(exitCode, 124, 'timeout must produce exit code 124');
       assertFalse(
         await pathExists(sentinel),
@@ -4181,7 +4181,7 @@ src: url('./goat-font.woff2') format('woff2');
     TEST(
       'CLI-Compile',
       'cli returns timeout result and warning log in Deno runtime',
-      makeTimeoutTest('Deno', 'deno', 'eval', 2000),
+      makeTimeoutTest('Deno', 'deno', 2000),
     );
 
     TEST(
@@ -4207,7 +4207,7 @@ src: url('./goat-font.woff2') format('woff2');
     TEST(
       'CLI-Compile',
       'cli returns normal output and exit code on non-timeout execution',
-      makeNormalTest('deno', 'eval'),
+      makeNormalTest('deno'),
     );
 
     TEST(
@@ -4215,7 +4215,6 @@ src: url('./goat-font.woff2') format('woff2');
       'cli timeout prevents delayed side effects before returning',
       makeOrphanTest(
         'deno',
-        'eval',
         (s) =>
           `setTimeout(() => Deno.writeTextFileSync(${
             JSON.stringify(s)
@@ -4230,13 +4229,13 @@ src: url('./goat-font.woff2') format('woff2');
     TEST(
       'CLI-Compile',
       'cli returns timeout result and warning log in Node runtime',
-      makeTimeoutTest('Node', 'node', '-e', 500),
+      makeTimeoutTest('Node', 'node', 500),
     );
 
     TEST(
       'CLI-Compile',
       'cli returns normal output and exit code on non-timeout execution',
-      makeNormalTest('node', '-e'),
+      makeNormalTest('node'),
     );
 
     TEST(
@@ -4244,7 +4243,6 @@ src: url('./goat-font.woff2') format('woff2');
       'cli timeout prevents delayed side effects before returning',
       makeOrphanTest(
         'node',
-        '-e',
         (s) =>
           `setTimeout(() => require('fs').writeFileSync(${
             JSON.stringify(s)
@@ -4259,7 +4257,7 @@ src: url('./goat-font.woff2') format('woff2');
     TEST(
       'CLI-Compile',
       'cli returns timeout result when Node spawns a Deno subprocess',
-      makeTimeoutTest('CrossRuntime', 'deno', 'eval', 500),
+      makeTimeoutTest('CrossRuntime', 'deno', 500),
     );
   }
 }
