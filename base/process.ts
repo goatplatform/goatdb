@@ -10,7 +10,7 @@ import { getRuntime } from './runtime/index.ts';
  * @returns Never returns (process terminates or test execution halts)
  * @throws Error if on an unsupported platform
  */
-export async function exit(code: number): Promise<never> {
+export function exit(code: number): never {
   return getRuntime().exit(code);
 }
 
