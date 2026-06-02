@@ -93,7 +93,7 @@ jobs:
             playwright-${{ runner.os }}-1.48.0-
 
       - name: Install Playwright browsers and system dependencies
-        run: deno run -A npm:playwright@^1.48.0 install --with-deps chromium
+        run: deno run -A npm:playwright@1.48.0 install --with-deps chromium
 
       - name: Static analysis (type check + module graph)
         run: deno check mod.ts
