@@ -13,6 +13,7 @@ import type {
 import type { OperatingSystem } from '../../os.ts';
 import type { FileImpl } from '../../json-log/file-impl-interface.ts';
 import { log } from '../../../logging/log.ts';
+import { browserOpenCommand } from '../browser-open.ts';
 
 /**
  * Deno-specific RuntimeAdapter implementation.
@@ -127,27 +128,16 @@ export const DenoAdapter: RuntimeAdapter = {
   }) as RuntimeTestConfig,
 
   openBrowser(url: string): Promise<void> {
-    const os = this.getOS();
-    let cmd: string;
-    let args: string[];
-
-    if (os === 'darwin') {
-      cmd = 'open';
-      args = [url];
-    } else if (os === 'linux') {
-      cmd = 'xdg-open';
-      args = [url];
-    } else if (os === 'windows') {
-      cmd = 'cmd';
-      args = ['/c', 'start', url];
-    } else {
+    const resolved = browserOpenCommand(this.getOS(), url);
+    if (!resolved) {
       log({
         severity: 'WARNING',
         error: 'MissingConfiguration',
-        message: `Unable to open browser on unsupported OS: ${os}`,
+        message: `Unable to open browser on unsupported OS: ${this.getOS()}`,
       });
       return Promise.resolve();
     }
+    const { cmd, args } = resolved;
 
     try {
       const process = new Deno.Command(cmd, {

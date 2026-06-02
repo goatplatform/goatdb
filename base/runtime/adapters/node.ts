@@ -15,6 +15,7 @@ import { normalizeNodePlatform } from '../../os.ts';
 import type { FileImpl } from '../../json-log/file-impl-interface.ts';
 import { notReached } from '../../error.ts';
 import { log } from '../../../logging/log.ts';
+import { browserOpenCommand } from '../browser-open.ts';
 
 /**
  * Node.js-specific RuntimeAdapter implementation.
@@ -156,33 +157,21 @@ export const NodeAdapter: RuntimeAdapter = {
   }) as RuntimeTestConfig,
 
   async openBrowser(url: string): Promise<void> {
-    const os = this.getOS();
+    const resolved = browserOpenCommand(this.getOS(), url);
+    if (!resolved) {
+      log({
+        severity: 'WARNING',
+        error: 'MissingConfiguration',
+        message: `Unable to open browser on unsupported OS: ${this.getOS()}`,
+      });
+      return;
+    }
+    const { cmd, args } = resolved;
+
     try {
-      // Lazy-load child_process
       const { spawn } = await import('node:child_process');
-      let cmd: string;
-      let args: string[];
-
-      if (os === 'darwin') {
-        cmd = 'open';
-        args = [url];
-      } else if (os === 'linux') {
-        cmd = 'xdg-open';
-        args = [url];
-      } else if (os === 'windows') {
-        cmd = 'cmd';
-        args = ['/c', 'start', url];
-      } else {
-        log({
-          severity: 'WARNING',
-          error: 'MissingConfiguration',
-          message: `Unable to open browser on unsupported OS: ${os}`,
-        });
-        return;
-      }
-
       const child = spawn(cmd, args, {
-        shell: os === 'windows',
+        shell: this.getOS() === 'windows',
         stdio: 'ignore',
       });
       child.on('error', (err) => {
