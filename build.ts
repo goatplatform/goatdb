@@ -21,31 +21,58 @@ export const kJsrDenoEsbuildPluginSpecifier = '@jsr/deno__esbuild-plugin';
 // cannot be resolved by Node.js at runtime.
 // We assign specifiers to variables so bundlers (esbuild) won't statically
 // resolve and inline these imports, which would break SEA binaries.
-// deno-lint-ignore no-explicit-any
-let esbuildModule: any;
-// deno-lint-ignore no-explicit-any
-let denoPluginModule: any;
-
-// deno-lint-ignore no-explicit-any
-function lazyLoad(moduleRef: { value: any }, specifier: string): Promise<any> {
-  if (!moduleRef.value) {
-    moduleRef.value = import(specifier);
-  }
-  return moduleRef.value;
+// Cached import promises — concurrent callers share one in-flight import, but
+// failed imports must clear the cache so later calls can retry.
+/** Mutable cache slot for a lazily imported module. */
+export interface ImportCacheState<T> {
+  promise?: Promise<T>;
 }
 
+/**
+ * Shares one in-flight dynamic import across callers, but clears rejected
+ * imports so later calls can retry.
+ */
+export function getCachedImport<T>(
+  state: ImportCacheState<T>,
+  importer: () => Promise<T>,
+): Promise<T> {
+  if (!state.promise) {
+    let pending: Promise<T>;
+    pending = importer().catch((err) => {
+      if (state.promise === pending) state.promise = undefined;
+      throw err;
+    });
+    state.promise = pending;
+  }
+  return state.promise;
+}
+
+/** Clears the cached import before callers await or dispose the prior one. */
+export function resetImportState<T>(
+  state: ImportCacheState<T>,
+): Promise<T> | undefined {
+  const pending = state.promise;
+  state.promise = undefined;
+  return pending;
+}
+
+// deno-lint-ignore no-explicit-any
+const esbuildImportState: ImportCacheState<any> = {};
+// deno-lint-ignore no-explicit-any
+const denoPluginImportState: ImportCacheState<any> = {};
+
 export async function getEsbuild(): Promise<typeof import('esbuild')> {
-  const mod = await lazyLoad({ value: esbuildModule }, 'esbuild');
-  esbuildModule = mod;
-  return mod as typeof import('esbuild');
+  return (await getCachedImport(
+    esbuildImportState,
+    () => import('esbuild'),
+  )) as typeof import('esbuild');
 }
 
 export async function getDenoPlugin(): Promise<typeof denoPlugin> {
-  const mod = await lazyLoad(
-    { value: denoPluginModule },
-    kDenoEsbuildPluginSpecifier,
+  const mod = await getCachedImport(
+    denoPluginImportState,
+    () => import(kDenoEsbuildPluginSpecifier),
   );
-  denoPluginModule = mod;
   const plugin = (mod.denoPlugin || mod.default) as
     | typeof denoPlugin
     | undefined;
@@ -186,10 +213,15 @@ export function adapterStubPlugin(
 }
 
 export async function stopBackgroundCompiler(): Promise<void> {
-  if (esbuildModule) {
-    await esbuildModule.stop();
-    esbuildModule = undefined;
-    denoPluginModule = undefined;
+  const esbuildPromise = resetImportState(esbuildImportState);
+  // denoPlugin cleanup is fire-and-forget: @deno/esbuild-plugin has no destructor
+  // or stop method — we only need to clear the cached promise so the next call to
+  // getDenoPlugin() starts a fresh import. The .catch() prevents an unhandled
+  // rejection if the in-flight import fails.
+  resetImportState(denoPluginImportState)?.catch(() => {});
+  if (esbuildPromise) {
+    const mod = await esbuildPromise;
+    await mod.stop();
   }
 }
 

@@ -38,6 +38,9 @@ import {
 import {
   type BuildPluginLike,
   createBuildContext,
+  getCachedImport,
+  type ImportCacheState,
+  resetImportState,
   stopBackgroundCompiler,
 } from '../build.ts';
 
@@ -332,6 +335,99 @@ async function withCWD<T>(dir: string, fn: () => Promise<T>): Promise<T> {
 }
 
 export default function setupCliCompileTests() {
+  TEST(
+    'CLI-Compile',
+    'getCachedImport shares one in-flight import across concurrent callers',
+    async () => {
+      const state: ImportCacheState<string> = {};
+      let importerCalls = 0;
+      let resolveImport!: (value: string) => void;
+      const importer = () => {
+        importerCalls++;
+        return new Promise<string>((resolve) => {
+          resolveImport = resolve;
+        });
+      };
+
+      const first = getCachedImport(state, importer);
+      const second = getCachedImport(state, importer);
+      // Identity check: the observable contract is that concurrent callers get
+      // the same promise, not just the same resolved value after the fact.
+      assertTrue(first === second, 'concurrent callers must receive the same promise object');
+
+      resolveImport('ok');
+      assertEquals(await first, 'ok');
+      assertEquals(await second, 'ok');
+      assertEquals(importerCalls, 1, 'importer must only be invoked once');
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'getCachedImport clears rejected imports so later calls can retry',
+    async () => {
+      const state: ImportCacheState<string> = {};
+      let importerCalls = 0;
+
+      await assertThrows(
+        () =>
+          getCachedImport(state, async () => {
+            importerCalls++;
+            throw new Error(`boom-${importerCalls}`);
+          }),
+        Error,
+        'boom-1',
+      );
+      assertEquals(
+        state.promise,
+        undefined,
+        'failed imports must not poison later retries',
+      );
+
+      const value = await getCachedImport(state, async () => {
+        importerCalls++;
+        return `ok-${importerCalls}`;
+      });
+      assertEquals(value, 'ok-2');
+      assertEquals(importerCalls, 2, 'retry must perform a new import');
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'resetImportState clears cache before awaiting the prior import',
+    async () => {
+      const state: ImportCacheState<string> = {};
+      let importerCalls = 0;
+      let rejectImport!: (reason?: unknown) => void;
+
+      const first = getCachedImport(state, () => {
+        importerCalls++;
+        return new Promise<string>((_resolve, reject) => {
+          rejectImport = reject;
+        });
+      });
+      const pending = resetImportState(state);
+      assertExists(pending, 'resetImportState must return the prior import');
+      assertEquals(
+        state.promise,
+        undefined,
+        'resetImportState must clear cache immediately',
+      );
+
+      rejectImport(new Error('boom'));
+      await assertThrows(() => pending, Error, 'boom');
+      await assertThrows(() => first, Error, 'boom');
+
+      const retried = await getCachedImport(state, async () => {
+        importerCalls++;
+        return 'ok';
+      });
+      assertEquals(retried, 'ok');
+      assertEquals(importerCalls, 2, 'retry must start a fresh import');
+    },
+  );
+
   TEST(
     'CLI-Compile',
     'startDebugServer rejects unsupported runtimes before startup side effects',
