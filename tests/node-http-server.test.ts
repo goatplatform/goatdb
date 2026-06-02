@@ -8,7 +8,6 @@
 
 import { TEST } from './mod.ts';
 import { assertEquals, assertExists, assertTrue } from './asserts.ts';
-import { isNode } from '../base/common.ts';
 import {
   GoatRequest,
   NodeHttpServer,
@@ -17,7 +16,6 @@ import {
 
 export default function setupNodeHttpServerTests() {
   TEST('NodeHttpServer', 'GET request returns response body', async () => {
-    if (!isNode()) return;
     const server = new NodeHttpServer();
     try {
       await server.start(
@@ -36,7 +34,6 @@ export default function setupNodeHttpServerTests() {
   });
 
   TEST('NodeHttpServer', 'POST body is readable in handler', async () => {
-    if (!isNode()) return;
     const server = new NodeHttpServer();
     try {
       await server.start(
@@ -59,7 +56,6 @@ export default function setupNodeHttpServerTests() {
   });
 
   TEST('NodeHttpServer', 'response headers are sent over wire', async () => {
-    if (!isNode()) return;
     const server = new NodeHttpServer();
     try {
       await server.start(
@@ -84,7 +80,6 @@ export default function setupNodeHttpServerTests() {
   });
 
   TEST('NodeHttpServer', 'status 404 is transmitted', async () => {
-    if (!isNode()) return;
     const server = new NodeHttpServer();
     try {
       await server.start(
@@ -102,7 +97,6 @@ export default function setupNodeHttpServerTests() {
   });
 
   TEST('NodeHttpServer', 'AbortSignal stops the server', async () => {
-    if (!isNode()) return;
     const server = new NodeHttpServer();
     const ac = new AbortController();
     try {
@@ -130,7 +124,6 @@ export default function setupNodeHttpServerTests() {
   });
 
   TEST('NodeHttpServer', 'address returns hostname and port', async () => {
-    if (!isNode()) return;
     const server = new NodeHttpServer();
     try {
       await server.start(

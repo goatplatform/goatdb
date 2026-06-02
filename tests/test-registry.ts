@@ -147,7 +147,9 @@ async function registerAllTestsImpl(): Promise<void> {
   setupTrusted(); // Database operations in trusted mode
   setupUntrusted(); // Database operations in untrusted mode
   await setupServerArchitectureTest(); // Server initialization and configuration
-  setupNodeHttpServerTests(); // Node.js HTTP server integration
+  if (isNode()) {
+    setupNodeHttpServerTests(); // Node.js HTTP server integration
+  }
   setupStaticAssetsEndpointTest(); // File serving and asset management
   setupMergeRichText(); // Rich text merge operations
   setupMergeConvergence(); // CRDT convergence properties
