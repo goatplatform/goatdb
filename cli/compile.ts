@@ -834,9 +834,10 @@ export function targetFromOSArch(os?: TargetOS, arch?: CPUArch): OSArchTarget {
       arch = 'arm64';
     } else {
       if (sysInfo.arch !== 'x64' && sysInfo.arch !== 'x86_64') {
-        console.warn(
-          `Unknown architecture "${sysInfo.arch}", defaulting to x64`,
-        );
+        log({
+          severity: 'WARNING',
+          message: `Unknown architecture "${sysInfo.arch}", defaulting to x64`,
+        });
       }
       arch = 'x64';
     }
