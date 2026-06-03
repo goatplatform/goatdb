@@ -1,3 +1,4 @@
+import { PLAYWRIGHT_VERSION } from './playwright-version.ts';
 import { kMinuteMs, kSecondMs } from './date.ts';
 import { ProcessManager } from './process-manager.ts';
 
@@ -168,7 +169,7 @@ export async function runBrowserTests(
     console.log('Launching browser...');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ns = 'npm'; // construct specifier to avoid Deno's npm scanner
-    const { chromium } = await import(`${ns}:playwright@^1.48.0`);
+    const { chromium } = await import(`${ns}:playwright@${PLAYWRIGHT_VERSION}`); // exact pin — see playwright-version.ts
 
     // Detect if running in Docker/CI environment
     const isDocker = await Deno.stat('/.dockerenv').then(() => true).catch(() =>

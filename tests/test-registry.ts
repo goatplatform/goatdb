@@ -39,7 +39,7 @@ import setupRuntimeTests, {
 } from './runtime.test.ts';
 import setupEmailServiceTests from './email-service.test.ts';
 import setupProgressTests from './progress.test.ts';
-import setupTestRunnerTests from './test-runner.test.ts';
+import setupTestRunnerTests, { setupPlaywrightPinningTests } from './test-runner.test.ts';
 import setupMergeAdjList from './merge-adjlist.test.ts';
 import setupMergeBloom from './merge-bloom.test.ts';
 import setupBloomFPR from './bloom-fpr.test.ts';
@@ -110,6 +110,9 @@ async function registerAllTestsImpl(): Promise<void> {
   }
   setupProgressTests(); // TUI progress tracking - Task state machine, aggregation
   setupTestRunnerTests(); // Test filtering and no-match error behavior
+  if (isDeno()) {
+    setupPlaywrightPinningTests(); // CI workflow Playwright pin sync (Deno-only, reads workflow file)
+  }
   setupHealthCheckEndpointTest(); // Simple HTTP endpoint check
   setupMergeAdjList(); // Adjacency list data structure
   setupMergeBloom(); // Bloom filter operations

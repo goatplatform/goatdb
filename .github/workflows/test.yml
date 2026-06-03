@@ -88,12 +88,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.playwright
-          key: playwright-${{ runner.os }}-1.48.0-${{ hashFiles('deno.json') }}
+          # Keep in sync with PLAYWRIGHT_VERSION in base/playwright-version.ts
+          key: playwright-${{ runner.os }}-1.60.0-${{ hashFiles('deno.json') }}
           restore-keys: |
-            playwright-${{ runner.os }}-1.48.0-
+            playwright-${{ runner.os }}-1.60.0-
 
       - name: Install Playwright browsers and system dependencies
-        run: deno run -A npm:playwright@1.48.0 install --with-deps chromium
+        run: deno run -A npm:playwright@1.60.0 install --with-deps chromium
 
       - name: Static analysis (type check + module graph)
         run: deno check mod.ts

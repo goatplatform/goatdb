@@ -13,6 +13,7 @@ import {
 } from './asserts.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 import { log } from '../logging/log.ts';
+import { PLAYWRIGHT_VERSION } from '../base/playwright-version.ts';
 import {
   finalizeFilteredRuntimeOutcomes,
   isBrowserStructuredNoMatchResult,
@@ -67,7 +68,7 @@ async function detectPlaywrightChromium(
       chromium = (await deps.importPlaywright()).chromium;
     } else {
       const ns = 'npm';
-      const specifier = `${ns}:playwright@^1.48.0`;
+      const specifier = `${ns}:playwright@${PLAYWRIGHT_VERSION}`; // exact pin — see playwright-version.ts
       chromium = (await import(specifier)).chromium;
     }
   } catch (error) {
@@ -145,6 +146,10 @@ function resetPlaywrightChromiumDetectionStateForTests(): void {
   _detectorState.didWarn = false;
 }
 
+function getMissingPlaywrightWarningMessage(): string {
+  return `Playwright Chromium not found; browser CLI coverage tests skipped (run: deno run -A npm:playwright@${PLAYWRIGHT_VERSION} install --with-deps chromium)`;
+}
+
 type ShouldRunBrowserCliCoverageDeps = {
   hasChromium?: () => Promise<boolean>;
   getEnv?: (name: string) => string | undefined;
@@ -171,8 +176,7 @@ async function shouldRunBrowserCliCoverage(
     if (!warn.didWarn) {
       (logFn ?? log)({
         severity: 'WARNING',
-        message:
-          'Playwright Chromium not found; browser CLI coverage tests skipped (run: deno run -A npm:playwright@^1.48.0 install --with-deps chromium)',
+        message: getMissingPlaywrightWarningMessage(),
       });
       warn.didWarn = true;
     }
@@ -577,7 +581,7 @@ export default function setupTestRunnerTests(): void {
 
         assertEquals(
           logEntries[0]?.message,
-          'Playwright Chromium not found; browser CLI coverage tests skipped (run: deno run -A npm:playwright@^1.48.0 install --with-deps chromium)',
+          getMissingPlaywrightWarningMessage(),
         );
 
         logEntries.length = 0;
@@ -1289,6 +1293,39 @@ export default function setupTestRunnerTests(): void {
       assertTrue(
         stderrText.includes('Invalid value for --runtime:'),
         'error message must identify the invalid --runtime value',
+      );
+    },
+  );
+}
+
+/**
+ * Registers only the Playwright version pinning CI workflow sync test.
+ * Registered under `if (isDeno())` in test-registry.ts to avoid polling in Node.js.
+ */
+export function setupPlaywrightPinningTests(): void {
+  TEST(
+    'TestRunner',
+    'CI workflow Playwright pin stays in sync with runtime pin',
+    async () => {
+      const workflow = await Deno.readTextFile('.github/workflows/test.yml');
+      assertTrue(
+        workflow.includes(
+          'key: playwright-${{ runner.os }}-' + PLAYWRIGHT_VERSION +
+            "-${{ hashFiles('deno.json') }}",
+        ),
+        'workflow cache key must use PLAYWRIGHT_VERSION',
+      );
+      assertTrue(
+        workflow.includes(
+          `playwright-\${{ runner.os }}-${PLAYWRIGHT_VERSION}-`,
+        ),
+        'workflow restore key must use PLAYWRIGHT_VERSION',
+      );
+      assertTrue(
+        workflow.includes(
+          `run: deno run -A npm:playwright@${PLAYWRIGHT_VERSION} install --with-deps chromium`,
+        ),
+        'workflow install command must use PLAYWRIGHT_VERSION',
       );
     },
   );
