@@ -8,6 +8,7 @@ import {
   getRegisteredAdapters,
   getRuntime,
 } from '../base/runtime/index.ts';
+import { browserOpenCommand } from '../base/runtime/browser-open.ts';
 import {
   getGlobalLoggerStreams,
   type LogEntry,
@@ -104,6 +105,32 @@ export default function setupRuntimeTests(): void {
       'exit() is not available in browser',
     );
   });
+
+  TEST('Runtime', 'browserOpenCommand quotes Windows URLs for cmd start', () => {
+    assertEquals(browserOpenCommand('windows', 'http://localhost:1234'), {
+      cmd: 'cmd',
+      args: ['/c', 'start', '""', '"http://localhost:1234"'],
+    });
+  });
+
+  TEST(
+    'Runtime',
+    'browserOpenCommand preserves shell metacharacters inside one Windows URL arg',
+    () => {
+      assertEquals(
+        browserOpenCommand('windows', 'https://example.com/a b?x=1&y=2|z'),
+        {
+          cmd: 'cmd',
+          args: [
+            '/c',
+            'start',
+            '""',
+            '"https://example.com/a b?x=1&y=2|z"',
+          ],
+        },
+      );
+    },
+  );
 
   TEST('Runtime', 'browser adapter logs unsupported browser opening', async () => {
     const captured = await withCapturedLogs(() =>
