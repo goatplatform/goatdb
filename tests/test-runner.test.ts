@@ -1310,16 +1310,15 @@ export function setupPlaywrightPinningTests(): void {
       const workflow = await Deno.readTextFile('.github/workflows/test.yml');
       assertTrue(
         workflow.includes(
-          'key: playwright-${{ runner.os }}-' + PLAYWRIGHT_VERSION +
-            "-${{ hashFiles('deno.json') }}",
+          'key: playwright-${{ runner.os }}-${{ hashFiles(\'base/playwright-version.ts\') }}',
         ),
-        'workflow cache key must use PLAYWRIGHT_VERSION',
+        'workflow cache key must hash base/playwright-version.ts',
       );
       assertTrue(
         workflow.includes(
-          `playwright-\${{ runner.os }}-${PLAYWRIGHT_VERSION}-`,
+          'restore-keys: |\n            playwright-${{ runner.os }}-',
         ),
-        'workflow restore key must use PLAYWRIGHT_VERSION',
+        'workflow restore-keys block must include the version-agnostic Playwright prefix',
       );
       assertTrue(
         workflow.includes(

@@ -88,10 +88,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.playwright
-          # Keep in sync with PLAYWRIGHT_VERSION in base/playwright-version.ts
-          key: playwright-${{ runner.os }}-1.60.0-${{ hashFiles('deno.json') }}
+          key: playwright-${{ runner.os }}-${{ hashFiles('base/playwright-version.ts') }}
           restore-keys: |
-            playwright-${{ runner.os }}-1.60.0-
+            playwright-${{ runner.os }}-
 
       - name: Install Playwright browsers and system dependencies
         run: deno run -A npm:playwright@1.60.0 install --with-deps chromium
