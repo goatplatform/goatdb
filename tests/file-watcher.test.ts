@@ -382,6 +382,68 @@ export function setupFileWatcherTests(): void {
 
   TEST(
     'FileWatcher',
+    'polling watcher skips hidden files',
+    async (ctx: TestSuite) => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const dir = await ctx.tempDir('poll-hidden-file');
+      const { watcher, waitForCycles } = await createWatcher(
+        fs as typeof import('node:fs'),
+        dir,
+        200,
+      );
+      try {
+        const { events, done } = startCollecting(watcher);
+        await waitForCycles(1);
+        fs.writeFileSync(path.join(dir, '.hidden.txt'), 'ignored');
+
+        await waitForCycles(2);
+        watcher.close();
+        await done;
+
+        assertEquals(events.length, 0, 'expected no events from hidden files');
+      } finally {
+        watcher.close();
+      }
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'polling watcher skips hidden directories',
+    async (ctx: TestSuite) => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const dir = await ctx.tempDir('poll-hidden-dir');
+      const { watcher, waitForCycles } = await createWatcher(
+        fs as typeof import('node:fs'),
+        dir,
+        200,
+      );
+      try {
+        const { events, done } = startCollecting(watcher);
+        await waitForCycles(1);
+        const hiddenDir = path.join(dir, '.hidden');
+        fs.mkdirSync(hiddenDir, { recursive: true });
+        fs.writeFileSync(path.join(hiddenDir, 'file.txt'), 'ignored');
+
+        await waitForCycles(2);
+        watcher.close();
+        await done;
+
+        assertEquals(
+          events.length,
+          0,
+          'expected no events from hidden directories',
+        );
+      } finally {
+        watcher.close();
+      }
+    },
+  );
+
+  TEST(
+    'FileWatcher',
     'emits any on root directory deletion',
     async (ctx: TestSuite) => {
       const fs = await import('node:fs');

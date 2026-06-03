@@ -294,11 +294,18 @@ export async function createPollingWatcher(
       try {
         entries = fs.readdirSync(currentDir);
       } catch {
-        logFailureThrottled(currentDir, `Failed to read directory: ${currentDir}`);
+        logFailureThrottled(
+          currentDir,
+          `Failed to read directory: ${currentDir}`,
+        );
         return; // deleted or permission denied
       }
       for (const entry of entries) {
         if (kDefaultIgnored.includes(entry)) continue;
+        // Skip hidden files/dirs in polling for performance
+        // (chokidar detects them, but shouldRebuildAfterPathChange filters them;
+        //  this avoids unnecessary readdir+stat in the fallback watcher)
+        if (entry.startsWith('.')) continue;
         const fullPath = join(currentDir, entry);
         try {
           const stat = fs.lstatSync(fullPath);
@@ -372,5 +379,3 @@ export async function createPollingWatcher(
 
   return watcher;
 }
-
-
