@@ -18,7 +18,7 @@ export function exit(code: number): never {
  * Signals test completion in browser environment.
  * Browser tests cannot exit the process, so they notify automation explicitly.
  */
-export function signalBrowserTestCompletion(code: number): Promise<never> {
+export function signalBrowserTestCompletion(code: number): Promise<void> {
   // Use existing test results if available, otherwise create minimal summary
   let summary = (globalThis as any).testResults;
   if (!summary) {
@@ -48,7 +48,7 @@ export function signalBrowserTestCompletion(code: number): Promise<never> {
   // Update DOM if test runner page exists
   updateBrowserTestDisplay(summary);
 
-  return Promise.resolve(undefined as never);
+  return Promise.resolve();
 }
 
 function updateBrowserTestDisplay(summary: any): void {
