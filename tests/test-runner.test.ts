@@ -20,47 +20,164 @@ import {
 } from '../base/runtime-filter.ts';
 
 const kPromptFailureThresholdMs = 15000;
-let _hasPlaywrightChromium: Promise<boolean> | undefined;
-let _didWarnMissingPlaywrightChromium = false;
+const _detectorState: {
+  hasChromium?: Promise<boolean>;
+  didWarn: boolean;
+} = { didWarn: false };
 
-function hasPlaywrightChromium(): Promise<boolean> {
-  if (typeof Deno === 'undefined') return Promise.resolve(false);
-  _hasPlaywrightChromium ??= (async () => {
-    try {
-      // Construct the specifier dynamically so non-Deno bundles never treat
-      // Playwright as a required static dependency.
-      const ns = 'npm';
-      const { chromium } = await import(`${ns}:playwright@^1.48.0`);
-      await Deno.stat(chromium.executablePath());
-      return true;
-    } catch {
-      return false;
-    }
-  })();
-  return _hasPlaywrightChromium;
+type PlaywrightChromiumModule = {
+  chromium: {
+    executablePath(): string;
+  };
+};
+
+type PlaywrightChromiumDetectionDeps = {
+  importPlaywright?: () => Promise<PlaywrightChromiumModule>;
+  stat?: (path: string | URL) => Promise<unknown>;
+  getEnv?: (name: string) => string | undefined;
+  /** Structural dir entry for platform-agnostic DI. */
+  readDir?: (
+    path: string | URL,
+  ) => AsyncIterable<{ isDirectory: boolean; name: string }>;
+  logFn?: typeof log;
+};
+
+/** Default env resolver used when DI doesn't supply one. */
+function fallbackGetEnv(name: string): string | undefined {
+  return typeof Deno === 'undefined' ? undefined : Deno.env.get(name);
 }
 
-async function shouldRunBrowserCliCoverage(): Promise<boolean> {
-  const hasChromium = await hasPlaywrightChromium();
-  if (!hasChromium) {
-    const requirePlaywright = typeof Deno !== 'undefined' &&
-      Deno.env.get('GOATDB_REQUIRE_PLAYWRIGHT') === 'true';
+function isWorkerImportFallbackError(error: unknown): boolean {
+  if (!(error instanceof TypeError)) return false;
+  const message = error.message.toLowerCase();
+  // Match the worker npm-specifier failure by stable signal words rather than
+  // one exact upstream sentence.
+  return message.includes('npm specifier') &&
+    (message.includes('non-analyzable') || message.includes('non analyzable'));
+}
+
+async function detectPlaywrightChromium(
+  deps: PlaywrightChromiumDetectionDeps = {},
+): Promise<boolean> {
+  let chromium: PlaywrightChromiumModule['chromium'];
+  try {
+    // Construct the specifier dynamically so non-Deno bundles never treat
+    // Playwright as a required static dependency.
+    if (deps.importPlaywright) {
+      chromium = (await deps.importPlaywright()).chromium;
+    } else {
+      const ns = 'npm';
+      const specifier = `${ns}:playwright@^1.48.0`;
+      chromium = (await import(specifier)).chromium;
+    }
+  } catch (error) {
+    // Only the known worker npm-specifier failure should fall back. Other
+    // import failures stay explicit rather than being misreported as missing
+    // Chromium.
+    if (isWorkerImportFallbackError(error)) {
+      return checkChromiumViaEnvPath(deps);
+    }
+    throw error;
+  }
+  const stat = 'stat' in deps
+    ? deps.stat
+    : (typeof Deno === 'undefined' ? undefined : Deno.stat);
+  if (!stat) return false;
+  try {
+    await stat(chromium.executablePath());
+    return true;
+  } catch {
+    // Import succeeded but binary is missing or unreadable.
+    return false;
+  }
+}
+
+function getOrCreateChromiumDetectionPromise(
+  factory: () => Promise<boolean>,
+): Promise<boolean> {
+  _detectorState.hasChromium ??= factory();
+  return _detectorState.hasChromium;
+}
+
+function hasPlaywrightChromium(): Promise<boolean> {
+  return getOrCreateChromiumDetectionPromise(() =>
+    typeof Deno === 'undefined'
+      ? Promise.resolve(false)
+      : detectPlaywrightChromium()
+  );
+}
+
+/**
+ * Fallback: detect Playwright Chromium by scanning PLAYWRIGHT_BROWSERS_PATH
+ * for a chromium-* cache directory. This only proves that Playwright's browser
+ * cache looks populated enough to attempt the browser CLI path.
+ */
+async function checkChromiumViaEnvPath(
+  deps: Pick<PlaywrightChromiumDetectionDeps, 'getEnv' | 'readDir' | 'logFn'> =
+    {},
+): Promise<boolean> {
+  const getEnv = deps.getEnv ?? fallbackGetEnv;
+  const readDir = 'readDir' in deps
+    ? deps.readDir
+    : (typeof Deno === 'undefined' ? undefined : Deno.readDir);
+  if (!readDir) return false;
+  const browsersPath = getEnv('PLAYWRIGHT_BROWSERS_PATH');
+  if (!browsersPath) return false;
+  try {
+    for await (const entry of readDir(browsersPath)) {
+      if (entry.isDirectory && entry.name.startsWith('chromium-')) {
+        return true;
+      }
+    }
+    return false;
+  } catch (err) {
+    (deps.logFn ?? log)({
+      severity: 'DEBUG',
+      message:
+        `checkChromiumViaEnvPath: failed to scan ${browsersPath}: ${err}`,
+    });
+    return false;
+  }
+}
+
+function resetPlaywrightChromiumDetectionStateForTests(): void {
+  _detectorState.hasChromium = undefined;
+  _detectorState.didWarn = false;
+}
+
+type ShouldRunBrowserCliCoverageDeps = {
+  hasChromium?: () => Promise<boolean>;
+  getEnv?: (name: string) => string | undefined;
+  logFn?: typeof log;
+  /** Mutable box for the one-shot warning flag. Defaults to global _detectorState. */
+  warnState?: { didWarn: boolean };
+};
+
+async function shouldRunBrowserCliCoverage(
+  deps: ShouldRunBrowserCliCoverageDeps = {},
+): Promise<boolean> {
+  const { hasChromium, getEnv, logFn, warnState } = deps;
+  const hasCr = await (hasChromium?.() ?? hasPlaywrightChromium());
+  if (!hasCr) {
+    const requirePlaywright = (getEnv ?? fallbackGetEnv)(
+      'GOATDB_REQUIRE_PLAYWRIGHT',
+    ) === 'true';
     if (requirePlaywright) {
       throw new Error(
         'CI requires Playwright Chromium for browser CLI coverage tests',
       );
     }
-    if (!_didWarnMissingPlaywrightChromium) {
-      log({
+    const warn = warnState ?? _detectorState;
+    if (!warn.didWarn) {
+      (logFn ?? log)({
         severity: 'WARNING',
-        error: 'MissingConfiguration',
         message:
-          'Playwright Chromium not found; browser CLI coverage tests skipped',
+          'Playwright Chromium not found; browser CLI coverage tests skipped (run: deno run -A npm:playwright@^1.48.0 install --with-deps chromium)',
       });
-      _didWarnMissingPlaywrightChromium = true;
+      warn.didWarn = true;
     }
   }
-  return hasChromium;
+  return hasCr;
 }
 
 async function runDenoCommandWithTimeout(args: string[]): Promise<{
