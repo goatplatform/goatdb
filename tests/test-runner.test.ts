@@ -274,6 +274,333 @@ export default function setupTestRunnerTests(): void {
 
   TEST(
     'TestRunner',
+    'Chromium env-path fallback returns false when PLAYWRIGHT_BROWSERS_PATH is unset',
+    async () => {
+      assertTrue(
+        !await checkChromiumViaEnvPath({
+          getEnv: () => undefined,
+        }),
+        'env-path fallback must report unavailable when the browser cache path is unset',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'Chromium env-path fallback handles empty PLAYWRIGHT_BROWSERS_PATH',
+    async () => {
+      assertTrue(
+        !await checkChromiumViaEnvPath({
+          getEnv: () => '',
+        }),
+        'env-path fallback must handle empty browser cache path gracefully',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'Chromium detection promise is created once across repeated calls',
+    async () => {
+      resetPlaywrightChromiumDetectionStateForTests();
+      try {
+        let factoryCalls = 0;
+        const p1 = getOrCreateChromiumDetectionPromise(async () => {
+          ++factoryCalls;
+          return true;
+        });
+        const p2 = getOrCreateChromiumDetectionPromise(async () => {
+          ++factoryCalls;
+          return false;
+        });
+        assertTrue(
+          p1 === p2,
+          'repeated callers must share the same detection promise',
+        );
+        assertEquals(await p1, true);
+        assertEquals(factoryCalls, 1);
+      } finally {
+        resetPlaywrightChromiumDetectionStateForTests();
+      }
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'Chromium env-path fallback detects chromium browser directories',
+    async () => {
+      assertTrue(
+        await checkChromiumViaEnvPath({
+          getEnv: () => '/playwright',
+          readDir: async function* () {
+            yield { isDirectory: true, name: 'firefox-1234' };
+            yield { isDirectory: true, name: 'chromium-1148' };
+          },
+        }),
+        'env-path fallback must detect Playwright Chromium cache directories',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'Chromium env-path fallback ignores non-chromium entries and unreadable directories',
+    async () => {
+      assertTrue(
+        !await checkChromiumViaEnvPath({
+          getEnv: () => '/playwright',
+          readDir: async function* () {
+            yield { isDirectory: true, name: 'firefox-1234' };
+            yield { isDirectory: false, name: 'chromium' };
+          },
+        }),
+        'env-path fallback must not report Chromium for unrelated cache entries',
+      );
+      assertTrue(
+        !await checkChromiumViaEnvPath({
+          getEnv: () => '/playwright',
+          readDir: () => {
+            throw new Error('unreadable');
+          },
+        }),
+        'env-path fallback must degrade to unavailable when the cache directory cannot be read',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'Playwright worker fallback only runs for the known worker npm-specifier failure',
+    async () => {
+      let didReadFallbackDir = false;
+      assertTrue(
+        await detectPlaywrightChromium({
+          importPlaywright: async () => {
+            throw new TypeError(
+              'Worker failed to resolve non analyzable npm specifier',
+            );
+          },
+          getEnv: () => '/playwright',
+          readDir: async function* () {
+            didReadFallbackDir = true;
+            yield { isDirectory: true, name: 'chromium-1148' };
+          },
+        }),
+        'worker import failures must use the env-path fallback',
+      );
+      assertTrue(
+        didReadFallbackDir,
+        'worker fallback must scan PLAYWRIGHT_BROWSERS_PATH',
+      );
+
+      didReadFallbackDir = false;
+      await assertThrows(
+        async () => {
+          await detectPlaywrightChromium({
+            importPlaywright: async () => {
+              throw new TypeError('wrong module shape');
+            },
+            getEnv: () => '/playwright',
+            readDir: async function* () {
+              didReadFallbackDir = true;
+              yield { isDirectory: true, name: 'chromium-1148' };
+            },
+          });
+        },
+        TypeError,
+        'wrong module shape',
+      );
+      assertTrue(
+        !didReadFallbackDir,
+        'unrelated TypeErrors must not scan PLAYWRIGHT_BROWSERS_PATH',
+      );
+
+      await assertThrows(
+        async () => {
+          await detectPlaywrightChromium({
+            importPlaywright: async () => {
+              throw new Error('broken Playwright install');
+            },
+            getEnv: () => '/playwright',
+            readDir: async function* () {
+              didReadFallbackDir = true;
+              yield { isDirectory: true, name: 'chromium-1148' };
+            },
+          });
+        },
+        Error,
+        'broken Playwright install',
+      );
+      assertTrue(
+        !didReadFallbackDir,
+        'non-worker failures must not scan PLAYWRIGHT_BROWSERS_PATH',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'detectPlaywrightChromium returns false when worker fallback has no browser path',
+    async () => {
+      assertTrue(
+        !await detectPlaywrightChromium({
+          importPlaywright: async () => {
+            throw new TypeError(
+              'Worker failed to resolve non analyzable npm specifier',
+            );
+          },
+          getEnv: () => undefined,
+        }),
+        'worker fallback must report unavailable without PLAYWRIGHT_BROWSERS_PATH',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'detectPlaywrightChromium returns false when worker fallback cannot read the browser path',
+    async () => {
+      assertTrue(
+        !await detectPlaywrightChromium({
+          importPlaywright: async () => {
+            throw new TypeError(
+              'Worker failed to resolve non analyzable npm specifier',
+            );
+          },
+          getEnv: () => '/playwright',
+          readDir: undefined,
+        }),
+        'worker fallback must report unavailable when readDir is unavailable',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'detectPlaywrightChromium returns false when stat is unavailable after successful import',
+    async () => {
+      assertTrue(
+        !await detectPlaywrightChromium({
+          importPlaywright: async () => ({
+            chromium: { executablePath: () => '/mock/chromium' },
+          }),
+          stat: undefined,
+        }),
+        'must report unavailable when Playwright import succeeds but stat is unavailable',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'detectPlaywrightChromium returns true when import and stat succeed',
+    async () => {
+      assertTrue(
+        await detectPlaywrightChromium({
+          importPlaywright: async () => ({
+            chromium: { executablePath: () => '/mock/chromium' },
+          }),
+          stat: async () => {},
+        }),
+        'must report available when Playwright import and binary stat both succeed',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'detectPlaywrightChromium returns false when binary stat fails after successful import',
+    async () => {
+      assertTrue(
+        !await detectPlaywrightChromium({
+          importPlaywright: async () => ({
+            chromium: { executablePath: () => '/mock/chromium' },
+          }),
+          stat: async () => {
+            throw new Error('binary not found');
+          },
+        }),
+        'must report unavailable when Playwright import succeeds but binary stat fails',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'browser CLI coverage preflight throws in CI and warns once locally',
+    async () => {
+      resetPlaywrightChromiumDetectionStateForTests();
+      try {
+        let caughtError: unknown;
+        try {
+          await shouldRunBrowserCliCoverage({
+            hasChromium: async () => false,
+            getEnv: (name) =>
+              name === 'GOATDB_REQUIRE_PLAYWRIGHT' ? 'true' : undefined,
+          });
+        } catch (error) {
+          caughtError = error;
+        }
+        assertTrue(
+          caughtError instanceof Error,
+          'CI preflight must throw when Chromium is unavailable',
+        );
+        assertEquals(
+          (caughtError as Error).message,
+          'CI requires Playwright Chromium for browser CLI coverage tests',
+        );
+
+        resetPlaywrightChromiumDetectionStateForTests();
+        const logEntries: Parameters<typeof log>[0][] = [];
+        assertTrue(
+          !await shouldRunBrowserCliCoverage({
+            hasChromium: async () => false,
+            getEnv: () => undefined,
+            logFn: (entry) => {
+              logEntries.push(entry);
+            },
+          }),
+          'local preflight must skip browser coverage when Chromium is unavailable',
+        );
+        assertTrue(
+          !await shouldRunBrowserCliCoverage({
+            hasChromium: async () => false,
+            getEnv: () => undefined,
+            logFn: (entry) => {
+              logEntries.push(entry);
+            },
+          }),
+          'local preflight must stay false across repeated checks',
+        );
+        assertEquals(logEntries.length, 1);
+        assertEquals(logEntries[0]?.severity, 'WARNING');
+
+        assertEquals(
+          logEntries[0]?.message,
+          'Playwright Chromium not found; browser CLI coverage tests skipped (run: deno run -A npm:playwright@^1.48.0 install --with-deps chromium)',
+        );
+
+        logEntries.length = 0;
+        assertTrue(
+          await shouldRunBrowserCliCoverage({
+            hasChromium: async () => true,
+            getEnv: (name) =>
+              name === 'GOATDB_REQUIRE_PLAYWRIGHT' ? 'true' : undefined,
+            logFn: (entry) => {
+              logEntries.push(entry);
+            },
+          }),
+          'preflight must run browser coverage when Chromium is available',
+        );
+        assertEquals(logEntries.length, 0);
+      } finally {
+        resetPlaywrightChromiumDetectionStateForTests();
+      }
+    },
+  );
+
+  TEST(
+    'TestRunner',
     'aggregate filtered run tolerates browser runtime no-match when server runtimes matched',
     () => {
       finalizeFilteredRuntimeOutcomes(
@@ -671,6 +998,38 @@ export default function setupTestRunnerTests(): void {
         elapsedMs,
         kPromptFailureThresholdMs,
         'CLI browser no-match path must fail promptly',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'tests/run.ts surfaces missing --test errors through the browser path',
+    async () => {
+      if (!await shouldRunBrowserCliCoverage()) return;
+      const { code, stderrText, elapsedMs } = await runDenoCommandWithTimeout([
+        'run',
+        '-A',
+        './tests/run.ts',
+        '--runtime=browser',
+        '--test=missing',
+      ]);
+
+      assertEquals(
+        code,
+        EXIT_CODE_NO_MATCH,
+        'CLI browser missing --test path must exit with EXIT_CODE_NO_MATCH',
+      );
+      assertTrue(
+        stderrText.includes(
+          'Test execution failed: No tests matched --test="missing"',
+        ),
+        'CLI browser missing --test path must surface the exact filter error message',
+      );
+      assertLessThan(
+        elapsedMs,
+        kPromptFailureThresholdMs,
+        'CLI browser missing --test path must fail promptly',
       );
     },
   );
