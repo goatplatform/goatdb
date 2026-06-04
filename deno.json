@@ -38,6 +38,7 @@
   },
   "tasks": {
     "build": "deno run -A system-assets/build-sys-assets.ts",
+    "setup:hooks": "git config core.hooksPath .githooks && echo 'Hooks configured. Run `git config core.hooksPath` to verify.'",
     "test": "deno run -A tests/run.ts",
     "test:smoke": "deno run -A tests/run.ts --runtime=deno --suite=SecurityBoundaries",
     "bench": "deno run -A benchmarks/run.ts",

@@ -54,6 +54,9 @@ with [Claude Code](https://www.anthropic.com/claude-code),
 git clone https://github.com/goatplatform/goatdb.git
 cd goatdb
 
+# Register the pre-commit hook (auto-remediates stale system assets)
+deno task setup:hooks
+
 # Verify cross-platform functionality
 deno task test   # Tests across Deno, Node.js, and browsers
 deno task bench  # Performance validation
@@ -62,6 +65,27 @@ deno task build  # Compile optimizations
 # Documentation site
 deno task docs:serve  # Docusaurus docs server
 ```
+
+:::tip[Hooks Auto-Remediate]
+The pre-commit hook runs `deno task build` on every commit. If a source file
+that the system worker depends on changed, the hook automatically regenerates
+`system-assets/assets.json` and stages the update — no manual rebuild needed.
+The hook never blocks a commit; only a genuine build error (broken TypeScript,
+missing dependency) will fail.
+
+To verify hooks are active:
+```bash
+git config core.hooksPath
+# → .githooks
+```
+
+To skip the hook for an emergency commit:
+```bash
+git commit --no-verify
+```
+
+CI will still catch stale assets even with `--no-verify`.
+:::
 
 ## Testing & Performance
 

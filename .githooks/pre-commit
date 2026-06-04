@@ -1,0 +1,31 @@
+#!/bin/sh
+# Pre-commit hook — auto-regenerates GoatDB system assets.
+#
+# Whenever source files that the system worker depends on change, this hook
+# runs `deno task build` to regenerate system-assets/assets.json. If the file
+# changed, it stages the new version automatically — the commit proceeds with
+# the correct artifact.
+#
+# Design: auto-remediate, never block. The only case that blocks the commit is
+# a genuine build failure (broken TypeScript, missing dependency, etc.).
+#
+# Setup: Run `git config core.hooksPath .githooks` once per clone.
+#
+# To skip: `git commit --no-verify` (CI will still catch stale assets).
+
+set -e
+
+echo "-> [pre-commit] checking system assets..."
+echo "-> [pre-commit] running: deno task build"
+
+# Regenerate system assets from source
+deno task build 2>&1
+
+# If assets.json changed relative to the index, stage the regeneration
+if ! git diff --exit-code -- system-assets/assets.json > /dev/null 2>&1; then
+    git add system-assets/assets.json
+    echo "-> [pre-commit] assets.json regenerated and re-staged (source files changed)"
+    echo "-> [pre-commit]    run 'git diff --cached -- system-assets/assets.json' to review changes"
+else
+    echo "-> [pre-commit] assets.json is up to date"
+fi
