@@ -898,7 +898,7 @@ export default function setupCliCompileTests() {
 
       assertTrue(
         /^http:\/\/debug\.example:\d+$/.test(sessionUrl),
-        `startDebugServer must expose the chosen server origin, got ${sessionUrl}`,
+        `startDebugServer must expose the chosen server origin without path routing, got ${sessionUrl}`,
       );
     },
   );

@@ -53,8 +53,9 @@ export type DomainConfig = {
    * to the correct URL. It enables a single server instance to serve multiple
    * organizations in a multi-tenant deployment.
    *
-   * A typical easy implementation is to place each organization under its own
-   * sub-path or sub-domain of the main service.
+   * The returned value is treated as an origin throughout the server and debug
+   * tooling. Use a dedicated origin or sub-domain per organization, not a
+   * path-prefixed route.
    *
    * @param orgId The organization id to resolve.
    * @returns A fully qualified URL for this organization.
