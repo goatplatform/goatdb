@@ -1,5 +1,5 @@
 import { TEST, type TestSuite } from './mod.ts';
-import { assertEquals } from './asserts.ts';
+import { assertEquals, assertTrue } from './asserts.ts';
 import type { FileWatchEvent } from '../base/file-watcher.ts';
 import { shouldRebuildAfterPathChange } from '../base/file-watcher.ts';
 
@@ -24,7 +24,7 @@ async function waitForDeleted(
       fs.accessSync(filePath);
     } catch (err) {
       // Re-throw unexpected errors (EACCES, EBUSY, etc.), not just ENOENT
-      const nodeErr = err as {code?: string};
+      const nodeErr = err as { code?: string };
       if (nodeErr.code !== 'ENOENT') throw nodeErr;
       return; // file is gone
     }
@@ -494,6 +494,43 @@ export function setupFileWatcherTests(): void {
 
   TEST(
     'FileWatcher',
+    'emits any when an initially empty root directory is deleted',
+    async (ctx: TestSuite) => {
+      const fs = await import('node:fs');
+      const dir = await ctx.tempDir('poll-empty-root-del');
+
+      const { watcher, waitForCycles } = await createWatcher(
+        fs as typeof import('node:fs'),
+        dir,
+        200,
+      );
+      try {
+        const { events, done } = startCollecting(watcher);
+        await waitForCycles(1);
+        fs.rmSync(dir, { recursive: true, force: true });
+
+        await waitForCycles(2);
+        watcher.close();
+        await done;
+
+        assertTrue(
+          events.length >= 1,
+          'expected at least one event for empty-root deletion',
+        );
+        assertEquals(events[0].paths[0], dir, 'expected root directory path');
+        assertEquals(
+          events[0].kind,
+          'any',
+          'expected any kind for root deletion',
+        );
+      } finally {
+        watcher.close();
+      }
+    },
+  );
+
+  TEST(
+    'FileWatcher',
     'continues polling after root directory deletion',
     async (ctx: TestSuite) => {
       const fs = await import('node:fs');
@@ -520,9 +557,21 @@ export function setupFileWatcherTests(): void {
         watcher.close();
         await done;
 
-        assertEquals(events.length >= 2, true, 'expected deletion and recreate events');
-        assertEquals(events[0].paths[0], dir, 'expected root deletion event first');
-        assertEquals(events[0].kind, 'any', 'expected any kind for root deletion');
+        assertEquals(
+          events.length >= 2,
+          true,
+          'expected deletion and recreate events',
+        );
+        assertEquals(
+          events[0].paths[0],
+          dir,
+          'expected root deletion event first',
+        );
+        assertEquals(
+          events[0].kind,
+          'any',
+          'expected any kind for root deletion',
+        );
         const recreatedEvent = events.find((event) =>
           event.paths[0] === recreatedFile && event.kind === 'create'
         );

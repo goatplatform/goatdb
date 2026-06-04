@@ -266,6 +266,7 @@ export async function createPollingWatcher(
   let pollerClosed = false;
   let previousState: Map<string, number>;
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let rootMissing = false;
   // Throttle per-path to at most one DEBUG log per 60s to avoid log floods
   // from persistently broken paths (e.g., permission denied, raced deletion).
   const lastFailureLog = new Map<string, number>();
@@ -325,29 +326,37 @@ export async function createPollingWatcher(
     return result;
   }
 
+  function rootExists(): boolean {
+    try {
+      fs.readdirSync(dir);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // Use recursive setTimeout instead of setInterval to prevent concurrent
   // scan() executions if one cycle takes longer than pollMs.
   function poll(): void {
     if (pollerClosed) return;
     const currentState = scan();
 
-    // If scan returns empty but previously had files, check if the root dir was
-    // deleted or became unreadable. If so, emit one high-level event instead of
-    // N remove events. Otherwise let the normal loop handle individual deletions.
-    if (previousState.size > 0 && currentState.size === 0) {
-      try {
-        fs.readdirSync(dir); // dir still exists, fall through to normal handling
-      } catch {
-        // dir deleted or unreadable
+    // Empty snapshots are ambiguous: the tree may be empty, or the root may be
+    // gone. Emit one root-level event on the transition to missing, even when
+    // the previous snapshot was also empty.
+    if (currentState.size === 0 && !rootExists()) {
+      if (!rootMissing) {
         pushEvent({ paths: [dir], kind: 'any' });
-        previousState = currentState;
-        onPollCycle?.();
-        if (!pollerClosed) {
-          timeoutId = setTimeout(poll, pollMs);
-        }
-        return;
+        rootMissing = true;
       }
+      previousState = currentState;
+      onPollCycle?.();
+      if (!pollerClosed) {
+        timeoutId = setTimeout(poll, pollMs);
+      }
+      return;
     }
+    rootMissing = false;
 
     // New or modified files
     for (const [filePath, mtime] of currentState) {
