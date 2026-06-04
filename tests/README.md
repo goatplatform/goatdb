@@ -34,8 +34,8 @@ deno task test
   function.
 - **Automatic Cleanup:** Temporary resources are managed and cleaned up
   automatically after each suite.
-- **Flexible Execution:** Tests can be run in Deno, Node.js, or both, with CLI
-  options to filter by suite or test name.
+- **Flexible Execution:** Tests can be run in Deno, Node.js, browser, or
+  combinations thereof, with CLI options to filter by suite or test name.
 
 ## How It Works
 
@@ -63,8 +63,8 @@ deno task test
 
 ### 3. Running Tests
 
-- The main entry point (`tests/tests-entry.ts`) calls all setup functions to
-  register tests.
+- The main entry points (`tests/tests-entry-server.ts` and
+  `tests/tests-entry-browser.ts`) call setup functions to register tests.
 - The test runner (`tests/mod.ts`) executes all suites or a filtered subset,
   logging results and timings.
 - CLI options (see `tests/run.ts`) allow running specific suites, tests, or
@@ -112,8 +112,8 @@ export default function setup() {
 ### Runtime-Specific Tests
 
 Tests must NEVER have platform checks (`if (!isBrowser())`, `if (isNode())`,
-etc.) inside their bodies or wrapped around individual `TEST()` calls.
-Instead, gate test **registration** at the caller level:
+etc.) inside their bodies or wrapped around individual `TEST()` calls. Instead,
+gate test **registration** at the caller level:
 
 ```typescript
 // ✅ CORRECT — setup function is pure, caller decides which runtimes use it
@@ -134,6 +134,7 @@ if (!isBrowser()) {
 ```
 
 ❌ WRONG — platform check in test body (silent no-op, wastes execution):
+
 ```typescript
 TEST('Node', 'works', async (ctx) => {
   if (!isNode()) return;
@@ -142,6 +143,7 @@ TEST('Node', 'works', async (ctx) => {
 ```
 
 ❌ WRONG — platform check around each TEST() (repetitive, noisy):
+
 ```typescript
 if (!isBrowser()) {
   TEST('Server', 'works', async (ctx) => { ... });
