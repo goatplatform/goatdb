@@ -2,7 +2,12 @@ import { TEST } from './mod.ts';
 import { GoatDB } from '../db/db.ts';
 import { Server } from '../net/server/server.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
-import { assertEquals, assertExists, assertLessThan } from './asserts.ts';
+import {
+  assertEquals,
+  assertExists,
+  assertLessThan,
+  assertThrows,
+} from './asserts.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
 import * as path from '../base/path.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
@@ -126,6 +131,55 @@ export default function setup(): void {
           await client.close();
         }
 
+        await server.stop();
+      }
+    },
+  );
+
+  TEST(
+    'MinimalSync',
+    'server start keeps shutdown guards closed while awaiting a prior stop',
+    async (ctx) => {
+      const serverPath = await ctx.tempDir('sync-server-stop-guard');
+      const { domain } = createTestDomainConfig();
+      const buildInfo = await generateBuildInfo(
+        path.join((await FileImplGet()).getCWD(), 'deno.json'),
+      );
+      const server = new Server<Schema>({
+        path: serverPath,
+        orgId: 'test-org',
+        port: 0,
+        registry: testRegistry,
+        buildInfo,
+        domain,
+      });
+      let releaseClose: (() => void) | undefined;
+
+      try {
+        const services = await server.servicesForOrganization('test-org');
+        const originalClose = services.db.close.bind(services.db);
+        const closeGate = new Promise<void>((resolve) => {
+          releaseClose = resolve;
+        });
+        services.db.close = async () => {
+          await closeGate;
+          return await originalClose();
+        };
+
+        const stopPromise = server.stop();
+        const restartPromise = server.start();
+        await sleep(10);
+
+        await assertThrows(
+          () => server.servicesForOrganization('test-org'),
+          Error,
+          'Service Unavailable',
+        );
+
+        releaseClose?.();
+        await Promise.all([stopPromise, restartPromise]);
+      } finally {
+        releaseClose?.();
         await server.stop();
       }
     },

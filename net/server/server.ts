@@ -627,23 +627,17 @@ export class Server<US extends Schema> {
    * @returns Promise that resolves when server is fully started
    */
   async start(): Promise<void> {
-    // Detach any prior stop promise before awaiting it. By clearing
-    // _stopPromise before the await, a concurrent stop() call during
-    // that await cannot return a stale promise from an old cycle — it
-    // will create its own fresh _stopPromise with _stopping = true.
-    this._stopping = false;
     const priorStop = this._stopPromise;
-    this._stopPromise = undefined;
     if (priorStop) {
       await priorStop;
-    }
-    // If a concurrent stop() won the race during the await, bail out.
-    if (this._stopping) {
-      return;
+      if (this._stopPromise === priorStop) {
+        this._stopPromise = undefined;
+      }
     }
     if (this._abortController) {
       return; // Already running
     }
+    this._stopping = false;
 
     // Handle self-signed certificate generation if needed
     if (this._baseOptions.https && 'selfSigned' in this._baseOptions.https) {
