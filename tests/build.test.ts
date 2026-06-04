@@ -2,7 +2,11 @@ import { TEST } from './mod.ts';
 import { assertEquals } from './asserts.ts';
 import * as path from '../base/path.ts';
 import { isBrowser } from '../base/common.ts';
-import { normalizeBuildEntryPath, resolveBuildEntryPath } from '../build.ts';
+import {
+  bundleResultFromBuildResult,
+  normalizeBuildEntryPath,
+  resolveBuildEntryPath,
+} from '../build.ts';
 
 export default function setupBuildTests(): void {
   // normalizeBuildEntryPath contract tests (input-driven, no OS gating)
@@ -203,4 +207,33 @@ export default function setupBuildTests(): void {
       },
     );
   }
+
+  TEST(
+    'Build',
+    'bundleResultFromBuildResult uses the last output segment for bundle and asset keys',
+    () => {
+      const result = bundleResultFromBuildResult({
+        outputFiles: [
+          {
+            path: '/tmp/output/project/output/app.js',
+            text: 'console.log("app")',
+            contents: new TextEncoder().encode('console.log("app")'),
+          },
+          {
+            path: '/tmp/output/project/output/app.js.map',
+            text: '{"version":3}',
+            contents: new TextEncoder().encode('{"version":3}'),
+          },
+          {
+            path: '/tmp/output/project/output/assets/font.woff2',
+            text: '',
+            contents: new Uint8Array([1, 2, 3]),
+          },
+        ],
+      });
+      assertEquals(result.bundles.app.source, 'console.log("app")');
+      assertEquals(result.bundles.app.map, '{"version":3}');
+      assertEquals(Array.from(result.assets['/assets/font.woff2']), [1, 2, 3]);
+    },
+  );
 }

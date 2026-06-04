@@ -127,8 +127,13 @@ export const kAssetNamesPattern = 'assets/[name]-[hash]';
 const textDecoder = new TextDecoder();
 
 function outputPathForFile(filePath: string): string {
-  const outputMatch = filePath.match(/(?:^|[/\\])output[/\\](.+)$/);
-  return (outputMatch?.[1] ?? path.basename(filePath)).replaceAll('\\', '/');
+  const normalizedPath = filePath.replaceAll('\\', '/');
+  const parts = normalizedPath.split('/');
+  const outputIndex = parts.lastIndexOf('output');
+  if (outputIndex >= 0 && outputIndex + 1 < parts.length) {
+    return parts.slice(outputIndex + 1).join('/');
+  }
+  return path.basename(normalizedPath);
 }
 
 function bundleKeyForFile(filePath: string): string {
