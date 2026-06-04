@@ -353,7 +353,10 @@ export default function setupCliCompileTests() {
       const second = getCachedImport(state, importer);
       // Identity check: the observable contract is that concurrent callers get
       // the same promise, not just the same resolved value after the fact.
-      assertTrue(first === second, 'concurrent callers must receive the same promise object');
+      assertTrue(
+        first === second,
+        'concurrent callers must receive the same promise object',
+      );
 
       resolveImport('ok');
       assertEquals(await first, 'ok');
@@ -1714,6 +1717,73 @@ export default function setupCliCompileTests() {
         Error,
         'Server entry not found: //server/share/missing-server.ts',
       );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'compile forwards esbuildPlugins before config validation',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('compile-esbuild-plugins');
+      const runtime = getRuntime();
+      const serverEntry = path.join(dir, 'server.ts');
+      const clientEntry = path.join(dir, 'client.ts');
+      const markerPath = path.join(dir, 'plugin-marker.txt');
+      const missingConfigPath = path.join(
+        dir,
+        runtime.id === 'node' ? 'missing-package.json' : 'missing-deno.json',
+      );
+      await writeTextFile(serverEntry, 'export {};\n');
+      await writeTextFile(
+        clientEntry,
+        `import { __sentinel__ } from 'testplugin:sentinel';\nexport const x = __sentinel__;\n`,
+      );
+      const plugin: BuildPluginLike = {
+        name: 'compile-forwarding-plugin',
+        setup(build) {
+          build.onStart(async () => {
+            await writeTextFile(markerPath, 'seen\n');
+          });
+          build.onResolve(
+            { filter: /^testplugin:/ },
+            (args: TestResolveArgs): TestResolveResult => ({
+              path: args.path,
+              namespace: 'testplugin',
+            }),
+          );
+          build.onLoad(
+            { filter: /.*/, namespace: 'testplugin' },
+            (): TestLoadResult => ({
+              contents: 'export const __sentinel__ = "compile-plugin";',
+              loader: 'js',
+            }),
+          );
+        },
+      };
+
+      try {
+        await assertThrows(
+          async () => {
+            await compile({
+              buildDir: path.join(dir, 'build'),
+              serverEntry,
+              jsPath: clientEntry,
+              esbuildPlugins: [plugin],
+              ...(runtime.id === 'node'
+                ? { packageJson: missingConfigPath }
+                : { denoJson: missingConfigPath }),
+            });
+          },
+          Error,
+          `Config file not found at "${missingConfigPath}"`,
+        );
+        assertTrue(
+          await pathExists(markerPath),
+          'compile() must forward esbuildPlugins into the client bundling path before config validation',
+        );
+      } finally {
+        await stopBackgroundCompiler();
+      }
     },
   );
 
