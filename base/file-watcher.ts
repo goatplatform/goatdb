@@ -303,10 +303,6 @@ export async function createPollingWatcher(
       }
       for (const entry of entries) {
         if (kDefaultIgnored.includes(entry)) continue;
-        // Skip hidden files/dirs in polling for performance
-        // (chokidar detects them, but shouldRebuildAfterPathChange filters them;
-        //  this avoids unnecessary readdir+stat in the fallback watcher)
-        if (entry.startsWith('.')) continue;
         const fullPath = join(currentDir, entry);
         try {
           const stat = fs.lstatSync(fullPath);

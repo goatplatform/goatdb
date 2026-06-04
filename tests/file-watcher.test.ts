@@ -382,7 +382,7 @@ export function setupFileWatcherTests(): void {
 
   TEST(
     'FileWatcher',
-    'polling watcher skips hidden files',
+    'polling watcher emits hidden files so callers can filter them',
     async (ctx: TestSuite) => {
       const fs = await import('node:fs');
       const path = await import('node:path');
@@ -395,13 +395,20 @@ export function setupFileWatcherTests(): void {
       try {
         const { events, done } = startCollecting(watcher);
         await waitForCycles(1);
-        fs.writeFileSync(path.join(dir, '.hidden.txt'), 'ignored');
+        const hiddenFile = path.join(dir, '.hidden.txt');
+        fs.writeFileSync(hiddenFile, 'observed');
 
         await waitForCycles(2);
         watcher.close();
         await done;
 
-        assertEquals(events.length, 0, 'expected no events from hidden files');
+        assertEquals(events.length, 1, 'expected one event from hidden file');
+        assertEquals(
+          events[0].paths[0],
+          hiddenFile,
+          'expected hidden file path',
+        );
+        assertEquals(events[0].kind, 'create', 'expected create kind');
       } finally {
         watcher.close();
       }
@@ -410,7 +417,7 @@ export function setupFileWatcherTests(): void {
 
   TEST(
     'FileWatcher',
-    'polling watcher skips hidden directories',
+    'polling watcher emits files inside hidden directories so callers can filter them',
     async (ctx: TestSuite) => {
       const fs = await import('node:fs');
       const path = await import('node:path');
@@ -424,8 +431,9 @@ export function setupFileWatcherTests(): void {
         const { events, done } = startCollecting(watcher);
         await waitForCycles(1);
         const hiddenDir = path.join(dir, '.hidden');
+        const hiddenFile = path.join(hiddenDir, 'file.txt');
         fs.mkdirSync(hiddenDir, { recursive: true });
-        fs.writeFileSync(path.join(hiddenDir, 'file.txt'), 'ignored');
+        fs.writeFileSync(hiddenFile, 'observed');
 
         await waitForCycles(2);
         watcher.close();
@@ -433,9 +441,15 @@ export function setupFileWatcherTests(): void {
 
         assertEquals(
           events.length,
-          0,
-          'expected no events from hidden directories',
+          1,
+          'expected one event from hidden directory',
         );
+        assertEquals(
+          events[0].paths[0],
+          hiddenFile,
+          'expected hidden file path',
+        );
+        assertEquals(events[0].kind, 'create', 'expected create kind');
       } finally {
         watcher.close();
       }
