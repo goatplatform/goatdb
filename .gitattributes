@@ -1,2 +1,3 @@
 system-assets/assets.json   text eol=lf
 *.ts                        text eol=lf
+*.yml                       text eol=lf
