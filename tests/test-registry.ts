@@ -36,7 +36,7 @@ import setupClusterLatency from './cluster-latency.test.ts';
 import setupCliInitTests, { setupCliInitBuildTests } from './cli-init.test.ts';
 import setupCliCompileTests from './cli-compile.test.ts';
 import setupPathTests from './path.test.ts';
-import setupBuildTests from './build.test.ts';
+import setupBuildTests, { setupBuildServerTests } from './build.test.ts';
 import setupRuntimeTests, {
   setupRuntimeDenoTests,
   setupRuntimeNodeTests,
@@ -104,6 +104,9 @@ async function registerAllTestsImpl(): Promise<void> {
   setupItemPath(); // Path validation and parsing logic
   setupPathTests(); // Cross-platform path utilities
   setupBuildTests(); // Build utility contracts (normalizeBuildEntryPath, etc.)
+  if (!isBrowser()) {
+    setupBuildServerTests(); // File URL decoding needs server filesystem APIs
+  }
   setupFileWatcherUnitTests(); // File watcher path-filtering logic (pure logic, no I/O)
   if (isDeno()) {
     setupBuildDenoTests(); // Deno-only build coverage that imports Deno-only modules
@@ -153,8 +156,12 @@ async function registerAllTestsImpl(): Promise<void> {
   setupJsonLogFormats(); // JSONLog storage format (GOAT binary + JSONL)
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
+  if (isDeno()) {
+    setupFileWatcherDenoTests(); // Deno.watchFs smoke coverage
+  }
   if (isNode()) {
     setupFileWatcherTests(); // Polling watcher tests (~500ms each)
+    setupFileWatcherNativeNodeTests(); // Runtime-selected Node watcher coverage
   }
   setupLiveQuery(); // Live query membership updates on ManagedItem edits
   setupWriteFailure(); // WriteFailure event after 3 consecutive I/O failures

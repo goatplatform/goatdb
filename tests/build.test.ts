@@ -1,7 +1,6 @@
 import { TEST } from './mod.ts';
 import { assertEquals } from './asserts.ts';
 import * as path from '../base/path.ts';
-import { isBrowser } from '../base/common.ts';
 import {
   bundleResultFromBuildResult,
   normalizeBuildEntryPath,
@@ -103,23 +102,6 @@ export default function setupBuildTests(): void {
     },
   );
 
-  if (!isBrowser()) {
-    TEST(
-      'Build',
-      'resolveBuildEntryPath decodes local file URLs to native paths',
-      () => {
-        assertEquals(
-          resolveBuildEntryPath('file:///C:/Users/foo/entry.ts'),
-          'C:/Users/foo/entry.ts',
-        );
-        assertEquals(
-          resolveBuildEntryPath('file:///tmp/entry.ts'),
-          '/tmp/entry.ts',
-        );
-      },
-    );
-  }
-
   TEST(
     'Build',
     'resolveBuildEntryPath preserves UNC entry specifiers without corruption',
@@ -195,19 +177,6 @@ export default function setupBuildTests(): void {
     );
   });
 
-  if (!isBrowser()) {
-    TEST(
-      'Build',
-      'resolveBuildEntryPath preserves UNC file:// URL identity',
-      () => {
-        assertEquals(
-          resolveBuildEntryPath('file://server/share/file.ts'),
-          'file://server/share/file.ts',
-        );
-      },
-    );
-  }
-
   TEST(
     'Build',
     'bundleResultFromBuildResult uses the last output segment for bundle and asset keys',
@@ -234,6 +203,34 @@ export default function setupBuildTests(): void {
       assertEquals(result.bundles.app.source, 'console.log("app")');
       assertEquals(result.bundles.app.map, '{"version":3}');
       assertEquals(Array.from(result.assets['/assets/font.woff2']), [1, 2, 3]);
+    },
+  );
+}
+
+export function setupBuildServerTests(): void {
+  TEST(
+    'Build',
+    'resolveBuildEntryPath decodes local file URLs to native paths',
+    () => {
+      assertEquals(
+        resolveBuildEntryPath('file:///C:/Users/foo/entry.ts'),
+        'C:/Users/foo/entry.ts',
+      );
+      assertEquals(
+        resolveBuildEntryPath('file:///tmp/entry.ts'),
+        '/tmp/entry.ts',
+      );
+    },
+  );
+
+  TEST(
+    'Build',
+    'resolveBuildEntryPath preserves UNC file:// URL identity',
+    () => {
+      assertEquals(
+        resolveBuildEntryPath('file://server/share/file.ts'),
+        'file://server/share/file.ts',
+      );
     },
   );
 }
