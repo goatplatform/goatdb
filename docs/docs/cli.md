@@ -225,14 +225,13 @@ If you need to embed a debug server in a custom script:
 
 `startDebugServer()` supports Deno and Node.js. On Deno it uses the Deno loader;
 on Node.js it uses GoatDB's browser-target plugin stack. Runtime config
-selection is runtime-specific: Deno reads `deno.json`, Node.js reads
-`package.json`, unless you pass `denoJson` or `packageJson` explicitly. By
-default it opens the local URL in your browser after startup; pass
-`openBrowser: false` for embedded or test usage.
-`onReady({ server, url,
-stop })` runs after listening begins, `url` is the
-chosen server origin, and `stop()` is safe to call more than once. Only one
-active debug server instance is supported at a time.
+selection is runtime-specific: Deno reads `deno.json` or an explicit `denoJson`,
+Node.js reads `package.json` or an explicit `packageJson`. By default it opens
+the local URL in your browser after startup; pass `openBrowser: false` for
+embedded or test usage. `onReady({ server, url,
+stop })` runs after listening
+begins, `url` is the chosen server origin, and `stop()` is safe to call more
+than once. Only one active debug server instance is supported at a time.
 
 ```typescript
 import { startDebugServer } from '@goatdb/goatdb/server/build';
