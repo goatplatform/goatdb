@@ -1,6 +1,7 @@
 import { assertEquals, assertExists, assertTrue } from './asserts.ts';
 import { TEST } from './mod.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
+import { setTestAppendFailureHook } from '../db/db.ts';
 
 // Minimal schema for generating commits.
 const kWriteFailSchema = {
@@ -19,7 +20,16 @@ export default function setup(): void {
     'WriteFailure',
     'emits WriteFailure with correct payload after 3 consecutive I/O failures',
     async (ctx) => {
-      const db = await ctx.createDB('write-fail-3x', { registry: kRegistry });
+      // Mutable counter — starts at 0 (off), test flips it to 3 after the
+      // first successful flush.
+      const state = { failuresLeft: 0 };
+      const db = await ctx.createDB('write-fail-3x', {
+        registry: kRegistry,
+      });
+      setTestAppendFailureHook(
+        db,
+        () => state.failuresLeft > 0 && state.failuresLeft-- > 0,
+      );
       const repoPath = '/data/items';
       const failureEvents: unknown[] = [];
       db.attach('WriteFailure', (detail) => {
@@ -36,9 +46,8 @@ export default function setup(): void {
         await db.flush(repoPath);
         assertEquals(failureEvents.length, 0, 'no failure after first flush');
 
-        // Force the next MAX_WRITE_FAILURES (3) append calls to throw, which
-        // is the threshold that triggers the WriteFailure event.
-        db._testForceAppendFailures = 3;
+        // Activate 3 forced failures for the next flush.
+        state.failuresLeft = 3;
 
         // Generate a pending commit and flush — _flushFileWithRetry loops 3
         // times, consuming all 3 forced failures, then emits WriteFailure.
@@ -65,6 +74,7 @@ export default function setup(): void {
         assertEquals(detail.repoPath, repoPath);
         assertExists(detail.error);
       } finally {
+        setTestAppendFailureHook(db, undefined);
         await db.flushAll();
         await db.close();
       }
@@ -75,9 +85,14 @@ export default function setup(): void {
     'WriteFailure',
     'partial failures below threshold do not fire WriteFailure',
     async (ctx) => {
+      const state = { failuresLeft: 0 };
       const db = await ctx.createDB('write-fail-partial', {
         registry: kRegistry,
       });
+      setTestAppendFailureHook(
+        db,
+        () => state.failuresLeft > 0 && state.failuresLeft-- > 0,
+      );
       const repoPath = '/data/items';
       const failureEvents: unknown[] = [];
       db.attach('WriteFailure', (detail) => {
@@ -92,8 +107,8 @@ export default function setup(): void {
         await item.commit();
         await db.flush(repoPath);
 
-        // Force only 2 failures (below the 3-strike threshold).
-        db._testForceAppendFailures = 2;
+        // Activate only 2 failures (below the 3-strike threshold).
+        state.failuresLeft = 2;
         item.set('value', 'updated');
         await db.flush(repoPath);
 
@@ -103,6 +118,7 @@ export default function setup(): void {
           'WriteFailure must not fire for partial failures',
         );
       } finally {
+        setTestAppendFailureHook(db, undefined);
         await db.flushAll();
         await db.close();
       }
@@ -113,9 +129,14 @@ export default function setup(): void {
     'WriteFailure',
     'database remains usable after WriteFailure event',
     async (ctx) => {
+      const state = { failuresLeft: 0 };
       const db = await ctx.createDB('write-fail-recovery', {
         registry: kRegistry,
       });
+      setTestAppendFailureHook(
+        db,
+        () => state.failuresLeft > 0 && state.failuresLeft-- > 0,
+      );
       const repoPath = '/data/items';
       const failureEvents: unknown[] = [];
       db.attach('WriteFailure', (detail) => {
@@ -131,13 +152,14 @@ export default function setup(): void {
         await item1.commit();
         await db.flush(repoPath);
 
-        // Trigger WriteFailure with 3 consecutive failures.
-        db._testForceAppendFailures = 3;
+        // Activate 3 failures to trigger WriteFailure.
+        state.failuresLeft = 3;
         item1.set('value', 'doomed');
         await db.flush(repoPath);
         assertEquals(failureEvents.length, 1, 'WriteFailure should have fired');
 
         // After the failure, create a new item and verify it persists.
+        // failuresLeft is now 0 so the next flush succeeds.
         const item2 = db.create('/data/items/item-r2', kWriteFailSchema, {
           value: 'survivor',
         });
@@ -150,6 +172,7 @@ export default function setup(): void {
           'new item should be readable',
         );
       } finally {
+        setTestAppendFailureHook(db, undefined);
         await db.flushAll();
         await db.close();
       }
