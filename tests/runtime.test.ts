@@ -8,14 +8,13 @@ import {
   getRegisteredAdapters,
   getRuntime,
 } from '../base/runtime/index.ts';
-import { browserOpenCommand } from '../base/runtime/browser-open.ts';
 import {
-  getGlobalLoggerStreams,
-  type LogEntry,
-  type LogStream,
-  setGlobalLoggerStreams,
-} from '../logging/log.ts';
+  browserOpenCommand,
+  withTestBrowserOpenCommand,
+} from '../base/runtime/browser-open.ts';
+import type { LogEntry } from '../logging/log.ts';
 import type { NormalizedLogEntry } from '../logging/entry.ts';
+import { withLogCapture } from './test-utils.ts';
 
 declare const __BUNDLE_TARGET__: string | undefined;
 
@@ -145,9 +144,11 @@ export default function setupRuntimeTests(): void {
     'Runtime',
     'browser adapter logs unsupported browser opening',
     async () => {
-      const captured = await withCapturedLogs(() =>
-        BrowserAdapter.openBrowser('http://localhost:1234')
-      );
+      let captured: NormalizedLogEntry<LogEntry>[] = [];
+      await withLogCapture(async (c) => {
+        captured = c;
+        await BrowserAdapter.openBrowser('http://localhost:1234');
+      });
       const warnings = captured.filter((e) =>
         e.severity === 'WARNING' &&
         e.error === 'MissingConfiguration' &&
@@ -181,22 +182,6 @@ export default function setupRuntimeTests(): void {
   // or accessing internal closure state, which is invasive.
 }
 
-function withCapturedLogs<T>(
-  fn: () => Promise<T>,
-): Promise<NormalizedLogEntry<LogEntry>[]> {
-  const captured: NormalizedLogEntry<LogEntry>[] = [];
-  const stream: LogStream = {
-    appendEntry(e) {
-      captured.push(e);
-    },
-  };
-  const previousStreams = getGlobalLoggerStreams();
-  setGlobalLoggerStreams([stream]);
-  return fn().finally(() => setGlobalLoggerStreams(previousStreams)).then(() =>
-    captured
-  );
-}
-
 /**
  * Runtime tests that only apply to the Deno runtime.
  * Gated at the registry/entry-point level.
@@ -218,25 +203,26 @@ export function setupRuntimeDenoTests(): void {
     'Runtime',
     'deno adapter logs unsupported browser opening',
     async () => {
-      const originalGetOS = DenoAdapter.getOS;
-      try {
-        DenoAdapter.getOS = () => 'unknown';
-        const captured = await withCapturedLogs(() =>
-          DenoAdapter.openBrowser('http://localhost:1234')
-        );
-        const warnings = captured.filter((e) =>
-          e.severity === 'WARNING' &&
-          e.error === 'MissingConfiguration' &&
-          e.message?.includes('Unable to open browser on unsupported OS')
-        );
-        assertEquals(
-          warnings.length,
-          1,
-          'Deno adapter should report unsupported browser opening',
-        );
-      } finally {
-        DenoAdapter.getOS = originalGetOS;
-      }
+      await withTestBrowserOpenCommand(
+        () => undefined,
+        async () => {
+          let captured: NormalizedLogEntry<LogEntry>[] = [];
+          await withLogCapture(async (c) => {
+            captured = c;
+            await DenoAdapter.openBrowser('http://localhost:1234');
+          });
+          const warnings = captured.filter((e) =>
+            e.severity === 'WARNING' &&
+            e.error === 'MissingConfiguration' &&
+            e.message?.includes('Unable to open browser on unsupported OS')
+          );
+          assertEquals(
+            warnings.length,
+            1,
+            'Deno adapter should report unsupported browser opening',
+          );
+        },
+      );
     },
   );
 }
@@ -261,25 +247,26 @@ export function setupRuntimeNodeTests(): void {
     'Runtime',
     'node adapter logs unsupported browser opening',
     async () => {
-      const originalGetOS = NodeAdapter.getOS;
-      try {
-        NodeAdapter.getOS = () => 'unknown';
-        const captured = await withCapturedLogs(() =>
-          NodeAdapter.openBrowser('http://localhost:1234')
-        );
-        const warnings = captured.filter((e) =>
-          e.severity === 'WARNING' &&
-          e.error === 'MissingConfiguration' &&
-          e.message?.includes('Unable to open browser on unsupported OS')
-        );
-        assertEquals(
-          warnings.length,
-          1,
-          'Node adapter should report unsupported browser opening',
-        );
-      } finally {
-        NodeAdapter.getOS = originalGetOS;
-      }
+      await withTestBrowserOpenCommand(
+        () => undefined,
+        async () => {
+          let captured: NormalizedLogEntry<LogEntry>[] = [];
+          await withLogCapture(async (c) => {
+            captured = c;
+            await NodeAdapter.openBrowser('http://localhost:1234');
+          });
+          const warnings = captured.filter((e) =>
+            e.severity === 'WARNING' &&
+            e.error === 'MissingConfiguration' &&
+            e.message?.includes('Unable to open browser on unsupported OS')
+          );
+          assertEquals(
+            warnings.length,
+            1,
+            'Node adapter should report unsupported browser opening',
+          );
+        },
+      );
     },
   );
 }
