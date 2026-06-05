@@ -56,16 +56,18 @@ import type { Server } from '../net/server/server.ts';
 import { createHttpServer } from '../net/server/http-compat.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { goatEntryPoints } from '../cli/link.ts';
-import { getRuntime } from '../base/runtime/index.ts';
+import {
+  getEffectiveCWD,
+  getEffectiveRuntimeId,
+  getRuntime,
+  withTestCWD,
+  withTestOpenBrowser,
+  withTestRuntimeId,
+} from '../base/runtime/index.ts';
 import { cli, type CliOptions } from '../base/development.ts';
 import { runAcrossPlatforms } from '../base/multi-runner.ts';
 import { createTestDomainConfig } from './merge-test-utils.ts';
-import {
-  getGlobalLoggerStreams,
-  setGlobalLoggerStreams,
-} from '../logging/log.ts';
-import type { LogEntry } from '../logging/log.ts';
-import type { NormalizedLogEntry } from '../logging/entry.ts';
+import { withLogCapture } from './test-utils.ts';
 
 function runBundledScript(js: string): Record<string, unknown> {
   const scope: Record<string, unknown> = {};
@@ -122,43 +124,11 @@ interface TestLoadResult {
   loader: string;
 }
 
-/**
- * Temporarily overrides the runtime id for a test callback, restoring it on
- * exit. Use this to simulate unsupported runtimes (e.g. 'browser') without
- * leaking global state mutations into subsequent tests.
- */
-async function withRuntimeId<T>(
-  id: string,
-  fn: () => Promise<T>,
-): Promise<T> {
-  const runtime = getRuntime() as { id: string };
-  const originalId = runtime.id;
-  runtime.id = id;
-  try {
-    return await fn();
-  } finally {
-    runtime.id = originalId;
-  }
-}
-
 const kPlaceholderAppConfig = {
   buildDir: '/tmp',
   htmlPath: undefined,
   jsPath: '/dev/null',
 };
-
-function withLogCapture<T>(
-  fn: (captured: NormalizedLogEntry<LogEntry>[]) => Promise<T>,
-): Promise<T> {
-  const captured: NormalizedLogEntry<LogEntry>[] = [];
-  const previousStreams = getGlobalLoggerStreams();
-  setGlobalLoggerStreams([{
-    appendEntry(e: NormalizedLogEntry<LogEntry>): void {
-      captured.push(e);
-    },
-  }]);
-  return fn(captured).finally(() => setGlobalLoggerStreams(previousStreams));
-}
 
 import {
   DENO_ONLY_FILTER_TEST,
@@ -319,21 +289,6 @@ async function waitForAssetText(
   );
 }
 
-/**
- * Temporarily overrides runtime.getCWD for the duration of `fn`.
- * Restores the original value after fn resolves or rejects. Safe to nest.
- */
-async function withCWD<T>(dir: string, fn: () => Promise<T>): Promise<T> {
-  const runtime = getRuntime();
-  const original = runtime.getCWD;
-  runtime.getCWD = () => dir;
-  try {
-    return await fn();
-  } finally {
-    runtime.getCWD = original;
-  }
-}
-
 export default function setupCliCompileTests() {
   TEST(
     'CLI-Compile',
@@ -440,32 +395,35 @@ export default function setupCliCompileTests() {
       const originalDebug = config.debug;
       let setupCalled = false;
 
-      await withRuntimeId('browser', async () => {
-        await assertThrows(
-          async () => {
-            await startDebugServer({
-              buildDir: dir,
-              jsPath: path.join(dir, 'entry.ts'),
-              path: path.join(dir, 'server-data'),
-              setup: () => {
-                setupCalled = true;
-              },
-            });
-          },
-          Error,
-          'startDebugServer() is only supported in Deno or Node.js.',
-        );
-        assertFalse(
-          setupCalled,
-          'startDebugServer must fail before running setup on unsupported runtimes',
-        );
-        assertEquals(
-          config.debug,
-          originalDebug,
-          'startDebugServer must not leak debug mode on unsupported runtimes',
-        );
+      try {
+        await withTestRuntimeId('browser', async () => {
+          await assertThrows(
+            async () => {
+              await startDebugServer({
+                buildDir: dir,
+                jsPath: path.join(dir, 'entry.ts'),
+                path: path.join(dir, 'server-data'),
+                setup: () => {
+                  setupCalled = true;
+                },
+              });
+            },
+            Error,
+            'startDebugServer() is only supported in Deno or Node.js.',
+          );
+          assertFalse(
+            setupCalled,
+            'startDebugServer must fail before running setup on unsupported runtimes',
+          );
+          assertEquals(
+            config.debug,
+            originalDebug,
+            'startDebugServer must not leak debug mode on unsupported runtimes',
+          );
+        });
+      } finally {
         await stopBackgroundCompiler();
-      });
+      }
     },
   );
 
@@ -479,16 +437,19 @@ export default function setupCliCompileTests() {
         out: APP_ENTRY_POINT,
       }];
 
-      await withRuntimeId('browser', async () => {
-        await assertThrows(
-          async () => {
-            await createBuildContext(entryPoints);
-          },
-          Error,
-          'createBuildContext() is only supported in Deno or Node.js.',
-        );
+      try {
+        await withTestRuntimeId('browser', async () => {
+          await assertThrows(
+            async () => {
+              await createBuildContext(entryPoints);
+            },
+            Error,
+            'createBuildContext() is only supported in Deno or Node.js.',
+          );
+        });
+      } finally {
         await stopBackgroundCompiler();
-      });
+      }
     },
   );
 
@@ -645,9 +606,7 @@ export default function setupCliCompileTests() {
       const entryPath = path.join(dir, 'entry.ts');
       const runtime = getRuntime() as {
         id: 'deno' | 'node' | 'browser';
-        openBrowser: (url: string) => Promise<void>;
       };
-      const originalOpenBrowser = runtime.openBrowser;
       const { domain, setPort } = createTestDomainConfig();
       let openBrowserCalls = 0;
       let sessionUrl = '';
@@ -666,42 +625,42 @@ export default function setupCliCompileTests() {
           '\n',
       );
 
-      runtime.openBrowser = async () => {
-        openBrowserCalls += 1;
-        throw new Error('openBrowser should be skipped after onReady stop()');
-      };
       try {
-        await startDebugServer({
-          buildDir: dir,
-          jsPath: entryPath,
-          path: path.join(dir, 'server-data'),
-          port: 0,
-          domain,
-          ...(runtime.id === 'node'
-            ? { packageJson: configPath }
-            : { denoJson: configPath }),
-          async onReady(session) {
-            sessionUrl = session.url;
-            assertExists(
-              session.server.port,
-              'onReady must expose the started server instance',
-            );
-            setPort(session.server.port);
-            await session.stop();
-            await session.stop();
-          },
+        await withTestOpenBrowser(async () => {
+          openBrowserCalls += 1;
+          throw new Error('openBrowser should be skipped after onReady stop()');
+        }, async () => {
+          await startDebugServer({
+            buildDir: dir,
+            jsPath: entryPath,
+            path: path.join(dir, 'server-data'),
+            port: 0,
+            domain,
+            ...(runtime.id === 'node'
+              ? { packageJson: configPath }
+              : { denoJson: configPath }),
+            async onReady(session) {
+              sessionUrl = session.url;
+              assertExists(
+                session.server.port,
+                'onReady must expose the started server instance',
+              );
+              setPort(session.server.port);
+              await session.stop();
+              await session.stop();
+            },
+          });
+          assertTrue(
+            sessionUrl.startsWith('http://localhost:'),
+            'onReady must expose the final local URL before shutdown',
+          );
+          assertEquals(
+            openBrowserCalls,
+            0,
+            'startDebugServer must skip browser launch once shutdown has started',
+          );
         });
-        assertTrue(
-          sessionUrl.startsWith('http://localhost:'),
-          'onReady must expose the final local URL before shutdown',
-        );
-        assertEquals(
-          openBrowserCalls,
-          0,
-          'startDebugServer must skip browser launch once shutdown has started',
-        );
       } finally {
-        runtime.openBrowser = originalOpenBrowser;
         await stopBackgroundCompiler();
       }
     },
@@ -715,9 +674,7 @@ export default function setupCliCompileTests() {
       const entryPath = path.join(dir, 'entry.ts');
       const runtime = getRuntime() as {
         id: 'deno' | 'node' | 'browser';
-        openBrowser: (url: string) => Promise<void>;
       };
-      const originalOpenBrowser = runtime.openBrowser;
       const { domain } = createTestDomainConfig();
       let stopServer: (() => Promise<void>) | undefined;
       let openBrowserUrl = '';
@@ -740,51 +697,51 @@ export default function setupCliCompileTests() {
         }) + '\n',
       );
 
-      runtime.openBrowser = async (url) => {
-        openBrowserUrl = url;
-        resolveBrowserOpened();
-      };
       try {
-        let resolveReady!: (
-          value: { stop: () => Promise<void>; url: string },
-        ) => void;
-        const readyPromise = new Promise<{
-          stop: () => Promise<void>;
-          url: string;
-        }>((resolve) => {
-          resolveReady = resolve;
+        await withTestOpenBrowser(async (url) => {
+          openBrowserUrl = url;
+          resolveBrowserOpened();
+        }, async () => {
+          let resolveReady!: (
+            value: { stop: () => Promise<void>; url: string },
+          ) => void;
+          const readyPromise = new Promise<{
+            stop: () => Promise<void>;
+            url: string;
+          }>((resolve) => {
+            resolveReady = resolve;
+          });
+          runPromise = startDebugServer({
+            buildDir: dir,
+            jsPath: entryPath,
+            path: path.join(dir, 'server-data'),
+            port: 0,
+            domain,
+            ...(runtime.id === 'node'
+              ? { packageJson: configPath }
+              : { denoJson: configPath }),
+            onReady(session) {
+              resolveReady({ stop: session.stop, url: session.url });
+            },
+          });
+          const ready = await withTimeout(
+            readyPromise,
+            kDebugServerReadyTimeoutMs,
+            'Timed out waiting for default-browser startDebugServer() readiness.',
+          );
+          stopServer = ready.stop;
+          await withTimeout(
+            browserOpened,
+            2_000,
+            'Timed out waiting for startDebugServer() to open the browser by default.',
+          );
+          assertEquals(
+            openBrowserUrl,
+            ready.url,
+            'startDebugServer must open the final local URL when openBrowser is omitted',
+          );
         });
-        runPromise = startDebugServer({
-          buildDir: dir,
-          jsPath: entryPath,
-          path: path.join(dir, 'server-data'),
-          port: 0,
-          domain,
-          ...(runtime.id === 'node'
-            ? { packageJson: configPath }
-            : { denoJson: configPath }),
-          onReady(session) {
-            resolveReady({ stop: session.stop, url: session.url });
-          },
-        });
-        const ready = await withTimeout(
-          readyPromise,
-          kDebugServerReadyTimeoutMs,
-          'Timed out waiting for default-browser startDebugServer() readiness.',
-        );
-        stopServer = ready.stop;
-        await withTimeout(
-          browserOpened,
-          2_000,
-          'Timed out waiting for startDebugServer() to open the browser by default.',
-        );
-        assertEquals(
-          openBrowserUrl,
-          ready.url,
-          'startDebugServer must open the final local URL when openBrowser is omitted',
-        );
       } finally {
-        runtime.openBrowser = originalOpenBrowser;
         await cleanupDebugServer(stopServer, runPromise);
       }
     },
@@ -798,9 +755,7 @@ export default function setupCliCompileTests() {
       const entryPath = path.join(dir, 'entry.ts');
       const runtime = getRuntime() as {
         id: 'deno' | 'node' | 'browser';
-        openBrowser: (url: string) => Promise<void>;
       };
-      const originalOpenBrowser = runtime.openBrowser;
       const { domain } = createTestDomainConfig();
       let openBrowserCalls = 0;
       let stopServer: (() => Promise<void>) | undefined;
@@ -817,34 +772,34 @@ export default function setupCliCompileTests() {
           '\n',
       );
 
-      runtime.openBrowser = async () => {
-        openBrowserCalls += 1;
-      };
       try {
-        const ready = await startDebugServerUntilReady({
-          buildDir: dir,
-          jsPath: entryPath,
-          path: path.join(dir, 'server-data'),
-          port: 0,
-          domain,
-          openBrowser: false,
-          ...(runtime.id === 'node'
-            ? { packageJson: configPath }
-            : { denoJson: configPath }),
+        await withTestOpenBrowser(async () => {
+          openBrowserCalls += 1;
+        }, async () => {
+          const ready = await startDebugServerUntilReady({
+            buildDir: dir,
+            jsPath: entryPath,
+            path: path.join(dir, 'server-data'),
+            port: 0,
+            domain,
+            openBrowser: false,
+            ...(runtime.id === 'node'
+              ? { packageJson: configPath }
+              : { denoJson: configPath }),
+          });
+          stopServer = ready.stopServer;
+          runPromise = ready.runPromise;
+          assertTrue(
+            ready.serverUrl.startsWith('http://localhost:'),
+            'headless startDebugServer must still report its local URL',
+          );
+          assertEquals(
+            openBrowserCalls,
+            0,
+            'openBrowser false must suppress automatic browser launch',
+          );
         });
-        stopServer = ready.stopServer;
-        runPromise = ready.runPromise;
-        assertTrue(
-          ready.serverUrl.startsWith('http://localhost:'),
-          'headless startDebugServer must still report its local URL',
-        );
-        assertEquals(
-          openBrowserCalls,
-          0,
-          'openBrowser false must suppress automatic browser launch',
-        );
       } finally {
-        runtime.openBrowser = originalOpenBrowser;
         await cleanupDebugServer(stopServer, runPromise);
       }
     },
@@ -911,9 +866,7 @@ export default function setupCliCompileTests() {
       const entryPath = path.join(dir, 'entry.ts');
       const runtime = getRuntime() as {
         id: 'deno' | 'node' | 'browser';
-        openBrowser: (url: string) => Promise<void>;
       };
-      const originalOpenBrowser = runtime.openBrowser;
       const { domain } = createTestDomainConfig();
       let openBrowserCalls = 0;
       let sessionUrl = '';
@@ -931,36 +884,36 @@ export default function setupCliCompileTests() {
         }) + '\n',
       );
 
-      runtime.openBrowser = async () => {
-        openBrowserCalls += 1;
-      };
       try {
-        await startDebugServer({
-          buildDir: dir,
-          jsPath: entryPath,
-          path: path.join(dir, 'server-data'),
-          watchDir: dir,
-          port: 0,
-          domain,
-          ...(runtime.id === 'node'
-            ? { packageJson: configPath }
-            : { denoJson: configPath }),
-          async onReady(session) {
-            sessionUrl = session.url;
-            await session.stop();
-          },
+        await withTestOpenBrowser(async () => {
+          openBrowserCalls += 1;
+        }, async () => {
+          await startDebugServer({
+            buildDir: dir,
+            jsPath: entryPath,
+            path: path.join(dir, 'server-data'),
+            watchDir: dir,
+            port: 0,
+            domain,
+            ...(runtime.id === 'node'
+              ? { packageJson: configPath }
+              : { denoJson: configPath }),
+            async onReady(session) {
+              sessionUrl = session.url;
+              await session.stop();
+            },
+          });
+          assertTrue(
+            sessionUrl.startsWith('http://localhost:'),
+            'onReady must still expose the local URL before a watched startup shuts down',
+          );
+          assertEquals(
+            openBrowserCalls,
+            0,
+            'watchDir startup stopped from onReady must not open the browser',
+          );
         });
-        assertTrue(
-          sessionUrl.startsWith('http://localhost:'),
-          'onReady must still expose the local URL before a watched startup shuts down',
-        );
-        assertEquals(
-          openBrowserCalls,
-          0,
-          'watchDir startup stopped from onReady must not open the browser',
-        );
       } finally {
-        runtime.openBrowser = originalOpenBrowser;
         await stopBackgroundCompiler();
       }
     },
@@ -1177,8 +1130,8 @@ export default function setupCliCompileTests() {
       );
 
       try {
-        const session = await withCWD(dir, async () => {
-          return await startDebugServerUntilReady({
+        await withTestCWD(dir, async () => {
+          const session = await startDebugServerUntilReady({
             buildDir: dir,
             jsPath,
             path: path.join(dir, 'server-data'),
@@ -1197,30 +1150,30 @@ export default function setupCliCompileTests() {
               };
             },
           });
-        });
-        stopServer = session.stopServer;
-        runPromise = session.runPromise;
-        assertExists(
-          serverRef?.port,
-          'debug server must publish the assigned port',
-        );
-        setPort(serverRef.port);
+          stopServer = session.stopServer;
+          runPromise = session.runPromise;
+          assertExists(
+            serverRef?.port,
+            'debug server must publish the assigned port',
+          );
+          setPort(serverRef.port);
 
-        assertEquals(
-          observedBuildInfo,
-          runtime.id === 'node'
-            ? {
-              appName: 'debug-node-app',
-              appVersion: '1.2.3',
-              debugBuild: true,
-            }
-            : {
-              appName: 'debug-deno-app',
-              appVersion: '4.5.6',
-              debugBuild: true,
-            },
-          'startDebugServer must derive buildInfo from the active runtime config file',
-        );
+          assertEquals(
+            observedBuildInfo,
+            runtime.id === 'node'
+              ? {
+                appName: 'debug-node-app',
+                appVersion: '1.2.3',
+                debugBuild: true,
+              }
+              : {
+                appName: 'debug-deno-app',
+                appVersion: '4.5.6',
+                debugBuild: true,
+              },
+            'startDebugServer must derive buildInfo from the active runtime config file',
+          );
+        });
       } finally {
         await cleanupDebugServer(stopServer, runPromise);
       }
@@ -1265,15 +1218,15 @@ export default function setupCliCompileTests() {
       );
 
       try {
-        const session = await withCWD(dir, async () => {
-          return await startDebugServerUntilReady({
+        await withTestCWD(dir, async () => {
+          const session = await startDebugServerUntilReady({
             buildDir: dir,
             jsPath,
             path: path.join(dir, 'server-data'),
             orgId: 'test-org',
             port: 0,
             domain,
-            ...(runtime.id === 'node'
+            ...(getEffectiveRuntimeId() === 'node'
               ? { packageJson: overrideConfigPath }
               : { denoJson: overrideConfigPath }),
             async setup(server) {
@@ -1287,23 +1240,23 @@ export default function setupCliCompileTests() {
               };
             },
           });
-        });
-        stopServer = session.stopServer;
-        runPromise = session.runPromise;
-        assertExists(
-          serverRef?.port,
-          'debug server must publish the assigned port',
-        );
-        setPort(serverRef.port);
+          stopServer = session.stopServer;
+          runPromise = session.runPromise;
+          assertExists(
+            serverRef?.port,
+            'debug server must publish the assigned port',
+          );
+          setPort(serverRef.port);
 
-        assertEquals(
-          observedBuildInfo,
-          {
-            appName: 'debug-override-app',
-            appVersion: '9.9.9',
-          },
-          'startDebugServer must prefer explicit config overrides over runtime defaults',
-        );
+          assertEquals(
+            observedBuildInfo,
+            {
+              appName: 'debug-override-app',
+              appVersion: '9.9.9',
+            },
+            'startDebugServer must prefer explicit config overrides over runtime defaults',
+          );
+        });
       } finally {
         await cleanupDebugServer(stopServer, runPromise);
       }
@@ -1326,9 +1279,9 @@ export default function setupCliCompileTests() {
         runtime.id === 'node' ? 'package.json' : 'deno.json',
       );
       try {
-        await assertThrows(
-          async () => {
-            await withCWD(dir, async () => {
+        await withTestCWD(dir, async () => {
+          await assertThrows(
+            async () => {
               await startDebugServer({
                 buildDir: dir,
                 jsPath,
@@ -1337,37 +1290,35 @@ export default function setupCliCompileTests() {
                   setupCalled = true;
                 },
               });
-            });
-          },
-          Error,
-          `Config file not found at "${expectedConfigPath}". Provide ${
-            runtime.id === 'node' ? 'packageJson' : 'denoJson'
-          } or run from a directory containing one.`,
-        );
-        assertFalse(
-          setupCalled,
-          'startDebugServer must fail before running user setup when config is missing',
-        );
-        assertEquals(
-          config.debug,
-          originalDebug,
-          'startDebugServer must not leak debug mode when config discovery fails',
-        );
-        await assertThrows(
-          async () => {
-            await withCWD(dir, async () => {
+            },
+            Error,
+            `Config file not found at "${expectedConfigPath}". Provide ${
+              getEffectiveRuntimeId() === 'node' ? 'packageJson' : 'denoJson'
+            } or run from a directory containing one.`,
+          );
+          assertFalse(
+            setupCalled,
+            'startDebugServer must fail before running user setup when config is missing',
+          );
+          assertEquals(
+            config.debug,
+            originalDebug,
+            'startDebugServer must not leak debug mode when config discovery fails',
+          );
+          await assertThrows(
+            async () => {
               await startDebugServer({
                 buildDir: dir,
                 jsPath,
                 path: path.join(dir, 'server-data'),
               });
-            });
-          },
-          Error,
-          `Config file not found at "${expectedConfigPath}". Provide ${
-            runtime.id === 'node' ? 'packageJson' : 'denoJson'
-          } or run from a directory containing one.`,
-        );
+            },
+            Error,
+            `Config file not found at "${expectedConfigPath}". Provide ${
+              getEffectiveRuntimeId() === 'node' ? 'packageJson' : 'denoJson'
+            } or run from a directory containing one.`,
+          );
+        });
       } finally {
         config.debug = originalDebug;
         await stopBackgroundCompiler();
@@ -1570,9 +1521,7 @@ export default function setupCliCompileTests() {
       const entryPath = path.join(dir, 'entry.ts');
       const runtime = getRuntime() as {
         id: 'deno' | 'node' | 'browser';
-        openBrowser: (url: string) => Promise<void>;
       };
-      const originalOpenBrowser = runtime.openBrowser;
       const config = getGoatConfig();
       const originalDebug = config.debug;
       const { domain } = createTestDomainConfig();
@@ -1592,7 +1541,6 @@ export default function setupCliCompileTests() {
         }) + '\n',
       );
 
-      runtime.openBrowser = async () => {};
       try {
         const session = await startDebugServerUntilReady({
           buildDir: dir,
@@ -1634,7 +1582,6 @@ export default function setupCliCompileTests() {
         );
       } finally {
         config.debug = originalDebug;
-        runtime.openBrowser = originalOpenBrowser;
         await cleanupDebugServer(stopServer, runPromise);
       }
     },
