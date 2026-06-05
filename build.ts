@@ -11,6 +11,8 @@ import { getRuntime } from './base/runtime/index.ts';
 import type { Plugin } from 'esbuild';
 import type { denoPlugin } from '@deno/esbuild-plugin';
 
+/** Specifier for esbuild — variable import prevents SEA bundler capture. */
+const kEsbuildSpecifier = 'esbuild';
 /** Specifier for the Deno esbuild plugin — used in imports and external lists. */
 export const kDenoEsbuildPluginSpecifier = '@deno/esbuild-plugin';
 /** JSR npm-proxy specifier for the Deno esbuild plugin. */
@@ -64,7 +66,7 @@ const denoPluginImportState: ImportCacheState<any> = {};
 export async function getEsbuild(): Promise<typeof import('esbuild')> {
   return (await getCachedImport(
     esbuildImportState,
-    () => import('esbuild'),
+    () => import(kEsbuildSpecifier),
   )) as typeof import('esbuild');
 }
 
