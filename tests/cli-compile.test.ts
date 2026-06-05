@@ -1027,6 +1027,129 @@ export default function setupCliCompileTests() {
 
   TEST(
     'CLI-Compile',
+    'startDebugServer applies watchFilter and rebuild hooks in order',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('debug-server-watch-filter-hooks');
+      const cssPath = path.join(dir, 'generated.css');
+      const entryPath = path.join(dir, 'entry.ts');
+      const triggerPath = path.join(dir, 'trigger.txt');
+      const ignoredPath = path.join(dir, 'ignored.txt');
+      const { domain, setPort } = createTestDomainConfig();
+      const hookOrder: string[] = [];
+      let buildNumber = 0;
+      let serverRef: Server<Schema> | undefined;
+      let stopServer: (() => Promise<void>) | undefined;
+      let runPromise: Promise<void> | undefined;
+
+      await writeTextFile(entryPath, `import './generated.css';\nexport {};\n`);
+      await writeTextFile(triggerPath, 'initial');
+      await writeTextFile(ignoredPath, 'initial');
+
+      try {
+        const session = await startDebugServerUntilReady({
+          buildDir: dir,
+          jsPath: entryPath,
+          path: path.join(dir, 'server-data'),
+          watchDir: dir,
+          watchFilter: (p) => p.endsWith('trigger.txt'),
+          orgId: 'test-org',
+          port: 0,
+          domain,
+          setup(server) {
+            serverRef = server;
+          },
+          async beforeBuild() {
+            buildNumber++;
+            hookOrder.push(`before-${buildNumber}`);
+            await writeTextFile(
+              cssPath,
+              `:root { --debug-hook-v${buildNumber}: 1; }`,
+            );
+          },
+          afterBuild() {
+            hookOrder.push(`after-${buildNumber}`);
+            return Promise.resolve();
+          },
+        });
+        stopServer = session.stopServer;
+        runPromise = session.runPromise;
+        assertExists(serverRef?.port, 'debug server must publish a port');
+        setPort(serverRef.port);
+
+        const cssUrl = `${session.serverUrl}/index.css`;
+        await waitForAssetText(cssUrl, '--debug-hook-v1');
+        assertEquals(hookOrder, ['before-1', 'after-1']);
+
+        await writeTextFile(ignoredPath, 'ignored change');
+        await sleep(700);
+        assertEquals(
+          hookOrder,
+          ['before-1', 'after-1'],
+          'custom watchFilter=false changes must not rebuild',
+        );
+
+        await writeTextFile(triggerPath, 'rebuild');
+        await waitForAssetText(cssUrl, '--debug-hook-v2');
+        assertEquals(hookOrder, [
+          'before-1',
+          'after-1',
+          'before-2',
+          'after-2',
+        ]);
+      } finally {
+        await cleanupDebugServer(stopServer, runPromise);
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'startDebugServer default watch filter ignores tmp files',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('debug-server-default-watch-filter');
+      const entryPath = path.join(dir, 'entry.ts');
+      const ignoredPath = path.join(dir, 'ignored.tmp');
+      const { domain } = createTestDomainConfig();
+      let beforeBuildCalls = 0;
+      let stopServer: (() => Promise<void>) | undefined;
+      let runPromise: Promise<void> | undefined;
+
+      await writeTextFile(entryPath, `export {};\n`);
+      await writeTextFile(ignoredPath, 'initial');
+
+      try {
+        const session = await startDebugServerUntilReady({
+          buildDir: dir,
+          jsPath: entryPath,
+          path: path.join(dir, 'server-data'),
+          watchDir: dir,
+          orgId: 'test-org',
+          port: 0,
+          domain,
+          beforeBuild() {
+            beforeBuildCalls++;
+            return Promise.resolve();
+          },
+        });
+        stopServer = session.stopServer;
+        runPromise = session.runPromise;
+        assertEquals(beforeBuildCalls, 1, 'initial build must run once');
+
+        await writeTextFile(ignoredPath, 'ignored change');
+        await sleep(700);
+        assertEquals(
+          beforeBuildCalls,
+          1,
+          'default watch filter must ignore .tmp changes',
+        );
+      } finally {
+        await cleanupDebugServer(stopServer, runPromise);
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
     'startDebugServer auto-selects the active runtime config file',
     async (ctx: TestSuite) => {
       const dir = await ctx.tempDir('debug-server-config-parity');

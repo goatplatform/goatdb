@@ -347,39 +347,8 @@ export async function startDebugServer<US extends Schema>(
 
     await server.start();
 
-    const serverUrl = debugServerOrigin(server, options);
-
-    if (options.onReady) {
-      await options.onReady({
-        server,
-        url: serverUrl,
-        stop: cleanup,
-      });
-    }
-    if (options.openBrowser !== false && !shuttingDown) {
-      await getRuntime().openBrowser(serverUrl);
-    }
-    if (shuttingDown) {
-      await stopped;
-      return;
-    }
-
-    log({
-      severity: 'INFO',
-      message: `Bundling took ${
-        ((performance.now() - bundlingStart) / 1000).toFixed(2)
-      }sec`,
-    });
-
     if (options.watchDir) {
       watcher = await watchDirectory(path.resolve(options.watchDir));
-      // If onReady called stop() before we created the watcher, close it now.
-      if (shuttingDown) {
-        watcher.close();
-        await stopped;
-        return;
-      }
-
       rebuildTimer = new SimpleTimer(300, false, async () => {
         if (shuttingDown) return;
         log({ severity: 'INFO', message: 'Bundling client code...' });
@@ -421,7 +390,33 @@ export async function startDebugServer<US extends Schema>(
           });
         }
       });
+    }
 
+    const serverUrl = debugServerOrigin(server, options);
+
+    if (options.onReady) {
+      await options.onReady({
+        server,
+        url: serverUrl,
+        stop: cleanup,
+      });
+    }
+    if (options.openBrowser !== false && !shuttingDown) {
+      await getRuntime().openBrowser(serverUrl);
+    }
+    if (shuttingDown) {
+      await stopped;
+      return;
+    }
+
+    log({
+      severity: 'INFO',
+      message: `Bundling took ${
+        ((performance.now() - bundlingStart) / 1000).toFixed(2)
+      }sec`,
+    });
+
+    if (watcher && rebuildTimer) {
       const filterFunc = options.watchFilter || shouldRebuildAfterPathChange;
 
       for await (const event of watcher) {

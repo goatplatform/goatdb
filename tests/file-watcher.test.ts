@@ -53,6 +53,20 @@ function startCollecting(
   return { events, done };
 }
 
+async function waitForEvent(
+  events: FileWatchEvent[],
+  predicate: (event: FileWatchEvent) => boolean,
+  message: string,
+  timeoutMs: number = 5_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (events.some(predicate)) return;
+    await sleep(50);
+  }
+  throw new Error(`${message}. Events: ${JSON.stringify(events)}`);
+}
+
 /**
  * Wrap createPollingWatcher with a cycle-counting callback so tests can
  * synchronize on poll completion without coupling to production internals.
@@ -724,14 +738,13 @@ export function setupFileWatcherDenoTests(): void {
         const { events, done } = startCollecting(watcher);
 
         await Deno.writeTextFile(`${dir}/test.txt`, 'hello');
-        await sleep(200);
-        watcher.close();
-        await done;
-
-        assertTrue(
-          events.some((e) => e.paths.some((p) => p.endsWith('test.txt'))),
+        await waitForEvent(
+          events,
+          (e) => e.paths.some((p) => p.endsWith('test.txt')),
           'Deno watcher must emit event for new file',
         );
+        watcher.close();
+        await done;
       } finally {
         watcher.close();
       }
@@ -751,14 +764,13 @@ export function setupFileWatcherDenoTests(): void {
         const { events, done } = startCollecting(watcher);
 
         await Deno.writeTextFile(`${dir}/test.txt`, 'v2');
-        await sleep(200);
-        watcher.close();
-        await done;
-
-        assertTrue(
-          events.some((e) => e.paths.some((p) => p.endsWith('test.txt'))),
+        await waitForEvent(
+          events,
+          (e) => e.paths.some((p) => p.endsWith('test.txt')),
           'Deno watcher must emit event for modified file',
         );
+        watcher.close();
+        await done;
       } finally {
         watcher.close();
       }
@@ -778,14 +790,13 @@ export function setupFileWatcherDenoTests(): void {
         const { events, done } = startCollecting(watcher);
 
         await Deno.remove(`${dir}/test.txt`);
-        await sleep(200);
-        watcher.close();
-        await done;
-
-        assertTrue(
-          events.some((e) => e.paths.some((p) => p.endsWith('test.txt'))),
+        await waitForEvent(
+          events,
+          (e) => e.paths.some((p) => p.endsWith('test.txt')),
           'Deno watcher must emit event for deleted file',
         );
+        watcher.close();
+        await done;
       } finally {
         watcher.close();
       }
@@ -810,14 +821,13 @@ export function setupFileWatcherNativeNodeTests(): void {
         const { events, done } = startCollecting(watcher);
 
         fs.writeFileSync(`${dir}/test.txt`, 'hello');
-        await sleep(300);
-        watcher.close();
-        await done;
-
-        assertTrue(
-          events.some((e) => e.paths.some((p) => p.endsWith('test.txt'))),
+        await waitForEvent(
+          events,
+          (e) => e.paths.some((p) => p.endsWith('test.txt')),
           'native Node watcher must emit event for new file',
         );
+        watcher.close();
+        await done;
       } finally {
         watcher.close();
       }
@@ -838,14 +848,13 @@ export function setupFileWatcherNativeNodeTests(): void {
         const { events, done } = startCollecting(watcher);
 
         fs.writeFileSync(`${dir}/test.txt`, 'v2');
-        await sleep(300);
-        watcher.close();
-        await done;
-
-        assertTrue(
-          events.some((e) => e.paths.some((p) => p.endsWith('test.txt'))),
+        await waitForEvent(
+          events,
+          (e) => e.paths.some((p) => p.endsWith('test.txt')),
           'native Node watcher must emit event for modified file',
         );
+        watcher.close();
+        await done;
       } finally {
         watcher.close();
       }
@@ -866,14 +875,13 @@ export function setupFileWatcherNativeNodeTests(): void {
         const { events, done } = startCollecting(watcher);
 
         fs.unlinkSync(`${dir}/test.txt`);
-        await sleep(300);
-        watcher.close();
-        await done;
-
-        assertTrue(
-          events.some((e) => e.paths.some((p) => p.endsWith('test.txt'))),
+        await waitForEvent(
+          events,
+          (e) => e.paths.some((p) => p.endsWith('test.txt')),
           'native Node watcher must emit event for deleted file',
         );
+        watcher.close();
+        await done;
       } finally {
         watcher.close();
       }
