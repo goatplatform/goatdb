@@ -3,7 +3,7 @@
 import * as path from './base/path.ts';
 import { APP_ENTRY_POINT } from './net/server/static-assets.ts';
 import { readFile } from './base/json-log/file-impl.ts';
-import { getRuntime } from './base/runtime/index.ts';
+import { getEffectiveRuntimeId, getRuntime } from './base/runtime/index.ts';
 
 // IMPORTANT: `esbuild` and `@deno/esbuild-plugin` MUST remain `import type`.
 // Runtime imports of these Deno/JSR-specific packages break Node.js SEA binaries.
@@ -477,7 +477,7 @@ export async function createBuildContext(
   entryPoints: { in: string; out: string }[],
   extraPlugins: BuildPluginLike[] = [],
 ): Promise<ReBuildContext> {
-  const runtime = getRuntime().id;
+  const runtime = getEffectiveRuntimeId();
   if (runtime !== 'deno' && runtime !== 'node') {
     throw new Error(
       'createBuildContext() is only supported in Deno or Node.js. ' +

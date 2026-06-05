@@ -166,6 +166,113 @@ export interface RuntimeAdapter {
   exit(code: number): never;
 }
 
+// ── Test hooks ──────────────────────────────────────────────────────────────
+/** @internal Test-only: overrides getEffectiveRuntimeId(). */
+let _testRuntimeId: string | undefined;
+/** @internal Test-only: overrides getEffectiveCWD(). */
+let _testCWD: string | undefined;
+/** @internal Test-only: overrides browser opening. */
+let _testOpenBrowser: ((url: string) => Promise<void>) | undefined;
+// Note: module-level globals are safe under sequential test execution. If
+// parallel test execution is ever enabled, these must move to a per-test
+// isolation strategy (e.g. AsyncLocalStorage or test-scoped contexts).
+
+async function withTestOverride<T, V>(
+  get: () => V,
+  set: (value: V) => void,
+  value: V,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const prev = get();
+  set(value);
+  try {
+    return await fn();
+  } finally {
+    set(prev);
+  }
+}
+
+/**
+ * @internal Test-only scoped override for the effective runtime ID.
+ */
+export function withTestRuntimeId<T>(
+  id: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return withTestOverride(
+    () => _testRuntimeId,
+    (value) => {
+      _testRuntimeId = value;
+    },
+    id,
+    fn,
+  );
+}
+
+/**
+ * @internal Test-only scoped override for the effective CWD.
+ */
+export function withTestCWD<T>(
+  dir: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return withTestOverride(
+    () => _testCWD,
+    (value) => {
+      _testCWD = value;
+    },
+    dir,
+    fn,
+  );
+}
+
+/**
+ * @internal Test-only scoped override for browser opening.
+ */
+export function withTestOpenBrowser<T>(
+  open: (url: string) => Promise<void>,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return withTestOverride(
+    () => _testOpenBrowser,
+    (value) => {
+      _testOpenBrowser = value;
+    },
+    open,
+    fn,
+  );
+}
+
+/**
+ * Returns the effective runtime ID.
+ * In production, delegates to `getRuntime().id`. Tests can override via
+ * `withTestRuntimeId()` to simulate unsupported runtimes without mutating
+ * the global adapter singleton.
+ */
+export function getEffectiveRuntimeId(): string {
+  return _testRuntimeId ?? getRuntime().id;
+}
+
+/**
+ * Returns the effective current working directory.
+ * In production, delegates to `getRuntime().getCWD()`. Tests can override
+ * via `withTestCWD()` without mutating the global adapter singleton.
+ */
+export function getEffectiveCWD(): string {
+  return _testCWD ?? getRuntime().getCWD();
+}
+
+/**
+ * Opens a URL via the effective runtime adapter.
+ * Tests can override via `withTestOpenBrowser()` without mutating the global
+ * adapter singleton.
+ */
+export function openBrowser(url: string): Promise<void> {
+  return _testOpenBrowser
+    ? _testOpenBrowser(url)
+    : getRuntime().openBrowser(url);
+}
+
 // Registry state
 const adapters: RuntimeAdapter[] = [];
 let cachedRuntime: RuntimeAdapter | undefined;

@@ -22,7 +22,12 @@ import { buildAssets } from './build-assets.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
 import { exit } from '../base/process.ts';
-import { getRuntime } from '../base/runtime/index.ts';
+import {
+  getEffectiveCWD,
+  getEffectiveRuntimeId,
+  getRuntime,
+  openBrowser,
+} from '../base/runtime/index.ts';
 import { log } from '../logging/log.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import type { AppConfig } from './app-config.ts';
@@ -218,14 +223,14 @@ export async function startDebugServer<US extends Schema>(
 ): Promise<void> {
   const config = getGoatConfig();
   const originalDebug = config.debug;
-  const runtime = getRuntime().id;
+  const runtime = getEffectiveRuntimeId();
   if (runtime !== 'deno' && runtime !== 'node') {
     throw new Error(
       'startDebugServer() is only supported in Deno or Node.js. ' +
         'Use compile() for production builds targeting other runtimes.',
     );
   }
-  const cwd = getRuntime().getCWD();
+  const cwd = getEffectiveCWD();
 
   // Guard against concurrent calls before any async work that would
   // corrupt config.debug save/restore.
@@ -402,7 +407,7 @@ export async function startDebugServer<US extends Schema>(
       });
     }
     if (options.openBrowser !== false && !shuttingDown) {
-      await getRuntime().openBrowser(serverUrl);
+      await openBrowser(serverUrl);
     }
     if (shuttingDown) {
       await stopped;
