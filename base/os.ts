@@ -1,4 +1,3 @@
-import { isBrowser, isDeno, isNode } from './common.ts';
 import { notReached } from './error.ts';
 import { getRuntime } from './runtime/index.ts';
 
@@ -91,11 +90,12 @@ export function isWindows(): boolean {
  * @group OS
  */
 export function getEnvVar(key: string): string | undefined {
-  if (isDeno()) {
+  const runtimeId = getRuntime().id;
+  if (runtimeId === 'deno') {
     return Deno.env.get(key);
-  } else if (isNode()) {
+  } else if (runtimeId === 'node') {
     return globalThis.process.env?.[key];
-  } else if (isBrowser()) {
+  } else if (runtimeId === 'browser') {
     // Browsers have no environment variables. GOATDB_* vars are proxied
     // through the GoatDBConfig global injected by the server (prefix stripped).
     if (!key.startsWith('GOATDB_')) return undefined;
