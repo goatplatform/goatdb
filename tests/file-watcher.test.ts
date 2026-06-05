@@ -1,7 +1,10 @@
 import { TEST, type TestSuite } from './mod.ts';
 import { assertEquals, assertTrue } from './asserts.ts';
 import type { FileWatchEvent } from '../base/file-watcher.ts';
-import { shouldRebuildAfterPathChange } from '../base/file-watcher.ts';
+import {
+  shouldRebuildAfterPathChange,
+  watchDirectory,
+} from '../base/file-watcher.ts';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -702,6 +705,178 @@ export function setupFileWatcherTests(): void {
         true,
         'expected at least one real event before close',
       );
+    },
+  );
+}
+
+/**
+ * Deno-only smoke tests for the native Deno watcher (Deno.watchFs).
+ * Gated by `if (isDeno())` in test-registry.ts.
+ */
+export function setupFileWatcherDenoTests(): void {
+  TEST(
+    'FileWatcher',
+    'Deno native watcher emits create event',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('deno-watch-create');
+      const watcher = await watchDirectory(dir);
+      try {
+        const { events, done } = startCollecting(watcher);
+
+        await Deno.writeTextFile(`${dir}/test.txt`, 'hello');
+        await sleep(200);
+        watcher.close();
+        await done;
+
+        assertTrue(
+          events.some((e) => e.paths.some((p) => p.endsWith('test.txt'))),
+          'Deno watcher must emit event for new file',
+        );
+      } finally {
+        watcher.close();
+      }
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'Deno native watcher emits modify event',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('deno-watch-modify');
+      await Deno.writeTextFile(`${dir}/test.txt`, 'v1');
+      await sleep(100);
+
+      const watcher = await watchDirectory(dir);
+      try {
+        const { events, done } = startCollecting(watcher);
+
+        await Deno.writeTextFile(`${dir}/test.txt`, 'v2');
+        await sleep(200);
+        watcher.close();
+        await done;
+
+        assertTrue(
+          events.some((e) => e.paths.some((p) => p.endsWith('test.txt'))),
+          'Deno watcher must emit event for modified file',
+        );
+      } finally {
+        watcher.close();
+      }
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'Deno native watcher emits remove event',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('deno-watch-remove');
+      await Deno.writeTextFile(`${dir}/test.txt`, 'hello');
+      await sleep(100);
+
+      const watcher = await watchDirectory(dir);
+      try {
+        const { events, done } = startCollecting(watcher);
+
+        await Deno.remove(`${dir}/test.txt`);
+        await sleep(200);
+        watcher.close();
+        await done;
+
+        assertTrue(
+          events.some((e) => e.paths.some((p) => p.endsWith('test.txt'))),
+          'Deno watcher must emit event for deleted file',
+        );
+      } finally {
+        watcher.close();
+      }
+    },
+  );
+}
+
+/**
+ * Node.js smoke tests for the native/chokidar watcher.
+ * Uses `watchDirectory()` which auto-selects chokidar or native fs.watch.
+ * Gated by `if (isNode())` in test-registry.ts.
+ */
+export function setupFileWatcherNativeNodeTests(): void {
+  TEST(
+    'FileWatcher',
+    'native Node watcher emits create event',
+    async (ctx: TestSuite) => {
+      const fs = await import('node:fs');
+      const dir = await ctx.tempDir('node-native-create');
+      const watcher = await watchDirectory(dir);
+      try {
+        const { events, done } = startCollecting(watcher);
+
+        fs.writeFileSync(`${dir}/test.txt`, 'hello');
+        await sleep(300);
+        watcher.close();
+        await done;
+
+        assertTrue(
+          events.some((e) => e.paths.some((p) => p.endsWith('test.txt'))),
+          'native Node watcher must emit event for new file',
+        );
+      } finally {
+        watcher.close();
+      }
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'native Node watcher emits modify event',
+    async (ctx: TestSuite) => {
+      const fs = await import('node:fs');
+      const dir = await ctx.tempDir('node-native-modify');
+      fs.writeFileSync(`${dir}/test.txt`, 'v1');
+      await sleep(100);
+
+      const watcher = await watchDirectory(dir);
+      try {
+        const { events, done } = startCollecting(watcher);
+
+        fs.writeFileSync(`${dir}/test.txt`, 'v2');
+        await sleep(300);
+        watcher.close();
+        await done;
+
+        assertTrue(
+          events.some((e) => e.paths.some((p) => p.endsWith('test.txt'))),
+          'native Node watcher must emit event for modified file',
+        );
+      } finally {
+        watcher.close();
+      }
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'native Node watcher emits remove event',
+    async (ctx: TestSuite) => {
+      const fs = await import('node:fs');
+      const dir = await ctx.tempDir('node-native-remove');
+      fs.writeFileSync(`${dir}/test.txt`, 'hello');
+      await sleep(100);
+
+      const watcher = await watchDirectory(dir);
+      try {
+        const { events, done } = startCollecting(watcher);
+
+        fs.unlinkSync(`${dir}/test.txt`);
+        await sleep(300);
+        watcher.close();
+        await done;
+
+        assertTrue(
+          events.some((e) => e.paths.some((p) => p.endsWith('test.txt'))),
+          'native Node watcher must emit event for deleted file',
+        );
+      } finally {
+        watcher.close();
+      }
     },
   );
 }
