@@ -1,31 +1,12 @@
 import * as path from '@std/path';
 import { getRepositoryPath } from '../base/git-root.ts';
 import { getRuntime } from '../base/runtime/index.ts';
-import { normalizeBuildEntryPath } from '../build.ts';
+import {
+  getDenoPlugin,
+  getEsbuild,
+  normalizeBuildEntryPath,
+} from '../build.ts';
 import { type StaticAssets, staticAssetsToJS } from './system-assets.ts';
-
-// Lazy-loaded build-time dependencies to avoid breaking Node.js bundles.
-// These are Deno/JSR-specific and cannot be resolved by Node.js at runtime.
-// deno-lint-ignore no-explicit-any
-let esbuildModule: any;
-// deno-lint-ignore no-explicit-any
-let denoPluginModule: any;
-
-async function getEsbuild(): Promise<typeof import('esbuild')> {
-  if (!esbuildModule) {
-    esbuildModule = await import('esbuild');
-  }
-  return esbuildModule as typeof import('esbuild');
-}
-
-async function getDenoPlugin(): Promise<
-  typeof import('@deno/esbuild-plugin').denoPlugin
-> {
-  if (!denoPluginModule) {
-    denoPluginModule = await import('@deno/esbuild-plugin');
-  }
-  return denoPluginModule.denoPlugin;
-}
 
 export async function buildSysAssetsBundle(): Promise<StaticAssets> {
   if (getRuntime().id !== 'deno') {
