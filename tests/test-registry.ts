@@ -22,14 +22,18 @@ import setupBinaryEncoding from './binary-encoding.test.ts';
 import setupServerArchitectureTest from './server-architecture.test.ts';
 import setupStaticAssetsEndpointTest from './static-assets-endpoint.test.ts';
 import setupFileImplTests from './file-impl.test.ts';
-import setupFileWatcherUnitTests, { setupFileWatcherTests } from './file-watcher.test.ts';
+import setupFileWatcherUnitTests, {
+  setupFileWatcherDenoTests,
+  setupFileWatcherNativeNodeTests,
+  setupFileWatcherTests,
+} from './file-watcher.test.ts';
 import setupJsonLogFormats from './json-log-formats.test.ts';
 import setupNodeHttpServerTests from './node-http-server.test.ts';
 import setupHealthCheckEndpointTest from './health-check-endpoint.test.ts';
 import setupMinimalSync from './minimal-client-server-sync.test.ts';
 import setupE2ELatency from './e2e-latency.test.ts';
 import setupClusterLatency from './cluster-latency.test.ts';
-import setupCliInitTests from './cli-init.test.ts';
+import setupCliInitTests, { setupCliInitBuildTests } from './cli-init.test.ts';
 import setupCliCompileTests from './cli-compile.test.ts';
 import setupPathTests from './path.test.ts';
 import setupBuildTests from './build.test.ts';
@@ -39,7 +43,11 @@ import setupRuntimeTests, {
 } from './runtime.test.ts';
 import setupEmailServiceTests from './email-service.test.ts';
 import setupProgressTests from './progress.test.ts';
-import setupTestRunnerTests, { setupPlaywrightPinningTests } from './test-runner.test.ts';
+import setupTestRunnerTests, {
+  setupPlaywrightPinningTests,
+  setupTestRunnerBrowserCliTests,
+  setupTestRunnerDenoTests,
+} from './test-runner.test.ts';
 import setupMergeAdjList from './merge-adjlist.test.ts';
 import setupMergeBloom from './merge-bloom.test.ts';
 import setupBloomFPR from './bloom-fpr.test.ts';
@@ -127,6 +135,9 @@ async function registerAllTestsImpl(): Promise<void> {
   setupSecurityBoundaries(); // Security boundary invariants (auth, sync, signatures)
   setupGoatRequestTest(); // HTTP request processing
   setupCliInitTests(); // CLI scaffolding functionality
+  if (!isBrowser()) {
+    setupCliInitBuildTests(); // Full build of scaffolded project (needs esbuild)
+  }
   setupMergeLCA(); // Lowest Common Ancestor / merge base
   setupMergeRecord(); // Record merge and schema upgrade
   setupMergeCorruption(); // Corruption detection via checksums
