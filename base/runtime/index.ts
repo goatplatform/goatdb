@@ -18,6 +18,7 @@
 import { notReached } from '../error.ts';
 import type { FileImpl } from '../json-log/file-impl-interface.ts';
 import type { OperatingSystem } from '../os.ts';
+import { log } from '../../logging/log.ts';
 
 /**
  * Identifies a JavaScript runtime environment.
@@ -219,6 +220,36 @@ export function clearRuntimeCache(): void {
  */
 export function getRegisteredAdapters(): readonly RuntimeAdapter[] {
   return adapters;
+}
+
+/**
+ * Wraps an async signal handler so rejections are logged, not unhandled.
+ * Shared by Deno and Node adapters — avoids duplicating the catch logic.
+ */
+export function wrapAsyncSignalHandler(
+  handler: () => Promise<void> | void,
+  signal: string,
+): () => void {
+  return () => {
+    try {
+      const result = handler();
+      if (result instanceof Promise) {
+        result.catch((err) => {
+          log({
+            severity: 'ERROR',
+            error: 'UncaughtServerError',
+            message: `Signal handler for ${signal} failed: ${err}`,
+          });
+        });
+      }
+    } catch (err) {
+      log({
+        severity: 'ERROR',
+        error: 'UncaughtServerError',
+        message: `Sync signal handler for ${signal} failed: ${err}`,
+      });
+    }
+  };
 }
 
 /**

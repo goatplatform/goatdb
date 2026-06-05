@@ -14,6 +14,7 @@ import type { OperatingSystem } from '../../os.ts';
 import type { FileImpl } from '../../json-log/file-impl-interface.ts';
 import { log } from '../../../logging/log.ts';
 import { browserOpenCommand } from '../browser-open.ts';
+import { wrapAsyncSignalHandler } from '../index.ts';
 
 /**
  * Deno-specific RuntimeAdapter implementation.
@@ -174,18 +175,7 @@ export const DenoAdapter: RuntimeAdapter = {
     signal: string,
     handler: () => Promise<void> | void,
   ): () => void {
-    const wrapped = () => {
-      const result = handler();
-      if (result instanceof Promise) {
-        result.catch((err) => {
-          log({
-            severity: 'ERROR',
-            error: 'UncaughtServerError',
-            message: `Signal handler for ${signal} failed: ${err}`,
-          });
-        });
-      }
-    };
+    const wrapped = wrapAsyncSignalHandler(handler, signal);
     Deno.addSignalListener(signal as Deno.Signal, wrapped);
     return () => {
       try {

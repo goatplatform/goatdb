@@ -16,6 +16,7 @@ import type { FileImpl } from '../../json-log/file-impl-interface.ts';
 import { notReached } from '../../error.ts';
 import { log } from '../../../logging/log.ts';
 import { browserOpenCommand } from '../browser-open.ts';
+import { wrapAsyncSignalHandler } from '../index.ts';
 
 /**
  * Node.js-specific RuntimeAdapter implementation.
@@ -197,18 +198,7 @@ export const NodeAdapter: RuntimeAdapter = {
   ): () => void {
     // deno-lint-ignore no-explicit-any
     const proc = (globalThis as any).process;
-    const wrapped = () => {
-      const result = handler();
-      if (result instanceof Promise) {
-        result.catch((err) => {
-          log({
-            severity: 'ERROR',
-            error: 'UncaughtServerError',
-            message: `Signal handler for ${signal} failed: ${err}`,
-          });
-        });
-      }
-    };
+    const wrapped = wrapAsyncSignalHandler(handler, signal);
     proc.on(signal, wrapped);
     return () => {
       try {
