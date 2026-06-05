@@ -41,7 +41,9 @@ import setupRuntimeTests, {
   setupRuntimeDenoTests,
   setupRuntimeNodeTests,
 } from './runtime.test.ts';
-import setupEmailServiceTests from './email-service.test.ts';
+import setupEmailServiceTests, {
+  setupEmailServiceServerTests,
+} from './email-service.test.ts';
 import setupProgressTests from './progress.test.ts';
 import setupTestRunnerTests, {
   setupPlaywrightPinningTests,
@@ -112,7 +114,10 @@ async function registerAllTestsImpl(): Promise<void> {
     setupBuildDenoTests(); // Deno-only build coverage that imports Deno-only modules
   }
   setupRuntimeTests(); // Runtime abstraction layer invariants
-  setupEmailServiceTests(); // Lazy email transport init and logging contracts
+  setupEmailServiceTests(); // Cross-runtime email service contracts
+  if (!isBrowser()) {
+    setupEmailServiceServerTests(); // Default nodemailer path needs server package resolution
+  }
   if (isDeno()) {
     setupRuntimeDenoTests(); // Deno-only runtime tests (signals, unsupported browser opening)
   }
