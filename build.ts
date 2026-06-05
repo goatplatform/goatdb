@@ -85,8 +85,8 @@ export async function getDenoPlugin(): Promise<typeof denoPlugin> {
 }
 
 export interface BundleResult {
-  source: string;
-  map: string;
+  source?: string; // JS bundle text; undefined for CSS-only entries (esbuild always emits JS, type is honest)
+  map?: string; // JS source map text
   css?: string; // companion CSS emitted by esbuild from bundled CSS imports; sourceMappingURL already stripped
   cssMap?: string; // corresponding CSS source map JSON string from esbuild .css.map output
 }

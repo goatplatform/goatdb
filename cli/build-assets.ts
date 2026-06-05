@@ -1,5 +1,6 @@
 import * as path from '../base/path.ts';
 import { log } from '../logging/log.ts';
+import { assert } from '../base/error.ts';
 import {
   type BuildOutput,
   type BuildPluginLike,
@@ -259,6 +260,10 @@ export async function buildAssets(
   // alongside the JS when that entry imported styles.
   for (const ep of Object.keys(buildResults)) {
     const { source, map } = buildResults[ep];
+    // Every entry point produces JS output from esbuild. If this fires,
+    // the build pipeline has a bug (e.g., CSS-only entry without JS stub).
+    assert(source !== undefined, `Missing JS output for entry "${ep}"`);
+    assert(map !== undefined, `Missing source map for entry "${ep}"`);
     if (ep === APP_ENTRY_POINT) {
       result['/app.js'] = {
         data: textEncoder.encode(source),
