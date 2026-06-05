@@ -2,11 +2,9 @@ import type { OperatingSystem } from '../os.ts';
 
 /**
  * Resolves the OS-specific command and arguments to open a URL in the default
- * browser. The URL is passed as a raw arg (no shell on mac/linux) so spaces
- * and special chars are safe. On Windows, `cmd /c start` needs an empty
- * quoted title `""` as the first start arg (otherwise the first quoted arg
- * is eaten as the window title), then the URL follows double-quoted to
- * prevent shell metacharacter injection (`&`, `|`, etc.).
+ * browser. The URL is always passed as a raw arg so shell parsing never sees
+ * untrusted URL content. Windows uses `rundll32 url.dll,FileProtocolHandler`
+ * instead of `cmd /c start` to avoid cmd-specific expansion rules.
  */
 export function browserOpenCommand(
   os: OperatingSystem,
@@ -15,7 +13,7 @@ export function browserOpenCommand(
   if (os === 'darwin') return { cmd: 'open', args: [url] };
   if (os === 'linux') return { cmd: 'xdg-open', args: [url] };
   if (os === 'windows') {
-    return { cmd: 'cmd', args: ['/c', 'start', '""', `"${url}"`] };
+    return { cmd: 'rundll32', args: ['url.dll,FileProtocolHandler', url] };
   }
   return undefined;
 }

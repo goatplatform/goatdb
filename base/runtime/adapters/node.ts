@@ -172,7 +172,6 @@ export const NodeAdapter: RuntimeAdapter = {
     try {
       const { spawn } = await import('node:child_process');
       const child = spawn(cmd, args, {
-        shell: this.getOS() === 'windows',
         stdio: 'ignore',
       });
       child.on('error', (err) => {

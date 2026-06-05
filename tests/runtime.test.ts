@@ -106,47 +106,60 @@ export default function setupRuntimeTests(): void {
     );
   });
 
-  TEST('Runtime', 'browserOpenCommand quotes Windows URLs for cmd start', () => {
-    assertEquals(browserOpenCommand('windows', 'http://localhost:1234'), {
-      cmd: 'cmd',
-      args: ['/c', 'start', '""', '"http://localhost:1234"'],
-    });
-  });
+  TEST(
+    'Runtime',
+    'browserOpenCommand uses a direct Windows launcher',
+    () => {
+      assertEquals(browserOpenCommand('windows', 'http://localhost:1234'), {
+        cmd: 'rundll32',
+        args: ['url.dll,FileProtocolHandler', 'http://localhost:1234'],
+      });
+    },
+  );
 
   TEST(
     'Runtime',
-    'browserOpenCommand preserves shell metacharacters inside one Windows URL arg',
+    'browserOpenCommand preserves Windows URL content as one raw arg',
     () => {
       assertEquals(
         browserOpenCommand('windows', 'https://example.com/a b?x=1&y=2|z'),
         {
-          cmd: 'cmd',
+          cmd: 'rundll32',
           args: [
-            '/c',
-            'start',
-            '""',
-            '"https://example.com/a b?x=1&y=2|z"',
+            'url.dll,FileProtocolHandler',
+            'https://example.com/a b?x=1&y=2|z',
           ],
         },
       );
     },
   );
 
-  TEST('Runtime', 'browser adapter logs unsupported browser opening', async () => {
-    const captured = await withCapturedLogs(() =>
-      BrowserAdapter.openBrowser('http://localhost:1234')
-    );
-    const warnings = captured.filter((e) =>
-      e.severity === 'WARNING' &&
-      e.error === 'MissingConfiguration' &&
-      e.message?.includes('openBrowser() is not supported in browser')
-    );
-    assertEquals(
-      warnings.length,
-      1,
-      'Browser adapter should report unsupported browser opening',
-    );
+  TEST('Runtime', 'browserOpenCommand preserves Windows URL quotes', () => {
+    assertEquals(browserOpenCommand('windows', 'https://example.com/a"&calc'), {
+      cmd: 'rundll32',
+      args: ['url.dll,FileProtocolHandler', 'https://example.com/a"&calc'],
+    });
   });
+
+  TEST(
+    'Runtime',
+    'browser adapter logs unsupported browser opening',
+    async () => {
+      const captured = await withCapturedLogs(() =>
+        BrowserAdapter.openBrowser('http://localhost:1234')
+      );
+      const warnings = captured.filter((e) =>
+        e.severity === 'WARNING' &&
+        e.error === 'MissingConfiguration' &&
+        e.message?.includes('openBrowser() is not supported in browser')
+      );
+      assertEquals(
+        warnings.length,
+        1,
+        'Browser adapter should report unsupported browser opening',
+      );
+    },
+  );
 
   // setupSignalHandler tests
 
