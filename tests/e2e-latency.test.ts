@@ -29,6 +29,7 @@ import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { sleep } from '../base/time.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
+import { createTestDomainConfig } from './merge-test-utils.ts';
 
 /**
  * Setup function required by GoatDB test infrastructure
@@ -98,33 +99,6 @@ export default function setupE2ELatency() {
    */
   const testRegistry = new DataRegistry();
   testRegistry.registerSchema(LatencyTestSchema);
-
-  /**
-   * Domain configuration for test environment
-   *
-   * GoatDB uses domain resolution to determine which organization a client belongs to.
-   * For testing, we map all localhost connections to a single test organization.
-   */
-  function createTestDomainConfig() {
-    let actualPort = 0;
-    return {
-      domain: {
-        resolveOrg: (orgId: string) =>
-          `http://localhost:${actualPort}/${orgId}`,
-        resolveDomain: (url: string) => {
-          try {
-            const u = new URL(url);
-            return u.hostname === 'localhost' ? 'test-org' : '';
-          } catch {
-            return '';
-          }
-        },
-      },
-      setPort: (p: number) => {
-        actualPort = p;
-      },
-    };
-  }
 
   /**
    * Build information required by GoatDB server

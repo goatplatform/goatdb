@@ -26,26 +26,7 @@ import {
 import { GoatDB } from '../db/db.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { BINARY_MAGIC } from '../base/core-types/encoding/binary-commit.ts';
-import {
-  getGlobalLoggerStreams,
-  setGlobalLoggerStreams,
-} from '../logging/log.ts';
-import type { LogEntry } from '../logging/log.ts';
-import type { NormalizedLogEntry } from '../logging/entry.ts';
-
-// Swaps in a capturing log stream for the duration of fn, then restores.
-function withLogCapture<T>(
-  fn: (captured: NormalizedLogEntry<LogEntry>[]) => Promise<T>,
-): Promise<T> {
-  const captured: NormalizedLogEntry<LogEntry>[] = [];
-  const prev = getGlobalLoggerStreams();
-  setGlobalLoggerStreams([{
-    appendEntry(e: NormalizedLogEntry<LogEntry>): void {
-      captured.push(e);
-    },
-  }]);
-  return fn(captured).finally(() => setGlobalLoggerStreams(prev));
-}
+import { withLogCapture } from './test-utils.ts';
 
 type LogFormat = 'goat' | 'jsonl';
 
