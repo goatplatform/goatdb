@@ -200,6 +200,24 @@ export interface WriteFailureDetail {
   commitIds: string[];
 }
 
+type TestAppendFailureHook = (() => boolean) | undefined;
+const gTestAppendFailureHooks = new WeakMap<GoatDB, TestAppendFailureHook>();
+
+/**
+ * @internal Test-only fault injection for append writes.
+ * The hook is called once per append attempt; return `true` to force failure.
+ */
+export function setTestAppendFailureHook(
+  db: GoatDB,
+  hook: TestAppendFailureHook,
+): void {
+  if (hook) {
+    gTestAppendFailureHooks.set(db, hook);
+  } else {
+    gTestAppendFailureHooks.delete(db);
+  }
+}
+
 /**
  * The main database class that manages repositories, synchronization, and data
  * access.
@@ -240,9 +258,6 @@ export class GoatDB<US extends Schema = Schema>
   >;
   // Consecutive write-failure count per file; dropped and logged at 3 failures.
   private readonly _appendFailCounts = new Map<JSONLogFile, number>();
-  // @internal Test-only: when > 0, _drainPendingAppends throws instead of
-  // writing, simulating I/O failures. Decremented on each triggered failure.
-  _testForceAppendFailures = 0;
   // Tracks the most recent fire-and-forget drain promise per file so that
   // flush()/closeRepo() can await it before their own drain loop.
   private readonly _inFlightDrains = new Map<JSONLogFile, Promise<void>>();
@@ -752,8 +767,7 @@ export class GoatDB<US extends Schema = Schema>
     }
     this._pendingAppends.delete(file);
     try {
-      if (this._testForceAppendFailures > 0) {
-        this._testForceAppendFailures--;
+      if (gTestAppendFailureHooks.get(this)?.()) {
         throw new Error('test-forced append failure');
       }
       await JSONLogFileAppend(file, pending.values, pending.ids);

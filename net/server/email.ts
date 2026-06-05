@@ -1,5 +1,5 @@
 import type { ServerServices } from './server.ts';
-import type { SendMailOptions } from 'nodemailer';
+import type { SendMailOptions, Transporter } from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
 import type SESTransport from 'nodemailer/lib/ses-transport/index.js';
 
@@ -85,6 +85,14 @@ export type EmailConfig = NodeMailerConfig & {
    * the Reply-To: field
    */
   replyTo?: string | string[] | undefined;
+
+  /**
+   * Optional custom transporter factory. When provided, used instead of
+   * `nodemailer.createTransport()`. Useful for testing — inject a mock
+   * transporter without monkey-patching the nodemailer module.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createTransport?: (config: Record<string, any>) => Transporter;
 };
 
 /**
@@ -115,10 +123,16 @@ export class EmailService<US extends Schema>
   private readonly _config: EmailConfig | undefined;
   private _transporter: import('nodemailer').Transporter | undefined;
   private _initPromise: Promise<void> | undefined;
+  private _emailLogger: import('../../logging/log.ts').Logger | undefined;
 
   constructor(config?: EmailConfig) {
     super();
     this._config = config;
+  }
+
+  override async setup(services: ServerServices<US>): Promise<void> {
+    await super.setup(services);
+    this._emailLogger = services.logger;
   }
 
   async send(info: EmailInfo): Promise<boolean> {
@@ -133,14 +147,19 @@ export class EmailService<US extends Schema>
       // rejection so transient failures don't permanently poison the service.
       if (!this._transporter) {
         if (!this._initPromise) {
-          this._initPromise = getNodemailer().then((nm) => {
-            const nodemailer = nm as NodemailerModule;
-            // CJS/ESM interop: dynamic import may expose createTransport
-            // under .default depending on the module resolution strategy.
-            const createTransport = nodemailer.default?.createTransport ||
-              nodemailer.createTransport;
-            this._transporter = createTransport(this._config!);
-          }).catch((err) => {
+          this._initPromise = (async () => {
+            if (this._config!.createTransport) {
+              this._transporter = this._config!.createTransport(this._config!);
+            } else {
+              const nm = await getNodemailer();
+              const nodemailer = nm as NodemailerModule;
+              // CJS/ESM interop: dynamic import may expose createTransport
+              // under .default depending on the module resolution strategy.
+              const createTransport = nodemailer.default?.createTransport ||
+                nodemailer.createTransport;
+              this._transporter = createTransport(this._config!);
+            }
+          })().catch((err) => {
             this._initPromise = undefined;
             throw asEmailInitError(err);
           });
@@ -160,7 +179,7 @@ export class EmailService<US extends Schema>
       };
       const success = await this._transporter!.sendMail(msg);
       if (success) {
-        this.services.logger.log({
+        (this._emailLogger ?? this.services.logger).log({
           severity: 'METRIC',
           name: 'EmailSent',
           value: 1,
@@ -168,7 +187,7 @@ export class EmailService<US extends Schema>
           type: info.type,
         });
       } else {
-        this.services.logger.log({
+        (this._emailLogger ?? this.services.logger).log({
           severity: 'INFO',
           error: 'EmailSendFailed',
           type: info.type,
@@ -177,7 +196,7 @@ export class EmailService<US extends Schema>
       return success;
     } catch (err: unknown) {
       const error = toError(err);
-      this.services.logger.log({
+      (this._emailLogger ?? this.services.logger).log({
         severity: 'ERROR',
         error: 'emailInitFailed' in error && error.emailInitFailed
           ? 'EmailInitFailed'
