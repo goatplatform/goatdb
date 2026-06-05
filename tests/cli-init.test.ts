@@ -284,13 +284,17 @@ export default function setupCliInitTests() {
       );
     },
   );
+}
 
+/**
+ * Server-only test: builds the scaffolded project through buildAssets.
+ * Gated by `if (!isBrowser())` in test-registry.ts.
+ */
+export function setupCliInitBuildTests(): void {
   TEST(
     'CLI-Init',
     'real scaffold entry builds through buildAssets',
     async (ctx: TestSuite) => {
-      if (typeof document !== 'undefined') return;
-
       const testDir = await ctx.tempDir('init-real-scaffold-build');
       const initModule = await import('../cli/init.ts');
       await initModule.bootstrapProject({
