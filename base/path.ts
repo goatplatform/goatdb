@@ -9,8 +9,7 @@
  * All paths use POSIX-style forward slashes for consistency.
  */
 
-import { isDeno, isNode } from './common.ts';
-import { notReached } from './error.ts';
+import { getRuntime } from './runtime/index.ts';
 
 /**
  * Converts backslashes to forward slashes for consistent POSIX-style paths.
@@ -192,14 +191,12 @@ export function resolve(...paths: string[]): string {
     }
   }
 
-  // If still not absolute, prepend cwd (only in server environments)
+  // If still not absolute, resolve against cwd.
+  // When cwd is '/', prepending it directly gives `//foo` (UNC-like).
+  // Adding a single slash avoids that while keeping the path absolute.
   if (!isAbsolute(resolvedPath)) {
-    if (isDeno()) {
-      resolvedPath = Deno.cwd() + '/' + resolvedPath;
-    } else if (isNode()) {
-      resolvedPath = process.cwd() + '/' + resolvedPath;
-    }
-    // Browser: no cwd available, keep path relative
+    const cwd = getRuntime().getCWD();
+    resolvedPath = cwd === '/' ? '/' + resolvedPath : cwd + '/' + resolvedPath;
   }
 
   return normalize(resolvedPath);
@@ -207,22 +204,12 @@ export function resolve(...paths: string[]): string {
 
 /**
  * Converts a relative path to an absolute path.
- * Only works in Deno and Node.js environments.
  *
  * @param p The path to convert
  * @returns The absolute path
  */
 export function toAbsolutePath(p: string): string {
-  if (isAbsolute(p)) {
-    return p;
-  }
-  if (isDeno()) {
-    return join(Deno.cwd(), p);
-  } else if (isNode()) {
-    return join(process.cwd(), p);
-  }
-  // Browser: treat as relative to root (consistent with resolve())
-  return '/' + p;
+  return resolve(p);
 }
 
 /**
@@ -264,15 +251,11 @@ export function toFileUrl(path: string): URL {
 
 /**
  * Converts a file:// URL to a filesystem path.
- * Only works in Deno and Node.js environments.
  *
  * @param url The file URL to convert
  * @returns The filesystem path
  */
 export function fromFileUrl(url: string | URL): string {
-  if (!isDeno() && !isNode()) {
-    notReached('fromFileUrl is not supported in browser');
-  }
   const urlObj = url instanceof URL ? url : new URL(url);
   if (urlObj.protocol !== 'file:') {
     throw new TypeError('Must be a file URL');

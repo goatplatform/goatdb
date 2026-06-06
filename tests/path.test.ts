@@ -14,6 +14,7 @@ import {
   toAbsolutePath,
   toFileUrl,
 } from '../base/path.ts';
+import { withTestCWD } from './test-utils.ts';
 import { assertThrows } from './asserts.ts';
 
 export default function setupPathTests(): void {
@@ -181,6 +182,18 @@ export default function setupPathTests(): void {
     assertEquals(resolve('foo', '/bar'), '/bar');
   });
 
+  TEST(
+    'Path',
+    'resolve keeps browser-root relative paths absolute without UNC semantics',
+    () => {
+      withTestCWD('/', () => {
+        assertEquals(resolve('foo/bar'), '/foo/bar');
+        assertEquals(resolve('foo'), '/foo');
+        assertEquals(resolve(''), '/');
+      });
+    },
+  );
+
   // toAbsolutePath tests
   TEST('Path', 'toAbsolutePath returns absolute paths unchanged', () => {
     assertEquals(toAbsolutePath('/foo/bar'), '/foo/bar');
@@ -192,6 +205,18 @@ export default function setupPathTests(): void {
     assertEquals(isAbsolute(result), true);
     assertEquals(result.endsWith('foo/bar'), true);
   });
+
+  TEST(
+    'Path',
+    'toAbsolutePath keeps browser-root relative paths absolute without UNC semantics',
+    () => {
+      withTestCWD('/', () => {
+        assertEquals(toAbsolutePath('foo/bar'), '/foo/bar');
+        assertEquals(toAbsolutePath('foo'), '/foo');
+        assertEquals(toAbsolutePath(''), '/');
+      });
+    },
+  );
 
   // isFileUrlPath tests
   TEST('Path', 'isFileUrlPath detects file:// URLs', () => {

@@ -10,6 +10,7 @@ import {
   newLogger,
   setGlobalLoggerStreams,
 } from '../logging/log.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 
 /**
  * Swaps in a capturing log stream for the duration of `fn`, then restores
@@ -46,4 +47,19 @@ export function createCapturedLogger(): {
     captured,
     logger: newLogger([stream]),
   };
+}
+
+/**
+ * @internal Temporarily overrides getRuntime().getCWD for the duration of fn.
+ * Restores the original function in a finally block.
+ */
+export function withTestCWD<T>(cwd: string, fn: () => T): T {
+  const runtime = getRuntime();
+  const orig = runtime.getCWD;
+  runtime.getCWD = () => cwd;
+  try {
+    return fn();
+  } finally {
+    runtime.getCWD = orig;
+  }
 }
