@@ -23,7 +23,8 @@
     "singleQuote": true,
     "exclude": [
       "benchmarks/browser/assets/",
-      "external/"
+      "external/",
+      "system-assets/assets.json"
     ]
   },
   "name": "@goatdb/goatdb",
