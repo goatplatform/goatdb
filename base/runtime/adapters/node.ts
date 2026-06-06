@@ -13,7 +13,6 @@ import type {
 import type { OperatingSystem } from '../../os.ts';
 import { normalizeNodePlatform } from '../../os.ts';
 import type { FileImpl } from '../../json-log/file-impl-interface.ts';
-import { notReached } from '../../error.ts';
 import { log } from '../../../logging/log.ts';
 import { browserOpenCommand } from '../browser-open.ts';
 import { wrapAsyncSignalHandler } from '../index.ts';
@@ -121,7 +120,9 @@ export const NodeAdapter: RuntimeAdapter = {
     // deno-lint-ignore no-explicit-any
     const execPath = (globalThis as any).process?.execPath;
     if (!execPath) {
-      return notReached('getExecPath() is not available in this environment');
+      // Defensive throw — proc.execPath is required by Node's contract,
+      // and the process would be in an unrecoverable state if missing.
+      throw new Error('getExecPath() is not available in this environment');
     }
     return execPath;
   },
@@ -212,6 +213,6 @@ export const NodeAdapter: RuntimeAdapter = {
     // deno-lint-ignore no-explicit-any
     const proc = (globalThis as any).process;
     proc.exit(code);
-    return notReached('exit() should not return');
+    throw new Error('unreachable: exit() should not return');
   },
 };

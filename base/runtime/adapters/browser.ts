@@ -55,31 +55,18 @@ export const BrowserAdapter: RuntimeAdapter = {
   },
 
   getSystemInfo(): SystemInfo {
-    const info: SystemInfo = {
-      runtime: 'browser',
-    };
-
-    // Try to extract browser info from navigator
     try {
       if (typeof navigator !== 'undefined') {
-        // deno-lint-ignore no-explicit-any
-        const nav = navigator as any;
-        // Get platform if available
-        if (nav.platform) {
-          // deno-lint-ignore no-explicit-any
-          (info as any).os = nav.platform;
-        }
-        // Get user agent for version info
-        if (nav.userAgent) {
-          // deno-lint-ignore no-explicit-any
-          (info as any).version = nav.userAgent;
-        }
+        return {
+          runtime: 'browser',
+          os: navigator.platform ?? undefined,
+          version: navigator.userAgent ?? undefined,
+        };
       }
     } catch {
       // Ignore errors accessing navigator
     }
-
-    return info;
+    return { runtime: 'browser' };
   },
 
   getCWD(): string {
@@ -159,9 +146,8 @@ export const BrowserAdapter: RuntimeAdapter = {
     log({
       severity: 'WARNING',
       error: 'MissingConfiguration',
-      message:
-        'openBrowser() is not supported in browser environment — ' +
-        'browsers cannot programmatically open new windows reliably.',
+      message: 'openBrowser() is not supported in browser environment — ' +
+        'Browsers cannot guarantee programmatic tab/window opening from non-user-initiated contexts.',
     });
     return Promise.resolve();
   },
