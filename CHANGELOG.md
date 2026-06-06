@@ -62,6 +62,24 @@ and GoatDB adheres to
   Node.js imports `package.json`. No cross-runtime fallback. Explicit
   `denoJson`/`packageJson` options work as before.
 
+- **`AppConfig.cssPath` semantics changed** _(first released in 0.5.1)_: The
+  `cssPath` field now represents a vendor/prepend CSS file that is prepended
+  into `/index.css` before esbuild-bundled CSS, rather than the sole source of
+  the app's CSS. Use this for global resets or vendor CSS that must load before
+  component styles. For application CSS, prefer `import './index.css'` in your
+  JS entry point instead.
+
+  **Migration:**
+  ```typescript
+  // Before — cssPath was the only CSS file
+  cssPath: './src/styles.css',
+
+  // After — use cssPath only for vendor/prepend CSS;
+  // import application CSS in your JS entry point
+  cssPath: './src/vendor.css',
+  // In your JS/TS entry: import './src/styles.css';
+  ```
+
 ### Added
 
 - `GoatDB.insert()` — bulk API for batch item creation without ancestor
@@ -100,9 +118,8 @@ and GoatDB adheres to
   builds
 - CSS bundling documented in dedicated [CSS and esbuild](/docs/css-esbuild)
   guide
-- Build failure severity during watch-mode rebuilds downgraded from `ERROR`
-  to `WARNING` — transient build failures in development are not application
-  errors
+- Build failure severity during watch-mode rebuilds downgraded from `ERROR` to
+  `WARNING` — transient build failures in development are not application errors
 
 - `Server.start()` now awaits a prior `stop()` promise and checks `_stopping`
   flag for clean start/stop race handling
@@ -135,8 +152,6 @@ and GoatDB adheres to
 - `postject` bundled as optional dependency — no more global install required
 - esbuild target updated from `node18` to `node24`
 - `goatdb` CLI binary now available via npm (`npx -y @goatdb/goatdb init`)
-
-## [0.5.0] - 2026-02-26
 
 ## [0.4.0] - 2026-02-20
 
