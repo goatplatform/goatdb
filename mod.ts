@@ -29,6 +29,7 @@ import { Repository } from './repo/repo.ts';
 import { ManagedItem } from './db/managed-item.ts';
 import { Item } from './cfds/base/item.ts';
 import { prettyJSON, uniqueId } from './base/common.ts';
+import { getRuntime } from './base/runtime/index.ts';
 import { ConsoleLogStream } from './logging/console-stream.ts';
 import type { LogStream } from './logging/log.ts';
 import { JSONLogStream } from './logging/json-log-stream.ts';
@@ -67,6 +68,7 @@ export {
   DataRegistry,
   Emitter,
   getEnvVar,
+  getRuntime,
   GoatDB,
   Item,
   itemPath,
