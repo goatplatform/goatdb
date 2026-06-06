@@ -33,7 +33,10 @@ import setupHealthCheckEndpointTest from './health-check-endpoint.test.ts';
 import setupMinimalSync from './minimal-client-server-sync.test.ts';
 import setupE2ELatency from './e2e-latency.test.ts';
 import setupClusterLatency from './cluster-latency.test.ts';
-import setupCliInitTests, { setupCliInitBuildTests } from './cli-init.test.ts';
+import setupCliInitTests, {
+  setupCliInitBuildTests,
+  setupCliInitNodeTests,
+} from './cli-init.test.ts';
 import setupCliCompileTests from './cli-compile.test.ts';
 import setupPathTests from './path.test.ts';
 import setupBuildTests, { setupBuildServerTests } from './build.test.ts';
@@ -143,6 +146,9 @@ async function registerAllTestsImpl(): Promise<void> {
   setupSecurityBoundaries(); // Security boundary invariants (auth, sync, signatures)
   setupGoatRequestTest(); // HTTP request processing
   setupCliInitTests(); // CLI scaffolding functionality
+  if (isNode()) {
+    setupCliInitNodeTests(); // Node-only scaffold template assertions
+  }
   if (!isBrowser()) {
     setupCliInitBuildTests(); // Full build of scaffolded project (needs esbuild)
   }

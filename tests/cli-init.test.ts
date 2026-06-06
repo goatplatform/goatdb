@@ -286,6 +286,124 @@ export default function setupCliInitTests() {
   );
 }
 
+export function setupCliInitNodeTests(): void {
+  TEST(
+    'CLI-Init',
+    'node scaffold keeps SEA templates self-contained and explicit about exits',
+    async (ctx: TestSuite) => {
+      const testDir = await ctx.tempDir('init-node-sea-template');
+      const initModule = await import('../cli/init.ts');
+      await initModule.bootstrapProject({
+        targetDir: testDir,
+        skipDependencies: true,
+      });
+
+      const seaContent = await readTextFile(
+        path.join(testDir, 'server/server-sea.ts'),
+      );
+      const buildContent = await readTextFile(
+        path.join(testDir, 'server/build.ts'),
+      );
+
+      // Count signal-handler registrations — must be exactly 2 (SIGTERM, SIGINT).
+      const sigHandlerCount =
+        (seaContent?.match(/runtime\.setupSignalHandler\(/g) ?? []).length;
+      assertEquals(
+        sigHandlerCount,
+        2,
+        'SEA template must register both SIGTERM and SIGINT',
+      );
+
+      // Encoding must be a string literal, not a BufferEncoding union.
+      assertTrue(
+        /encoding:\s*['"][^'"]+['"]/.test(seaContent ?? ''),
+        'SEA template must use a string-literal encoding, not BufferEncoding',
+      );
+
+      // Fatal exit sites must be `return runtime.exit(N)` so the type-checker
+      // verifies the `never` return type — bare `runtime.exit(N)` is allowed
+      // only on the success path of `main()`.
+      const fatalExitCount =
+        (seaContent?.match(/return runtime\.exit\([01]\)/g) ?? []).length;
+      assertTrue(
+        fatalExitCount >= 2,
+        'SEA template must make fatal exits explicit for type-checking',
+      );
+
+      // setTimeout returns a Timeout with .unref() in Node, but the SEA bundle
+      // may be transpiled to a context that lacks the typed unref. Optional
+      // chaining keeps it valid either way.
+      assertTrue(
+        (seaContent ?? '').includes('forceExit.unref?.()'),
+        'SEA template must tolerate runtimes without typed unref()',
+      );
+
+      // Build script must target the SEA server entry.
+      assertTrue(
+        /serverEntry:\s*['"]server\/server-sea\.ts['"]/.test(
+          buildContent ?? '',
+        ),
+        'build template must target the SEA server entry',
+      );
+
+      // Build script must route fatal exits through the runtime adapter.
+      assertTrue(
+        /getRuntime\(\)\.exit\(1\)/.test(buildContent ?? ''),
+        'build template must exit non-zero on build failure',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Init',
+    'node scaffold non-SEA server template uses runtime adapter shutdown wiring',
+    async (ctx: TestSuite) => {
+      const testDir = await ctx.tempDir('init-node-server-template');
+      const initModule = await import('../cli/init.ts');
+      await initModule.bootstrapProject({
+        targetDir: testDir,
+        skipDependencies: true,
+      });
+
+      const serverContent = await readTextFile(
+        path.join(testDir, 'server/server.ts'),
+      );
+
+      assertEquals(
+        (serverContent?.match(/runtime\.setupSignalHandler\(/g) ?? []).length,
+        2,
+        'non-SEA server template must register both SIGTERM and SIGINT through the runtime adapter',
+      );
+      assertTrue(
+        (serverContent ?? '').includes(
+          "console.log('\\nRuntime:', getRuntime().getSystemInfo())",
+        ),
+        'non-SEA server template must print runtime info via the runtime adapter',
+      );
+      assertTrue(
+        (serverContent ?? '').includes('getRuntime().exit(0)'),
+        'non-SEA server template must exit info mode through the runtime adapter',
+      );
+      assertTrue(
+        (serverContent ?? '').includes(
+          'const forceExit = setTimeout(() => runtime.exit(1), 5000);',
+        ),
+        'non-SEA server template must force-exit shutdown through the runtime adapter',
+      );
+      assertTrue(
+        (serverContent ?? '').includes(
+          'server.stop().then(() => runtime.exit(0)).catch((e) => {',
+        ),
+        'non-SEA server template must route graceful shutdown exit through the runtime adapter',
+      );
+      assertTrue(
+        !(serverContent ?? '').includes('process.on('),
+        'non-SEA server template must avoid direct process signal wiring',
+      );
+    },
+  );
+}
+
 /**
  * Server-only test: builds the scaffolded project through buildAssets.
  * Gated by `if (!isBrowser())` in test-registry.ts.

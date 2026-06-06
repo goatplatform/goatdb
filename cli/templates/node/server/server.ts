@@ -3,7 +3,7 @@ import {
   Server,
   staticAssetsFromJS,
 } from '@goatdb/goatdb/server';
-import { prettyJSON } from '@goatdb/goatdb';
+import { getRuntime, prettyJSON } from '@goatdb/goatdb';
 import { registerSchemas } from '../common/schema.js';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -68,9 +68,8 @@ async function main(): Promise<void> {
       (buildInfo.appName || 'app') + ' v' + (buildInfo.appVersion || 'unknown'),
     );
     console.log(prettyJSON(buildInfo));
-    console.log('\nNode.js version:', process.version);
-    console.log('Platform:', process.platform, process.arch);
-    process.exit(0);
+    console.log('\nRuntime:', getRuntime().getSystemInfo());
+    getRuntime().exit(0);
   }
 
   const server = new Server({
@@ -82,19 +81,23 @@ async function main(): Promise<void> {
 
   await server.start();
 
+  const runtime = getRuntime();
   let stopping = false;
   const shutdown = () => {
     if (stopping) return;
     stopping = true;
-    const forceExit = setTimeout(() => process.exit(1), 5000);
+    const forceExit = setTimeout(() => runtime.exit(1), 5000);
+    // setTimeout returns a Node.js Timeout with .unref() in standard Node.js.
+    // The SEA template uses unref?.() because esbuild may transpile it to a
+    // context that lacks the typed unref, but here we always have it.
     forceExit.unref();
-    server.stop().then(() => process.exit(0)).catch((e) => {
+    server.stop().then(() => runtime.exit(0)).catch((e) => {
       console.error(e);
-      process.exit(1);
+      runtime.exit(1);
     });
   };
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
+  runtime.setupSignalHandler('SIGTERM', shutdown);
+  runtime.setupSignalHandler('SIGINT', shutdown);
 
   console.log(`GoatDB server running at http://localhost:${server.port}`);
 }
@@ -105,6 +108,6 @@ if (
 ) {
   main().catch((err) => {
     console.error('Server startup failed:', err);
-    process.exit(1);
+    getRuntime().exit(1);
   });
 }

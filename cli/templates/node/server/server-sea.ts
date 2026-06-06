@@ -1,7 +1,8 @@
-// Type declarations for Node.js SEA module
+// Type declarations for Node.js SEA module.
+// Why: the scaffold must type-check outside @types/node's SEA coverage.
 declare module 'node:sea' {
   export function getAsset(key: string): ArrayBuffer;
-  export function getAsset(key: string, encoding: BufferEncoding): string;
+  export function getAsset(key: string, encoding: 'utf8'): string;
   export function isSea(): boolean;
 }
 
@@ -10,7 +11,11 @@ import {
   Server,
   staticAssetsFromJS,
 } from '@goatdb/goatdb/server';
-import { prettyJSON, type ReadonlyJSONObject } from '@goatdb/goatdb';
+import {
+  getRuntime,
+  prettyJSON,
+  type ReadonlyJSONObject,
+} from '@goatdb/goatdb';
 import { registerSchemas } from '../common/schema.js';
 import { basename, join } from 'node:path';
 
@@ -30,7 +35,10 @@ function isValidPort(port: number): boolean {
  * Parse command line arguments.
  * Simple parser to avoid bundling yargs into the SEA binary.
  */
-function parseArgs(args: string[]): Arguments {
+function parseArgs(
+  args: string[],
+  runtime: ReturnType<typeof getRuntime>,
+): Arguments {
   const result: Arguments = {
     port: 8080,
   };
@@ -41,7 +49,7 @@ function parseArgs(args: string[]): Arguments {
       const portStr = args[i + 1];
       if (portStr === undefined || portStr.startsWith('-')) {
         console.error('--port requires a value.');
-        process.exit(1);
+        runtime.exit(1);
       } else {
         i++;
         const parsed = parseInt(portStr, 10);
@@ -49,7 +57,7 @@ function parseArgs(args: string[]): Arguments {
           result.port = parsed;
         } else {
           console.error(`Invalid port: ${portStr}.`);
-          process.exit(1);
+          runtime.exit(1);
         }
       }
     } else if (arg.startsWith('--port=')) {
@@ -59,13 +67,13 @@ function parseArgs(args: string[]): Arguments {
         result.port = parsed;
       } else {
         console.error(`Invalid port: ${portStr}.`);
-        process.exit(1);
+        runtime.exit(1);
       }
     } else if (arg === '--path') {
       const val = args[i + 1];
       if (val === undefined || val.startsWith('-')) {
         console.error('--path requires a value.');
-        process.exit(1);
+        runtime.exit(1);
       } else {
         i++;
         result.path = val;
@@ -74,7 +82,7 @@ function parseArgs(args: string[]): Arguments {
       const val = arg.substring(arg.indexOf('=') + 1);
       if (!val) {
         console.error('--path requires a value.');
-        process.exit(1);
+        runtime.exit(1);
       } else {
         result.path = val;
       }
@@ -92,7 +100,7 @@ function parseArgs(args: string[]): Arguments {
   }
 
   if (!result.path) {
-    result.path = join(process.cwd(), 'server-data');
+    result.path = join(runtime.getCWD(), 'server-data');
   }
 
   return result;
@@ -106,11 +114,43 @@ Usage: ${basename(process.argv[0])} [options] [path]
 
 Options:
   --port, -p <number>   Port to run the server on (default: 8080)
-  --path <string>       Path to server data directory (default: ./server-data)
+  --path <string>       Path to server data directory (default: ./server-data from current working directory)
   --info, -i            Print build information and exit
   --version, -v         Print version and exit
   --help, -h            Show this help message
 `);
+}
+
+function requireSea(
+  runtime: ReturnType<typeof getRuntime>,
+): typeof import('node:sea') {
+  try {
+    return require('node:sea') as typeof import('node:sea');
+  } catch {
+    console.error(
+      'This file must be run as a compiled SEA binary. ' +
+        'Use `goatdb compile` to build it.',
+    );
+    return runtime.exit(1);
+  }
+}
+
+function loadEmbeddedAssets(
+  sea: typeof import('node:sea'),
+  runtime: ReturnType<typeof getRuntime>,
+): { encodedAssets: ReadonlyJSONObject; buildInfo: BuildInfo } {
+  try {
+    return {
+      encodedAssets: JSON.parse(sea.getAsset('staticAssets.json', 'utf8')),
+      buildInfo: JSON.parse(sea.getAsset('buildInfo.json', 'utf8')),
+    };
+  } catch (err) {
+    console.error(
+      'Failed to load embedded assets. Binary may be corrupted.',
+    );
+    console.error(err);
+    return runtime.exit(1);
+  }
 }
 
 // Production server - https://goatdb.dev/docs/server
@@ -119,40 +159,22 @@ Options:
  * Assets are loaded from the embedded SEA blob.
  */
 async function main(): Promise<void> {
-  // Load embedded assets via node:sea
-  let sea: typeof import('node:sea');
-  try {
-    sea = require('node:sea');
-  } catch (_) {
-    console.error(
-      'This file must be run as a compiled SEA binary. ' +
-        'Use `goatdb compile` to build it.',
-    );
-    process.exit(1);
-  }
-  let encodedAssets: ReadonlyJSONObject;
-  let buildInfo: BuildInfo;
-  try {
-    encodedAssets = JSON.parse(sea.getAsset('staticAssets.json', 'utf8'));
-    buildInfo = JSON.parse(sea.getAsset('buildInfo.json', 'utf8'));
-  } catch (err) {
-    console.error(
-      'Failed to load embedded assets. Binary may be corrupted.',
-    );
-    console.error(err);
-    process.exit(1);
-  }
+  const runtime = getRuntime();
 
-  const args = parseArgs(process.argv.slice(2));
+  // Load embedded assets via node:sea.
+  const sea = requireSea(runtime);
+  const { encodedAssets, buildInfo } = loadEmbeddedAssets(sea, runtime);
+
+  const args = parseArgs(process.argv.slice(2), runtime);
 
   if (args.help) {
     printHelp(buildInfo);
-    process.exit(0);
+    runtime.exit(0);
   }
 
   if (args.version) {
     console.log(buildInfo.appVersion || 'unknown');
-    process.exit(0);
+    runtime.exit(0);
   }
 
   registerSchemas();
@@ -162,9 +184,8 @@ async function main(): Promise<void> {
       (buildInfo.appName || 'app') + ' v' + (buildInfo.appVersion || 'unknown'),
     );
     console.log(prettyJSON(buildInfo));
-    console.log('\nNode.js version:', process.version);
-    console.log('Platform:', process.platform, process.arch);
-    process.exit(0);
+    console.log('\nRuntime:', runtime.getSystemInfo());
+    runtime.exit(0);
   }
 
   const server = new Server({
@@ -181,18 +202,18 @@ async function main(): Promise<void> {
   const shutdown = () => {
     if (stopping) return;
     stopping = true;
-    const forceExit = setTimeout(() => process.exit(1), 5_000);
-    forceExit.unref();
-    server.stop().then(() => process.exit(0)).catch((e) => {
+    const forceExit = setTimeout(() => runtime.exit(1), 5_000);
+    forceExit.unref?.();
+    server.stop().then(() => runtime.exit(0)).catch((e) => {
       console.error(e);
-      process.exit(1);
+      runtime.exit(1);
     });
   };
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
+  runtime.setupSignalHandler('SIGTERM', shutdown);
+  runtime.setupSignalHandler('SIGINT', shutdown);
 }
 
 main().catch((err) => {
   console.error('Server startup failed:', err);
-  process.exit(1);
+  getRuntime().exit(1);
 });
