@@ -34,6 +34,12 @@ jobs:
         run: |
           deno check mod.ts
           deno check cli/debug-server.ts
+          deno check cli/compile.ts
+          deno check cli/init.ts
+          deno check base/file-watcher.ts
+
+      - name: Check formatting
+        run: deno fmt --check
 
       - name: Run Deno tests
         run: deno task test --runtime=deno
@@ -96,7 +102,15 @@ jobs:
         run: deno run -A npm:playwright@1.60.0 install --with-deps chromium
 
       - name: Static analysis (type check + module graph)
-        run: deno check mod.ts
+        run: |
+          deno check mod.ts
+          deno check cli/debug-server.ts
+          deno check cli/compile.ts
+          deno check cli/init.ts
+          deno check base/file-watcher.ts
+
+      - name: Check formatting
+        run: deno fmt --check
 
       - name: Run TestRunner browser CLI coverage
         run: deno task test --runtime=deno --suite=TestRunner
