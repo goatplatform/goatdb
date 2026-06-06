@@ -55,7 +55,7 @@ export function isBrowserStructuredNoMatchResult(
     result.exitCode === EXIT_CODE_NO_MATCH;
 }
 
-export function finalizeFilteredRuntimeOutcomes(
+export function validateFilteredRuntimeOutcomes(
   outcomes: RuntimeFilterOutcome[],
   suite?: string,
   test?: string,

@@ -14,9 +14,9 @@ import {
 import { getRuntime } from '../base/runtime/index.ts';
 import { PLAYWRIGHT_VERSION } from '../base/playwright-version.ts';
 import {
-  finalizeFilteredRuntimeOutcomes,
   isBrowserStructuredNoMatchResult,
   type RuntimeFilterOutcome,
+  validateFilteredRuntimeOutcomes,
 } from '../base/runtime-filter.ts';
 
 const kPromptFailureThresholdMs = 15000;
@@ -80,12 +80,11 @@ export default function setupTestRunnerTests(): void {
     },
   );
 
-
   TEST(
     'TestRunner',
     'aggregate filtered run tolerates browser runtime no-match when server runtimes matched',
     () => {
-      finalizeFilteredRuntimeOutcomes(
+      validateFilteredRuntimeOutcomes(
         [
           { runtime: 'deno', status: 'matched' },
           { runtime: 'node', status: 'matched' },
@@ -101,7 +100,7 @@ export default function setupTestRunnerTests(): void {
     'TestRunner',
     'aggregate filtered run tolerates server runtime no-match when browser matched',
     () => {
-      finalizeFilteredRuntimeOutcomes(
+      validateFilteredRuntimeOutcomes(
         [
           { runtime: 'deno', status: 'no-match' },
           { runtime: 'node', status: 'no-match' },
@@ -119,7 +118,7 @@ export default function setupTestRunnerTests(): void {
     () => {
       assertThrows(
         () => {
-          finalizeFilteredRuntimeOutcomes(
+          validateFilteredRuntimeOutcomes(
             [
               { runtime: 'deno', status: 'no-match' },
               { runtime: 'node', status: 'no-match' },
@@ -140,7 +139,7 @@ export default function setupTestRunnerTests(): void {
     () => {
       assertThrows(
         () => {
-          finalizeFilteredRuntimeOutcomes(
+          validateFilteredRuntimeOutcomes(
             [
               { runtime: 'deno', status: 'no-match' },
               { runtime: 'node', status: 'no-match' },
@@ -261,26 +260,52 @@ export default function setupTestRunnerTests(): void {
 
   TEST(
     'TestRunner',
-    'finalizeFilteredRuntimeOutcomes is a no-op without filters',
+    'validateFilteredRuntimeOutcomes is a no-op without filters',
     () => {
       const outcomes: RuntimeFilterOutcome[] = [{
         runtime: 'deno',
         status: 'no-match',
       }];
       const before = structuredClone(outcomes);
-      finalizeFilteredRuntimeOutcomes(outcomes);
+      validateFilteredRuntimeOutcomes(outcomes);
       assertEquals(outcomes, before);
     },
   );
 
   TEST(
     'TestRunner',
-    'finalizeFilteredRuntimeOutcomes is a no-op with empty outcomes',
+    'validateFilteredRuntimeOutcomes is a no-op with empty outcomes',
     () => {
       const outcomes: RuntimeFilterOutcome[] = [];
       const before = structuredClone(outcomes);
-      finalizeFilteredRuntimeOutcomes(outcomes, 'MissingSuite');
+      validateFilteredRuntimeOutcomes(outcomes, 'MissingSuite');
       assertEquals(outcomes, before);
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'validateFilteredRuntimeOutcomes treats unknown runtime id as no-match',
+    () => {
+      // The validator keys off `outcome.status`, not the runtime id, so an
+      // unknown runtime ('bun') reporting `no-match` is aggregated the same
+      // way as 'deno' or 'node' reporting no-match. The whole-outcomes
+      // are-no-match path must still throw NoMatchError when at least one
+      // filter was provided.
+      assertThrows(
+        () => {
+          validateFilteredRuntimeOutcomes(
+            [
+              { runtime: 'deno', status: 'no-match' },
+              { runtime: 'node', status: 'no-match' },
+              { runtime: 'bun', status: 'no-match' },
+            ],
+            'MissingSuite',
+          );
+        },
+        NoMatchError,
+        'No tests matched',
+      );
     },
   );
 
@@ -391,6 +416,24 @@ export default function setupTestRunnerTests(): void {
       assertEquals(err.name, 'NoMatchError');
       assertTrue(!err.message.includes('--suite='));
       assertTrue(err.message.includes('--test="myTest"'));
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'NoMatchError rejects construction without filters',
+    () => {
+      let error: unknown;
+      try {
+        new NoMatchError();
+      } catch (thrown) {
+        error = thrown;
+      }
+      assertTrue(error instanceof Error);
+      assertEquals(
+        (error as Error).message,
+        'NoMatchError requires at least one of suiteName or testName',
+      );
     },
   );
 }
@@ -814,9 +857,7 @@ export function setupPlaywrightPinningTests(): void {
         'workflow cache key must hash base/playwright-version.ts',
       );
       assertTrue(
-        workflow.includes(
-          'restore-keys: |\n            playwright-${{ runner.os }}-',
-        ),
+        /restore-keys:[\s\S]*playwright-\$\{\{[\s\S]*runner\.os[\s\S]*\}\}-/.test(workflow),
         'workflow restore-keys block must include the version-agnostic Playwright prefix',
       );
       assertTrue(
@@ -825,6 +866,20 @@ export function setupPlaywrightPinningTests(): void {
         ),
         'workflow install command must use PLAYWRIGHT_VERSION',
       );
+      for (
+        const checkedPath of [
+          'mod.ts',
+          'cli/debug-server.ts',
+          'cli/compile.ts',
+          'cli/init.ts',
+          'base/file-watcher.ts',
+        ]
+      ) {
+        assertTrue(
+          workflow.includes(`deno check ${checkedPath}`),
+          `workflow static analysis step must include deno check ${checkedPath}`,
+        );
+      }
     },
   );
 }

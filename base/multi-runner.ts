@@ -1,8 +1,8 @@
 import { compileForNodeWithEsbuild, nodeRun } from './node-runner.ts';
 import {
-  finalizeFilteredRuntimeOutcomes,
   isBrowserStructuredNoMatchResult,
   type RuntimeFilterOutcome,
+  validateFilteredRuntimeOutcomes,
 } from './runtime-filter.ts';
 import {
   EXIT_CODE_NO_MATCH,
@@ -528,7 +528,7 @@ export async function runAcrossPlatforms(
     if (browserTestFailure) throw browserTestFailure;
   }
 
-  finalizeFilteredRuntimeOutcomes(
+  validateFilteredRuntimeOutcomes(
     runtimeOutcomes,
     config.suite,
     config.test,
