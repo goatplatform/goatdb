@@ -1,5 +1,6 @@
 import { TEST, type TestSuite } from './mod.ts';
 import { assertEquals, assertTrue } from './asserts.ts';
+import { withLogCapture } from './test-utils.ts';
 import type { FileWatchEvent } from '../base/file-watcher.ts';
 import {
   shouldRebuildAfterPathChange,
@@ -232,6 +233,50 @@ export function setupFileWatcherTests(): void {
       watcher.close();
     }
   });
+
+  TEST(
+    'FileWatcher',
+    'detects modified file when only size changes across polls',
+    async (ctx: TestSuite) => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const dir = await ctx.tempDir('poll-modify-size');
+      const filePath = path.join(dir, 'modify-size.txt');
+      const t0 = Math.floor(Date.now() / 1000);
+      fs.writeFileSync(filePath, 'v1');
+      fs.utimesSync(filePath, t0, t0);
+
+      const { watcher, waitForCycles } = await createWatcher(
+        fs as typeof import('node:fs'),
+        dir,
+        200,
+      );
+      try {
+        const { events, done } = startCollecting(watcher);
+        await waitForCycles(1);
+        fs.writeFileSync(filePath, 'size changed significantly');
+        fs.utimesSync(filePath, t0, t0);
+
+        await waitForCycles(2);
+        watcher.close();
+        await done;
+
+        assertEquals(events.length, 1, 'expected exactly one event');
+        assertEquals(
+          events[0].paths[0],
+          filePath,
+          'expected correct file path',
+        );
+        assertEquals(
+          events[0].kind,
+          'modify',
+          'expected size-only change to emit modify',
+        );
+      } finally {
+        watcher.close();
+      }
+    },
+  );
 
   TEST('FileWatcher', 'detects deleted file', async (ctx: TestSuite) => {
     const fs = await import('node:fs');
@@ -562,6 +607,42 @@ export function setupFileWatcherTests(): void {
 
   TEST(
     'FileWatcher',
+    'suppresses expected root-deletion read errors',
+    async (ctx: TestSuite) => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const dir = await ctx.tempDir('poll-root-del-log');
+      fs.writeFileSync(path.join(dir, 'file.txt'), 'data');
+
+      await withLogCapture(async (captured) => {
+        const { watcher, waitForCycles } = await createWatcher(
+          fs as typeof import('node:fs'),
+          dir,
+          200,
+        );
+        try {
+          const { done } = startCollecting(watcher);
+          await waitForCycles(1);
+          fs.rmSync(dir, { recursive: true, force: true });
+          await waitForCycles(2);
+          watcher.close();
+          await done;
+        } finally {
+          watcher.close();
+        }
+
+        assertTrue(
+          captured.every((entry) =>
+            !entry.message?.includes(`Failed to read directory: ${dir}`)
+          ),
+          'root deletion should not emit throttled read-failure noise',
+        );
+      });
+    },
+  );
+
+  TEST(
+    'FileWatcher',
     'continues polling after root directory deletion',
     async (ctx: TestSuite) => {
       const fs = await import('node:fs');
@@ -612,6 +693,81 @@ export function setupFileWatcherTests(): void {
           'expected create event after root directory recreation',
         );
       } finally {
+        watcher.close();
+      }
+    },
+  );
+
+  // Unreadable-root branch (EACCES) is distinct from missing-root. We
+  // attempt chmod 000 and assert the watcher produces no false-positive
+  // deletion events while the root is unreadable, then resumes emitting
+  // events after we restore the permissions. The chmod is best-effort —
+  // on filesystems or processes that ignore it (Windows, or root-owned
+  // directories in some CI environments) the test still validates the
+  // happy path of the surrounding code.
+  TEST(
+    'FileWatcher',
+    'unreadable root emits no events and recovers on chmod restore',
+    async (ctx: TestSuite) => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const dir = await ctx.tempDir('poll-root-unreadable');
+      fs.writeFileSync(path.join(dir, 'seed.txt'), 'data');
+
+      const { watcher, waitForCycles } = await createWatcher(
+        fs as typeof import('node:fs'),
+        dir,
+        200,
+      );
+
+      let chmodSucceeded = false;
+      try {
+        const { events, done } = startCollecting(watcher);
+        await waitForCycles(1);
+
+        // Try to make the root unreadable. Ignore failures on
+        // filesystems/processes that don't honor chmod.
+        try {
+          fs.chmodSync(dir, 0o000);
+          chmodSucceeded = true;
+        } catch {
+          // chmod unsupported in this environment — skip strict assertions.
+        }
+
+        if (chmodSucceeded) {
+          // While the root is unreadable, scan() returns []; the poller
+          // must NOT emit a "root missing" event. Wait several cycles and
+          // assert no root-deletion event was emitted.
+          await waitForCycles(3);
+          const rootDeletionWhileUnreadable = events.find((e) =>
+            e.paths[0] === dir && e.kind === 'any'
+          );
+          assertEquals(
+            rootDeletionWhileUnreadable,
+            undefined,
+            'unreadable root must not be reported as deleted',
+          );
+
+          // Restore permissions and create a new file. The watcher should
+          // pick up the new file on the next poll cycle.
+          fs.chmodSync(dir, 0o755);
+          const newFile = path.join(dir, 'recovered.txt');
+          fs.writeFileSync(newFile, 'recovered');
+          await waitForEvent(
+            events,
+            (e) => e.paths[0] === newFile && e.kind === 'create',
+            'watcher must resume event emission after root is readable again',
+          );
+        }
+
+        watcher.close();
+        await done;
+      } finally {
+        try {
+          if (chmodSucceeded) fs.chmodSync(dir, 0o755);
+        } catch {
+          // Best-effort cleanup; ignore failures.
+        }
         watcher.close();
       }
     },

@@ -264,9 +264,23 @@ export async function createPollingWatcher(
   const { join } = await import('node:path');
 
   let pollerClosed = false;
-  let previousState: Map<string, number>;
+  let previousState: Map<string, { mtimeMs: number; size: number }>;
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   let rootMissing = false;
+
+  function isMissingFileSystemError(err: unknown): boolean {
+    const code = (err as { code?: string } | null | undefined)?.code;
+    return code === 'ENOENT' || code === 'ENOTDIR';
+  }
+
+  function getRootStatus(): 'present' | 'missing' | 'unreadable' {
+    try {
+      fs.readdirSync(dir);
+      return 'present';
+    } catch (err) {
+      return isMissingFileSystemError(err) ? 'missing' : 'unreadable';
+    }
+  }
   // Throttle per-path to at most one DEBUG log per 60s to avoid log floods
   // from persistently broken paths (e.g., permission denied, raced deletion).
   const lastFailureLog = new Map<string, number>();
@@ -287,14 +301,19 @@ export async function createPollingWatcher(
     }
   });
 
-  // Walk the directory tree and return a map of absolute path -> mtimeMs
-  function scan(): Map<string, number> {
-    const result = new Map<string, number>();
+  // Walk the directory tree and return a snapshot of absolute file path ->
+  // change fingerprint. Size is tracked alongside mtimeMs because some
+  // filesystems coarsen mtimes during rapid rewrites.
+  function scan(): Map<string, { mtimeMs: number; size: number }> {
+    const result = new Map<string, { mtimeMs: number; size: number }>();
     const walk = (currentDir: string): void => {
       let entries: string[];
       try {
         entries = fs.readdirSync(currentDir);
-      } catch {
+      } catch (err) {
+        if (currentDir === dir && isMissingFileSystemError(err)) {
+          return; // Root deletion is expected and handled by poll().
+        }
         logFailureThrottled(
           currentDir,
           `Failed to read directory: ${currentDir}`,
@@ -310,7 +329,7 @@ export async function createPollingWatcher(
           if (stat.isDirectory()) {
             walk(fullPath);
           } else {
-            result.set(fullPath, stat.mtimeMs);
+            result.set(fullPath, { mtimeMs: stat.mtimeMs, size: stat.size });
           }
         } catch {
           logFailureThrottled(fullPath, `Failed to stat file: ${fullPath}`);
@@ -322,44 +341,49 @@ export async function createPollingWatcher(
     return result;
   }
 
-  function rootExists(): boolean {
-    try {
-      fs.readdirSync(dir);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   // Use recursive setTimeout instead of setInterval to prevent concurrent
   // scan() executions if one cycle takes longer than pollMs.
   function poll(): void {
     if (pollerClosed) return;
     const currentState = scan();
 
-    // Empty snapshots are ambiguous: the tree may be empty, or the root may be
-    // gone. Emit one root-level event on the transition to missing, even when
-    // the previous snapshot was also empty.
-    if (currentState.size === 0 && !rootExists()) {
-      if (!rootMissing) {
-        pushEvent({ paths: [dir], kind: 'any' });
-        rootMissing = true;
+    // Empty snapshots are ambiguous: the tree may truly be empty, the root may
+    // be deleted, or the root may be temporarily unreadable. Emit one root-
+    // level event only on the transition to a missing root; unreadable roots
+    // stay quiet to avoid false delete/recreate churn.
+    if (currentState.size === 0) {
+      const rootStatus = getRootStatus();
+      if (rootStatus === 'missing') {
+        if (!rootMissing) {
+          pushEvent({ paths: [dir], kind: 'any' });
+          rootMissing = true;
+        }
+        previousState = currentState;
+        onPollCycle?.();
+        if (!pollerClosed) {
+          timeoutId = setTimeout(poll, pollMs);
+        }
+        return;
       }
-      previousState = currentState;
-      onPollCycle?.();
-      if (!pollerClosed) {
-        timeoutId = setTimeout(poll, pollMs);
+      if (rootStatus === 'unreadable') {
+        rootMissing = false;
+        onPollCycle?.();
+        if (!pollerClosed) {
+          timeoutId = setTimeout(poll, pollMs);
+        }
+        return;
       }
-      return;
+      rootMissing = false;
+    } else {
+      rootMissing = false;
     }
-    rootMissing = false;
 
     // New or modified files
-    for (const [filePath, mtime] of currentState) {
+    for (const [filePath, { mtimeMs, size }] of currentState) {
       const prev = previousState.get(filePath);
       if (prev === undefined) {
         pushEvent({ paths: [filePath], kind: 'create' });
-      } else if (mtime !== prev) {
+      } else if (mtimeMs !== prev.mtimeMs || size !== prev.size) {
         pushEvent({ paths: [filePath], kind: 'modify' });
       }
     }
