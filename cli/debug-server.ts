@@ -324,6 +324,18 @@ export async function startDebugServer<US extends Schema>(
         out: APP_ENTRY_POINT,
       },
     ];
+    const appConfig: AppConfig = {
+      buildDir: options.buildDir,
+      jsPath: options.jsPath,
+      htmlPath: options.htmlPath,
+      cssPath: options.cssPath,
+      assetsPath: options.assetsPath,
+      assetsFilter: options.assetsFilter,
+      denoJson: options.denoJson,
+      packageJson: options.packageJson,
+      minify: options.minify,
+      appName: options.appName,
+    };
 
     await server.servicesForOrganization(options.orgId || 'localhost');
 
@@ -341,9 +353,8 @@ export async function startDebugServer<US extends Schema>(
       entryPoints,
       options.esbuildPlugins,
     );
-    const { esbuildPlugins: _ignoredEsbuildPlugins, ...buildOptions } = options;
     server.updateStaticAssets(
-      await buildAssets(ctx, entryPoints, buildOptions),
+      await buildAssets(ctx, entryPoints, appConfig),
     );
 
     if (options.afterBuild) {
@@ -367,7 +378,7 @@ export async function startDebugServer<US extends Schema>(
           }
 
           server.updateStaticAssets(
-            await buildAssets(ctx, entryPoints, buildOptions),
+            await buildAssets(ctx, entryPoints, appConfig),
           );
 
           if (options.afterBuild) {
