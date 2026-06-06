@@ -329,4 +329,22 @@ export default async function setupServerArchitectureTest() {
       );
     },
   );
+
+  TEST(
+    'ServerArchitecture',
+    'stop() is idempotent and safe to call concurrently',
+    async (ctx) => {
+      const server = makeServer(await ctx.tempDir('stop-idempotent'));
+      // Concurrent callers must receive the same cached promise, and the
+      // shared cleanup must not throw or double-free resources.
+      const [p1, p2, p3] = [
+        server.stop(),
+        server.stop(),
+        server.stop(),
+      ];
+      assertEquals(p1, p2, 'stop() promise is shared across callers');
+      assertEquals(p1, p3, 'stop() promise is shared across callers');
+      await Promise.all([p1, p2, p3]);
+    },
+  );
 }

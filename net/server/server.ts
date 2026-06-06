@@ -712,21 +712,20 @@ export class Server<US extends Schema> {
     if (this._stopPromise) {
       return this._stopPromise;
     }
-
-    // Debug-server setup may initialize DB/services before start() finishes.
-    // Stop must still release those resources, but only once.
-    const ac = this._abortController;
-    if (
-      !ac && this._pendingServices.size === 0 && this._servicesByOrg.size === 0
-    ) {
-      this._stopping = true;
-      this._stopPromise = Promise.resolve();
-      return this._stopPromise;
-    }
-    this._abortController = undefined;
-    this._stopping = true;
-
     this._stopPromise = (async () => {
+      // Debug-server setup may initialize DB/services before start() finishes.
+      // Stop must still release those resources, but only once.
+      const ac = this._abortController;
+      if (
+        !ac && this._pendingServices.size === 0 &&
+        this._servicesByOrg.size === 0
+      ) {
+        this._stopping = true;
+        return;
+      }
+      this._abortController = undefined;
+      this._stopping = true;
+
       // Stop HTTP server first so no new requests hit closing DBs.
       if (ac) {
         this._httpServer?.stop();
