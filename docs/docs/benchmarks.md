@@ -5,9 +5,8 @@ sidebar_position: 8
 slug: /benchmarks
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-import '../src/css/benchmark-tables.css';
+import Tabs from '@theme/Tabs'; import TabItem from '@theme/TabItem'; import
+'../src/css/benchmark-tables.css';
 
 # GoatDB Benchmarks
 
@@ -413,6 +412,7 @@ due to its long execution time.
 | Deno                                | Apple M4 Pro, 24GB RAM        | deno 2.7.5 (darwin aarch64)                                                                                                                  |
 | Node.js                             | Apple M4 Pro, 24GB RAM        | node v25.2.1 (darwin arm64)                                                                                                                  |
 | Browser                             | Apple M4 Pro, 24GB RAM (OPFS) | browser Chrome 145.0 (Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36) |
+
 {/* BENCH:methodology-table:END */}
 
 </details>
@@ -572,33 +572,35 @@ due to its long execution time.
 
 ### SQLite Fast-Unsafe
 
-| Operation                                    | Average | Median  | Stddev  | CV      | Samples | Throughput |
-| -------------------------------------------- | ------- | ------- | ------- | ------- | ------- | ---------- |
-| Create instance                              | 89.2µs  | 84.4µs  | 13.8µs  | 16%     | 10      | 11K ops/s  |
-| Open database (empty)                        | 121.8µs | 122.7µs | 9.6µs   | 8%      | 7       | 8K ops/s   |
-| Open database (100k items)                   | 143.2µs | 142.0µs | 8.5µs   | 6%      | 7       | 7K ops/s   |
-| Create item                                  | 15.3µs  | 13.7µs  | 6.4µs   | **42%** | 10      | 65K ops/s  |
-| Read item                                    | 8.8µs   | 8.0µs   | 2.4µs   | 27%     | 10      | 114K ops/s |
-| Update item                                  | 10.0µs  | 9.9µs   | 1.3µs   | 13%     | 10      | 100K ops/s |
-| Bulk create 100 items                        | 128.7µs | 129.6µs | 2.6µs   | 2%      | 10      | 8K ops/s   |
-| Bulk read 100 items                          | 129.1µs | 128.1µs | 6.4µs   | 5%      | 10      | 8K ops/s   |
-| Write 100k items                             | 140.9ms | 140.5ms | 2.1ms   | 2%      | 7       | 7 ops/s    |
-| Read 100k items (cold)                       | 69.8ms  | 69.4ms  | 5.4ms   | 8%      | 7       | 14 ops/s   |
-| Read 100k items (warm)                       | 67.3ms  | 66.8ms  | 4.1ms   | 6%      | 7       | 15 ops/s   |
-| Filter query cold (100 items)                | 36.4µs  | 35.9µs  | 1.9µs   | 5%      | 10      | 27K ops/s  |
-| Filter query warm (100 items)                | 28.7µs  | 27.5µs  | 1.9µs   | 6%      | 10      | 35K ops/s  |
-| Filter query cold (100k → 1k results)        | 572.8µs | 565.5µs | 25.2µs  | 4%      | 10      | 2K ops/s   |
-| Filter query warm (100k → 1k results)        | 501.7µs | 503.5µs | 13.1µs  | 3%      | 10      | 2K ops/s   |
-| Filter query cold (100k → 10k results)       | 6.0ms   | 5.7ms   | 763.2µs | 13%     | 10      | 167 ops/s  |
-| Filter query warm (100k → 10k results)       | 5.8ms   | 5.5ms   | 731.8µs | 13%     | 10      | 172 ops/s  |
-| Filter + sort query cold (100 items)         | 19.1µs  | 17.9µs  | 5.2µs   | 27%     | 10      | 52K ops/s  |
-| Filter + sort query warm (100 items)         | 2.2µs   | 1.9µs   | 0.8µs   | **35%** | 10      | 454K ops/s |
-| Live query update (100 items)                | 850.6µs | 832.7µs | 81.4µs  | 10%     | 20      | 1K ops/s   |
-| Live query update (1k items)                 | 3.1ms   | 3.1ms   | 325.7µs | 11%     | 20      | 326 ops/s  |
-| Live query update (10k items)                | 21.0ms  | 20.7ms  | 3.2ms   | 15%     | 20      | 48 ops/s   |
-| Count operation                              | 6.4µs   | 6.2µs   | 1.3µs   | 20%     | 10      | 155K ops/s |
-| Keys operation                               | 10.6µs  | 10.1µs  | 1.6µs   | 15%     | 10      | 94K ops/s  |
+| Operation                              | Average | Median  | Stddev  | CV      | Samples | Throughput |
+| -------------------------------------- | ------- | ------- | ------- | ------- | ------- | ---------- |
+| Create instance                        | 89.2µs  | 84.4µs  | 13.8µs  | 16%     | 10      | 11K ops/s  |
+| Open database (empty)                  | 121.8µs | 122.7µs | 9.6µs   | 8%      | 7       | 8K ops/s   |
+| Open database (100k items)             | 143.2µs | 142.0µs | 8.5µs   | 6%      | 7       | 7K ops/s   |
+| Create item                            | 15.3µs  | 13.7µs  | 6.4µs   | **42%** | 10      | 65K ops/s  |
+| Read item                              | 8.8µs   | 8.0µs   | 2.4µs   | 27%     | 10      | 114K ops/s |
+| Update item                            | 10.0µs  | 9.9µs   | 1.3µs   | 13%     | 10      | 100K ops/s |
+| Bulk create 100 items                  | 128.7µs | 129.6µs | 2.6µs   | 2%      | 10      | 8K ops/s   |
+| Bulk read 100 items                    | 129.1µs | 128.1µs | 6.4µs   | 5%      | 10      | 8K ops/s   |
+| Write 100k items                       | 140.9ms | 140.5ms | 2.1ms   | 2%      | 7       | 7 ops/s    |
+| Read 100k items (cold)                 | 69.8ms  | 69.4ms  | 5.4ms   | 8%      | 7       | 14 ops/s   |
+| Read 100k items (warm)                 | 67.3ms  | 66.8ms  | 4.1ms   | 6%      | 7       | 15 ops/s   |
+| Filter query cold (100 items)          | 36.4µs  | 35.9µs  | 1.9µs   | 5%      | 10      | 27K ops/s  |
+| Filter query warm (100 items)          | 28.7µs  | 27.5µs  | 1.9µs   | 6%      | 10      | 35K ops/s  |
+| Filter query cold (100k → 1k results)  | 572.8µs | 565.5µs | 25.2µs  | 4%      | 10      | 2K ops/s   |
+| Filter query warm (100k → 1k results)  | 501.7µs | 503.5µs | 13.1µs  | 3%      | 10      | 2K ops/s   |
+| Filter query cold (100k → 10k results) | 6.0ms   | 5.7ms   | 763.2µs | 13%     | 10      | 167 ops/s  |
+| Filter query warm (100k → 10k results) | 5.8ms   | 5.5ms   | 731.8µs | 13%     | 10      | 172 ops/s  |
+| Filter + sort query cold (100 items)   | 19.1µs  | 17.9µs  | 5.2µs   | 27%     | 10      | 52K ops/s  |
+| Filter + sort query warm (100 items)   | 2.2µs   | 1.9µs   | 0.8µs   | **35%** | 10      | 454K ops/s |
+| Live query update (100 items)          | 850.6µs | 832.7µs | 81.4µs  | 10%     | 20      | 1K ops/s   |
+| Live query update (1k items)           | 3.1ms   | 3.1ms   | 325.7µs | 11%     | 20      | 326 ops/s  |
+| Live query update (10k items)          | 21.0ms  | 20.7ms  | 3.2ms   | 15%     | 20      | 48 ops/s   |
+| Count operation                        | 6.4µs   | 6.2µs   | 1.3µs   | 20%     | 10      | 155K ops/s |
+| Keys operation                         | 10.6µs  | 10.1µs  | 1.6µs   | 15%     | 10      | 94K ops/s  |
+
 {/* BENCH:stats-deno:END */}
+
 </TabItem>
 <TabItem value="stats-node" label="Node.js">
 
@@ -751,33 +753,35 @@ due to its long execution time.
 
 ### SQLite Fast-Unsafe
 
-| Operation                                       | Average | Median  | Stddev  | CV      | Samples | Throughput |
-| ----------------------------------------------- | ------- | ------- | ------- | ------- | ------- | ---------- |
-| Create instance                                 | 74.3µs  | 73.7µs  | 5.8µs   | 8%      | 10      | 13K ops/s  |
-| Open database (empty)                           | 102.3µs | 102.0µs | 4.4µs   | 4%      | 7       | 10K ops/s  |
-| Open database (100k items)                      | 125.3µs | 125.5µs | 6.5µs   | 5%      | 7       | 8K ops/s   |
-| Create item                                     | 9.8µs   | 9.7µs   | 1.5µs   | 16%     | 10      | 102K ops/s |
-| Read item                                       | 7.2µs   | 6.5µs   | 2.2µs   | 31%     | 10      | 138K ops/s |
-| Update item                                     | 7.3µs   | 7.2µs   | 1.0µs   | 13%     | 10      | 137K ops/s |
-| Bulk create 100 items                           | 91.5µs  | 91.0µs  | 2.1µs   | 2%      | 10      | 11K ops/s  |
-| Bulk read 100 items                             | 112.8µs | 111.6µs | 4.5µs   | 4%      | 10      | 9K ops/s   |
-| Write 100k items                                | 104.9ms | 103.5ms | 2.4ms   | 2%      | 7       | 10 ops/s   |
-| Read 100k items (cold)                          | 37.2ms  | 36.5ms  | 3.7ms   | 10%     | 7       | 27 ops/s   |
-| Read 100k items (warm)                          | 36.2ms  | 36.2ms  | 501.5µs | 1%      | 7       | 28 ops/s   |
-| Filter query cold (100 items)                   | 22.6µs  | 22.1µs  | 1.3µs   | 6%      | 10      | 44K ops/s  |
-| Filter query warm (100 items)                   | 15.1µs  | 14.5µs  | 1.6µs   | 10%     | 10      | 66K ops/s  |
-| Filter query cold (100k → 1k results)           | 311.8µs | 312.7µs | 5.9µs   | 2%      | 10      | 3K ops/s   |
-| Filter query warm (100k → 1k results)           | 313.7µs | 304.8µs | 27.6µs  | 9%      | 10      | 3K ops/s   |
-| Filter query cold (100k → 10k results)          | 3.1ms   | 3.1ms   | 45.0µs  | 1%      | 10      | 323 ops/s  |
-| Filter query warm (100k → 10k results)          | 3.0ms   | 3.0ms   | 17.8µs  | 1%      | 10      | 336 ops/s  |
-| Filter + sort query cold (100 items)            | 13.8µs  | 12.5µs  | 3.5µs   | 26%     | 10      | 73K ops/s  |
-| Filter + sort query warm (100 items)            | 1.8µs   | 1.5µs   | 0.8µs   | **43%** | 10      | 543K ops/s |
-| Live query update (100 items)                   | 518.8µs | 519.8µs | 21.4µs  | 4%      | 20      | 2K ops/s   |
-| Live query update (1k items)                    | 2.2ms   | 2.1ms   | 425.0µs | 20%     | 20      | 463 ops/s  |
-| Live query update (10k items)                   | 14.5ms  | 14.5ms  | 1.5ms   | 10%     | 20      | 69 ops/s   |
-| Count operation                                 | 5.0µs   | 4.6µs   | 1.3µs   | 25%     | 10      | 200K ops/s |
-| Keys operation                                  | 9.0µs   | 7.6µs   | 3.8µs   | **43%** | 10      | 112K ops/s |
+| Operation                              | Average | Median  | Stddev  | CV      | Samples | Throughput |
+| -------------------------------------- | ------- | ------- | ------- | ------- | ------- | ---------- |
+| Create instance                        | 74.3µs  | 73.7µs  | 5.8µs   | 8%      | 10      | 13K ops/s  |
+| Open database (empty)                  | 102.3µs | 102.0µs | 4.4µs   | 4%      | 7       | 10K ops/s  |
+| Open database (100k items)             | 125.3µs | 125.5µs | 6.5µs   | 5%      | 7       | 8K ops/s   |
+| Create item                            | 9.8µs   | 9.7µs   | 1.5µs   | 16%     | 10      | 102K ops/s |
+| Read item                              | 7.2µs   | 6.5µs   | 2.2µs   | 31%     | 10      | 138K ops/s |
+| Update item                            | 7.3µs   | 7.2µs   | 1.0µs   | 13%     | 10      | 137K ops/s |
+| Bulk create 100 items                  | 91.5µs  | 91.0µs  | 2.1µs   | 2%      | 10      | 11K ops/s  |
+| Bulk read 100 items                    | 112.8µs | 111.6µs | 4.5µs   | 4%      | 10      | 9K ops/s   |
+| Write 100k items                       | 104.9ms | 103.5ms | 2.4ms   | 2%      | 7       | 10 ops/s   |
+| Read 100k items (cold)                 | 37.2ms  | 36.5ms  | 3.7ms   | 10%     | 7       | 27 ops/s   |
+| Read 100k items (warm)                 | 36.2ms  | 36.2ms  | 501.5µs | 1%      | 7       | 28 ops/s   |
+| Filter query cold (100 items)          | 22.6µs  | 22.1µs  | 1.3µs   | 6%      | 10      | 44K ops/s  |
+| Filter query warm (100 items)          | 15.1µs  | 14.5µs  | 1.6µs   | 10%     | 10      | 66K ops/s  |
+| Filter query cold (100k → 1k results)  | 311.8µs | 312.7µs | 5.9µs   | 2%      | 10      | 3K ops/s   |
+| Filter query warm (100k → 1k results)  | 313.7µs | 304.8µs | 27.6µs  | 9%      | 10      | 3K ops/s   |
+| Filter query cold (100k → 10k results) | 3.1ms   | 3.1ms   | 45.0µs  | 1%      | 10      | 323 ops/s  |
+| Filter query warm (100k → 10k results) | 3.0ms   | 3.0ms   | 17.8µs  | 1%      | 10      | 336 ops/s  |
+| Filter + sort query cold (100 items)   | 13.8µs  | 12.5µs  | 3.5µs   | 26%     | 10      | 73K ops/s  |
+| Filter + sort query warm (100 items)   | 1.8µs   | 1.5µs   | 0.8µs   | **43%** | 10      | 543K ops/s |
+| Live query update (100 items)          | 518.8µs | 519.8µs | 21.4µs  | 4%      | 20      | 2K ops/s   |
+| Live query update (1k items)           | 2.2ms   | 2.1ms   | 425.0µs | 20%     | 20      | 463 ops/s  |
+| Live query update (10k items)          | 14.5ms  | 14.5ms  | 1.5ms   | 10%     | 20      | 69 ops/s   |
+| Count operation                        | 5.0µs   | 4.6µs   | 1.3µs   | 25%     | 10      | 200K ops/s |
+| Keys operation                         | 9.0µs   | 7.6µs   | 3.8µs   | **43%** | 10      | 112K ops/s |
+
 {/* BENCH:stats-node:END */}
+
 </TabItem>
 <TabItem value="stats-browser" label="Browser">
 
@@ -866,7 +870,9 @@ due to its long execution time.
 | Live query update (10k items)          | 43846.9ms | 43796.0ms | 205.1ms | 0%      | 20      | —          |
 | Count operation                        | 446.0µs   | 442.5µs   | 24.2µs  | 5%      | 10      | 2K ops/s   |
 | Keys operation                         | 459.0µs   | 455.0µs   | 17.9µs  | 4%      | 10      | 2K ops/s   |
+
 {/* BENCH:stats-browser:END */}
+
 </TabItem>
 </Tabs>
 

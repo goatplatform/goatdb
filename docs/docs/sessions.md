@@ -5,9 +5,10 @@ sidebar_position: 4
 slug: /sessions
 ---
 
-import KeyGeneration from '@site/src/components/diagrams/KeyGeneration';
-import SigningVerification from '@site/src/components/diagrams/SigningVerification';
-import DistributedSecurity from '@site/src/components/diagrams/DistributedSecurity';
+import KeyGeneration from '@site/src/components/diagrams/KeyGeneration'; import
+SigningVerification from '@site/src/components/diagrams/SigningVerification';
+import DistributedSecurity from
+'@site/src/components/diagrams/DistributedSecurity';
 
 # Sessions and Users
 

@@ -1,19 +1,23 @@
-import { SchemaGetFieldDef, type Schema, type SchemaDataType } from '../cfds/base/schema.ts';
-import type { Commit } from '../repo/commit.ts';
-import type { Repository } from '../repo/repo.ts';
-import { itemPathGetPart, itemPathGetRepoId, itemPathIsValid } from './path.ts';
-import { Item } from '../cfds/base/item.ts';
-import { Emitter } from '../base/emitter.ts';
+import {
+  type Schema,
+  type SchemaDataType,
+  SchemaGetFieldDef,
+} from "../cfds/base/schema.ts";
+import type { Commit } from "../repo/commit.ts";
+import type { Repository } from "../repo/repo.ts";
+import { itemPathGetPart, itemPathGetRepoId, itemPathIsValid } from "./path.ts";
+import { Item } from "../cfds/base/item.ts";
+import { Emitter } from "../base/emitter.ts";
 import {
   type Mutation,
   type MutationPack,
   mutationPackAppend,
-} from './mutations.ts';
-import { SimpleTimer, type Timer } from '../base/timer.ts';
-import type { GoatDB } from './db.ts';
-import { assert } from '../base/error.ts';
-import { log } from '../logging/log.ts';
-import { ScratchPool } from '../base/scratch-pool.ts';
+} from "./mutations.ts";
+import { SimpleTimer, type Timer } from "../base/timer.ts";
+import type { GoatDB } from "./db.ts";
+import { assert } from "../base/error.ts";
+import { log } from "../logging/log.ts";
+import { ScratchPool } from "../base/scratch-pool.ts";
 
 /**
  * A high-level interface for reading, writing, and synchronizing a single item
@@ -24,7 +28,7 @@ import { ScratchPool } from '../base/scratch-pool.ts';
  * @group Items
  */
 export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
-  extends Emitter<'change' | 'LoadingFinished'> {
+  extends Emitter<"change" | "LoadingFinished"> {
   private readonly _commitDelayTimer: Timer;
   private _head?: Commit;
   private _item!: Item<S>;
@@ -36,7 +40,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
   private _readyPromise?: Promise<void>;
   // deno-lint-ignore no-explicit-any
   private readonly _scratchPool = new ScratchPool<Mutation<any>>(
-    () => ['', true, undefined],
+    () => ["", true, undefined],
   );
 
   constructor(readonly db: GoatDB<US>, readonly path: string) {
@@ -46,8 +50,8 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     this._commitDelayTimer = new SimpleTimer(300, false, () => {
       this.commit().catch((e) => {
         log({
-          severity: 'WARNING',
-          error: 'StorageError',
+          severity: "WARNING",
+          error: "StorageError",
           message: `Auto-commit failed for ${this.path}`,
           trace: String(e),
         });
@@ -78,7 +82,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    * Returns the key of this item within its repository.
    */
   get key(): string {
-    return itemPathGetPart(this.path, 'item')!;
+    return itemPathGetPart(this.path, "item")!;
   }
 
   /**
@@ -131,11 +135,11 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     if (this._item.upgradeSchema(s)) {
       const sc = this._scratchPool.rent();
       try {
-        sc[0] = '__schema';
+        sc[0] = "__schema";
         sc[2] = null;
         this.onChange(sc);
       } finally {
-        sc[0] = '';
+        sc[0] = "";
         sc[2] = undefined;
         this._scratchPool.release();
       }
@@ -171,11 +175,11 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
       this._item.isDeleted = flag;
       const sc = this._scratchPool.rent();
       try {
-        sc[0] = 'isDeleted';
+        sc[0] = "isDeleted";
         sc[2] = oldValue;
         this.onChange(sc);
       } finally {
-        sc[0] = '';
+        sc[0] = "";
         sc[2] = undefined;
         this._scratchPool.release();
       }
@@ -237,7 +241,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
       sc[2] = oldValue;
       this.onChange(sc);
     } finally {
-      sc[0] = '';
+      sc[0] = "";
       sc[2] = undefined;
       this._scratchPool.release();
     }
@@ -272,7 +276,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
         sc[2] = oldValue;
         this.onChange(sc);
       } finally {
-        sc[0] = '';
+        sc[0] = "";
         sc[2] = undefined;
         this._scratchPool.release();
       }
@@ -308,8 +312,8 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     } else {
       if (!valid) {
         log({
-          severity: 'WARNING',
-          error: 'ValidationError',
+          severity: "WARNING",
+          error: "ValidationError",
           message:
             `[GoatDB] Skipping commit for invalid item at ${this.path}: ${error}`,
         });
@@ -344,7 +348,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
       return;
     }
     const [doc, head] = repo.rebase(
-      itemPathGetPart(this.path, 'item')!,
+      itemPathGetPart(this.path, "item")!,
       this._item,
       this._head,
     );
@@ -377,7 +381,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    * visualization and analysis tool.
    */
   downloadDebugGraph(): void {
-    const key = itemPathGetPart(this.path, 'item')!;
+    const key = itemPathGetPart(this.path, "item")!;
     this.repository?.downloadDebugNetworkForKey(key);
   }
 
@@ -406,8 +410,8 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     isRebase = false,
   ): void {
     ++this._age;
-    this.emit('change', mutations);
-    this.db.emit('ItemChanged', this.path, isRebase);
+    this.emit("change", mutations);
+    this.db.emit("ItemChanged", this.path, isRebase);
     this._commitDelayTimer.schedule();
   }
 
@@ -417,7 +421,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     try {
       this._commitDelayTimer.unschedule();
       const currentDoc = this._item.clone();
-      const key = itemPathGetPart(this.path, 'item')!;
+      const key = itemPathGetPart(this.path, "item")!;
       const repo = await this.db.open(itemPathGetRepoId(this.path));
       const newHead = await repo.setValueForKey(key, currentDoc, this._head);
       if (newHead) {
@@ -448,7 +452,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    * @param repo The repository to load from.
    */
   private loadInitialDoc(repo: Repository): void {
-    const entry = repo.valueForKey<S>(itemPathGetPart(this.path, 'item')!);
+    const entry = repo.valueForKey<S>(itemPathGetPart(this.path, "item")!);
 
     if (this.schema.ns === null) {
       if (entry) {
@@ -467,7 +471,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
         for (const f of this._item.keys) {
           pack = mutationPackAppend(pack, [f as string, false, undefined]);
         }
-        this.emit('change', pack);
+        this.emit("change", pack);
       }
     } else {
       // Our schema is no longer null which means a creation event had
@@ -481,6 +485,6 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     this._readyPromiseResolve?.();
     this._readyPromise = undefined;
     this._readyPromiseResolve = undefined;
-    this.emit('LoadingFinished');
+    this.emit("LoadingFinished");
   }
 }

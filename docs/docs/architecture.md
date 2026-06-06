@@ -5,12 +5,13 @@ sidebar_position: 2
 slug: /architecture
 ---
 
-import StackArchitectureV2 from '@site/src/components/diagrams/StackArchitectureV2';
-import CoreArchitectureV2 from '@site/src/components/diagrams/CoreArchitectureV2';
-import ComparisonSplitSimple from '@site/src/components/diagrams/ComparisonSplitSimple';
-import RepositoryModel from '@site/src/components/diagrams/RepositoryModel';
-import SyncProtocolV2 from '@site/src/components/diagrams/SyncProtocolV2';
-import Tabs from '@theme/Tabs';
+import StackArchitectureV2 from
+'@site/src/components/diagrams/StackArchitectureV2'; import CoreArchitectureV2
+from '@site/src/components/diagrams/CoreArchitectureV2'; import
+ComparisonSplitSimple from
+'@site/src/components/diagrams/ComparisonSplitSimple'; import RepositoryModel
+from '@site/src/components/diagrams/RepositoryModel'; import SyncProtocolV2 from
+'@site/src/components/diagrams/SyncProtocolV2'; import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # GoatDB Architecture
@@ -91,29 +92,14 @@ eliminates specific complexities that developers face daily.
 
 ### Eliminates Frontend Complexity
 
-<ComparisonSplitSimple
-  title="Frontend State Management"
-  traditional={{
-    label: 'Traditional Approach',
-    items: [
-      'Loading states throughout the app for every data operation',
-      'Async complexity spread across every component',
-      'Manual coordination of network requests and UI state',
-      'Optimistic updates and cache invalidation everywhere',
-    ],
-    complexity: 'high',
-  }}
-  goatdb={{
-    label: 'GoatDB Approach',
-    items: [
-      'Single loading state during app initialization',
-      'All user interactions are synchronous',
-      'Data always instantly available after startup',
-      'Automatic background sync without UI blocking',
-    ],
-    complexity: 'low',
-  }}
-/>
+<ComparisonSplitSimple title="Frontend State Management" traditional={{ label:
+'Traditional Approach', items: [ 'Loading states throughout the app for every
+data operation', 'Async complexity spread across every component', 'Manual
+coordination of network requests and UI state', 'Optimistic updates and cache
+invalidation everywhere', ], complexity: 'high', }} goatdb={{ label: 'GoatDB
+Approach', items: [ 'Single loading state during app initialization', 'All user
+interactions are synchronous', 'Data always instantly available after startup',
+'Automatic background sync without UI blocking', ], complexity: 'low', }} />
 
 The fundamental difference stems from where data lives. Most databases reside on
 servers, forcing every UI interaction to become an async network operation.
@@ -124,29 +110,15 @@ development experience.
 
 ### Eliminates Database Migration Pain
 
-<ComparisonSplitSimple
-  title="Schema Evolution"
-  traditional={{
-    label: 'SQL Migrations',
-    items: [
-      'Database locks block all operations during migrations',
-      'Failed migrations require emergency rollbacks with data loss risk',
-      'Breaking schema changes force coordinated releases across teams',
-      'Production hotfixes blocked by pending migration dependencies',
-    ],
-    complexity: 'high',
-  }}
-  goatdb={{
-    label: 'GoatDB Evolution',
-    items: [
-      'Automatic field-level upgrades during data access',
-      'Mixed-version deployments merge changes seamlessly',
-      'Schema changes deploy independently without coordination',
-      'Safe rollbacks through branch-based version control',
-    ],
-    complexity: 'low',
-  }}
-/>
+<ComparisonSplitSimple title="Schema Evolution" traditional={{ label: 'SQL
+Migrations', items: [ 'Database locks block all operations during migrations',
+'Failed migrations require emergency rollbacks with data loss risk', 'Breaking
+schema changes force coordinated releases across teams', 'Production hotfixes
+blocked by pending migration dependencies', ], complexity: 'high', }} goatdb={{
+label: 'GoatDB Evolution', items: [ 'Automatic field-level upgrades during data
+access', 'Mixed-version deployments merge changes seamlessly', 'Schema changes
+deploy independently without coordination', 'Safe rollbacks through branch-based
+version control', ], complexity: 'low', }} />
 
 GoatDB's [schema evolution](/docs/schema) leverages its Git-like architecture to
 eliminate traditional migration pain. Sequential upgrade functions transform
@@ -158,29 +130,15 @@ switch branches rather than attempting risky downgrade migrations.
 
 ### Eliminates Server State Management
 
-<ComparisonSplitSimple
-  title="Server Operations"
-  traditional={{
-    label: 'Traditional Servers',
-    items: [
-      'Connection pools require constant tuning and monitoring',
-      'Server crashes mean complex backup/restore procedures',
-      'Cache invalidation cascades break application logic',
-      'Database clustering requires coordination and split-brain prevention',
-    ],
-    complexity: 'high',
-  }}
-  goatdb={{
-    label: 'GoatDB Servers',
-    items: [
-      'Stateless servers crash without data loss',
-      'Clients automatically heal crashed servers',
-      'No cache invalidation - clients manage their own state',
-      'Add servers without coordination or configuration',
-    ],
-    complexity: 'low',
-  }}
-/>
+<ComparisonSplitSimple title="Server Operations" traditional={{ label:
+'Traditional Servers', items: [ 'Connection pools require constant tuning and
+monitoring', 'Server crashes mean complex backup/restore procedures', 'Cache
+invalidation cascades break application logic', 'Database clustering requires
+coordination and split-brain prevention', ], complexity: 'high', }} goatdb={{
+label: 'GoatDB Servers', items: [ 'Stateless servers crash without data loss',
+'Clients automatically heal crashed servers', 'No cache invalidation - clients
+manage their own state', 'Add servers without coordination or configuration', ],
+complexity: 'low', }} />
 
 GoatDB inverts traditional server architecture by treating servers as stateless
 synchronization nodes rather than authoritative data stores. Clients hold the

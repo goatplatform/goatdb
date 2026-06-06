@@ -18,9 +18,13 @@ Your contributions power the next generation of collaborative applications.
 Every feature you add, bug you fix, and optimization you make helps developers
 worldwide build better real-time, offline-capable apps.
 
-:::tip[Ready to Start?] Check out our
+:::tip[Ready to Start?]
+
+Check out our
 [Good First Issues](https://github.com/goatplatform/goatdb/labels/good%20first%20issue)
-to find your first contribution opportunity. :::
+to find your first contribution opportunity.
+
+:::
 
 ## What You're Building
 
@@ -67,24 +71,33 @@ deno task docs:serve  # Docusaurus docs server
 ```
 
 :::tip[Hooks Auto-Remediate]
-The pre-commit hook runs `deno task build` on every commit. If a source file
-that the system worker depends on changed, the hook automatically regenerates
-`system-assets/assets.json` and stages the update — no manual rebuild needed.
-The hook never blocks a commit; only a genuine build error (broken TypeScript,
-missing dependency) will fail.
+
+The pre-commit hook runs `deno task build` and `deno fmt --check` on every
+commit. If build regenerates `system-assets/assets.json`, the hook stages the
+update automatically — no manual rebuild needed.
+
+The hook blocks a commit in three cases:
+
+- `.githooks` is not the active hooks directory
+- `deno task build` fails for a real reason (broken TypeScript, missing
+  dependency, etc.)
+- `deno fmt --check` finds unformatted files (run `deno fmt` to fix)
 
 To verify hooks are active:
+
 ```bash
 git config core.hooksPath
 # → .githooks
 ```
 
 To skip the hook for an emergency commit:
+
 ```bash
 git commit --no-verify
 ```
 
 CI will still catch stale assets even with `--no-verify`.
+
 :::
 
 ## Testing & Performance
@@ -120,8 +133,12 @@ deno task bench --runtime=browser --headless
 **Features**: Single-process debugging, real-world metrics (P95, P99), source
 map support across all platforms.
 
-:::tip[Quality Gate] Run `deno task test && deno task bench` before submitting
-to ensure no regressions. :::
+:::tip[Quality Gate]
+
+Run `deno task test && deno task bench` before submitting to ensure no
+regressions.
+
+:::
 
 ## Code Standards
 

@@ -5,10 +5,10 @@ sidebar_position: 4
 slug: /query
 ---
 
-import LocalCopy from '@site/src/components/diagrams/LocalCopy';
-import CommitStorage from '@site/src/components/diagrams/CommitStorage';
-import QueryCache from '@site/src/components/diagrams/QueryCache';
-import IncrementalUpdates from '@site/src/components/diagrams/IncrementalUpdates';
+import LocalCopy from '@site/src/components/diagrams/LocalCopy'; import
+CommitStorage from '@site/src/components/diagrams/CommitStorage'; import
+QueryCache from '@site/src/components/diagrams/QueryCache'; import
+IncrementalUpdates from '@site/src/components/diagrams/IncrementalUpdates';
 
 # Querying Data in GoatDB
 

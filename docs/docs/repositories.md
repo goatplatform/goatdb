@@ -5,8 +5,9 @@ sidebar_position: 7
 slug: /repositories
 ---
 
-import RepositoryStructure from '@site/src/components/diagrams/RepositoryStructure';
-import CommitGraphs from '@site/src/components/diagrams/CommitGraphs';
+import RepositoryStructure from
+'@site/src/components/diagrams/RepositoryStructure'; import CommitGraphs from
+'@site/src/components/diagrams/CommitGraphs';
 
 # Repositories in GoatDB
 
