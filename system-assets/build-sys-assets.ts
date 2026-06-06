@@ -1,4 +1,4 @@
-import * as path from '@std/path';
+import * as path from '../base/path.ts';
 import { getRepositoryPath } from '../base/git-root.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 import {
