@@ -1,6 +1,6 @@
-import * as path from "../base/path.ts";
-import { log } from "../logging/log.ts";
-import { assert } from "../base/error.ts";
+import * as path from '../base/path.ts';
+import { log } from '../logging/log.ts';
+import { assert } from '../base/error.ts';
 import {
   type BuildOutput,
   type BuildPluginLike,
@@ -12,18 +12,18 @@ import {
   resolveBuildEntryPath,
   sharedClientBuildOptions,
   stopBackgroundCompiler,
-} from "../build.ts";
-import { APP_ENTRY_POINT } from "../net/server/static-assets.ts";
-import type { AppConfig } from "./app-config.ts";
+} from '../build.ts';
+import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
+import type { AppConfig } from './app-config.ts';
 import {
   type Asset,
   type StaticAssets,
-} from "../system-assets/system-assets.ts";
+} from '../system-assets/system-assets.ts';
 import {
   type ContentType,
   ContentTypeMapping,
-} from "../system-assets/content-type.ts";
-import { pathExists, readFile, walkDir } from "../base/json-log/file-impl.ts";
+} from '../system-assets/content-type.ts';
+import { pathExists, readFile, walkDir } from '../base/json-log/file-impl.ts';
 
 const textDecoder = new TextDecoder();
 const textEncoder = new TextEncoder();
@@ -36,7 +36,7 @@ interface CSSChunk {
 /** @internal Counts '\n' characters in s — used to compute line offsets for the sections source map. */
 export function countNewlines(s: string): number {
   let n = 0;
-  for (const ch of s) if (ch === "\n") n++;
+  for (const ch of s) if (ch === '\n') n++;
   return n;
 }
 
@@ -58,7 +58,7 @@ export function buildCombinedCSS(
   chunks: CSSChunk[],
   mapUrl: string,
 ): { css: string; cssMap?: string } {
-  const cssBody = chunks.map((c) => c.content).join("\n\n");
+  const cssBody = chunks.map((c) => c.content).join('\n\n');
 
   const mappedChunks = chunks.filter((c) => c.map);
   if (mappedChunks.length === 0) {
@@ -105,7 +105,7 @@ export interface BuildAssetsOptions {
    * Target runtime. If 'node', skips Deno-specific plugins.
    * Default: 'deno'
    */
-  runtime?: "deno" | "node";
+  runtime?: 'deno' | 'node';
   /**
    * When true, keeps the esbuild background process alive after building.
    * Caller is responsible for calling stopBackgroundCompiler().
@@ -142,13 +142,13 @@ export async function buildAssets(
 ): Promise<StaticAssets> {
   let buildOutput: BuildOutput;
   let shouldStopEsbuild = false;
-  const targetRuntime = options?.runtime ?? "deno";
+  const targetRuntime = options?.runtime ?? 'deno';
   if (ctx && isReBuildContext(ctx)) {
     if (options?.esbuildPlugins?.length) {
       throw new Error(
-        "BuildAssetsOptions.esbuildPlugins cannot be provided together with a " +
-          "pre-built ReBuildContext — plugins must be registered when the " +
-          "context is created via createBuildContext().",
+        'BuildAssetsOptions.esbuildPlugins cannot be provided together with a ' +
+          'pre-built ReBuildContext — plugins must be registered when the ' +
+          'context is created via createBuildContext().',
       );
     }
     buildOutput = await ctx.rebuild();
@@ -193,7 +193,7 @@ export async function buildAssets(
       await compileAssetsDirectory(
         path.resolve(appConfig.assetsPath),
         appConfig.assetsFilter,
-        "/assets",
+        '/assets',
       ),
     );
   }
@@ -209,9 +209,9 @@ export async function buildAssets(
   if (Object.hasOwn(buildResults, APP_ENTRY_POINT)) {
     if (appConfig.htmlPath) {
       try {
-        result["/index.html"] = {
+        result['/index.html'] = {
           data: await readFile(appConfig.htmlPath),
-          contentType: "text/html",
+          contentType: 'text/html',
         };
       } catch (e: unknown) {
         throw new Error(`Error loading ${appConfig.htmlPath}`, { cause: e });
@@ -243,16 +243,16 @@ export async function buildAssets(
 
     const { css: combinedCss, cssMap } = buildCombinedCSS(
       cssChunks,
-      "/index.css.map",
+      '/index.css.map',
     );
-    result["/index.css"] = {
+    result['/index.css'] = {
       data: textEncoder.encode(combinedCss),
-      contentType: "text/css",
+      contentType: 'text/css',
     };
     if (cssMap) {
-      result["/index.css.map"] = {
+      result['/index.css.map'] = {
         data: textEncoder.encode(cssMap),
-        contentType: "application/json",
+        contentType: 'application/json',
       };
     }
   }
@@ -265,23 +265,23 @@ export async function buildAssets(
     assert(source !== undefined, `Missing JS output for entry "${ep}"`);
     assert(map !== undefined, `Missing source map for entry "${ep}"`);
     if (ep === APP_ENTRY_POINT) {
-      result["/app.js"] = {
+      result['/app.js'] = {
         data: textEncoder.encode(source),
-        contentType: "text/javascript",
+        contentType: 'text/javascript',
       };
-      result["/app.js.map"] = {
+      result['/app.js.map'] = {
         data: textEncoder.encode(map),
-        contentType: "application/json",
+        contentType: 'application/json',
       };
       continue;
     }
     result[`/${ep}.js`] = {
       data: textEncoder.encode(source),
-      contentType: "text/javascript",
+      contentType: 'text/javascript',
     };
     result[`/${ep}.js.map`] = {
       data: textEncoder.encode(map),
-      contentType: "application/json",
+      contentType: 'application/json',
     };
     if (buildResults[ep].css) {
       const cssAssetPath = `/${ep}.css`;
@@ -292,12 +292,12 @@ export async function buildAssets(
       );
       result[cssAssetPath] = {
         data: textEncoder.encode(css),
-        contentType: "text/css",
+        contentType: 'text/css',
       };
       if (cssMap) {
         result[cssMapAssetPath] = {
           data: textEncoder.encode(cssMap),
-          contentType: "application/json",
+          contentType: 'application/json',
         };
       }
     }
@@ -307,7 +307,7 @@ export async function buildAssets(
 
 function contentTypeForPath(filePath: string): ContentType {
   const ext = path.extname(filePath).substring(1).toLowerCase();
-  return ContentTypeMapping[ext] || "application/octet-stream";
+  return ContentTypeMapping[ext] || 'application/octet-stream';
 }
 
 export async function compileAssetsDirectory(
@@ -325,12 +325,12 @@ export async function compileAssetsDirectory(
     }
     const origExt = path.extname(filePath);
     let ext = origExt.substring(1);
-    if (ext === "ts") {
-      ext = "js";
+    if (ext === 'ts') {
+      ext = 'js';
     }
     let key = filePath.substring(dir.length).toLowerCase();
     // Rewrite extension to match
-    key = key.substring(0, key.length - origExt.length) + "." + ext;
+    key = key.substring(0, key.length - origExt.length) + '.' + ext;
     if (prefix) {
       key = `${prefix}${key}`;
     }

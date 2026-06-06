@@ -857,7 +857,8 @@ export function setupPlaywrightPinningTests(): void {
         'workflow cache key must hash base/playwright-version.ts',
       );
       assertTrue(
-        /restore-keys:[\s\S]*playwright-\$\{\{[\s\S]*runner\.os[\s\S]*\}\}-/.test(workflow),
+        /restore-keys:[\s\S]*playwright-\$\{\{[\s\S]*runner\.os[\s\S]*\}\}-/
+          .test(workflow),
         'workflow restore-keys block must include the version-agnostic Playwright prefix',
       );
       assertTrue(

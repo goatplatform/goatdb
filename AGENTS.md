@@ -38,8 +38,8 @@ ALL `TEST()` calls MUST be inside the setup function:
 ```typescript
 // tests/my.test.ts
 export default function setup() {
-  TEST("Suite", "test name", async (ctx) => {
-    const db = await ctx.createDB("test-id");
+  TEST('Suite', 'test name', async (ctx) => {
+    const db = await ctx.createDB('test-id');
     try {
       // test code
     } finally {
@@ -61,15 +61,15 @@ level:
 ```typescript
 // ✅ CORRECT — registration gated, test body is pure
 export default function setupServerTests() {
-  TEST("Suite", "works", async (ctx) => {
+  TEST('Suite', 'works', async (ctx) => {
     // No platform checks here — pure test logic
   });
 }
 
 // tests-entry.ts or test-registry.ts — caller decides which runtimes
 // register which suites. Only ONE gate per test file.
-import { isBrowser } from "../base/common.ts";
-import setupServerTests from "./server.test.ts";
+import { isBrowser } from '../base/common.ts';
+import setupServerTests from './server.test.ts';
 
 if (!isBrowser()) {
   setupServerTests(); // ← gate here, not inside the setup function
@@ -79,7 +79,7 @@ if (!isBrowser()) {
 ❌ WRONG — platform check in test body:
 
 ```typescript
-TEST("Suite", "name", async (ctx) => {
+TEST('Suite', 'name', async (ctx) => {
   if (!isNode()) return; // ← silently no-ops, wastes resources
 });
 ```

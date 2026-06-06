@@ -407,11 +407,11 @@ due to its long execution time.
 
 {/* BENCH:methodology-table:START */}
 
-| Platform                            | Hardware                      | Runtime                                                                                                                                      |
-| ----------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Deno                                | Apple M4 Pro, 24GB RAM        | deno 2.7.5 (darwin aarch64)                                                                                                                  |
-| Node.js                             | Apple M4 Pro, 24GB RAM        | node v25.2.1 (darwin arm64)                                                                                                                  |
-| Browser                             | Apple M4 Pro, 24GB RAM (OPFS) | browser Chrome 145.0 (Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36) |
+| Platform | Hardware                      | Runtime                                                                                                                                      |
+| -------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deno     | Apple M4 Pro, 24GB RAM        | deno 2.7.5 (darwin aarch64)                                                                                                                  |
+| Node.js  | Apple M4 Pro, 24GB RAM        | node v25.2.1 (darwin arm64)                                                                                                                  |
+| Browser  | Apple M4 Pro, 24GB RAM (OPFS) | browser Chrome 145.0 (Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36) |
 
 {/* BENCH:methodology-table:END */}
 
