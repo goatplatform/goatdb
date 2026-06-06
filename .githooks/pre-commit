@@ -1,17 +1,45 @@
 #!/bin/sh
+# Pre-commit hook
+
+# Guard: verify hooks directory is active
+repo_root=$(git rev-parse --show-toplevel)
+expected_hooks_dir="$repo_root/.githooks"
+configured_hooks_path=$(git config core.hooksPath || true)
+
+resolve_dir() {
+    if [ -d "$1" ]; then
+        (
+            cd "$1" 2>/dev/null && pwd -P
+        )
+    fi
+}
+
+active_hooks_dir="$configured_hooks_path"
+case "$active_hooks_dir" in
+    /*) ;;
+    *) active_hooks_dir="$repo_root/$active_hooks_dir" ;;
+esac
+
+if [ "$(resolve_dir "$active_hooks_dir")" != "$(resolve_dir "$expected_hooks_dir")" ]; then
+    echo "Error: .githooks is not the active hooks directory. Run 'deno task setup:hooks' first." >&2
+    exit 1
+fi
+
 # Pre-commit hook — auto-regenerates GoatDB system assets.
 #
-# Whenever source files that the system worker depends on change, this hook
-# runs `deno task build` to regenerate system-assets/assets.json. If the file
-# changed, it stages the new version automatically — the commit proceeds with
-# the correct artifact.
+# Scope: this hook runs `deno task build` and `deno fmt --check`. It does not
+# run tests, lint, or general type-checking.
 #
-# Design: auto-remediate, never block. The only case that blocks the commit is
-# a genuine build failure (broken TypeScript, missing dependency, etc.).
+# Behavior: if build regenerates system-assets/assets.json, the hook stages the
+# updated artifact automatically and allows the commit to continue. The hook
+# blocks the commit in three cases:
+# - `.githooks` is not the active hooks directory
+# - `deno task build` fails for a real reason (broken TypeScript, missing dep)
+# - `deno fmt --check` finds unformatted source (run `deno fmt` to fix)
 #
 # Setup: Run `git config core.hooksPath .githooks` once per clone.
 #
-# To skip: `git commit --no-verify` (CI will still catch stale assets).
+# To skip: `git commit --no-verify`.
 
 set -e
 
@@ -28,4 +56,10 @@ if ! git diff --exit-code -- system-assets/assets.json > /dev/null 2>&1; then
     echo "-> [pre-commit]    run 'git diff --cached -- system-assets/assets.json' to review changes"
 else
     echo "-> [pre-commit] assets.json is up to date"
+fi
+
+echo "-> [pre-commit] checking formatting..."
+if ! deno fmt --check 2>&1; then
+    echo "Error: files are not formatted. Run 'deno fmt' to fix." >&2
+    exit 1
 fi
