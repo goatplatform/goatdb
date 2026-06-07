@@ -1,7 +1,14 @@
 #!/bin/sh
 # Pre-commit hook
+#
+# Scope: regenerates system assets, checks formatting.
+# Auto-activates if not yet configured (first commit after clone).
+# Runs `deno task build` and `deno fmt --check`.
+# To skip: `git commit --no-verify`.
 
-# Guard: verify hooks directory is active
+set -e
+
+# Auto-activate .githooks if not already active
 repo_root=$(git rev-parse --show-toplevel)
 expected_hooks_dir="$repo_root/.githooks"
 configured_hooks_path=$(git config core.hooksPath || true)
@@ -21,27 +28,10 @@ case "$active_hooks_dir" in
 esac
 
 if [ "$(resolve_dir "$active_hooks_dir")" != "$(resolve_dir "$expected_hooks_dir")" ]; then
-    echo "Error: .githooks is not the active hooks directory. Run 'deno task setup:hooks' first." >&2
-    exit 1
+    echo "-> [pre-commit] configuring .githooks as hooks directory..."
+    git config core.hooksPath .githooks
+    echo "-> [pre-commit] ...done (this is a one-time setup)"
 fi
-
-# Pre-commit hook — auto-regenerates GoatDB system assets.
-#
-# Scope: this hook runs `deno task build` and `deno fmt --check`. It does not
-# run tests, lint, or general type-checking.
-#
-# Behavior: if build regenerates system-assets/assets.json, the hook stages the
-# updated artifact automatically and allows the commit to continue. The hook
-# blocks the commit in three cases:
-# - `.githooks` is not the active hooks directory
-# - `deno task build` fails for a real reason (broken TypeScript, missing dep)
-# - `deno fmt --check` finds unformatted source (run `deno fmt` to fix)
-#
-# Setup: Run `git config core.hooksPath .githooks` once per clone.
-#
-# To skip: `git commit --no-verify`.
-
-set -e
 
 echo "-> [pre-commit] checking system assets..."
 echo "-> [pre-commit] running: deno task build"
