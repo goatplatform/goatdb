@@ -100,7 +100,12 @@
 
   <g transform="translate(20, 60)">
     <rect width="300" height="360" rx="8" ry="8" class="bg-section-blue" />
-    <text x="150" y="30" text-anchor="middle" class="text-icon-large">💻</text>
+    <text
+      x="150"
+      y="30"
+      text-anchor="middle"
+      class="text-icon-large"
+    >💻</text>
     <text
       x="150"
       y="55"
@@ -166,7 +171,12 @@
 
   <g transform="translate(420, 60)">
     <rect width="360" height="360" rx="8" ry="8" class="bg-section-gray" />
-    <text x="180" y="30" text-anchor="middle" class="text-icon-large">🌐</text>
+    <text
+      x="180"
+      y="30"
+      text-anchor="middle"
+      class="text-icon-large"
+    >🌐</text>
     <text
       x="180"
       y="55"

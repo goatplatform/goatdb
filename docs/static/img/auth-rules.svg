@@ -156,7 +156,12 @@
       class="text-code"
     >(e.g., /admin/*)</text> {/* Adjusted x for space */}
 
-    <text x="45" y="135" text-anchor="start" class="text-icon-logic">⚙️</text>
+    <text
+      x="45"
+      y="135"
+      text-anchor="start"
+      class="text-icon-logic"
+    >⚙️</text>
     <text
       x="70"
       y="135"
