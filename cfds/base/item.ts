@@ -2,8 +2,11 @@ import { assert } from '../../base/error.ts';
 import {
   kNullSchema,
   type Schema,
+  type SchemaDataKey,
   type SchemaDataType,
+  type SchemaDataValue,
   SchemaEquals,
+  type SchemaField,
 } from './schema.ts';
 import {
   clone,
@@ -47,9 +50,10 @@ export interface ReadonlyItem<S extends Schema> {
   readonly schema: S;
   readonly isValid: boolean;
   readonly checksum: string;
-  get<K extends keyof S['fields']>(key: K): SchemaDataType<S>[K];
-  has(key: keyof S['fields']): boolean;
+  get<K extends SchemaField<S>>(key: K): SchemaDataValue<S, K>;
+  has<K extends SchemaField<S>>(key: K): boolean;
   cloneData(): SchemaDataType<S>;
+  readonly keys: readonly SchemaDataKey<S>[];
 }
 
 export interface ItemConfig<S extends Schema> {
@@ -201,7 +205,7 @@ export class Item<S extends Schema = Schema>
    * regular, not deleted, item.
    */
   set isDeleted(flag: boolean) {
-    (this.set as (k: string, v: boolean) => void)('isDeleted', flag);
+    this.set('isDeleted', flag as SchemaDataValue<S, 'isDeleted'>);
   }
 
   /**
@@ -231,11 +235,10 @@ export class Item<S extends Schema = Schema>
     return this._checksum;
   }
 
-  /**
-   * Returns the keys currently present in this item.
-   */
-  get keys(): (keyof SchemaDataType<S>)[] {
-    return Object.keys(this._data) as (keyof SchemaDataType<S>)[];
+  // _data is populated only by set() using SchemaField<S> keys (all strings);
+  // Object.keys() returns string[] which matches SchemaDataKey<S>
+  get keys(): readonly SchemaDataKey<S>[] {
+    return Object.keys(this._data) as SchemaDataKey<S>[];
   }
 
   /**
@@ -249,11 +252,11 @@ export class Item<S extends Schema = Schema>
    * @throws    Throws if attempting to access a field not defined by this
    *            item's schema (unless this is a null item).
    */
-  get<T extends keyof S['fields']>(
+  get<T extends SchemaField<S>>(
     key: T,
-  ): SchemaDataType<S>[T] {
+  ): SchemaDataValue<S, T> {
     if (this.isNull) {
-      return undefined as unknown as SchemaDataType<S>[T];
+      return undefined as SchemaDataValue<S, T>;
     }
     const fieldDef = SchemaGetFieldDef(this.schema, key);
     assert(
@@ -261,9 +264,9 @@ export class Item<S extends Schema = Schema>
       `Unknown field name '${key as string}' for schema '${this.schema.ns}'`,
     );
     if (!Object.hasOwn(this._data, key) && fieldDef.default !== undefined) {
-      return fieldDef.default(this._data) as SchemaDataType<S>[T];
+      return fieldDef.default(this._data) as SchemaDataValue<S, T>;
     }
-    return this._data[key] as SchemaDataType<S>[T];
+    return this._data[key] as SchemaDataValue<S, T>;
   }
 
   /**
@@ -274,7 +277,7 @@ export class Item<S extends Schema = Schema>
    * @throws    Throws if attempting to access a field not defined by this
    *            item's schema.
    */
-  has<T extends keyof SchemaDataType<S>>(key: T): boolean {
+  has<T extends SchemaField<S>>(key: T): boolean {
     assert(
       SchemaGetFieldDef(this.schema, key) !== undefined,
       `Unknown field name '${key as string}' for schema '${this.schema.ns}'`,
@@ -292,9 +295,9 @@ export class Item<S extends Schema = Schema>
    * @throws      Throws if attempting to set a field not defined by this item's
    *              schema.
    */
-  set<T extends keyof SchemaDataType<S>>(
+  set<T extends SchemaField<S>>(
     key: T,
-    value: SchemaDataType<S>[T] | undefined,
+    value: SchemaDataValue<S, T> | undefined,
   ): void {
     assert(!this._locked);
     assert(
@@ -316,8 +319,8 @@ export class Item<S extends Schema = Schema>
    */
   setMulti(data: Partial<SchemaDataType<S>>): void {
     assert(!this._locked);
-    for (const [key, value] of Object.entries(data)) {
-      this.set(key, value);
+    for (const key of Object.keys(data) as SchemaDataKey<S>[]) {
+      this.set(key, data[key]);
     }
   }
 
@@ -330,7 +333,7 @@ export class Item<S extends Schema = Schema>
    * @throws    Throws if attempting to set a field not defined by this item's
    *            schema.
    */
-  delete<T extends keyof SchemaDataType<S>>(key: T): boolean {
+  delete<T extends SchemaField<S>>(key: T): boolean {
     assert(!this._locked);
     assert(
       SchemaGetFieldDef(this.schema, key) !== undefined,
@@ -401,7 +404,7 @@ export class Item<S extends Schema = Schema>
    *          is specified.
    */
   cloneData(
-    onlyFields?: (keyof SchemaDataType<S>)[],
+    onlyFields?: SchemaDataKey<S>[],
   ): Readwrite<SchemaDataType<S>> {
     return clone(this._schema, this._data, onlyFields);
   }

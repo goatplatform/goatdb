@@ -15,6 +15,7 @@ import setupTrusted from './db-trusted.test.ts';
 import setupItemPath from './item-path.ts';
 import setupAssertsTests from './asserts.test.ts';
 import setupOrderstamp from './orderstamp-expose.test.ts';
+import setupSchemaRuntimeKeys from './schema-runtime-keys.test.ts';
 import setupGoatRequestTest from './goat-request.test.ts';
 import setupSession from './session.test.ts';
 import setupCommit from './commit.test.ts';
@@ -106,6 +107,7 @@ async function registerAllTestsImpl(): Promise<void> {
   // FAST UNIT TESTS (0-1ms each) - Pure logic, no I/O
   setupAssertsTests(); // Assertion utility correctness
   setupOrderstamp(); // Utility functions for distributed timestamps
+  setupSchemaRuntimeKeys(); // Built-in runtime schema fields and key typing
   setupItemPath(); // Path validation and parsing logic
   setupPathTests(); // Cross-platform path utilities
   setupBuildTests(); // Build utility contracts (normalizeBuildEntryPath, etc.)

@@ -171,9 +171,17 @@ const kBuiltinFields: Record<string, FieldDef<ValueType>> = {
  * @template T The schema type
  * @group Schema
  */
-export type SchemaField<T extends Schema> =
-  | keyof T['fields']
-  | keyof typeof kBuiltinFields;
+export type SchemaField<T extends Schema> = Extract<
+  keyof T['fields'] | keyof typeof kBuiltinFields,
+  string
+>;
+
+type SchemaRuntimeFieldDef<
+  T extends Schema,
+  K extends SchemaField<T>,
+> = K extends keyof T['fields'] ? T['fields'][K]
+  : K extends keyof typeof kBuiltinFields ? (typeof kBuiltinFields)[K]
+  : never;
 
 /**
  * Given a schema, extracts the names of all required fields.
@@ -184,9 +192,9 @@ export type SchemaField<T extends Schema> =
 export type SchemaRequiredFields<
   T extends Schema,
   K extends SchemaField<T> = SchemaField<T>,
-> = T['fields'][K]['required'] extends true
+> = SchemaRuntimeFieldDef<T, K>['required'] extends true
   // deno-lint-ignore ban-types
-  ? T['fields'][K]['default'] extends Function ? never
+  ? SchemaRuntimeFieldDef<T, K>['default'] extends Function ? never
   : K
   : never;
 
@@ -197,7 +205,8 @@ export type SchemaRequiredFields<
 export type SchemaOptionalFields<
   T extends Schema,
   K extends SchemaField<T> = SchemaField<T>,
-> = T['fields'][K]['required'] extends false | undefined ? K : never;
+> = SchemaRuntimeFieldDef<T, K>['required'] extends false | undefined ? K
+  : never;
 
 /**
  * Given a type (FieldValue) and a required + default function, this generates
@@ -211,19 +220,41 @@ export type SchemaValueWithOptional<
 > = R extends true ? T : D extends true ? T : (undefined | T);
 
 /**
+ * Given a schema and one of its runtime fields, extracts the field's value.
+ * @group Schema
+ */
+export type SchemaDataValue<
+  T extends Schema,
+  K extends SchemaField<T>,
+> = SchemaValueWithOptional<
+  FieldValue<SchemaRuntimeFieldDef<T, K>['type']>,
+  SchemaRuntimeFieldDef<T, K> extends { required: true } ? true : false,
+  SchemaRuntimeFieldDef<T, K> extends { default: Function } ? true : false
+>;
+
+/**
  * Given a schema, extracts the type of its data.
  * @group Schema
  */
 export type SchemaDataType<
   T extends Schema,
-  K extends keyof T['fields'] = keyof T['fields'],
+  K extends SchemaField<T> = SchemaField<T>,
 > = {
-  [k in K]: SchemaValueWithOptional<
-    FieldValue<T['fields'][k]['type']>,
-    T['fields'][k] extends { required: true } ? true : false,
-    T['fields'][k] extends { default: Function } ? true : false
-  >;
+  [k in K]: SchemaDataValue<T, k>;
 };
+
+/**
+ * String keys that can appear in a schema's runtime data object.
+ *
+ * `Object.keys()` only returns strings, so generic runtime key lists should
+ * not expose raw `keyof SchemaDataType<T>` which can widen to
+ * `string | number | symbol`.
+ * @group Schema
+ */
+export type SchemaDataKey<T extends Schema> = Extract<
+  keyof SchemaDataType<T>,
+  string
+>;
 
 /**
  * The null schema is used to reserve keys for items that they're schema
@@ -337,17 +368,25 @@ export function SchemaGetRequiredFields(s: Schema): readonly string[] {
 }
 
 /**
- * Given a schema and a field, returns its
- * @param s
- * @param field
- * @returns
+ * Returns the field definition for a declared or built-in runtime field.
+ *
+ * The typed overload preserves the field's concrete value type for known keys.
+ * The string overload exists for runtime enumeration paths like `Object.keys()`.
  * @group Schema
  */
-export function SchemaGetFieldDef<
-  S extends Schema,
-  F extends keyof S['fields'] | keyof typeof kBuiltinFields,
->(s: S, field: F): FieldDef<S['fields'][F]['type']> | undefined {
-  const def = s.fields[field as string] || kBuiltinFields[field as string];
+export function SchemaGetFieldDef<S extends Schema, F extends SchemaField<S>>(
+  s: S,
+  field: F,
+): FieldDef<SchemaRuntimeFieldDef<S, F>['type']> | undefined;
+export function SchemaGetFieldDef(
+  s: Schema,
+  field: string,
+): FieldDef<ValueType> | undefined;
+export function SchemaGetFieldDef(
+  s: Schema,
+  field: string,
+): FieldDef<ValueType> | undefined {
+  const def = s.fields[field] || kBuiltinFields[field];
   if (!def) {
     return undefined;
   }
