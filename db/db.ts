@@ -201,7 +201,8 @@ export interface WriteFailureDetail {
 }
 
 type TestAppendFailureHook = (() => boolean) | undefined;
-const gTestAppendFailureHooks = new WeakMap<GoatDB, TestAppendFailureHook>();
+// Test hooks key by DB identity only, so erase the generic parameter here.
+const gTestAppendFailureHooks = new WeakMap<object, TestAppendFailureHook>();
 
 /**
  * @internal Test-only fault injection for append writes.

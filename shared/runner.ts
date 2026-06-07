@@ -152,6 +152,11 @@ export interface BenchmarkStatistics {
  */
 export type RunFunc = (ctx: Suite) => Promise<void> | void;
 
+type CachedDB = {
+  db: unknown;
+  close: () => Promise<void>;
+};
+
 /**
  * Generic Suite class for running tests or benchmarks.
  * Provides context utilities like temp directories and database creation.
@@ -159,7 +164,7 @@ export type RunFunc = (ctx: Suite) => Promise<void> | void;
 export class Suite {
   private _tempDir: string | undefined;
   private readonly results: RunResult[] = [];
-  private readonly _dbs = new Map<string, GoatDB<Schema>>();
+  private readonly _dbs = new Map<string, CachedDB>();
   private _customTiming: { start?: number; duration?: number } = {};
 
   /**
@@ -216,8 +221,8 @@ export class Suite {
    */
   async cleanup() {
     // Close all open DBs first
-    for (const db of this._dbs.values()) {
-      await db.close();
+    for (const { close } of this._dbs.values()) {
+      await close();
     }
     this._dbs.clear();
 
@@ -312,18 +317,29 @@ export class Suite {
       );
     }
 
-    // Track this DB instance
-    this._dbs.set(testId, db as unknown as GoatDB<Schema>);
+    // Track this DB instance without forcing a fake schema supertype.
+    this._dbs.set(testId, {
+      db,
+      close: () => db.close(),
+    });
     return db;
   }
 
+  /**
+   * Gets a cached DB for `testId` or creates one.
+   *
+   * Contract: a given `testId` must always be reused with the same schema
+   * generic. The cache stores erased instances, so the caller owns that
+   * invariant when requesting an existing DB.
+   */
   async getOrCreateDB<S extends Schema = Schema>(
     testId: string,
     config: Partial<DBInstanceConfig> = {},
   ): Promise<GoatDB<S>> {
     const existing = this._dbs.get(testId);
     if (existing) {
-      return existing as unknown as GoatDB<S>;
+      // Caller must ensure testId was created with the same <S>.
+      return existing.db as GoatDB<S>;
     }
     return this.createDB<S>(testId, config);
   }
