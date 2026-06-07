@@ -1,3 +1,10 @@
 system-assets/assets.json   text eol=lf
 *.ts                        text eol=lf
+*.tsx                       text eol=lf
+*.js                        text eol=lf
+*.json                      text eol=lf
+*.md                        text eol=lf
+*.html                      text eol=lf
+*.css                       text eol=lf
+*.svg                       text eol=lf
 *.yml                       text eol=lf
