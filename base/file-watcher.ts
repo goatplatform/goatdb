@@ -284,13 +284,31 @@ export async function createPollingWatcher(
   // Throttle per-path to at most one DEBUG log per 60s to avoid log floods
   // from persistently broken paths (e.g., permission denied, raced deletion).
   const lastFailureLog = new Map<string, number>();
+  const kFailureLogMaxSize = 1000;
   function logFailureThrottled(path: string, msg: string): void {
     const now = Date.now();
     const last = lastFailureLog.get(path) ?? 0;
-    if (now - last >= 60_000) {
-      lastFailureLog.set(path, now);
-      log({ severity: 'DEBUG', message: msg });
+    if (now - last < 60_000) return;
+
+    // Evict stale entries first, then oldest survivors, but never the current
+    // path before its throttle window is checked.
+    if (
+      !lastFailureLog.has(path) && lastFailureLog.size >= kFailureLogMaxSize
+    ) {
+      const cutoff = now - 60_000;
+      for (const [p, t] of lastFailureLog) {
+        if (t < cutoff) lastFailureLog.delete(p);
+      }
+      while (lastFailureLog.size >= kFailureLogMaxSize) {
+        const oldestPath = lastFailureLog.keys().next().value;
+        if (oldestPath === undefined || oldestPath === path) break;
+        lastFailureLog.delete(oldestPath);
+      }
+      if (lastFailureLog.size >= kFailureLogMaxSize) return;
     }
+
+    lastFailureLog.set(path, now);
+    log({ severity: 'DEBUG', message: msg });
   }
 
   const { pushEvent, watcher } = createQueuedWatcher(() => {

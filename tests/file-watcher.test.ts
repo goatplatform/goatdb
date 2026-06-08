@@ -148,6 +148,68 @@ export default function setupFileWatcherUnitTests(): void {
       );
     },
   );
+
+  TEST(
+    'FileWatcher',
+    'polling failure throttle stays bounded without re-logging the active path',
+    async () => {
+      const dir = '/watch-root';
+      const entries = [
+        ...Array.from({ length: 1000 }, (_, i) => `broken-${i}`),
+        'broken-0',
+      ];
+      const fakeFs = {
+        readdirSync(currentDir: string): string[] {
+          if (currentDir !== dir) {
+            throw new Error(`unexpected dir: ${currentDir}`);
+          }
+          return entries;
+        },
+        lstatSync(_fullPath: string): never {
+          const err = new Error('permission denied') as Error & {
+            code?: string;
+          };
+          err.code = 'EACCES';
+          throw err;
+        },
+      } as typeof import('node:fs');
+
+      const originalNow = Date.now;
+      try {
+        Date.now = () => 61_000;
+        await withLogCapture(async (captured) => {
+          const { watcher, waitForCycles } = await createWatcher(
+            fakeFs,
+            dir,
+            5,
+          );
+          try {
+            await waitForCycles(1);
+          } finally {
+            watcher.close();
+          }
+
+          const debugMessages = captured.filter((entry) =>
+            entry.severity === 'DEBUG'
+          ).map((entry) => entry.message);
+          assertEquals(
+            debugMessages.length,
+            new Set(entries).size,
+            'second poll inside the throttle window must not emit extra DEBUG logs',
+          );
+          assertEquals(
+            debugMessages.filter((message) =>
+              message === `Failed to stat file: ${dir}/broken-0`
+            ).length,
+            1,
+            'the oldest tracked path must stay throttled even when the map is full',
+          );
+        });
+      } finally {
+        Date.now = originalNow;
+      }
+    },
+  );
 }
 
 export function setupFileWatcherTests(): void {
