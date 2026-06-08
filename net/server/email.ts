@@ -106,7 +106,22 @@ export interface EmailMessage extends SendMailOptions {
   emailType?: EmailType;
 }
 
-type EmailInitError = Error & { emailInitFailed: true };
+/**
+ * Error type indicating email service initialization failed.
+ * This branded marker is primarily useful inside the email service and its
+ * tests, where initialization failures must be distinguished from send-time
+ * failures in logs.
+ */
+export type EmailInitError = Error & { emailInitFailed: true };
+
+/**
+ * Type guard for {@link EmailInitError}.
+ * Returns true only for Errors explicitly branded with `emailInitFailed: true`.
+ */
+export function isEmailInitError(err: unknown): err is EmailInitError {
+  return err instanceof Error &&
+    (err as { emailInitFailed?: unknown }).emailInitFailed === true;
+}
 
 function toError(err: unknown): Error {
   return err instanceof Error ? err : new Error(String(err));
@@ -198,9 +213,7 @@ export class EmailService<US extends Schema>
       const error = toError(err);
       (this._emailLogger ?? this.services.logger).log({
         severity: 'ERROR',
-        error: 'emailInitFailed' in error && error.emailInitFailed
-          ? 'EmailInitFailed'
-          : 'EmailSendFailed',
+        error: isEmailInitError(error) ? 'EmailInitFailed' : 'EmailSendFailed',
         type: info.type,
         trace: error.stack,
       });

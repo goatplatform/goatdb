@@ -2,7 +2,7 @@ import { TEST } from './mod.ts';
 import { assertEquals, assertFalse, assertTrue } from './asserts.ts';
 import type { Logger } from '../logging/log.ts';
 import { createCapturedLogger } from './test-utils.ts';
-import { EmailService } from '../net/server/email.ts';
+import { EmailService, isEmailInitError } from '../net/server/email.ts';
 import type { BuildInfo } from '../base/build-info.ts';
 
 function createBuildInfo(): BuildInfo {
@@ -32,6 +32,32 @@ function makeMinimalServices(logger: Logger): any {
 export default function setupEmailServiceTests(): void {
   TEST(
     'EmailService',
+    'isEmailInitError requires the explicit true marker',
+    () => {
+      const branded = new Error('branded') as Error & {
+        emailInitFailed?: boolean;
+      };
+      branded.emailInitFailed = true;
+      assertTrue(isEmailInitError(branded), 'true marker must be accepted');
+
+      const falseMarker = new Error('false-marker') as Error & {
+        emailInitFailed?: boolean;
+      };
+      falseMarker.emailInitFailed = false;
+      assertFalse(
+        isEmailInitError(falseMarker),
+        'false marker must not be accepted',
+      );
+
+      assertFalse(
+        isEmailInitError(new Error('plain')),
+        'plain errors must not be accepted',
+      );
+    },
+  );
+
+  TEST(
+    'EmailService',
     'initializes transport lazily on first send and deduplicates concurrent init',
     async () => {
       let createTransportCalls = 0;
@@ -46,7 +72,7 @@ export default function setupEmailServiceTests(): void {
               sendMailCalls++;
               return true;
             },
-          } as import('nodemailer').Transporter;
+          } as unknown as import('nodemailer').Transporter;
         },
       });
       const { captured, logger } = createCapturedLogger();
@@ -112,7 +138,7 @@ export default function setupEmailServiceTests(): void {
               sendMailCalls++;
               return true;
             },
-          } as import('nodemailer').Transporter;
+          } as unknown as import('nodemailer').Transporter;
         },
       });
       const { captured, logger } = createCapturedLogger();
@@ -165,7 +191,7 @@ export default function setupEmailServiceTests(): void {
         createTransport() {
           return {
             sendMail: async () => false,
-          } as import('nodemailer').Transporter;
+          } as unknown as import('nodemailer').Transporter;
         },
       });
       const { captured, logger } = createCapturedLogger();
@@ -199,7 +225,7 @@ export default function setupEmailServiceTests(): void {
             sendMail: async () => {
               throw new Error('email-send-sentinel');
             },
-          } as import('nodemailer').Transporter;
+          } as unknown as import('nodemailer').Transporter;
         },
       });
       const { captured, logger } = createCapturedLogger();
@@ -259,6 +285,80 @@ export function setupEmailServiceServerTests(): void {
         ).length,
         1,
         'default nodemailer transport path must emit EmailSent metric',
+      );
+    },
+  );
+
+  TEST(
+    'EmailService',
+    'default nodemailer path logs EmailInitFailed when transporter creation throws',
+    async () => {
+      const email = new EmailService(
+        {
+          from: 'system@test.invalid',
+          get send() {
+            throw new Error('email-init-sentinel');
+          },
+        } as unknown as import('../net/server/email.ts').EmailConfig,
+      );
+      const { captured, logger } = createCapturedLogger();
+      await email.setup(makeMinimalServices(logger));
+
+      const sent = await email.send({
+        type: 'Login',
+        magicLink: 'https://example.com/default-init-failure',
+        to: 'default-init-failure@test.invalid',
+      });
+
+      assertFalse(sent, 'transport init failure must return false to caller');
+      assertEquals(
+        captured.filter((e) =>
+          e.severity === 'ERROR' && e.error === 'EmailInitFailed'
+        ).length,
+        1,
+        'default nodemailer init failure must emit EmailInitFailed',
+      );
+      assertEquals(
+        captured.filter((e) => e.error === 'EmailSendFailed').length,
+        0,
+        'default nodemailer init failure must not emit EmailSendFailed',
+      );
+    },
+  );
+
+  TEST(
+    'EmailService',
+    'default nodemailer path logs EmailSendFailed when sendMail throws after init',
+    async () => {
+      const email = new EmailService(
+        {
+          from: 'system@test.invalid',
+          send() {
+            throw new Error('email-send-sentinel');
+          },
+        } as unknown as import('../net/server/email.ts').EmailConfig,
+      );
+      const { captured, logger } = createCapturedLogger();
+      await email.setup(makeMinimalServices(logger));
+
+      const sent = await email.send({
+        type: 'Login',
+        magicLink: 'https://example.com/default-send-failure',
+        to: 'default-send-failure@test.invalid',
+      });
+
+      assertFalse(sent, 'sendMail failure must return false to caller');
+      assertEquals(
+        captured.filter((e) =>
+          e.severity === 'ERROR' && e.error === 'EmailSendFailed'
+        ).length,
+        1,
+        'default nodemailer send failure must emit EmailSendFailed',
+      );
+      assertEquals(
+        captured.filter((e) => e.error === 'EmailInitFailed').length,
+        0,
+        'post-init default nodemailer send failure must not emit EmailInitFailed',
       );
     },
   );
