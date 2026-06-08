@@ -85,8 +85,10 @@ export function buildCombinedCSS(
         map: JSON.parse(chunks[i].map!),
       });
     }
+    // Advance by the chunk's generated newline count plus the unconditional
+    // '\n\n' separator inserted between chunks.
     lineOffset += countNewlines(chunks[i].content);
-    if (i < chunks.length - 1) lineOffset += 2; // the '\n\n' separator adds 2 newlines
+    if (i < chunks.length - 1) lineOffset += 2;
   }
 
   return {

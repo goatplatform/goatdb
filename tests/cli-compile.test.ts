@@ -3922,6 +3922,28 @@ src: url('./goat-font.woff2') format('woff2');
       assertEquals(mixedSections.sections.length, 1);
       assertEquals(mixedSections.sections[0].offset, { line: 2, column: 0 });
 
+      // Trailing newline in an unmapped chunk must still advance offsets by the
+      // chunk's real newline count plus the inserted '\n\n' separator.
+      const mixedWithTrailingNewline = buildCombinedCSS(
+        [
+          { content: '/* reset */\n' },
+          {
+            content: '.a{color:red}',
+            map: '{"version":3,"sources":["a.css"]}',
+          },
+        ],
+        '/index.css.map',
+      );
+      // deno-lint-ignore no-explicit-any
+      const trailingSections = JSON.parse(
+        mixedWithTrailingNewline.cssMap!,
+      ) as any;
+      assertEquals(trailingSections.sections.length, 1);
+      assertEquals(trailingSections.sections[0].offset, {
+        line: 3,
+        column: 0,
+      });
+
       // No mapped chunks -> no cssMap
       const none = buildCombinedCSS(
         [{ content: '/* reset */' }, { content: '/* vendor */' }],
