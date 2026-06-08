@@ -38,7 +38,11 @@ import setupCliInitTests, {
   setupCliInitBuildTests,
   setupCliInitNodeTests,
 } from './cli-init.test.ts';
-import setupCliCompileTests from './cli-compile.test.ts';
+import { setupCliEntrypointDenoTests } from './cli-entrypoints.test.ts';
+import setupCliCompileTests, {
+  setupCliCompileDenoTests,
+  setupCliCompileNodeTests,
+} from './cli-compile.test.ts';
 import setupPathTests from './path.test.ts';
 import setupBuildTests, { setupBuildServerTests } from './build.test.ts';
 import setupRuntimeTests, {
@@ -49,11 +53,13 @@ import setupEmailServiceTests, {
   setupEmailServiceServerTests,
 } from './email-service.test.ts';
 import setupProgressTests from './progress.test.ts';
+import setupTestUtilsTests from './test-utils.test.ts';
 import setupTestRunnerTests, {
   setupPlaywrightPinningTests,
   setupTestRunnerBrowserCliTests,
   setupTestRunnerDenoTests,
 } from './test-runner.test.ts';
+import { getEnvVar } from '../base/os.ts';
 import setupMergeAdjList from './merge-adjlist.test.ts';
 import setupMergeBloom from './merge-bloom.test.ts';
 import setupBloomFPR from './bloom-fpr.test.ts';
@@ -119,6 +125,7 @@ async function registerAllTestsImpl(): Promise<void> {
     setupBuildDenoTests(); // Deno-only build coverage that imports Deno-only modules
   }
   setupRuntimeTests(); // Runtime abstraction layer invariants
+  setupTestUtilsTests(); // Shared test helper wrappers
   setupEmailServiceTests(); // Cross-runtime email service contracts
   if (!isBrowser()) {
     setupEmailServiceServerTests(); // Default nodemailer path needs server package resolution
@@ -132,6 +139,10 @@ async function registerAllTestsImpl(): Promise<void> {
   setupProgressTests(); // TUI progress tracking - Task state machine, aggregation
   setupTestRunnerTests(); // Test filtering and no-match error behavior
   if (isDeno()) {
+    setupTestRunnerDenoTests(); // Deno-only runner registration/cache coverage
+    if (getEnvVar('GOATDB_REQUIRE_PLAYWRIGHT') === 'true') {
+      setupTestRunnerBrowserCliTests(); // Browser CLI coverage; requires Playwright/browser tooling in the spawned child process
+    }
     setupPlaywrightPinningTests(); // CI workflow Playwright pin sync (Deno-only, reads workflow file)
   }
   setupHealthCheckEndpointTest(); // Simple HTTP endpoint check
@@ -148,6 +159,9 @@ async function registerAllTestsImpl(): Promise<void> {
   setupSecurityBoundaries(); // Security boundary invariants (auth, sync, signatures)
   setupGoatRequestTest(); // HTTP request processing
   setupCliInitTests(); // CLI scaffolding functionality
+  if (isDeno()) {
+    setupCliEntrypointDenoTests(); // Deno-only CLI entrypoint exit behavior
+  }
   if (isNode()) {
     setupCliInitNodeTests(); // Node-only scaffold template assertions
   }
@@ -195,6 +209,12 @@ async function registerAllTestsImpl(): Promise<void> {
   // HEAVY END-TO-END TESTS (10-30s each) - Full system, network latency, multi-node
   if (!isBrowser()) {
     setupCliCompileTests(); // CLI compilation (includes E2E compile test)
+  }
+  if (isNode()) {
+    setupCliCompileNodeTests(); // Node-only: SEA, signing, buildAssets enforcement
+  }
+  if (isDeno()) {
+    setupCliCompileDenoTests(); // Deno-only: CSS bundling, node runner, cli timeout
   }
   setupE2ELatency(); // Client-to-client sync latency measurement
   setupClusterLatency(); // Multi-server cluster sync performance

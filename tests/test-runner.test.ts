@@ -441,6 +441,43 @@ export default function setupTestRunnerTests(): void {
 export function setupTestRunnerDenoTests(): void {
   TEST(
     'TestRunner',
+    'browser CLI coverage registers only when GOATDB_REQUIRE_PLAYWRIGHT is true',
+    async () => {
+      const code = `
+        const { countMatchingTests } = await import('./tests/test-registry.ts');
+        const count = await countMatchingTests(
+          'TestRunner',
+          'tests/run.ts browser failures exit non-zero',
+        );
+        console.log(count);
+      `;
+      const withoutPlaywright = await runDenoCommandWithTimeout([
+        'eval',
+        '--ext=ts',
+        code,
+      ]);
+      assertEquals(withoutPlaywright.code, 0, withoutPlaywright.stderrText);
+      assertEquals(
+        withoutPlaywright.stdoutText.trim(),
+        '0',
+        'browser CLI coverage should stay unregistered without GOATDB_REQUIRE_PLAYWRIGHT',
+      );
+
+      const withPlaywright = await runDenoCommandWithTimeout([
+        'eval',
+        '--ext=ts',
+        `Deno.env.set('GOATDB_REQUIRE_PLAYWRIGHT', 'true');\n${code}`,
+      ]);
+      assertEquals(withPlaywright.code, 0, withPlaywright.stderrText);
+      assertTrue(
+        Number(withPlaywright.stdoutText.trim()) > 0,
+        'browser CLI coverage should register when GOATDB_REQUIRE_PLAYWRIGHT=true',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
     'promise caching prevents duplicate concurrent registration',
     async () => {
       const code = `

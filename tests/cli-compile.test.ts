@@ -18,7 +18,6 @@ import {
   assertTrue,
 } from './asserts.ts';
 import * as path from '../base/path.ts';
-import { isBrowser, isDeno, isNode } from '../base/common.ts';
 import {
   mkdir,
   pathExists,
@@ -57,7 +56,6 @@ import { createHttpServer } from '../net/server/http-compat.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { goatEntryPoints } from '../cli/link.ts';
 import {
-  getEffectiveCWD,
   getEffectiveRuntimeId,
   getRuntime,
   withTestCWD,
@@ -287,6 +285,104 @@ async function waitForAssetText(
       }, ` +
       `body preview: "${lastText.slice(0, 200)}"`,
   );
+}
+
+// --- Shared test helpers for cli() timeout behavior ---
+
+function makeTimeoutTest(
+  name: string,
+  cmd: string,
+  timeoutMs: number,
+): (ctx: TestSuite) => Promise<void> {
+  return async (ctx: TestSuite) => {
+    const dir = await ctx.tempDir('cli-timeout');
+    const scriptPath = path.join(dir, 'script.js');
+    await writeTextFile(scriptPath, 'setInterval(() => {}, 1000)');
+    await withLogCapture(async (captured) => {
+      const cliArgs: (string | CliOptions)[] = cmd === 'deno'
+        ? ['run', scriptPath, { timeout: timeoutMs }]
+        : [scriptPath, { timeout: timeoutMs }];
+      const cliResult = await cli(cmd, ...cliArgs);
+      assertEquals(
+        cliResult.exitCode,
+        124,
+        'timed out cli() must return 124',
+      );
+      assertTrue(
+        cliResult.result.startsWith('Process timed out after'),
+        'cli() timeout result must start with "Process timed out after"',
+      );
+      const warnings = captured.filter((e) => e.severity === 'WARNING');
+      assertEquals(
+        warnings.length,
+        1,
+        `${name} cli timeout should emit one warning log`,
+      );
+      const message = warnings[0].message ?? '';
+      assertTrue(
+        /^CLI subprocess timed out after \d+ms: /.test(message),
+        `${name} cli timeout warning must use the generic timeout prefix`,
+      );
+      assertTrue(
+        !message.includes('(Deno)') && !message.includes('SIGTERM') &&
+          !message.includes('SIGKILL') && !message.includes('taskkill'),
+        `${name} cli timeout warning must not leak runtime kill details`,
+      );
+    });
+  };
+}
+
+function makeNormalTest(
+  cmd: string,
+): (ctx: TestSuite) => Promise<void> {
+  return async (ctx: TestSuite) => {
+    const dir = await ctx.tempDir('cli-normal');
+    const scriptPath = path.join(dir, 'script.js');
+    await writeTextFile(scriptPath, 'console.log("hello")');
+    await withLogCapture(async (captured) => {
+      const cliArgs: (string | CliOptions)[] = cmd === 'deno'
+        ? ['run', scriptPath]
+        : [scriptPath];
+      const { result, exitCode } = await cli(cmd, ...cliArgs);
+      assertEquals(exitCode, 0, 'normal cli() must return exit code 0');
+      assertEquals(
+        result.trim(),
+        'hello',
+        'normal cli() must capture stdout',
+      );
+      assertEquals(
+        captured.filter((e) => e.severity === 'WARNING').length,
+        0,
+        'non-timeout cli() must not emit timeout warnings',
+      );
+    });
+  };
+}
+
+function makeOrphanTest(
+  cmd: string,
+  code: (sentinel: string) => string,
+  suffix: string,
+): (ctx: TestSuite) => Promise<void> {
+  return async (ctx: TestSuite) => {
+    const dir = await ctx.tempDir(`cli-timeout-kill-${suffix}`);
+    const sentinel = path.join(dir, 'sentinel');
+    const scriptPath = path.join(dir, 'script.js');
+    await writeTextFile(scriptPath, code(sentinel));
+    // Subprocess schedules a file write at 5s — well past the 200ms timeout.
+    // The 25x margin (200ms timeout vs 5000ms sentinel write) ensures the
+    // direct timed-out subprocess cannot reach its delayed callback before
+    // cli() returns, even under CI load.
+    const cliArgs: (string | CliOptions)[] = cmd === 'deno'
+      ? ['run', scriptPath, { timeout: 200 }]
+      : [scriptPath, { timeout: 200 }];
+    const { exitCode } = await cli(cmd, ...cliArgs);
+    assertEquals(exitCode, 124, 'timeout must produce exit code 124');
+    assertFalse(
+      await pathExists(sentinel),
+      'timeout must prevent the delayed sentinel write before cli() returns',
+    );
+  };
 }
 
 export default function setupCliCompileTests() {
@@ -1885,52 +1981,6 @@ export default function setupCliCompileTests() {
     },
   );
 
-  if (isNode()) {
-    TEST(
-      'CLI-Compile',
-      'signExecutable warns about certPassword visibility before signtool failure',
-      async (ctx: TestSuite) => {
-        const runtime = getRuntime() as { getOS: () => string };
-        const originalGetOS = runtime.getOS;
-        const dir = await ctx.tempDir('sign-windows-cert-password');
-        const execPath = path.join(dir, 'app.exe');
-        const certPath = path.join(dir, 'cert.pfx');
-        await writeTextFile(execPath, 'stub');
-        await writeTextFile(certPath, 'stub');
-
-        try {
-          runtime.getOS = () => 'windows';
-          await withLogCapture(async (captured) => {
-            await assertThrows(
-              async () => {
-                await signExecutable(execPath, {
-                  windows: {
-                    certFile: certPath,
-                    certPassword: 'secret',
-                  },
-                });
-              },
-              Error,
-              'Code signing failed:',
-            );
-            const warning = captured.find((e) =>
-              e.severity === 'WARNING' &&
-              e.message?.includes('certPassword is passed as a CLI argument')
-            );
-            assertExists(warning, 'certPassword usage should emit a warning');
-            assertEquals(
-              warning?.error,
-              undefined,
-              'certPassword warning should not be misclassified as missing configuration',
-            );
-          });
-        } finally {
-          runtime.getOS = originalGetOS;
-        }
-      },
-    );
-  }
-
   TEST(
     'CLI-Compile',
     'should compute target OS/arch correctly',
@@ -2017,69 +2067,6 @@ export default function setupCliCompileTests() {
       }
     },
   );
-
-  if (isNode()) {
-    TEST(
-      'CLI-Compile',
-      'bundleServerForSEA accepts file:// URL entry points',
-      async (ctx) => {
-        const dir = await ctx.tempDir('bundle-sea-file-url');
-        const entryPath = path.join(dir, 'entry.ts');
-        await writeTextFile(entryPath, 'export const value = 42;\n');
-        const outPath = path.join(dir, 'bundle.cjs');
-
-        try {
-          await bundleServerForSEA(path.toFileUrl(entryPath).href, outPath);
-        } finally {
-          await stopBackgroundCompiler();
-        }
-
-        assertTrue(await pathExists(outPath), 'output file must be written');
-        const content = await readTextFile(outPath);
-        assertExists(content, 'output file should be readable');
-        assertTrue(
-          content!.includes('module.exports'),
-          'file:// entry points must still produce CJS output',
-        );
-      },
-    );
-  }
-
-  if (isNode()) {
-    TEST(
-      'CLI-Compile',
-      'bundleServerForSEA produces valid CJS',
-      async (ctx) => {
-        const dir = await ctx.tempDir('bundle-sea');
-        const entryPath = path.join(dir, 'entry.ts');
-        await writeTextFile(
-          entryPath,
-          'export function main(): number { return 42; }',
-        );
-        const outPath = path.join(dir, 'bundle.cjs');
-
-        // bundleServerForSEA uses esbuild's background service; stop it after the
-        // test so the process can exit cleanly.
-        try {
-          await bundleServerForSEA(entryPath, outPath);
-        } finally {
-          await stopBackgroundCompiler();
-        }
-
-        const content = await readTextFile(outPath);
-        assertExists(content, 'output file should be readable');
-        const text = content!;
-        assertTrue(text.length > 0, 'output file must not be empty');
-        // esbuild's bundle mode (bundle: true) wraps all exports into a CJS module
-        // via `module.exports = __toCommonJS(entry_exports)`. This pattern is absent
-        // from ESM output and confirms the bundle is CJS, not ESM.
-        assertTrue(
-          text.includes('module.exports'),
-          'CJS output must assign module.exports',
-        );
-      },
-    );
-  }
 
   TEST(
     'CLI-Compile',
@@ -2222,79 +2209,6 @@ src: url('./goat-font.woff2') format('woff2');
       }
     },
   );
-
-  if (isDeno()) {
-    TEST(
-      'CLI-Compile',
-      DENO_ONLY_FILTER_TEST,
-      async (ctx: TestSuite) => {
-        const dir = await ctx.tempDir('build-assets-deno-css');
-        await writeTextFile(
-          path.join(dir, 'style.css'),
-          ':root { --deno-css-test: 1; }',
-        );
-        await writeTextFile(
-          path.join(dir, 'entry.ts'),
-          "import './style.css';\nexport {};",
-        );
-        const entryPoints = [{
-          in: path.join(dir, 'entry.ts'),
-          out: APP_ENTRY_POINT,
-        }];
-
-        try {
-          const assets = await buildAssets(
-            undefined,
-            entryPoints,
-            { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
-            { runtime: 'deno', keepEsbuildAlive: false },
-          );
-          assertExists(
-            assets['/index.css'],
-            '/index.css must be present for deno runtime',
-          );
-          const css = new TextDecoder().decode(assets['/index.css'].data);
-          assertTrue(
-            css.includes('--deno-css-test'),
-            'CSS from import must land in /index.css on deno path',
-          );
-          // Source map must also be emitted for the deno path
-          assertExists(
-            assets['/index.css.map'],
-            '/index.css.map must be present on deno path',
-          );
-          const cssMapStr = new TextDecoder().decode(
-            assets['/index.css.map'].data,
-          );
-          const cssMap = JSON.parse(cssMapStr);
-          assertEquals(
-            cssMap.version,
-            3,
-            '/index.css.map must be a valid v3 source map',
-          );
-          // Verify the map actually references the original source file.
-          // Single-chunk path returns an esbuild map directly (no sections wrapper).
-          const sources: string[] = cssMap.sources ??
-            cssMap.sections?.[0]?.map?.sources ?? [];
-          assertTrue(
-            sources.length > 0,
-            '/index.css.map must contain at least one source entry',
-          );
-          assertTrue(
-            sources.some((s: string) => s.includes('style.css')),
-            '/index.css.map must reference the original style.css source file',
-          );
-          const cssText = new TextDecoder().decode(assets['/index.css'].data);
-          assertTrue(
-            cssText.includes('sourceMappingURL=/index.css.map'),
-            '/index.css must reference /index.css.map',
-          );
-        } finally {
-          await stopBackgroundCompiler();
-        }
-      },
-    );
-  }
 
   TEST(
     'CLI-Compile',
@@ -4035,30 +3949,6 @@ src: url('./goat-font.woff2') format('woff2');
     );
   }
 
-  if (isNode()) {
-    TEST(
-      'CLI-Compile',
-      'buildAssets enforces Deno runtime for deno target',
-      async () => {
-        try {
-          await assertThrows(
-            async () =>
-              buildAssets(
-                undefined,
-                [{ in: '/fake.ts', out: 'fake' }],
-                kPlaceholderAppConfig,
-                { runtime: 'deno' },
-              ),
-            Error,
-            'cannot build Deno-target bundle',
-          );
-        } finally {
-          await stopBackgroundCompiler();
-        }
-      },
-    );
-  }
-
   TEST(
     'CLI-Compile',
     'buildAssets accepts valid plugins',
@@ -4236,286 +4126,375 @@ src: url('./goat-font.woff2') format('woff2');
       }
     },
   );
+}
 
-  // --- Shared test helpers for cli() timeout behavior ---
+/**
+ * Node.js-only CLI compile tests.
+ * Gated at test-registry.ts level.
+ */
+export function setupCliCompileNodeTests(): void {
+  TEST(
+    'CLI-Compile',
+    'signExecutable warns about certPassword visibility before signtool failure',
+    async (ctx: TestSuite) => {
+      const runtime = getRuntime() as { getOS: () => string };
+      const originalGetOS = runtime.getOS;
+      const dir = await ctx.tempDir('sign-windows-cert-password');
+      const execPath = path.join(dir, 'app.exe');
+      const certPath = path.join(dir, 'cert.pfx');
+      await writeTextFile(execPath, 'stub');
+      await writeTextFile(certPath, 'stub');
 
-  function makeTimeoutTest(
-    name: string,
-    cmd: string,
-    timeoutMs: number,
-  ): (ctx: TestSuite) => Promise<void> {
-    return async (ctx: TestSuite) => {
-      const dir = await ctx.tempDir('cli-timeout');
-      const scriptPath = path.join(dir, 'script.js');
-      await writeTextFile(scriptPath, 'setInterval(() => {}, 1000)');
+      try {
+        runtime.getOS = () => 'windows';
+        await withLogCapture(async (captured) => {
+          await assertThrows(
+            async () => {
+              await signExecutable(execPath, {
+                windows: { certFile: certPath, certPassword: 'secret' },
+              });
+            },
+            Error,
+            'Code signing failed:',
+          );
+          const warning = captured.find((e) =>
+            e.severity === 'WARNING' &&
+            e.message?.includes('certPassword is passed as a CLI argument')
+          );
+          assertExists(warning, 'certPassword usage should emit a warning');
+          assertEquals(
+            warning?.error,
+            undefined,
+            'certPassword warning should not be misclassified as missing configuration',
+          );
+        });
+      } finally {
+        runtime.getOS = originalGetOS;
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'bundleServerForSEA accepts file:// URL entry points',
+    async (ctx) => {
+      const dir = await ctx.tempDir('bundle-sea-file-url');
+      const entryPath = path.join(dir, 'entry.ts');
+      await writeTextFile(entryPath, 'export const value = 42;\n');
+      const outPath = path.join(dir, 'bundle.cjs');
+
+      try {
+        await bundleServerForSEA(path.toFileUrl(entryPath).href, outPath);
+      } finally {
+        await stopBackgroundCompiler();
+      }
+
+      assertTrue(await pathExists(outPath), 'output file must be written');
+      const content = await readTextFile(outPath);
+      assertExists(content, 'output file should be readable');
+      assertTrue(
+        content!.includes('module.exports'),
+        'file:// entry points must still produce CJS output',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'bundleServerForSEA produces valid CJS',
+    async (ctx) => {
+      const dir = await ctx.tempDir('bundle-sea');
+      const entryPath = path.join(dir, 'entry.ts');
+      await writeTextFile(
+        entryPath,
+        'export function main(): number { return 42; }',
+      );
+      const outPath = path.join(dir, 'bundle.cjs');
+
+      try {
+        await bundleServerForSEA(entryPath, outPath);
+      } finally {
+        await stopBackgroundCompiler();
+      }
+
+      const content = await readTextFile(outPath);
+      assertExists(content, 'output file should be readable');
+      const text = content!;
+      assertTrue(text.length > 0, 'output file must not be empty');
+      assertTrue(
+        text.includes('module.exports'),
+        'CJS output must assign module.exports',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'buildAssets enforces Deno runtime for deno target',
+    async () => {
+      try {
+        await assertThrows(
+          async () =>
+            buildAssets(
+              undefined,
+              [{ in: '/fake.ts', out: 'fake' }],
+              kPlaceholderAppConfig,
+              { runtime: 'deno' },
+            ),
+          Error,
+          'cannot build Deno-target bundle',
+        );
+      } finally {
+        await stopBackgroundCompiler();
+      }
+    },
+  );
+
+  // Node cli tests
+  TEST(
+    'CLI-Compile',
+    'cli returns timeout result and warning log in Node runtime',
+    makeTimeoutTest('Node', 'node', 500),
+  );
+
+  TEST(
+    'CLI-Compile',
+    'cli returns normal output and exit code on non-timeout execution',
+    makeNormalTest('node'),
+  );
+
+  TEST(
+    'CLI-Compile',
+    'cli timeout prevents delayed side effects before returning',
+    makeOrphanTest(
+      'node',
+      (s) =>
+        `setTimeout(() => require('fs').writeFileSync(${
+          JSON.stringify(s)
+        }, 'x'), 5000)`,
+      'node',
+    ),
+  );
+
+  TEST(
+    'CLI-Compile',
+    'cli returns timeout result when Node spawns a Deno subprocess',
+    makeTimeoutTest('CrossRuntime', 'deno', 500),
+  );
+}
+
+/**
+ * Deno-only CLI compile tests.
+ * Gated at test-registry.ts level.
+ */
+export function setupCliCompileDenoTests(): void {
+  TEST(
+    'CLI-Compile',
+    DENO_ONLY_FILTER_TEST,
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('build-assets-deno-css');
+      await writeTextFile(
+        path.join(dir, 'style.css'),
+        ':root { --deno-css-test: 1; }',
+      );
+      await writeTextFile(
+        path.join(dir, 'entry.ts'),
+        "import './style.css';\nexport {};",
+      );
+      const entryPoints = [{
+        in: path.join(dir, 'entry.ts'),
+        out: APP_ENTRY_POINT,
+      }];
+
+      try {
+        const assets = await buildAssets(
+          undefined,
+          entryPoints,
+          { buildDir: dir, jsPath: path.join(dir, 'entry.ts') },
+          { runtime: 'deno', keepEsbuildAlive: false },
+        );
+        assertExists(
+          assets['/index.css'],
+          '/index.css must be present for deno runtime',
+        );
+        const css = new TextDecoder().decode(assets['/index.css'].data);
+        assertTrue(
+          css.includes('--deno-css-test'),
+          'CSS from import must land in /index.css on deno path',
+        );
+        assertExists(
+          assets['/index.css.map'],
+          '/index.css.map must be present on deno path',
+        );
+        const cssMapStr = new TextDecoder().decode(
+          assets['/index.css.map'].data,
+        );
+        const cssMap = JSON.parse(cssMapStr);
+        assertEquals(
+          cssMap.version,
+          3,
+          '/index.css.map must be a valid v3 source map',
+        );
+        const sources: string[] = cssMap.sources ??
+          cssMap.sections?.[0]?.map?.sources ?? [];
+        assertTrue(
+          sources.length > 0,
+          '/index.css.map must contain at least one source entry',
+        );
+        assertTrue(
+          sources.some((s: string) => s.includes('style.css')),
+          '/index.css.map must reference the original style.css source file',
+        );
+        const cssText = new TextDecoder().decode(assets['/index.css'].data);
+        assertTrue(
+          cssText.includes('sourceMappingURL=/index.css.map'),
+          '/index.css must reference /index.css.map',
+        );
+      } finally {
+        await stopBackgroundCompiler();
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'compileForNodeWithEsbuild accepts file:// entries, resolves JSR imports, and runs in Node.js',
+    async (ctx: TestSuite) => {
+      const { compileForNodeWithEsbuild, nodeRun } = await import(
+        '../base/node-runner.ts'
+      );
+      const dir = await ctx.tempDir('node-esbuild-plugin');
+      const entryPath = path.join(dir, 'entry.ts');
+      await writeTextFile(
+        entryPath,
+        `import { assertEquals } from "jsr:@std/assert";\nexport { assertEquals };`,
+      );
+      const result = await compileForNodeWithEsbuild(
+        path.toFileUrl(entryPath).href,
+        'output',
+      );
+      assertEquals(
+        result.errors.length,
+        0,
+        'Node.js compilation with @deno/esbuild-plugin must produce no errors',
+      );
+      assertExists(result.outputFiles, 'compilation must produce output files');
+      assertTrue(
+        result.outputFiles!.length > 0,
+        'compilation must produce at least one output file',
+      );
+      const nodeResult = await nodeRun(result);
+      assertTrue(
+        nodeResult.success,
+        `compiled bundle must execute successfully in Node.js: ${nodeResult.stderrText}`,
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'runAcrossPlatforms surfaces Node.js stderr details on failure',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('node-runner-surface-stderr');
+      const entryPath = path.join(dir, 'entry.ts');
+      await writeTextFile(
+        entryPath,
+        "throw new Error('node-runner-sentinel');\n",
+      );
+
+      await assertThrows(
+        async () => {
+          await runAcrossPlatforms({
+            entryPointServer: entryPath,
+            entryPointBrowser: entryPath,
+            runtimes: ['node'],
+          });
+        },
+        Error,
+        'node-runner-sentinel',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'nodeRun returns timeout failure after child teardown settles',
+    async (ctx: TestSuite) => {
+      const { compileForNodeWithEsbuild, nodeRun } = await import(
+        '../base/node-runner.ts'
+      );
+      const dir = await ctx.tempDir('node-runner-timeout');
+      const entryPath = path.join(dir, 'entry.ts');
+      await writeTextFile(entryPath, 'setInterval(() => {}, 1000);\n');
+      const result = await compileForNodeWithEsbuild(entryPath, 'output');
+      const originalSetTimeout = globalThis.setTimeout;
+      try {
+        globalThis.setTimeout = ((handler, timeout, ...args) =>
+          originalSetTimeout(
+            handler,
+            typeof timeout === 'number' && timeout > 100 ? 20 : timeout,
+            ...args,
+          )) as typeof setTimeout;
+        const nodeResult = await nodeRun(result);
+        assertFalse(nodeResult.success, 'timed out node run must fail');
+        assertEquals(
+          nodeResult.exitCode,
+          -1,
+          'timeout returns wrapper failure',
+        );
+        assertTrue(
+          nodeResult.stderrText.includes('Timed out after 300000ms'),
+          `timeout error should be surfaced, got: ${nodeResult.stderrText}`,
+        );
+      } finally {
+        globalThis.setTimeout = originalSetTimeout;
+      }
+    },
+  );
+
+  // Deno cli tests
+  TEST(
+    'CLI-Compile',
+    'cli returns timeout result and warning log in Deno runtime',
+    makeTimeoutTest('Deno', 'deno', 2000),
+  );
+
+  TEST(
+    'CLI-Compile',
+    'cli rethrows Deno spawn failures that are not timeouts',
+    async (_ctx: TestSuite) => {
       await withLogCapture(async (captured) => {
-        const cliArgs: (string | CliOptions)[] = cmd === 'deno'
-          ? ['run', scriptPath, { timeout: timeoutMs }]
-          : [scriptPath, { timeout: timeoutMs }];
-        const cliResult = await cli(cmd, ...cliArgs);
-        assertEquals(
-          cliResult.exitCode,
-          124,
-          'timed out cli() must return 124',
-        );
-        assertTrue(
-          cliResult.result.startsWith('Process timed out after'),
-          'cli() timeout result must start with "Process timed out after"',
-        );
-        const warnings = captured.filter((e) => e.severity === 'WARNING');
-        assertEquals(
-          warnings.length,
-          1,
-          `${name} cli timeout should emit one warning log`,
-        );
-        const message = warnings[0].message ?? '';
-        assertTrue(
-          /^CLI subprocess timed out after \d+ms: /.test(message),
-          `${name} cli timeout warning must use the generic timeout prefix`,
-        );
-        assertTrue(
-          !message.includes('(Deno)') && !message.includes('SIGTERM') &&
-            !message.includes('SIGKILL') && !message.includes('taskkill'),
-          `${name} cli timeout warning must not leak runtime kill details`,
-        );
-      });
-    };
-  }
-
-  function makeNormalTest(
-    cmd: string,
-  ): (ctx: TestSuite) => Promise<void> {
-    return async (ctx: TestSuite) => {
-      const dir = await ctx.tempDir('cli-normal');
-      const scriptPath = path.join(dir, 'script.js');
-      await writeTextFile(scriptPath, 'console.log("hello")');
-      await withLogCapture(async (captured) => {
-        const cliArgs: (string | CliOptions)[] = cmd === 'deno'
-          ? ['run', scriptPath]
-          : [scriptPath];
-        const { result, exitCode } = await cli(cmd, ...cliArgs);
-        assertEquals(exitCode, 0, 'normal cli() must return exit code 0');
-        assertEquals(
-          result.trim(),
-          'hello',
-          'normal cli() must capture stdout',
+        await assertThrows(
+          async () => {
+            await cli('goatdb-definitely-missing-cli-command');
+          },
+          Error,
         );
         assertEquals(
           captured.filter((e) => e.severity === 'WARNING').length,
           0,
-          'non-timeout cli() must not emit timeout warnings',
+          'non-timeout Deno cli() failures must not emit timeout warnings',
         );
       });
-    };
-  }
+    },
+  );
 
-  function makeOrphanTest(
-    cmd: string,
-    code: (sentinel: string) => string,
-    suffix: string,
-  ): (ctx: TestSuite) => Promise<void> {
-    return async (ctx: TestSuite) => {
-      const dir = await ctx.tempDir(`cli-timeout-kill-${suffix}`);
-      const sentinel = path.join(dir, 'sentinel');
-      const scriptPath = path.join(dir, 'script.js');
-      await writeTextFile(scriptPath, code(sentinel));
-      // Subprocess schedules a file write at 5s — well past the 200ms timeout.
-      // The 25x margin (200ms timeout vs 5000ms sentinel write) ensures the
-      // direct timed-out subprocess cannot reach its delayed callback before
-      // cli() returns, even under CI load.
-      const cliArgs: (string | CliOptions)[] = cmd === 'deno'
-        ? ['run', scriptPath, { timeout: 200 }]
-        : [scriptPath, { timeout: 200 }];
-      const { exitCode } = await cli(cmd, ...cliArgs);
-      assertEquals(exitCode, 124, 'timeout must produce exit code 124');
-      assertFalse(
-        await pathExists(sentinel),
-        'timeout must prevent the delayed sentinel write before cli() returns',
-      );
-    };
-  }
+  TEST(
+    'CLI-Compile',
+    'cli returns normal output and exit code on non-timeout execution',
+    makeNormalTest('deno'),
+  );
 
-  if (isDeno()) {
-    TEST(
-      'CLI-Compile',
-      'compileForNodeWithEsbuild accepts file:// entries, resolves JSR imports, and runs in Node.js',
-      async (ctx: TestSuite) => {
-        const { compileForNodeWithEsbuild, nodeRun } = await import(
-          '../base/node-runner.ts'
-        );
-        const dir = await ctx.tempDir('node-esbuild-plugin');
-        const entryPath = path.join(dir, 'entry.ts');
-        await writeTextFile(
-          entryPath,
-          `import { assertEquals } from "jsr:@std/assert";\nexport { assertEquals };`,
-        );
-        const result = await compileForNodeWithEsbuild(
-          path.toFileUrl(entryPath).href,
-          'output',
-        );
-        assertEquals(
-          result.errors.length,
-          0,
-          'Node.js compilation with @deno/esbuild-plugin must produce no errors',
-        );
-        assertExists(
-          result.outputFiles,
-          'compilation must produce output files',
-        );
-        assertTrue(
-          result.outputFiles!.length > 0,
-          'compilation must produce at least one output file',
-        );
-        const nodeResult = await nodeRun(result);
-        assertTrue(
-          nodeResult.success,
-          `compiled bundle must execute successfully in Node.js: ${nodeResult.stderrText}`,
-        );
-      },
-    );
-
-    TEST(
-      'CLI-Compile',
-      'runAcrossPlatforms surfaces Node.js stderr details on failure',
-      async (ctx: TestSuite) => {
-        const dir = await ctx.tempDir('node-runner-surface-stderr');
-        const entryPath = path.join(dir, 'entry.ts');
-        await writeTextFile(
-          entryPath,
-          "throw new Error('node-runner-sentinel');\n",
-        );
-
-        await assertThrows(
-          async () => {
-            await runAcrossPlatforms({
-              entryPointServer: entryPath,
-              entryPointBrowser: entryPath,
-              runtimes: ['node'],
-            });
-          },
-          Error,
-          'node-runner-sentinel',
-        );
-      },
-    );
-
-    TEST(
-      'CLI-Compile',
-      'nodeRun returns timeout failure after child teardown settles',
-      async (ctx: TestSuite) => {
-        const { compileForNodeWithEsbuild, nodeRun } = await import(
-          '../base/node-runner.ts'
-        );
-        const dir = await ctx.tempDir('node-runner-timeout');
-        const entryPath = path.join(dir, 'entry.ts');
-        await writeTextFile(entryPath, 'setInterval(() => {}, 1000);\n');
-        const result = await compileForNodeWithEsbuild(entryPath, 'output');
-        const originalSetTimeout = globalThis.setTimeout;
-        try {
-          globalThis.setTimeout = ((handler, timeout, ...args) =>
-            originalSetTimeout(
-              handler,
-              typeof timeout === 'number' && timeout > 100 ? 20 : timeout,
-              ...args,
-            )) as typeof setTimeout;
-          const nodeResult = await nodeRun(result);
-          assertFalse(nodeResult.success, 'timed out node run must fail');
-          assertEquals(
-            nodeResult.exitCode,
-            -1,
-            'timeout returns wrapper failure',
-          );
-          assertTrue(
-            nodeResult.stderrText.includes('Timed out after 300000ms'),
-            `timeout error should be surfaced, got: ${nodeResult.stderrText}`,
-          );
-        } finally {
-          globalThis.setTimeout = originalSetTimeout;
-        }
-      },
-    );
-
-    // Deno tests
-    TEST(
-      'CLI-Compile',
-      'cli returns timeout result and warning log in Deno runtime',
-      makeTimeoutTest('Deno', 'deno', 2000),
-    );
-
-    TEST(
-      'CLI-Compile',
-      'cli rethrows Deno spawn failures that are not timeouts',
-      async (_ctx: TestSuite) => {
-        await withLogCapture(async (captured) => {
-          await assertThrows(
-            async () => {
-              await cli('goatdb-definitely-missing-cli-command');
-            },
-            Error,
-          );
-          assertEquals(
-            captured.filter((e) => e.severity === 'WARNING').length,
-            0,
-            'non-timeout Deno cli() failures must not emit timeout warnings',
-          );
-        });
-      },
-    );
-
-    TEST(
-      'CLI-Compile',
-      'cli returns normal output and exit code on non-timeout execution',
-      makeNormalTest('deno'),
-    );
-
-    TEST(
-      'CLI-Compile',
-      'cli timeout prevents delayed side effects before returning',
-      makeOrphanTest(
-        'deno',
-        (s) =>
-          `setTimeout(() => Deno.writeTextFileSync(${
-            JSON.stringify(s)
-          }, 'x'), 5000)`,
-        'deno',
-      ),
-    );
-  }
-
-  if (isNode()) {
-    // Node tests
-    TEST(
-      'CLI-Compile',
-      'cli returns timeout result and warning log in Node runtime',
-      makeTimeoutTest('Node', 'node', 500),
-    );
-
-    TEST(
-      'CLI-Compile',
-      'cli returns normal output and exit code on non-timeout execution',
-      makeNormalTest('node'),
-    );
-
-    TEST(
-      'CLI-Compile',
-      'cli timeout prevents delayed side effects before returning',
-      makeOrphanTest(
-        'node',
-        (s) =>
-          `setTimeout(() => require('fs').writeFileSync(${
-            JSON.stringify(s)
-          }, 'x'), 5000)`,
-        'node',
-      ),
-    );
-
-    // Cross-runtime test: Node spawning Deno (restores coverage that was lost
-    // when the old timeout test changed from `cli('deno', 'run', ...)` to
-    // `cli('node', '-e', ...)`).
-    TEST(
-      'CLI-Compile',
-      'cli returns timeout result when Node spawns a Deno subprocess',
-      makeTimeoutTest('CrossRuntime', 'deno', 500),
-    );
-  }
+  TEST(
+    'CLI-Compile',
+    'cli timeout prevents delayed side effects before returning',
+    makeOrphanTest(
+      'deno',
+      (s) =>
+        `setTimeout(() => Deno.writeTextFileSync(${
+          JSON.stringify(s)
+        }, 'x'), 5000)`,
+      'deno',
+    ),
+  );
 }
