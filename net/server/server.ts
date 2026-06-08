@@ -638,6 +638,9 @@ export class Server<US extends Schema> {
     if (this._abortController) {
       return; // Already running
     }
+    // Reset stop flag BEFORE any async work, so a concurrent stop() during
+    // service startup sees the correct state and the later _stopping check
+    // (after service awaits) still catches races.
     this._stopping = false;
 
     // Handle self-signed certificate generation if needed

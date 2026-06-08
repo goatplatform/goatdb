@@ -151,8 +151,9 @@ export type CompileOptions =
      * GoatDB's fallback CSS loader, so they can rewrite CSS imports, resolve
      * package CSS, or provide other browser bundle transforms.
      *
-     * @remarks The namespace `'node-stub'` is reserved by GoatDB internally.
-     * User-supplied plugins must not register that name.
+     * @remarks GoatDB reserves the plugin names `'adapter-stub'`,
+     * `'node-stub'`, and `'goatdb-css-loader'` internally.
+     * User-supplied plugins must use a different name.
      */
     esbuildPlugins?: BuildPluginLike[];
   };
