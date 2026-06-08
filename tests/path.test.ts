@@ -185,8 +185,8 @@ export default function setupPathTests(): void {
   TEST(
     'Path',
     'resolve keeps browser-root relative paths absolute without UNC semantics',
-    () => {
-      withTestCWD('/', () => {
+    async () => {
+      await withTestCWD('/', () => {
         assertEquals(resolve('foo/bar'), '/foo/bar');
         assertEquals(resolve('foo'), '/foo');
         assertEquals(resolve(''), '/');
@@ -209,8 +209,8 @@ export default function setupPathTests(): void {
   TEST(
     'Path',
     'toAbsolutePath keeps browser-root relative paths absolute without UNC semantics',
-    () => {
-      withTestCWD('/', () => {
+    async () => {
+      await withTestCWD('/', () => {
         assertEquals(toAbsolutePath('foo/bar'), '/foo/bar');
         assertEquals(toAbsolutePath('foo'), '/foo');
         assertEquals(toAbsolutePath(''), '/');
