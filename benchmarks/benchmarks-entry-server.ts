@@ -42,7 +42,7 @@ async function main(): Promise<void> {
 
   // Exit with code 1 if any benchmarks failed, 0 if all passed
   const exitCode = summary.summary.failed > 0 ? 1 : 0;
-  await exit(exitCode);
+  exit(exitCode);
 }
 
 main();

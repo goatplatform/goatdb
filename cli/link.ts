@@ -595,7 +595,7 @@ async function linkMain(): Promise<void> {
   const cmd = Deno.args[0];
   if (cmd === undefined) {
     console.error('Usage: unlink or link <local-goatdb-path>');
-    await exit(1);
+    exit(1);
   }
   if (cmd === 'unlink') {
     await unlinkGoatDB();
@@ -603,11 +603,11 @@ async function linkMain(): Promise<void> {
     const localGoatDBPath = Deno.args[1];
     if (localGoatDBPath === undefined) {
       console.error('Usage: link <local-goatdb-path>');
-      await exit(1);
+      exit(1);
     }
     await linkGoatDB(localGoatDBPath);
   } else {
     console.error('Usage: unlink or link <local-goatdb-path>');
-    await exit(1);
+    exit(1);
   }
 }

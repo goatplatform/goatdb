@@ -231,16 +231,16 @@ export async function runCLI(args: readonly string[]): Promise<void> {
     args[0] === '-h'
   ) {
     console.log(usage);
-    await exit(0);
+    exit(0);
   } else if (args[0] !== 'init') {
     console.error(usage);
-    await exit(1);
+    exit(1);
   }
   try {
     await bootstrapProject({ targetDir: args[1] });
   } catch (error) {
     console.error('Error during project initialization:', error);
-    await exit(1);
+    exit(1);
   }
 }
 
@@ -261,8 +261,8 @@ if (isNode() && process.argv[1]) {
     if (thisFile === resolved) {
       return runCLI(process.argv.slice(2));
     }
-  }).catch(async (err) => {
+  }).catch((err) => {
     console.error(err);
-    await exit(1);
+    exit(1);
   });
 }

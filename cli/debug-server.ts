@@ -302,7 +302,7 @@ export async function startDebugServer<US extends Schema>(
     const signalHandler = async () => {
       try {
         await cleanup();
-        await exit(0);
+        exit(0);
       } catch (err) {
         log({
           severity: 'ERROR',
@@ -310,7 +310,7 @@ export async function startDebugServer<US extends Schema>(
           message: `Debug server cleanup failed: ${err}`,
           trace: err instanceof Error ? err.stack : undefined,
         });
-        await exit(1);
+        exit(1);
       }
     };
     removeSignalHandlers = setupDebugServerSignalHandlers(signalHandler);

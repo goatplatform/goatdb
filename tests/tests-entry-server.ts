@@ -29,7 +29,7 @@ async function main(): Promise<void> {
   } catch (error) {
     if (error instanceof NoMatchError) {
       console.error(error.message);
-      await exit(EXIT_CODE_NO_MATCH);
+      exit(EXIT_CODE_NO_MATCH);
       return;
     }
     throw error;
@@ -40,7 +40,7 @@ async function main(): Promise<void> {
 
   // Exit with code 1 if any tests failed, 0 if all passed
   const exitCode = summary.failed > 0 ? 1 : 0;
-  await exit(exitCode);
+  exit(exitCode);
 }
 
 assert(
