@@ -47,7 +47,7 @@ function incrementBuildNumber(version: VersionNumber): VersionNumber {
 }
 
 function setupDebugServerSignalHandlers(
-  handler: () => Promise<void>,
+  handler: () => void,
 ): () => void {
   const runtime = getRuntime();
   const cleanup1 = runtime.setupSignalHandler('SIGTERM', handler);
