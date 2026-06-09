@@ -299,11 +299,17 @@ export async function startDebugServer<US extends Schema>(
       })();
       return cleanupPromise;
     };
-    const signalHandler = async () => {
-      try {
-        await cleanup();
+    let signalShutdownStarted = false;
+    const signalHandler = (): void => {
+      // setupSignalHandler does not await async handlers. Keep this callback
+      // synchronous and chain exit after cleanup so shutdown ordering is real.
+      if (signalShutdownStarted) {
+        return;
+      }
+      signalShutdownStarted = true;
+      void cleanup().then(() => {
         exit(0);
-      } catch (err) {
+      }).catch((err) => {
         log({
           severity: 'ERROR',
           error: 'UncaughtServerError',
@@ -311,7 +317,7 @@ export async function startDebugServer<US extends Schema>(
           trace: err instanceof Error ? err.stack : undefined,
         });
         exit(1);
-      }
+      });
     };
     removeSignalHandlers = setupDebugServerSignalHandlers(signalHandler);
 
