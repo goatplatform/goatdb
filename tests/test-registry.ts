@@ -83,6 +83,7 @@ import setupSecurityBoundaries from './security-boundaries.test.ts';
 import setupLiveQuery from './live-query.test.ts';
 import setupWriteFailure from './write-failure.test.ts';
 import setupBuildDenoTests from './build-deno.test.ts';
+import { setupGitHooksDenoTests } from './githooks.test.ts';
 import { isBrowser, isDeno, isNode } from '../base/common.ts';
 import { TestsRunner } from './mod.ts';
 
@@ -144,6 +145,7 @@ async function registerAllTestsImpl(): Promise<void> {
       setupTestRunnerBrowserCliTests(); // Browser CLI coverage; requires Playwright/browser tooling in the spawned child process
     }
     setupPlaywrightPinningTests(); // CI workflow Playwright pin sync (Deno-only, reads workflow file)
+    setupGitHooksDenoTests(); // Git hook contracts: staged TS type-checking and path handling
   }
   setupHealthCheckEndpointTest(); // Simple HTTP endpoint check
   setupMergeAdjList(); // Adjacency list data structure

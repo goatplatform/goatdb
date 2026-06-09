@@ -1,9 +1,11 @@
 #!/bin/sh
 # Pre-commit hook
 #
-# Scope: regenerates system assets, checks formatting.
+# Scope: regenerates system assets, checks formatting, and type-checks staged
+# TypeScript files.
 # Auto-activates if not yet configured (first commit after clone).
-# Runs `deno task build` and `deno fmt --check`.
+# Runs `deno task build`, `deno fmt --check`, and `deno check` for staged
+# `*.ts` / `*.tsx` files.
 # To skip: `git commit --no-verify`.
 
 set -e
@@ -52,4 +54,13 @@ echo "-> [pre-commit] checking formatting..."
 if ! deno fmt --check 2>&1; then
     echo "Error: files are not formatted. Run 'deno fmt' to fix." >&2
     exit 1
+fi
+
+echo "-> [pre-commit] type-checking changed files..."
+if ! git diff --cached --quiet --diff-filter=ACMR -- '*.ts' '*.tsx'; then
+    git diff --cached --name-only -z --diff-filter=ACMR -- '*.ts' '*.tsx' |
+        xargs -0 deno check 2>&1 || {
+            echo "Error: type-checking failed. Fix the issues above before committing." >&2
+            exit 1
+        }
 fi
