@@ -1278,6 +1278,109 @@ export default function setupCliCompileTests() {
 
   TEST(
     'CLI-Compile',
+    'startDebugServer preserves file URL jsPath when effective cwd is overridden',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('debug-server-file-url-js-path');
+      const entryPath = path.join(dir, 'entry.ts');
+      const jsPath = path.toFileUrl(entryPath).href;
+      const { domain } = createTestDomainConfig();
+      let stopServer: (() => Promise<void>) | undefined;
+      let runPromise: Promise<void> | undefined;
+
+      await writeTextFile(
+        entryPath,
+        'globalThis.__debugFileUrl = "kept";\nexport {};\n',
+      );
+      await writeTextFile(
+        path.join(dir, 'deno.json'),
+        JSON.stringify({ name: 'debug-file-url-deno', version: '1.0.0' }) +
+          '\n',
+      );
+      await writeTextFile(
+        path.join(dir, 'package.json'),
+        JSON.stringify({ name: 'debug-file-url-node', version: '1.0.0' }) +
+          '\n',
+      );
+
+      try {
+        await withTestCWD(dir, async () => {
+          const session = await startDebugServerUntilReady({
+            buildDir: dir,
+            jsPath,
+            path: path.join(dir, 'server-data'),
+            orgId: 'test-org',
+            port: 0,
+            domain,
+          });
+          stopServer = session.stopServer;
+          runPromise = session.runPromise;
+
+          const appJs = await waitForAssetText(
+            `${session.serverUrl}/app.js`,
+            '__debugFileUrl',
+          );
+          assertTrue(
+            appJs.includes('__debugFileUrl'),
+            'startDebugServer must bundle file:// jsPath entries without rewriting them as relative paths',
+          );
+        });
+      } finally {
+        await cleanupDebugServer(stopServer, runPromise);
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'startDebugServer resolves relative jsPath against the real runtime cwd when effective cwd is overridden',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('debug-server-relative-js-path');
+      const jsPath = './tests/browser-failure-fixture.ts';
+      const { domain } = createTestDomainConfig();
+      let stopServer: (() => Promise<void>) | undefined;
+      let runPromise: Promise<void> | undefined;
+
+      await writeTextFile(
+        path.join(dir, 'deno.json'),
+        JSON.stringify({ name: 'debug-relative-deno', version: '1.0.0' }) +
+          '\n',
+      );
+      await writeTextFile(
+        path.join(dir, 'package.json'),
+        JSON.stringify({ name: 'debug-relative-node', version: '1.0.0' }) +
+          '\n',
+      );
+
+      try {
+        await withTestCWD(dir, async () => {
+          const session = await startDebugServerUntilReady({
+            buildDir: dir,
+            jsPath,
+            path: path.join(dir, 'server-data'),
+            orgId: 'test-org',
+            port: 0,
+            domain,
+          });
+          stopServer = session.stopServer;
+          runPromise = session.runPromise;
+
+          const appJs = await waitForAssetText(
+            `${session.serverUrl}/app.js`,
+            'intentional browser failure',
+          );
+          assertTrue(
+            appJs.includes('intentional browser failure'),
+            'startDebugServer must resolve relative jsPath values against the real runtime cwd instead of the test override cwd',
+          );
+        });
+      } finally {
+        await cleanupDebugServer(stopServer, runPromise);
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
     'startDebugServer explicit config options override runtime defaults',
     async (ctx: TestSuite) => {
       const dir = await ctx.tempDir('debug-server-config-override');

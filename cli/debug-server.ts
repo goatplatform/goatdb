@@ -326,7 +326,11 @@ export async function startDebugServer<US extends Schema>(
 
     const entryPoints = [
       {
-        in: resolveBuildEntryPath(options.jsPath),
+        in: resolveBuildEntryPath(
+          path.isFileUrlPath(options.jsPath) || path.isAbsolute(options.jsPath)
+            ? options.jsPath
+            : path.join(getRuntime().getCWD(), options.jsPath),
+        ),
         out: APP_ENTRY_POINT,
       },
     ];
