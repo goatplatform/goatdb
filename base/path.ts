@@ -9,7 +9,7 @@
  * All paths use POSIX-style forward slashes for consistency.
  */
 
-import { getRuntime } from './runtime/index.ts';
+import { getEffectiveCWD } from './runtime/index.ts';
 
 /**
  * Converts backslashes to forward slashes for consistent POSIX-style paths.
@@ -195,7 +195,7 @@ export function resolve(...paths: string[]): string {
   // When cwd is '/', prepending it directly gives `//foo` (UNC-like).
   // Adding a single slash avoids that while keeping the path absolute.
   if (!isAbsolute(resolvedPath)) {
-    const cwd = getRuntime().getCWD();
+    const cwd = getEffectiveCWD();
     resolvedPath = cwd === '/' ? '/' + resolvedPath : cwd + '/' + resolvedPath;
   }
 

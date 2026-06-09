@@ -14,6 +14,7 @@ import {
   toAbsolutePath,
   toFileUrl,
 } from '../base/path.ts';
+import { getEffectiveCWD } from '../base/runtime/index.ts';
 import { withTestCWD } from './test-utils.ts';
 import { assertThrows } from './asserts.ts';
 
@@ -193,6 +194,22 @@ export default function setupPathTests(): void {
       });
     },
   );
+
+  TEST('Path', 'getEffectiveCWD reflects withTestCWD overrides', async () => {
+    const originalCWD = getEffectiveCWD();
+    await withTestCWD('/path-test-override', () => {
+      assertEquals(getEffectiveCWD(), '/path-test-override');
+      assertEquals(
+        resolve('fixture.ts'),
+        '/path-test-override/fixture.ts',
+      );
+    });
+    assertEquals(
+      getEffectiveCWD(),
+      originalCWD,
+      'withTestCWD must restore the original effective cwd after resolve() checks',
+    );
+  });
 
   // toAbsolutePath tests
   TEST('Path', 'toAbsolutePath returns absolute paths unchanged', () => {
