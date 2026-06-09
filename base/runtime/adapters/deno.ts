@@ -13,7 +13,11 @@ import type {
 import type { OperatingSystem } from '../../os.ts';
 import type { FileImpl } from '../../json-log/file-impl-interface.ts';
 import { log } from '../../../logging/log.ts';
-import { browserOpenCommand } from '../browser-open.ts';
+import {
+  browserOpenCommand,
+  invalidBrowserOpenUrlReason,
+  isBrowserOpenUrl,
+} from '../browser-open.ts';
 import { wrapAsyncSignalHandler } from '../index.ts';
 
 /**
@@ -129,12 +133,22 @@ export const DenoAdapter: RuntimeAdapter = {
   }) as RuntimeTestConfig,
 
   openBrowser(url: string): Promise<void> {
-    const resolved = browserOpenCommand(this.getOS(), url);
+    if (!isBrowserOpenUrl(url)) {
+      log({
+        severity: 'WARNING',
+        error: 'BadRequest',
+        message: 'Refusing to open invalid browser URL ' +
+          `(${invalidBrowserOpenUrlReason(url)}).`,
+      });
+      return Promise.resolve();
+    }
+    const os = this.getOS();
+    const resolved = browserOpenCommand(os, url);
     if (!resolved) {
       log({
         severity: 'WARNING',
         error: 'MissingConfiguration',
-        message: `Unable to open browser on unsupported OS: ${this.getOS()}`,
+        message: `Unable to open browser on unsupported OS: ${os}`,
       });
       return Promise.resolve();
     }

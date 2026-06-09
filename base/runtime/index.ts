@@ -137,7 +137,7 @@ export interface RuntimeAdapter {
   readonly testConfig: RuntimeTestConfig;
 
   /**
-   * Opens a URL in the default browser.
+   * Opens a validated http(s) URL in the default browser.
    * Uses platform-specific commands (open, xdg-open, start).
    *
    * @param url - The URL to open
@@ -332,6 +332,12 @@ export function getRegisteredAdapters(): readonly RuntimeAdapter[] {
 /**
  * Wraps an async signal handler so rejections are logged, not unhandled.
  * Shared by Deno and Node adapters — avoids duplicating the catch logic.
+ *
+ * IMPORTANT: The returned wrapper does NOT await async handlers. Signal
+ * handlers must be synchronous or fire-and-forget. Async cleanup (flushing
+ * DB, closing connections) may not complete before the process exits. If
+ * reliable async shutdown is needed, coordinate externally (e.g., wait for
+ * a promise before calling exit()).
  */
 export function wrapAsyncSignalHandler(
   handler: () => Promise<void> | void,

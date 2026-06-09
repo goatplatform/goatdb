@@ -10,6 +10,7 @@ import {
 } from '../base/runtime/index.ts';
 import {
   browserOpenCommand,
+  isBrowserOpenUrl,
   withTestBrowserOpenCommand,
 } from '../base/runtime/browser-open.ts';
 import type { LogEntry } from '../logging/log.ts';
@@ -140,6 +141,75 @@ export default function setupRuntimeTests(): void {
     });
   });
 
+  TEST('Runtime', 'browserOpenCommand rejects unsafe or malformed URLs', () => {
+    assertEquals(
+      isBrowserOpenUrl('javascript:alert(1)'),
+      false,
+      'javascript: URLs must be rejected',
+    );
+    assertEquals(
+      browserOpenCommand('darwin', 'javascript:alert(1)'),
+      undefined,
+      'javascript: URLs must be rejected',
+    );
+    assertEquals(
+      isBrowserOpenUrl('file:///etc/passwd'),
+      false,
+      'file: URLs must be rejected',
+    );
+    assertEquals(
+      browserOpenCommand('linux', 'file:///etc/passwd'),
+      undefined,
+      'file: URLs must be rejected',
+    );
+    assertEquals(
+      isBrowserOpenUrl('data:text/html,<script>'),
+      false,
+      'data: URLs must be rejected',
+    );
+    assertEquals(
+      browserOpenCommand('windows', 'data:text/html,<script>'),
+      undefined,
+      'data: URLs must be rejected',
+    );
+    assertEquals(isBrowserOpenUrl(''), false, 'empty URL must be rejected');
+    assertEquals(
+      browserOpenCommand('darwin', ''),
+      undefined,
+      'empty URL must be rejected',
+    );
+    assertEquals(
+      isBrowserOpenUrl('https://'),
+      false,
+      'URLs without a host must be rejected',
+    );
+    assertEquals(
+      browserOpenCommand('linux', 'https://'),
+      undefined,
+      'URLs without a host must be rejected',
+    );
+    assertEquals(
+      isBrowserOpenUrl(' https://example.com'),
+      false,
+      'leading whitespace must be rejected instead of trimmed',
+    );
+    assertEquals(
+      browserOpenCommand('windows', ' https://example.com'),
+      undefined,
+      'leading whitespace must be rejected instead of trimmed',
+    );
+    assertEquals(
+      isBrowserOpenUrl('https://exa\nmple.com'),
+      false,
+      'control characters must be rejected',
+    );
+    assertEquals(
+      browserOpenCommand('darwin', 'https://exa\nmple.com'),
+      undefined,
+      'control characters must be rejected',
+    );
+  });
+
   TEST(
     'Runtime',
     'browser adapter logs unsupported browser opening',
@@ -225,6 +295,33 @@ export function setupRuntimeDenoTests(): void {
       );
     },
   );
+
+  TEST(
+    'Runtime',
+    'deno adapter logs invalid browser URLs as sanitized bad requests',
+    async () => {
+      const invalidUrl = 'javascript:alert(1)\nhttps://secret.example';
+      let captured: NormalizedLogEntry<LogEntry>[] = [];
+      await withLogCapture(async (c) => {
+        captured = c;
+        await DenoAdapter.openBrowser(invalidUrl);
+      });
+      const warnings = captured.filter((e) =>
+        e.severity === 'WARNING' &&
+        e.error === 'BadRequest' &&
+        e.message?.includes('Refusing to open invalid browser URL')
+      );
+      assertEquals(
+        warnings.length,
+        1,
+        'Deno adapter should reject invalid browser URLs explicitly',
+      );
+      assertTrue(
+        !warnings[0].message?.includes(invalidUrl),
+        'Deno adapter must not echo raw invalid URLs into logs',
+      );
+    },
+  );
 }
 
 /**
@@ -266,6 +363,33 @@ export function setupRuntimeNodeTests(): void {
             'Node adapter should report unsupported browser opening',
           );
         },
+      );
+    },
+  );
+
+  TEST(
+    'Runtime',
+    'node adapter logs invalid browser URLs as sanitized bad requests',
+    async () => {
+      const invalidUrl = 'javascript:alert(1)\nhttps://secret.example';
+      let captured: NormalizedLogEntry<LogEntry>[] = [];
+      await withLogCapture(async (c) => {
+        captured = c;
+        await NodeAdapter.openBrowser(invalidUrl);
+      });
+      const warnings = captured.filter((e) =>
+        e.severity === 'WARNING' &&
+        e.error === 'BadRequest' &&
+        e.message?.includes('Refusing to open invalid browser URL')
+      );
+      assertEquals(
+        warnings.length,
+        1,
+        'Node adapter should reject invalid browser URLs explicitly',
+      );
+      assertTrue(
+        !warnings[0].message?.includes(invalidUrl),
+        'Node adapter must not echo raw invalid URLs into logs',
       );
     },
   );
