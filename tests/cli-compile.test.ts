@@ -36,6 +36,7 @@ import {
 } from '../cli/compile.ts';
 import {
   type BuildPluginLike,
+  bundleResultFromBuildResult,
   createBuildContext,
   getCachedImport,
   type ImportCacheState,
@@ -4076,6 +4077,156 @@ src: url('./goat-font.woff2') format('woff2');
         '/index.css.map',
       );
       assertEquals(none.cssMap, undefined);
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'bundleResultFromBuildResult ignores sourceMappingURL text outside trailing footer comments',
+    async () => {
+      const cssText = '.a::after{content:"sourceMappingURL=kept";}';
+      let warningCount = 0;
+      let css: string | undefined;
+      await withLogCapture(async (entries) => {
+        css = bundleResultFromBuildResult({
+          outputFiles: [{
+            path: '/tmp/output/index.css',
+            text: cssText,
+            contents: new TextEncoder().encode(cssText),
+          }],
+        }).bundles.index?.css;
+        warningCount = entries.filter((e) =>
+          e.severity === 'WARNING' &&
+          e.message?.includes(
+            'CSS sourceMappingURL comment does not match expected format',
+          )
+        ).length;
+      });
+      assertEquals(css, cssText, 'Non-footer CSS content must be preserved');
+      assertEquals(
+        warningCount,
+        0,
+        'Non-footer sourceMappingURL text must not trigger warnings',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'bundleResultFromBuildResult ignores earlier CSS comments when validating trailing sourceMappingURL warnings',
+    async () => {
+      const cssText =
+        '/* sourceMappingURL=earlier */\n.a{color:red}\n/* trailing comment */';
+      let warningCount = 0;
+      let css: string | undefined;
+      await withLogCapture(async (entries) => {
+        css = bundleResultFromBuildResult({
+          outputFiles: [{
+            path: '/tmp/output/index.css',
+            text: cssText,
+            contents: new TextEncoder().encode(cssText),
+          }],
+        }).bundles.index?.css;
+        warningCount = entries.filter((e) =>
+          e.severity === 'WARNING' &&
+          e.message?.includes(
+            'CSS sourceMappingURL comment does not match expected format',
+          )
+        ).length;
+      });
+      assertEquals(css, cssText, 'Earlier CSS comments must be preserved');
+      assertEquals(
+        warningCount,
+        0,
+        'Only the final trailing CSS comment may trigger malformed sourceMappingURL warnings',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'bundleResultFromBuildResult ignores benign trailing comments that mention sourceMappingURL',
+    async () => {
+      const cssText =
+        '.a{color:red}\n/* note: sourceMappingURL stays in docs, not as a footer */';
+      let warningCount = 0;
+      let css: string | undefined;
+      await withLogCapture(async (entries) => {
+        css = bundleResultFromBuildResult({
+          outputFiles: [{
+            path: '/tmp/output/index.css',
+            text: cssText,
+            contents: new TextEncoder().encode(cssText),
+          }],
+        }).bundles.index?.css;
+        warningCount = entries.filter((e) =>
+          e.severity === 'WARNING' &&
+          e.message?.includes(
+            'CSS sourceMappingURL comment does not match expected format',
+          )
+        ).length;
+      });
+      assertEquals(css, cssText, 'Benign trailing comments must be preserved');
+      assertEquals(
+        warningCount,
+        0,
+        'Benign trailing comments must not trigger malformed sourceMappingURL warnings',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'bundleResultFromBuildResult strips valid trailing CSS sourceMappingURL footers',
+    () => {
+      const cssText = '.a{color:red}\n/*# sourceMappingURL=/index.css.map */\n';
+      const css = bundleResultFromBuildResult({
+        outputFiles: [{
+          path: '/tmp/output/index.css',
+          text: cssText,
+          contents: new TextEncoder().encode(cssText),
+        }],
+      }).bundles.index?.css;
+      assertEquals(
+        css,
+        '.a{color:red}\n',
+        'Valid trailing sourceMappingURL footers must be stripped from emitted CSS chunks',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'bundleResultFromBuildResult warns on malformed trailing CSS sourceMappingURL comments',
+    async () => {
+      const cssText = '.a{color:red}\n/*# sourceMappingURL */';
+      let warningCount = 0;
+      let css: string | undefined;
+      await withLogCapture(async (entries) => {
+        css = bundleResultFromBuildResult({
+          outputFiles: [{
+            path: '/tmp/output/index.css',
+            text: cssText,
+            contents: new TextEncoder().encode(cssText),
+          }],
+        }).bundles.index?.css;
+        warningCount = entries.filter((e) =>
+          e.severity === 'WARNING' &&
+          e.message?.includes(
+            'CSS sourceMappingURL comment does not match expected format',
+          )
+        ).length;
+      });
+      assertEquals(
+        css,
+        cssText,
+        'Malformed trailing comments must stay visible in CSS so build output is not silently rewritten',
+      );
+      assertEquals(
+        warningCount,
+        1,
+        'Malformed trailing sourceMappingURL comments must warn once',
+      );
     },
   );
 

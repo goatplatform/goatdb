@@ -4,6 +4,7 @@ import * as path from './base/path.ts';
 import { APP_ENTRY_POINT } from './net/server/static-assets.ts';
 import { readFile } from './base/json-log/file-impl.ts';
 import { getEffectiveRuntimeId, getRuntime } from './base/runtime/index.ts';
+import { log } from './logging/log.ts';
 
 // IMPORTANT: `esbuild` and `@deno/esbuild-plugin` MUST remain `import type`.
 // Runtime imports of these Deno/JSR-specific packages break Node.js SEA binaries.
@@ -128,6 +129,11 @@ export const kAssetNamesPattern = 'assets/[name]-[hash]';
 
 const textDecoder = new TextDecoder();
 
+const kCssSourceMapPattern = /\/\*[#@]\s*sourceMappingURL=\S+\s*\*\/\s*$/;
+const kTrailingCssCommentPattern = /\/\*(?:(?!\*\/)[\s\S])*\*\/\s*$/;
+const kCssSourceMapDirectiveCommentPattern =
+  /^\/\*[#@]\s*sourceMappingURL\b[\s\S]*\*\/\s*$/;
+
 function outputPathForFile(filePath: string): string {
   const normalizedPath = filePath.replaceAll('\\', '/');
   const parts = normalizedPath.split('/');
@@ -184,10 +190,24 @@ export function bundleResultFromBuildResult(
     } else if (file.path.endsWith('.css')) {
       // Strip the trailing sourceMappingURL comment — buildAssets reattaches the
       // final map URL for whichever emitted CSS asset owns this chunk.
-      bundleResult.css = file.text.replace(
-        /\/\*#\s*sourceMappingURL=\S+\s*\*\/\s*$/,
-        '',
-      );
+      // Warn only when the final trailing CSS comment looks like a malformed
+      // sourceMappingURL footer. Earlier comments and arbitrary CSS content may
+      // legitimately contain the same text and must not trigger warnings.
+      const trailingComment = file.text.match(kTrailingCssCommentPattern)?.[0];
+      const hadMapUrl = kCssSourceMapPattern.test(file.text);
+      bundleResult.css = file.text.replace(kCssSourceMapPattern, '');
+      if (
+        trailingComment &&
+        kCssSourceMapDirectiveCommentPattern.test(trailingComment) &&
+        !hadMapUrl
+      ) {
+        log({
+          severity: 'WARNING',
+          message:
+            'CSS sourceMappingURL comment does not match expected format. ' +
+            'esbuild may have changed its output format.',
+        });
+      }
     }
   }
   return { bundles, assets };
