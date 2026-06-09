@@ -1949,6 +1949,115 @@ export default function setupCliCompileTests() {
 
   TEST(
     'CLI-Compile',
+    'startDebugServer signal cleanup exits once and only after async stop finishes',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('debug-server-signal-ordering');
+      const entryPath = path.join(dir, 'entry.ts');
+      const runtime = getRuntime() as unknown as {
+        setupSignalHandler: (
+          signal: string,
+          handler: () => Promise<void> | void,
+        ) => () => void;
+        exit: (code: number) => never;
+        id: string;
+      };
+      const originalSetupSignalHandler = runtime.setupSignalHandler;
+      const originalExit = runtime.exit;
+      const signalHandlers = new Map<string, () => Promise<void> | void>();
+      const exitCodes: number[] = [];
+      const { domain } = createTestDomainConfig();
+      let resolveStopGate!: () => void;
+      const stopGate = new Promise<void>((resolve) => {
+        resolveStopGate = resolve;
+      });
+      let stopCalls = 0;
+      let stopFinished = false;
+      let stopServer: (() => Promise<void>) | undefined;
+      let runPromise: Promise<void> | undefined;
+
+      await writeTextFile(entryPath, 'export const ready = true;\n');
+      const configPath = path.join(
+        dir,
+        runtime.id === 'node' ? 'package.json' : 'deno.json',
+      );
+      await writeTextFile(
+        configPath,
+        JSON.stringify({
+          name: 'debug-server-signal-ordering',
+          version: '1.0.0',
+        }) + '\n',
+      );
+
+      runtime.setupSignalHandler = (signal, handler) => {
+        signalHandlers.set(signal, handler);
+        return () => {
+          signalHandlers.delete(signal);
+        };
+      };
+      runtime.exit = (code: number) => {
+        exitCodes.push(code);
+        return undefined as never;
+      };
+
+      try {
+        const session = await startDebugServerUntilReady({
+          buildDir: dir,
+          jsPath: entryPath,
+          path: path.join(dir, 'server-data'),
+          orgId: 'test-org',
+          port: 0,
+          domain,
+          setup(server) {
+            const originalStop = server.stop.bind(server);
+            server.stop = (async () => {
+              stopCalls++;
+              await stopGate;
+              stopFinished = true;
+              return await originalStop();
+            }) as typeof server.stop;
+          },
+        });
+        stopServer = session.stopServer;
+        runPromise = session.runPromise;
+
+        assertExists(signalHandlers.get('SIGTERM'));
+        assertExists(signalHandlers.get('SIGINT'));
+
+        signalHandlers.get('SIGTERM')!();
+        signalHandlers.get('SIGINT')!();
+        await Promise.resolve();
+
+        assertEquals(
+          stopCalls,
+          1,
+          'duplicate shutdown signals must reuse the in-flight cleanup',
+        );
+        assertEquals(
+          exitCodes.length,
+          0,
+          'process exit must wait for async cleanup to finish',
+        );
+
+        resolveStopGate();
+        await withTimeout(
+          runPromise,
+          2_000,
+          'signal-driven cleanup must resolve the debug server run promise',
+        );
+
+        assertTrue(stopFinished, 'signal cleanup must wait for server.stop()');
+        assertEquals(exitCodes, [0]);
+      } finally {
+        runtime.setupSignalHandler = originalSetupSignalHandler;
+        runtime.exit = originalExit;
+        resolveStopGate();
+        await cleanupDebugServer(stopServer, runPromise);
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
     'compile resolves file:// serverEntry inputs before public validation errors',
     async (ctx: TestSuite) => {
       const dir = await ctx.tempDir('compile-file-url-entry');
