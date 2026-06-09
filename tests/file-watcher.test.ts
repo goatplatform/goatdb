@@ -153,6 +153,7 @@ export default function setupFileWatcherUnitTests(): void {
     'FileWatcher',
     'polling failure throttle stays bounded without re-logging the active path',
     async () => {
+      const { join } = await import('node:path');
       const dir = '/watch-root';
       const entries = [
         ...Array.from({ length: 1000 }, (_, i) => `broken-${i}`),
@@ -199,7 +200,7 @@ export default function setupFileWatcherUnitTests(): void {
           );
           assertEquals(
             debugMessages.filter((message) =>
-              message === `Failed to stat file: ${dir}/broken-0`
+              message === `Failed to stat file: ${join(dir, 'broken-0')}`
             ).length,
             1,
             'the oldest tracked path must stay throttled even when the map is full',
@@ -215,8 +216,9 @@ export default function setupFileWatcherUnitTests(): void {
     'FileWatcher',
     'polling watcher keeps unreadable roots quiet until they become readable',
     async () => {
+      const { join } = await import('node:path');
       const dir = '/watch-root';
-      const filePath = `${dir}/visible.txt`;
+      const filePath = join(dir, 'visible.txt');
       let readable = false;
       const fakeFs = {
         constants: { F_OK: 0, R_OK: 4 },
