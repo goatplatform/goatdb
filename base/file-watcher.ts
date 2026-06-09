@@ -275,8 +275,14 @@ export async function createPollingWatcher(
 
   function getRootStatus(): 'present' | 'missing' | 'unreadable' {
     try {
-      fs.readdirSync(dir);
-      return 'present';
+      fs.accessSync(dir, fs.constants.F_OK);
+      // Verify read permission (stat doesn't distinguish chmod 000 for owner)
+      try {
+        fs.accessSync(dir, fs.constants.R_OK);
+        return 'present';
+      } catch {
+        return 'unreadable';
+      }
     } catch (err) {
       return isMissingFileSystemError(err) ? 'missing' : 'unreadable';
     }

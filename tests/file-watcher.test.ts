@@ -210,6 +210,77 @@ export default function setupFileWatcherUnitTests(): void {
       }
     },
   );
+
+  TEST(
+    'FileWatcher',
+    'polling watcher keeps unreadable roots quiet until they become readable',
+    async () => {
+      const dir = '/watch-root';
+      const filePath = `${dir}/visible.txt`;
+      let readable = false;
+      const fakeFs = {
+        constants: { F_OK: 0, R_OK: 4 },
+        accessSync(currentDir: string, mode?: number): void {
+          if (currentDir !== dir) {
+            throw new Error(`unexpected dir: ${currentDir}`);
+          }
+          if (mode === 4 && !readable) {
+            const err = new Error('permission denied') as Error & {
+              code?: string;
+            };
+            err.code = 'EACCES';
+            throw err;
+          }
+        },
+        readdirSync(currentDir: string): string[] {
+          if (currentDir !== dir) {
+            throw new Error(`unexpected dir: ${currentDir}`);
+          }
+          if (!readable) {
+            const err = new Error('permission denied') as Error & {
+              code?: string;
+            };
+            err.code = 'EACCES';
+            throw err;
+          }
+          return ['visible.txt'];
+        },
+        lstatSync(currentPath: string) {
+          if (currentPath !== filePath) {
+            throw new Error(`unexpected path: ${currentPath}`);
+          }
+          return {
+            isSymbolicLink: () => false,
+            isDirectory: () => false,
+            mtimeMs: 1,
+            size: 1,
+          };
+        },
+      } as typeof import('node:fs');
+
+      const { watcher, waitForCycles } = await createWatcher(fakeFs, dir, 5);
+      const { events, done } = startCollecting(watcher);
+      try {
+        await waitForCycles(2);
+        assertEquals(
+          events.length,
+          0,
+          'unreadable roots must not emit synthetic delete events while access is denied',
+        );
+
+        readable = true;
+        await waitForEvent(
+          events,
+          (event) => event.kind === 'create' && event.paths[0] === filePath,
+          'readable recovery must surface the file as a create event',
+          1_000,
+        );
+      } finally {
+        watcher.close();
+        await done;
+      }
+    },
+  );
 }
 
 export function setupFileWatcherTests(): void {
