@@ -454,7 +454,7 @@ export function setupTestRunnerDenoTests(): void {
       const withoutPlaywright = await runDenoCommandWithTimeout([
         'eval',
         '--ext=ts',
-        code,
+        `Deno.env.delete('GOATDB_REQUIRE_PLAYWRIGHT');\n${code}`,
       ]);
       assertEquals(withoutPlaywright.code, 0, withoutPlaywright.stderrText);
       assertEquals(
