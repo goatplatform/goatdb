@@ -224,9 +224,15 @@ function createQueuedWatcher(
  * Creates a FileWatcher backed by chokidar.
  * @internal
  *
+ * Waits for chokidar's `ready` event before resolving, ensuring the
+ * initial scan completes and no startup events are missed. Event
+ * handlers are attached only after `ready`, so `ignoreInitial: true`
+ * must be set to suppress pre-ready events. Rejects if chokidar
+ * emits an error before `ready`.
+ *
  * @param chokidar The chokidar module (default or namespace export)
  * @param dir The directory to watch
- * @returns A FileWatcher instance
+ * @returns A FileWatcher instance (resolves after initial scan)
  */
 /** @internal */
 export async function createChokidarWatcher(
@@ -255,18 +261,50 @@ export async function createChokidarWatcher(
 
   const { pushEvent, watcher } = createQueuedWatcher(() => underlying.close());
 
-  underlying.on(
-    'add',
-    (path: string) => pushEvent({ paths: [path], kind: 'create' }),
-  );
-  underlying.on(
-    'change',
-    (path: string) => pushEvent({ paths: [path], kind: 'modify' }),
-  );
-  underlying.on(
-    'unlink',
-    (path: string) => pushEvent({ paths: [path], kind: 'remove' }),
-  );
+  const onAdd = (path: string) => pushEvent({ paths: [path], kind: 'create' });
+  const onChange = (path: string) =>
+    pushEvent({ paths: [path], kind: 'modify' });
+  const onUnlink = (path: string) =>
+    pushEvent({ paths: [path], kind: 'remove' });
+  const attachEventHandlers = () => {
+    underlying.on('add', onAdd);
+    underlying.on('change', onChange);
+    underlying.on('unlink', onUnlink);
+  };
+
+  const logRuntimeError = (err: unknown) => {
+    log({
+      severity: 'ERROR',
+      error: 'UncaughtServerError',
+      message: `chokidar watcher runtime error: ${String(err)}`,
+      trace: err instanceof Error ? err.stack : undefined,
+    });
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      underlying.off('ready', onReady);
+      underlying.off('error', onSetupError);
+    };
+    const onReady = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      attachEventHandlers();
+      underlying.on('error', logRuntimeError);
+      resolve();
+    };
+    const onSetupError = (err: unknown) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      watcher.close();
+      reject(err);
+    };
+    underlying.on('ready', onReady);
+    underlying.on('error', onSetupError);
+  });
 
   return watcher;
 }

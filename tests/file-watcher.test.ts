@@ -3,6 +3,7 @@ import { assertEquals, assertTrue } from './asserts.ts';
 import { withLogCapture } from './test-utils.ts';
 import type { FileWatchEvent } from '../base/file-watcher.ts';
 import {
+  createChokidarWatcher,
   createPollingWatcher,
   relativeWatchedPath,
   shouldRebuildAfterPathChange,
@@ -131,21 +132,21 @@ export default function setupFileWatcherUnitTests(): void {
 
   TEST(
     'FileWatcher',
+    'shouldRebuildAfterPathChange allows path traversal components',
+    () => {
+      assertEquals(shouldRebuildAfterPathChange('../src/main.ts'), true);
+      assertEquals(shouldRebuildAfterPathChange('./file.ts'), true);
+    },
+  );
+
+  TEST(
+    'FileWatcher',
     'shouldRebuildAfterPathChange handles custom ignores',
     () => {
       assertEquals(
         shouldRebuildAfterPathChange('vendor/lib.js', ['vendor']),
         false,
       );
-    },
-  );
-
-  TEST(
-    'FileWatcher',
-    'shouldRebuildAfterPathChange allows path traversal components',
-    () => {
-      assertEquals(shouldRebuildAfterPathChange('../src/main.ts'), true);
-      assertEquals(shouldRebuildAfterPathChange('./file.ts'), true);
     },
   );
 
@@ -1401,6 +1402,184 @@ export function setupFileWatcherNativeNodeTests(): void {
         );
         watcher.close();
         await done;
+      } finally {
+        watcher.close();
+      }
+    },
+  );
+
+  // ---- Fake-chokidar ready-gating tests ----
+
+  class FakeChokidarWatcher {
+    private handlers = new Map<string, Set<(...args: unknown[]) => void>>();
+    private _closed = false;
+
+    on(event: string, handler: (...args: unknown[]) => void): this {
+      if (!this.handlers.has(event)) this.handlers.set(event, new Set());
+      this.handlers.get(event)!.add(handler);
+      return this;
+    }
+    off(event: string, handler: (...args: unknown[]) => void): this {
+      this.handlers.get(event)?.delete(handler);
+      return this;
+    }
+    close(): void {
+      this._closed = true;
+    }
+    get closed(): boolean {
+      return this._closed;
+    }
+    emit(event: string, ...args: unknown[]): void {
+      for (const h of this.handlers.get(event) ?? []) h(...args);
+    }
+  }
+
+  let lastChokidarOpts: Record<string, unknown> | null = null;
+
+  function fakeChokidar(watcher: FakeChokidarWatcher): unknown {
+    lastChokidarOpts = null;
+    return {
+      watch: (_dir: string, opts: Record<string, unknown>) => {
+        lastChokidarOpts = opts;
+        return watcher;
+      },
+    };
+  }
+
+  TEST(
+    'FileWatcher',
+    'chokidar ready gate suppresses events emitted before ready',
+    async () => {
+      const fw = new FakeChokidarWatcher();
+      const readyPromise = createChokidarWatcher(
+        fakeChokidar(fw) as never,
+        '/test',
+      );
+      await sleep(0);
+      // Emit an event before ready — must be suppressed
+      fw.emit('add', '/test/pre-ready.txt');
+      fw.emit('ready');
+      const watcher = await readyPromise;
+      try {
+        const { events, done } = startCollecting(watcher);
+        // Emit an event after ready — must be delivered
+        fw.emit('add', '/test/post-ready.txt');
+        await waitForEvent(
+          events,
+          (e) => e.paths.some((p) => p.endsWith('post-ready.txt')),
+          'post-ready event must be delivered',
+          1_000,
+        );
+        watcher.close();
+        await done;
+        assertEquals(
+          events.some((e) => e.paths.some((p) => p.endsWith('pre-ready.txt'))),
+          false,
+          'pre-ready events must not reach consumers',
+        );
+      } finally {
+        watcher.close();
+      }
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'chokidar ready gate rejects on error before ready',
+    async () => {
+      const fw = new FakeChokidarWatcher();
+      const readyPromise = createChokidarWatcher(
+        fakeChokidar(fw) as never,
+        '/test',
+      );
+      await sleep(0);
+      fw.emit('error', new Error('setup failed'));
+      try {
+        await readyPromise;
+        throw new Error('expected createChokidarWatcher to reject');
+      } catch (err) {
+        assertEquals(
+          (err as Error).message,
+          'setup failed',
+          'must reject with the setup error',
+        );
+      }
+      assertEquals(fw.closed, true, 'watcher must be closed after setup error');
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'chokidar ready gate logs runtime errors after ready',
+    async () => {
+      const fw = new FakeChokidarWatcher();
+      const readyPromise = createChokidarWatcher(
+        fakeChokidar(fw) as never,
+        '/test',
+      );
+      await sleep(0);
+      fw.emit('ready');
+      const watcher = await readyPromise;
+      try {
+        await withLogCapture(async (captured) => {
+          fw.emit('add', '/test/visible.txt');
+          fw.emit('error', new Error('broken'));
+          await sleep(50); // let the log flush
+          const errors = captured.filter(
+            (e) => e.severity === 'ERROR' && e.message?.includes('chokidar'),
+          );
+          assertEquals(
+            errors.length >= 1,
+            true,
+            'runtime chokidar errors must be logged',
+          );
+        });
+      } finally {
+        watcher.close();
+      }
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'chokidar ready gate wires normalized ignored filter',
+    async () => {
+      const fw = new FakeChokidarWatcher();
+      const readyPromise = createChokidarWatcher(
+        fakeChokidar(fw) as never,
+        '/project/build/watched',
+      );
+      await sleep(0);
+      fw.emit('ready');
+      const watcher = await readyPromise;
+      try {
+        // The ignored callback is passed to chokidar.watch() as an option.
+        // Verify it was constructed correctly by calling it directly.
+        const ignored = lastChokidarOpts?.ignored as (
+          path: string,
+        ) => boolean;
+        assertEquals(typeof ignored, 'function', 'ignored must be a function');
+
+        // Path under watch root — must NOT be ignored
+        assertEquals(
+          ignored('/project/build/watched/visible.txt'),
+          false,
+          'visible path under watch root must pass',
+        );
+
+        // Hidden file outside root — must be ignored
+        assertEquals(
+          ignored('/project/.hidden/secret.txt'),
+          true,
+          'hidden file must be suppressed',
+        );
+
+        // File under ignored ancestor outside root — must be ignored
+        assertEquals(
+          ignored('/project/build/other/file.txt'),
+          true,
+          'file under ignored ancestor must be suppressed',
+        );
       } finally {
         watcher.close();
       }
