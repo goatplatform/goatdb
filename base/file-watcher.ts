@@ -2,7 +2,9 @@
  * Cross-runtime file watching abstraction.
  *
  * Provides a unified interface for watching file system changes across
- * Deno and Node.js environments.
+ * Deno and Node.js environments. Node-based watchers suppress hidden
+ * paths before events reach callers when the underlying backend exposes
+ * enough path information to identify them reliably.
  *
  * @module GoatDB/FileWatcher
  */
@@ -24,13 +26,67 @@ export interface FileWatchEvent {
  * Interface for a file system watcher.
  */
 export interface FileWatcher {
-  /** Async iterator that yields file change events */
+  /**
+   * Async iterator that yields file change events.
+   * When close() is called while the iterator is awaiting the next event,
+   * the pending await is resolved immediately, allowing the iterator to
+   * terminate cleanly.
+   */
   [Symbol.asyncIterator](): AsyncIterableIterator<FileWatchEvent>;
   /** Closes the watcher and releases resources */
   close(): void;
 }
 
 const kDefaultIgnored = ['node_modules', '.git', 'server-data', 'build'];
+
+/**
+ * Returns true when any path component is a dotfile (starts with '.')
+ * or belongs to a known ignored directory.
+ *
+ * Dotfiles are excluded because they are not application data; watching
+ * them wastes scan cycles and delays the chokidar ready signal past
+ * the files that actually matter.
+ */
+function pathHasIgnoredComponent(
+  p: string,
+  ignored: string[] = kDefaultIgnored,
+): boolean {
+  const components = p.split(/[/\\]/);
+  return components.some((comp) =>
+    // Exclude '.' and '..' — they are path traversal components, not dotfiles.
+    (comp !== '.' && comp !== '..' && comp.startsWith('.')) ||
+    ignored.includes(comp)
+  );
+}
+
+/**
+ * Normalize an absolute chokidar path relative to the watch root, so
+ * that `pathHasIgnoredComponent` checks only components under the root.
+ * Paths outside the root are returned unchanged so they are evaluated
+ * against the full absolute path. Handles both POSIX and Windows.
+ */
+/** @internal */
+export function relativeWatchedPath(
+  watchedPath: string,
+  normalizedDir: string,
+  posix: typeof import('node:path').posix,
+  win32: typeof import('node:path').win32,
+): string {
+  const pathApi = watchedPath.includes('\\') || normalizedDir.includes('\\')
+    ? win32
+    : posix;
+  if (!pathApi.isAbsolute(watchedPath)) return watchedPath;
+  const relativePath = pathApi.relative(normalizedDir, watchedPath);
+  // Accept empty string (root itself) or forward-relative paths;
+  // reject ..-prefixed and absolute paths (outside root).
+  if (
+    relativePath === '' || (!relativePath.startsWith('..') &&
+      !pathApi.isAbsolute(relativePath))
+  ) {
+    return relativePath;
+  }
+  return watchedPath;
+}
 
 /**
  * Determines if a file change should trigger a rebuild.
@@ -47,14 +103,7 @@ export function shouldRebuildAfterPathChange(
   if (p.endsWith('.tmp')) {
     return false;
   }
-  // Ignore paths where any of the components start with '.' or are in ignored list
-  const components = p.split(/[/\\]/);
-  for (const comp of components) {
-    if (comp.startsWith('.') || ignored.includes(comp)) {
-      return false;
-    }
-  }
-  return true;
+  return !pathHasIgnoredComponent(p, ignored);
 }
 
 /**
@@ -106,7 +155,10 @@ async function createNodeWatcher(dir: string): Promise<FileWatcher> {
     const fs = await import('node:fs');
     return await createNativeFsWatcher(fs, dir);
   }
-  return createChokidarWatcher(chokidarModule.default || chokidarModule, dir);
+  return await createChokidarWatcher(
+    chokidarModule.default || chokidarModule,
+    dir,
+  );
 }
 
 /**
@@ -168,12 +220,35 @@ function createQueuedWatcher(
   };
 }
 
-function createChokidarWatcher(
+/**
+ * Creates a FileWatcher backed by chokidar.
+ * @internal
+ *
+ * @param chokidar The chokidar module (default or namespace export)
+ * @param dir The directory to watch
+ * @returns A FileWatcher instance
+ */
+/** @internal */
+export async function createChokidarWatcher(
   chokidar: typeof import('chokidar'),
   dir: string,
-): FileWatcher {
-  const underlying = chokidar.watch(dir, {
-    ignored: kDefaultIgnored,
+): Promise<FileWatcher> {
+  const { posix, win32 } = await import('node:path');
+  // Normalize dir to strip trailing separators — path.relative on some Node
+  // versions returns '..' instead of '' when one arg has a trailing sep.
+  const dirPathApi = dir.includes('\\') ? win32 : posix;
+  const normalizedDir = dirPathApi.resolve(dir);
+
+  // Chokidar usually passes absolute paths into `ignored`. Filter relative
+  // to the watch root so hidden/ignored ancestors outside the root do not
+  // suppress the entire project tree.
+  const ignored = (watchedPath: string) =>
+    pathHasIgnoredComponent(
+      relativeWatchedPath(watchedPath, normalizedDir, posix, win32),
+    );
+
+  const underlying = chokidar.watch(normalizedDir, {
+    ignored,
     persistent: true,
     ignoreInitial: true,
   });
@@ -234,10 +309,17 @@ async function createNativeFsWatcher(
 
   underlying.on('change', (eventType, filename) => {
     if (!filename) return;
+    const path = String(filename);
+    // On Linux, fs.watch provides only the basename, not the full relative
+    // path. This means only dotfile detection works; directory-based
+    // filtering (e.g., 'node_modules') requires the full path. This is
+    // acceptable because createNativeFsWatcher is a fallback used only
+    // when chokidar is unavailable.
+    if (pathHasIgnoredComponent(path)) return;
     const kind: FileWatchEvent['kind'] = eventType === 'rename'
       ? 'any'
       : 'modify';
-    pushEvent({ paths: [String(filename)], kind });
+    pushEvent({ paths: [path], kind });
   });
 
   return watcher;
@@ -261,7 +343,7 @@ export async function createPollingWatcher(
   pollMs: number = 1000,
   onPollCycle?: () => void,
 ): Promise<FileWatcher> {
-  const { join } = await import('node:path');
+  const { join, win32 } = await import('node:path');
 
   let pollerClosed = false;
   let previousState: Map<string, { mtimeMs: number; size: number }>;
@@ -345,8 +427,10 @@ export async function createPollingWatcher(
         return; // deleted or permission denied
       }
       for (const entry of entries) {
-        if (kDefaultIgnored.includes(entry)) continue;
-        const fullPath = join(currentDir, entry);
+        if (pathHasIgnoredComponent(entry)) continue;
+        const fullPath = currentDir.includes('\\')
+          ? win32.join(currentDir, entry)
+          : join(currentDir, entry);
         try {
           const stat = fs.lstatSync(fullPath);
           if (stat.isSymbolicLink()) continue; // skip symlinks to prevent escape/cycle

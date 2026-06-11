@@ -3,6 +3,8 @@ import { assertEquals, assertTrue } from './asserts.ts';
 import { withLogCapture } from './test-utils.ts';
 import type { FileWatchEvent } from '../base/file-watcher.ts';
 import {
+  createPollingWatcher,
+  relativeWatchedPath,
   shouldRebuildAfterPathChange,
   watchDirectory,
 } from '../base/file-watcher.ts';
@@ -81,31 +83,20 @@ async function createWatcher(
   waitForCycles: (cycles: number, timeoutMs?: number) => Promise<void>;
 }> {
   let cycleCount = 0;
-  const mod = await import('../base/file-watcher.ts');
-  const watcher = await mod.createPollingWatcher(fs, dir, pollMs, () => {
+  const watcher = await createPollingWatcher(fs, dir, pollMs, () => {
     cycleCount++;
   });
   return {
     watcher,
-    waitForCycles: (cycles: number, timeoutMs: number = 5000) => {
-      if (cycleCount >= cycles) return Promise.resolve();
-      return new Promise<void>((resolve, reject) => {
-        const check = setInterval(() => {
-          if (cycleCount >= cycles) {
-            clearInterval(check);
-            clearTimeout(failTimer);
-            resolve();
-          }
-        }, 10);
-        const failTimer = setTimeout(() => {
-          clearInterval(check);
-          reject(
-            new Error(
-              `waitForCycles: timed out after ${timeoutMs}ms waiting for ${cycles} cycles`,
-            ),
-          );
-        }, timeoutMs);
-      });
+    waitForCycles: async (cycles: number, timeoutMs: number = 5000) => {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        if (cycleCount >= cycles) return;
+        await sleep(10);
+      }
+      throw new Error(
+        `waitForCycles: timed out after ${timeoutMs}ms waiting for ${cycles} cycles`,
+      );
     },
   };
 }
@@ -151,6 +142,15 @@ export default function setupFileWatcherUnitTests(): void {
 
   TEST(
     'FileWatcher',
+    'shouldRebuildAfterPathChange allows path traversal components',
+    () => {
+      assertEquals(shouldRebuildAfterPathChange('../src/main.ts'), true);
+      assertEquals(shouldRebuildAfterPathChange('./file.ts'), true);
+    },
+  );
+
+  TEST(
+    'FileWatcher',
     'polling failure throttle stays bounded without re-logging the active path',
     async () => {
       const { join } = await import('node:path');
@@ -173,7 +173,7 @@ export default function setupFileWatcherUnitTests(): void {
           err.code = 'EACCES';
           throw err;
         },
-      } as typeof import('node:fs');
+      } as unknown as typeof import('node:fs');
 
       const originalNow = Date.now;
       try {
@@ -277,6 +277,51 @@ export default function setupFileWatcherUnitTests(): void {
           'readable recovery must surface the file as a create event',
           1_000,
         );
+      } finally {
+        watcher.close();
+        await done;
+      }
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'polling watcher preserves Windows path separators in emitted paths',
+    async () => {
+      const { win32 } = await import('node:path');
+      const dir = 'C:\\watch-root';
+      const filePath = win32.join(dir, 'visible.txt');
+      let cycle = 0;
+      const fakeFs = {
+        constants: { F_OK: 0, R_OK: 4 },
+        accessSync(_currentDir: string, _mode?: number): void {},
+        readdirSync(currentDir: string): string[] {
+          if (currentDir !== dir) {
+            throw new Error(`unexpected dir: ${currentDir}`);
+          }
+          cycle += 1;
+          return cycle === 1 ? [] : ['visible.txt'];
+        },
+        lstatSync(currentPath: string) {
+          if (currentPath !== filePath) {
+            throw new Error(`unexpected path: ${currentPath}`);
+          }
+          return {
+            isSymbolicLink: () => false,
+            isDirectory: () => false,
+            mtimeMs: 1,
+            size: 1,
+          };
+        },
+      } as typeof import('node:fs');
+
+      const { watcher, waitForCycles } = await createWatcher(fakeFs, dir, 5);
+      const { events, done } = startCollecting(watcher);
+      try {
+        await waitForCycles(2);
+        assertEquals(events.length, 1, 'expected one create event');
+        assertEquals(events[0].paths[0], filePath, 'expected Windows path');
+        assertEquals(events[0].kind, 'create', 'expected create kind');
       } finally {
         watcher.close();
         await done;
@@ -579,7 +624,7 @@ export function setupFileWatcherTests(): void {
 
   TEST(
     'FileWatcher',
-    'polling watcher emits hidden files so callers can filter them',
+    'polling watcher ignores hidden files during traversal',
     async (ctx: TestSuite) => {
       const fs = await import('node:fs');
       const path = await import('node:path');
@@ -593,19 +638,13 @@ export function setupFileWatcherTests(): void {
         const { events, done } = startCollecting(watcher);
         await waitForCycles(1);
         const hiddenFile = path.join(dir, '.hidden.txt');
-        fs.writeFileSync(hiddenFile, 'observed');
+        fs.writeFileSync(hiddenFile, 'ignored');
 
         await waitForCycles(2);
         watcher.close();
         await done;
 
-        assertEquals(events.length, 1, 'expected one event from hidden file');
-        assertEquals(
-          events[0].paths[0],
-          hiddenFile,
-          'expected hidden file path',
-        );
-        assertEquals(events[0].kind, 'create', 'expected create kind');
+        assertEquals(events.length, 0, 'expected no events from hidden file');
       } finally {
         watcher.close();
       }
@@ -614,7 +653,7 @@ export function setupFileWatcherTests(): void {
 
   TEST(
     'FileWatcher',
-    'polling watcher emits files inside hidden directories so callers can filter them',
+    'polling watcher ignores files inside hidden directories during traversal',
     async (ctx: TestSuite) => {
       const fs = await import('node:fs');
       const path = await import('node:path');
@@ -630,7 +669,7 @@ export function setupFileWatcherTests(): void {
         const hiddenDir = path.join(dir, '.hidden');
         const hiddenFile = path.join(hiddenDir, 'file.txt');
         fs.mkdirSync(hiddenDir, { recursive: true });
-        fs.writeFileSync(hiddenFile, 'observed');
+        fs.writeFileSync(hiddenFile, 'ignored');
 
         await waitForCycles(2);
         watcher.close();
@@ -638,15 +677,43 @@ export function setupFileWatcherTests(): void {
 
         assertEquals(
           events.length,
-          1,
-          'expected one event from hidden directory',
+          0,
+          'expected no events from hidden directory contents',
         );
+      } finally {
+        watcher.close();
+      }
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'polling watcher skips symlinks to prevent directory escape',
+    async (ctx: TestSuite) => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const dir = await ctx.tempDir('poll-symlink');
+      const target = path.join(dir, 'target.txt');
+      fs.writeFileSync(target, 'real');
+      const link = path.join(dir, 'link.txt');
+      fs.symlinkSync(target, link);
+
+      const { watcher, waitForCycles } = await createWatcher(
+        fs as typeof import('node:fs'),
+        dir,
+        200,
+      );
+      try {
+        const { events, done } = startCollecting(watcher);
+        await waitForCycles(2);
+        watcher.close();
+        await done;
+
         assertEquals(
-          events[0].paths[0],
-          hiddenFile,
-          'expected hidden file path',
+          events.length,
+          0,
+          'symlinked files must not emit events',
         );
-        assertEquals(events[0].kind, 'create', 'expected create kind');
       } finally {
         watcher.close();
       }
@@ -1101,6 +1168,167 @@ export function setupFileWatcherDenoTests(): void {
  * Gated by `if (isNode())` in test-registry.ts.
  */
 export function setupFileWatcherNativeNodeTests(): void {
+  TEST(
+    'FileWatcher',
+    'relativeWatchedPath relativizes paths under the watch root',
+    async () => {
+      const { posix, win32 } = await import('node:path');
+      assertEquals(
+        relativeWatchedPath('/project/src/main.ts', '/project', posix, win32),
+        'src/main.ts',
+      );
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'relativeWatchedPath returns empty string for root itself',
+    async () => {
+      const { posix, win32 } = await import('node:path');
+      assertEquals(
+        relativeWatchedPath('/project', '/project', posix, win32),
+        '',
+      );
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'relativeWatchedPath normalizes trailing separators at the watch root',
+    async () => {
+      const { posix, win32 } = await import('node:path');
+      assertEquals(
+        relativeWatchedPath('/project/file.ts', '/project/', posix, win32),
+        'file.ts',
+      );
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'relativeWatchedPath keeps non-absolute paths as-is',
+    async () => {
+      const { posix, win32 } = await import('node:path');
+      assertEquals(
+        relativeWatchedPath('src/main.ts', '/project', posix, win32),
+        'src/main.ts',
+      );
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'relativeWatchedPath leaves paths outside root unchanged',
+    async () => {
+      const { posix, win32 } = await import('node:path');
+      const result = relativeWatchedPath(
+        '/other/file.ts',
+        '/project/build/watched',
+        posix,
+        win32,
+      );
+      assertEquals(result, '/other/file.ts');
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'relativeWatchedPath leaves sibling-under-ignored-ancestor unchanged',
+    async () => {
+      const { posix, win32 } = await import('node:path');
+      const result = relativeWatchedPath(
+        '/project/build/other/file.ts',
+        '/project/build/watched',
+        posix,
+        win32,
+      );
+      // ../other/file.ts starts with '..' → returned as absolute path
+      assertEquals(result, '/project/build/other/file.ts');
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'relativeWatchedPath handles Windows paths',
+    async () => {
+      const { win32 } = await import('node:path');
+      const result = relativeWatchedPath(
+        'C:\\project\\src\\main.ts',
+        'C:\\project',
+        null as unknown as typeof import('node:path').posix,
+        win32,
+      );
+      assertEquals(result, 'src\\main.ts');
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'native Node watcher does not ignore roots under ignored ancestors',
+    async (ctx: TestSuite) => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const parent = await ctx.tempDir('node-native-ancestor');
+      const dir = path.join(parent, 'build', 'watched');
+      fs.mkdirSync(dir, { recursive: true });
+
+      const watcher = await watchDirectory(dir);
+      try {
+        const { events, done } = startCollecting(watcher);
+
+        fs.writeFileSync(path.join(dir, 'visible.txt'), 'visible');
+        await waitForEvent(
+          events,
+          (e) => e.paths.some((p) => p.endsWith('visible.txt')),
+          'watch root under an ignored ancestor must still observe visible files',
+        );
+        watcher.close();
+        await done;
+      } finally {
+        watcher.close();
+      }
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'native Node watcher suppresses hidden files at the public API boundary',
+    async (ctx: TestSuite) => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const dir = await ctx.tempDir('node-native-hidden');
+      const watcher = await watchDirectory(dir);
+      try {
+        const { events, done } = startCollecting(watcher);
+
+        fs.mkdirSync(path.join(dir, '.hidden-dir'), { recursive: true });
+        fs.writeFileSync(`${dir}/.hidden.txt`, 'secret');
+        fs.writeFileSync(path.join(dir, '.hidden-dir', 'nested.txt'), 'secret');
+        fs.writeFileSync(`${dir}/visible.txt`, 'visible');
+        await waitForEvent(
+          events,
+          (e) => e.paths.some((p) => p.endsWith('visible.txt')),
+          'public Node watcher must still observe visible files',
+        );
+        watcher.close();
+        await done;
+
+        assertEquals(
+          events.some((e) => e.paths.some((p) => p.endsWith('.hidden.txt'))),
+          false,
+          'hidden files must not reach public Node watcher callers',
+        );
+        assertEquals(
+          events.some((e) => e.paths.some((p) => p.includes('.hidden-dir'))),
+          false,
+          'files inside hidden directories must not reach public Node watcher callers',
+        );
+      } finally {
+        watcher.close();
+      }
+    },
+  );
+
   TEST(
     'FileWatcher',
     'native Node watcher emits create event',
