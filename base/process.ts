@@ -11,7 +11,41 @@ import { getRuntime } from './runtime/index.ts';
  * @throws Error if on an unsupported platform
  */
 export function exit(code: number): never {
+  if (_testExitOverride) {
+    _testExitOverride(code);
+    // Must still satisfy the never return type — throw so callers never
+    // see a resolved path after exit().
+    throw new Error(`exit(${code}) intercepted by test override`);
+  }
   return getRuntime().exit(code);
+}
+
+// ── Test hooks ──────────────────────────────────────────────────────────────
+/** @internal Test-only: overrides exit() to capture the exit code instead of terminating. */
+// Note: module-level globals are safe under sequential test execution. If
+// parallel test execution is ever enabled, these must move to a per-test
+// isolation strategy (e.g. AsyncLocalStorage or test-scoped contexts).
+let _testExitOverride: ((code: number) => void) | undefined;
+
+/**
+ * @internal Test-only scoped override for exit().
+ * When set, exit() calls the override instead of the runtime adapter.
+ * Pass undefined to restore normal behavior.
+ *
+ * Since exit() returns never, the override must throw or the caller must
+ * accept that the code after exit() is dead.
+ */
+export async function withTestExitOverride<T>(
+  override: ((code: number) => void) | undefined,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const prev = _testExitOverride;
+  _testExitOverride = override;
+  try {
+    return await fn();
+  } finally {
+    _testExitOverride = prev;
+  }
 }
 
 /**

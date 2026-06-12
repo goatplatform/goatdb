@@ -13,6 +13,7 @@ import {
   isBrowserOpenUrl,
   withTestBrowserOpenCommand,
 } from '../base/runtime/browser-open.ts';
+import { exit, withTestExitOverride } from '../base/process.ts';
 import type { LogEntry } from '../logging/log.ts';
 import type { NormalizedLogEntry } from '../logging/entry.ts';
 import { withLogCapture } from './test-utils.ts';
@@ -105,6 +106,111 @@ export default function setupRuntimeTests(): void {
       'exit() is not available in browser',
     );
   });
+
+  TEST(
+    'Runtime',
+    'process.ts exit() dispatches through test override',
+    async () => {
+      const capturedCodes: number[] = [];
+      await assertThrows(
+        () =>
+          withTestExitOverride(
+            (code: number) => capturedCodes.push(code),
+            async () => {
+              // exit() throws via test override — do NOT catch here, let
+              // assertThrows see the rejection.
+              exit(42);
+            },
+          ),
+        Error,
+        'exit(42) intercepted by test override',
+      );
+      assertEquals(
+        capturedCodes,
+        [42],
+        'process.ts exit() must dispatch through the test override',
+      );
+    },
+  );
+
+  TEST(
+    'Runtime',
+    'exit override nesting clears inner after outer resumes',
+    async () => {
+      // Outer scope with override A.
+      // Inside, override with override B.
+      // After B scope exits, A should be active again.
+      const codes: number[] = [];
+      await withTestExitOverride(
+        (code: number) => codes.push(code),
+        async () => {
+          // Inside outer scope — push code via inners
+          const innerCodes: number[] = [];
+          await assertThrows(
+            () =>
+              withTestExitOverride(
+                (code: number) => innerCodes.push(code),
+                async () => exit(100),
+              ),
+            Error,
+            'exit(100) intercepted by test override',
+          );
+          assertEquals(innerCodes, [100], 'inner override must be called');
+          assertEquals(codes, [], 'outer override must not be called yet');
+
+          // Now verify outer override is active again
+          await assertThrows(
+            () => exit(200),
+            Error,
+            'exit(200) intercepted by test override',
+          );
+          assertEquals(
+            codes,
+            [200],
+            'outer override must be active after inner exits',
+          );
+        },
+      );
+    },
+  );
+
+  TEST(
+    'Runtime',
+    'process.ts exit() restores override after scope',
+    async () => {
+      const capturedCodes: number[] = [];
+      await withTestExitOverride(
+        (code: number) => capturedCodes.push(code),
+        async () => {
+          try {
+            exit(1);
+          } catch {
+            // Expected
+          }
+        },
+      );
+      assertEquals(capturedCodes, [1], 'override must have been called');
+
+      // After scope, override is restored. Verify via a second independent
+      // scope — proves the first override is no longer active.
+      const secondCodes: number[] = [];
+      await withTestExitOverride(
+        (code: number) => secondCodes.push(code),
+        async () => {
+          try {
+            exit(5);
+          } catch {
+            // Expected
+          }
+        },
+      );
+      assertEquals(
+        secondCodes,
+        [5],
+        'second override must work independently — no leak from previous',
+      );
+    },
+  );
 
   TEST(
     'Runtime',
