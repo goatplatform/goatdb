@@ -8,7 +8,7 @@
  *
  * @module GoatDB/FileWatcher
  */
-import { isDeno, isNode } from './common.ts';
+import { getRuntime } from './runtime/index.ts';
 import { notReached } from './error.ts';
 import { log } from '../logging/log.ts';
 
@@ -114,9 +114,10 @@ export function shouldRebuildAfterPathChange(
  * @throws If called in an unsupported runtime (browser)
  */
 export async function watchDirectory(dir: string): Promise<FileWatcher> {
-  if (isDeno()) {
+  const runtime = getRuntime().id;
+  if (runtime === 'deno') {
     return createDenoWatcher(dir);
-  } else if (isNode()) {
+  } else if (runtime === 'node') {
     return await createNodeWatcher(dir);
   }
   notReached('File watching not supported in browser');
