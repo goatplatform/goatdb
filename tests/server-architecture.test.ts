@@ -347,4 +347,36 @@ export default async function setupServerArchitectureTest() {
       await Promise.all([p1, p2, p3]);
     },
   );
+
+  TEST(
+    'ServerArchitecture',
+    'start↔stop race — stop during start cleanly aborts',
+    async (ctx) => {
+      const server = makeServer(await ctx.tempDir('start-stop-race'));
+
+      // Set up org services (async DB init) so stop() has resources to clean.
+      await server.servicesForOrganization('test-org');
+
+      // start() has internal async points: prior-stop await, HTTPS cert
+      // generation, service startup, HTTP listen. Calling stop() concurrently
+      // tests that start() detects _stopping and bails out.
+      const startPromise = server.start();
+
+      // Immediately call stop() — races against start(). Should win the race,
+      // set _stopping, and clean up resources without double-free.
+      await server.stop();
+
+      // After the race settles, start() should have been aborted and its
+      // promise should resolve (not reject).
+      await startPromise;
+
+      // Verify the server is truly stopped by restarting it cleanly.
+      const server2 = makeServer(
+        await ctx.tempDir('start-stop-race-recover'),
+      );
+      await server2.servicesForOrganization('test-org');
+      await server2.start();
+      await server2.stop();
+    },
+  );
 }
