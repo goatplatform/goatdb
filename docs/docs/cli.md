@@ -230,8 +230,9 @@ Node.js reads `package.json` or an explicit `packageJson`. By default it opens
 the local URL in your browser after startup; pass `openBrowser: false` for
 embedded or test usage. `onReady({ server, url,
 stop })` runs after listening
-begins, `url` is the chosen server origin, and `stop()` is safe to call more
-than once. Only one active debug server instance is supported at a time.
+begins, `url` is the chosen server origin, `stop()` is safe to call more than
+once, and the returned promise rejects if startup or the live watcher fails.
+Only one active debug server instance is supported at a time.
 
 ```typescript
 import { startDebugServer } from '@goatdb/goatdb/server/build';
