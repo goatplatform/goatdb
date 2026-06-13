@@ -2168,6 +2168,31 @@ export default function setupCliCompileTests() {
 
   TEST(
     'CLI-Compile',
+    'package.json declares runtime build/watch deps as optional for exported server/build APIs',
+    async () => {
+      const pkgText = await readTextFile('package.json');
+      assertExists(
+        pkgText,
+        'package.json must be readable for packaging checks',
+      );
+      const pkg = JSON.parse(pkgText) as {
+        optionalDependencies?: Record<string, string>;
+      };
+      assertEquals(
+        typeof pkg.optionalDependencies?.esbuild,
+        'string',
+        'build APIs lazy-load esbuild at runtime; it must appear in optionalDependencies',
+      );
+      assertEquals(
+        typeof pkg.optionalDependencies?.chokidar,
+        'string',
+        'debug-server watch mode lazy-loads chokidar at runtime; it must appear in optionalDependencies',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
     'signExecutable warns and ignores signing on unsupported platforms',
     async (ctx: TestSuite) => {
       const runtime = getRuntime();

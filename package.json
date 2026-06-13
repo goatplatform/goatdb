@@ -30,6 +30,8 @@
     "@std/path": "npm:@jsr/std__path@^1.0.9"
   },
   "optionalDependencies": {
+    "chokidar": "^4.0.3",
+    "esbuild": "^0.25.4",
     "postject": "1.0.0-alpha.6"
   },
   "peerDependencies": {
