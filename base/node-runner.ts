@@ -18,7 +18,18 @@ let denoPluginModule:
 async function getEsbuild(): Promise<typeof import('esbuild')> {
   if (!esbuildModule) {
     const specifier = 'esbuild';
-    esbuildModule = await import(specifier);
+    try {
+      esbuildModule = await import(specifier);
+    } catch (cause) {
+      throw new Error(
+        `esbuild is required for GoatDB server compilation but is not installed.\n` +
+          `Install it with: npm install esbuild\n` +
+          `(esbuild is an optional dependency of @goatdb/goatdb; ` +
+          `core DB and server functionality work without it.)\n` +
+          `Original error: ${String(cause)}`,
+        { cause },
+      );
+    }
   }
   return esbuildModule!;
 }

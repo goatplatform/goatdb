@@ -67,7 +67,18 @@ const denoPluginImportState: ImportCacheState<any> = {};
 export async function getEsbuild(): Promise<typeof import('esbuild')> {
   return (await getCachedImport(
     esbuildImportState,
-    () => import(kEsbuildSpecifier),
+    () =>
+      import(kEsbuildSpecifier).catch((cause) => {
+        throw new Error(
+          `esbuild is required for GoatDB build operations ` +
+            `(compile, startDebugServer) but is not installed.\n` +
+            `Install it with: npm install esbuild\n` +
+            `(esbuild is an optional dependency of @goatdb/goatdb; ` +
+            `core DB and server functionality work without it.)\n` +
+            `Original error: ${String(cause)}`,
+          { cause },
+        );
+      }),
   )) as typeof import('esbuild');
 }
 
