@@ -37,6 +37,18 @@ export interface FileWatcher {
   close(): void;
 }
 
+interface ChokidarLikeWatcher {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  on(event: string, handler: (...args: any[]) => void): ChokidarLikeWatcher;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  off(event: string, handler: (...args: any[]) => void): ChokidarLikeWatcher;
+  close(): void;
+}
+
+interface ChokidarLike {
+  watch(path: string, options: Record<string, unknown>): ChokidarLikeWatcher;
+}
+
 const kDefaultIgnored = ['node_modules', '.git', 'server-data', 'build'];
 
 /**
@@ -147,11 +159,13 @@ function createDenoWatcher(dir: string): FileWatcher {
   };
 }
 
+const kChokidarSpecifier = 'chokidar';
+
 async function createNodeWatcher(dir: string): Promise<FileWatcher> {
   // Try chokidar first (more reliable for recursive watching)
   let chokidarModule;
   try {
-    chokidarModule = await import('chokidar');
+    chokidarModule = await import(kChokidarSpecifier);
   } catch {
     const fs = await import('node:fs');
     return await createNativeFsWatcher(fs, dir);
@@ -168,11 +182,17 @@ async function createNodeWatcher(dir: string): Promise<FileWatcher> {
  */
 function createQueuedWatcher(
   onClose: () => void,
-): { pushEvent: (event: FileWatchEvent) => void; watcher: FileWatcher } {
+): {
+  pushEvent: (event: FileWatchEvent) => void;
+  fail: (err: unknown) => void;
+  watcher: FileWatcher;
+} {
   const eventQueue: FileWatchEvent[] = [];
   let resolveNext: ((value: FileWatchEvent) => void) | null = null;
+  let rejectNext: ((reason?: unknown) => void) | null = null;
   let closed = false;
   let cleanedUp = false;
+  let terminalError: Error | undefined;
 
   function cleanup(): void {
     if (cleanedUp) return;
@@ -181,33 +201,54 @@ function createQueuedWatcher(
     if (resolveNext) {
       resolveNext({ paths: [], kind: 'any' });
       resolveNext = null;
+      rejectNext = null;
     }
     onClose();
   }
 
   return {
     pushEvent(event: FileWatchEvent) {
-      if (closed) return;
+      if (closed || terminalError) return;
       if (resolveNext) {
         resolveNext(event);
         resolveNext = null;
+        rejectNext = null;
       } else {
         eventQueue.push(event);
       }
     },
+    fail(err: unknown) {
+      if (closed || terminalError) return;
+      terminalError = err instanceof Error ? err : new Error(String(err));
+      eventQueue.length = 0;
+      closed = true;
+      cleanedUp = true;
+      if (rejectNext) {
+        rejectNext(terminalError);
+        resolveNext = null;
+        rejectNext = null;
+      }
+      onClose();
+    },
     watcher: {
       async *[Symbol.asyncIterator]() {
         try {
-          while (!closed) {
+          while (true) {
+            if (terminalError) throw terminalError;
             if (eventQueue.length > 0) {
               yield eventQueue.shift()!;
-            } else {
-              const event = await new Promise<FileWatchEvent>((resolve) => {
+              continue;
+            }
+            if (closed) break;
+            const event = await new Promise<FileWatchEvent>(
+              (resolve, reject) => {
                 resolveNext = resolve;
-              });
-              if (!closed) {
-                yield event;
-              }
+                rejectNext = reject;
+              },
+            );
+            if (terminalError) throw terminalError;
+            if (!closed) {
+              yield event;
             }
           }
         } finally {
@@ -237,7 +278,7 @@ function createQueuedWatcher(
  */
 /** @internal */
 export async function createChokidarWatcher(
-  chokidar: typeof import('chokidar'),
+  chokidar: ChokidarLike,
   dir: string,
 ): Promise<FileWatcher> {
   const { posix, win32 } = await import('node:path');
@@ -260,7 +301,9 @@ export async function createChokidarWatcher(
     ignoreInitial: true,
   });
 
-  const { pushEvent, watcher } = createQueuedWatcher(() => underlying.close());
+  const { pushEvent, fail, watcher } = createQueuedWatcher(() =>
+    underlying.close()
+  );
 
   const onAdd = (path: string) => pushEvent({ paths: [path], kind: 'create' });
   const onChange = (path: string) =>
@@ -271,15 +314,6 @@ export async function createChokidarWatcher(
     underlying.on('add', onAdd);
     underlying.on('change', onChange);
     underlying.on('unlink', onUnlink);
-  };
-
-  const logRuntimeError = (err: unknown) => {
-    log({
-      severity: 'ERROR',
-      error: 'UncaughtServerError',
-      message: `chokidar watcher runtime error: ${String(err)}`,
-      trace: err instanceof Error ? err.stack : undefined,
-    });
   };
 
   await new Promise<void>((resolve, reject) => {
@@ -293,14 +327,14 @@ export async function createChokidarWatcher(
       settled = true;
       cleanup();
       attachEventHandlers();
-      underlying.on('error', logRuntimeError);
+      underlying.on('error', fail);
       resolve();
     };
     const onSetupError = (err: unknown) => {
       if (settled) return;
       settled = true;
       cleanup();
-      watcher.close();
+      fail(err);
       reject(err);
     };
     underlying.on('ready', onReady);

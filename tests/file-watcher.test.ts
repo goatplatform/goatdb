@@ -1,5 +1,5 @@
 import { TEST, type TestSuite } from './mod.ts';
-import { assertEquals, assertTrue } from './asserts.ts';
+import { assertEquals, assertThrows, assertTrue } from './asserts.ts';
 import { withLogCapture } from './test-utils.ts';
 import type { FileWatchEvent } from '../base/file-watcher.ts';
 import {
@@ -1510,7 +1510,7 @@ export function setupFileWatcherNativeNodeTests(): void {
 
   TEST(
     'FileWatcher',
-    'chokidar ready gate logs runtime errors after ready',
+    'chokidar runtime errors after ready terminate the iterator',
     async () => {
       const fw = new FakeChokidarWatcher();
       const readyPromise = createChokidarWatcher(
@@ -1521,19 +1521,29 @@ export function setupFileWatcherNativeNodeTests(): void {
       fw.emit('ready');
       const watcher = await readyPromise;
       try {
-        await withLogCapture(async (captured) => {
-          fw.emit('add', '/test/visible.txt');
-          fw.emit('error', new Error('broken'));
-          await sleep(50); // let the log flush
-          const errors = captured.filter(
-            (e) => e.severity === 'ERROR' && e.message?.includes('chokidar'),
-          );
-          assertEquals(
-            errors.length >= 1,
-            true,
-            'runtime chokidar errors must be logged',
-          );
-        });
+        fw.emit('add', '/test/visible.txt');
+        const iter = watcher[Symbol.asyncIterator]();
+        const first = await iter.next();
+        assertEquals(
+          first.done,
+          false,
+          'visible event must still be delivered',
+        );
+        assertEquals(first.value.paths[0], '/test/visible.txt');
+
+        fw.emit('error', new Error('broken'));
+        await assertThrows(
+          async () => {
+            await iter.next();
+          },
+          Error,
+          'broken',
+        );
+        assertEquals(
+          fw.closed,
+          true,
+          'terminal runtime errors must close the watcher',
+        );
       } finally {
         watcher.close();
       }

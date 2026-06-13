@@ -66,6 +66,23 @@ function setupDebugServerSignalHandlers(
   };
 }
 
+/** @internal Shared watch-loop so iterator failures surface to callers. */
+export async function runDebugServerWatchLoop(
+  watcher: FileWatcher,
+  cwd: string,
+  filterFunc: (path: string) => boolean,
+  onMatch: (relativePath: string) => void,
+): Promise<void> {
+  for await (const event of watcher) {
+    for (const p of event.paths) {
+      const relativePath = p.startsWith(cwd) ? p.substring(cwd.length + 1) : p;
+      if (filterFunc(relativePath)) {
+        onMatch(relativePath);
+      }
+    }
+  }
+}
+
 function debugServerOrigin<US extends Schema>(
   server: Server<US>,
   options: DebugServerOptions<US>,
@@ -215,7 +232,8 @@ export type DebugServerOptions<US extends Schema> =
  * browser unless `openBrowser` is false.
  *
  * @param options Options for running the debug server.
- * @returns Resolves after the debug server is shut down.
+ * @returns Resolves after clean shutdown. Rejects if startup fails or a live
+ *   watcher fails after startup.
  * @group Debug Server
  */
 export async function startDebugServer<US extends Schema>(
@@ -445,19 +463,32 @@ export async function startDebugServer<US extends Schema>(
     if (watcher && rebuildTimer) {
       const filterFunc = options.watchFilter || shouldRebuildAfterPathChange;
 
-      for await (const event of watcher) {
-        for (const p of event.paths) {
-          const relativePath = p.startsWith(cwd)
-            ? p.substring(cwd.length + 1)
-            : p;
-          if (filterFunc(relativePath)) {
+      try {
+        await runDebugServerWatchLoop(
+          watcher,
+          cwd,
+          filterFunc,
+          (relativePath) => {
             log({
               severity: 'INFO',
               message: `Detected change at ${relativePath}`,
             });
             rebuildTimer.schedule();
-          }
+          },
+        );
+      } catch (err) {
+        if (!shuttingDown) {
+          log({
+            severity: 'ERROR',
+            error: 'UncaughtServerError',
+            message:
+              `Debug server file watcher failed for ${options.watchDir}: ${
+                String(err)
+              }`,
+            trace: err instanceof Error ? err.stack : undefined,
+          });
         }
+        throw err;
       }
       if (shuttingDown) {
         await cleanup();

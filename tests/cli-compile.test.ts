@@ -49,8 +49,12 @@ import {
   buildCombinedCSS,
   countNewlines,
 } from '../cli/build-assets.ts';
-import { startDebugServer } from '../cli/debug-server.ts';
+import {
+  runDebugServerWatchLoop,
+  startDebugServer,
+} from '../cli/debug-server.ts';
 import type { StaticAssets } from '../system-assets/system-assets.ts';
+import type { FileWatcher } from '../base/file-watcher.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import type { Server } from '../net/server/server.ts';
 import { createHttpServer } from '../net/server/http-compat.ts';
@@ -1864,6 +1868,41 @@ export default function setupCliCompileTests() {
       } finally {
         await cleanupDebugServer(stopServer, runPromise);
       }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'runDebugServerWatchLoop surfaces terminal watcher failures',
+    async () => {
+      const seen: string[] = [];
+      const watcher: FileWatcher = {
+        async *[Symbol.asyncIterator]() {
+          yield { paths: ['/tmp/watch-root/ok.ts'], kind: 'modify' };
+          throw new Error('watcher failed');
+        },
+        close() {},
+      };
+
+      await assertThrows(
+        async () => {
+          await runDebugServerWatchLoop(
+            watcher,
+            '/tmp/watch-root',
+            () => true,
+            (relativePath) => {
+              seen.push(relativePath);
+            },
+          );
+        },
+        Error,
+        'watcher failed',
+      );
+      assertEquals(
+        seen,
+        ['ok.ts'],
+        'debug-server watch loop must forward matched events before surfacing the terminal failure',
+      );
     },
   );
 
