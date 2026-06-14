@@ -18,9 +18,9 @@ import {
 } from '../build.ts';
 import { getGoatConfig } from '../base/config.ts';
 import { Server, type ServerOptions } from '../net/server/server.ts';
-import { buildAssets } from './build-assets.ts';
+import { buildAssets, type EntryPoint } from './build-assets.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
-import { generateBuildInfo } from '../base/build-info.ts';
+import type { BuildInfo } from '../base/build-info.ts';
 import { exit } from '../base/process.ts';
 import {
   getEffectiveCWD,
@@ -36,8 +36,11 @@ import {
   shouldRebuildAfterPathChange,
   watchDirectory,
 } from '../base/file-watcher.ts';
-import { pathExists } from '../base/json-log/file-impl.ts';
 import { notReached } from '../base/error.ts';
+import {
+  resolveRuntimeBuildInfo,
+  type RuntimeConfigFileOptions,
+} from './runtime-build-info.ts';
 
 /** Guards startDebugServer against concurrent calls that would corrupt config.debug save/restore. */
 let _debugServerActive = false;
@@ -109,6 +112,225 @@ function debugServerOrigin<US extends Schema>(
     ? options.https.hostname
     : 'localhost';
   return `${protocol}//${hostname}:${server.port}`;
+}
+
+// ── Debug server lifecycle helpers ──────────────────────────────────────
+
+/** @internal Mutable holder for resources acquired during setup. */
+interface DebugServerResources {
+  ctx: ReBuildContext | undefined;
+  watcher: FileWatcher | undefined;
+  rebuildTimer: SimpleTimer | undefined;
+  shuttingDown: boolean;
+  cleanup(): Promise<void>;
+  stopped: Promise<void>;
+  removeSignalHandlers(): void;
+}
+
+function createDebugServerLifecycle<US extends Schema>(
+  server: Server<US>,
+): DebugServerResources {
+  let resolveStopped!: () => void;
+  let cleanupPromise: Promise<void> | undefined;
+  const resources: DebugServerResources = {
+    ctx: undefined,
+    watcher: undefined,
+    rebuildTimer: undefined,
+    shuttingDown: false,
+    stopped: new Promise<void>((resolve) => {
+      resolveStopped = resolve;
+    }),
+    cleanup() {
+      if (cleanupPromise) return cleanupPromise;
+      resources.shuttingDown = true;
+      cleanupPromise = (async () => {
+        try {
+          resources.watcher?.close();
+          resources.rebuildTimer?.unschedule();
+          try {
+            await server.stop();
+          } finally {
+            resources.ctx?.close();
+          }
+        } finally {
+          resolveStopped();
+        }
+      })();
+      return cleanupPromise;
+    },
+    removeSignalHandlers() {},
+  };
+
+  let signalShutdownStarted = false;
+  const signalHandler = (): void => {
+    if (signalShutdownStarted) return;
+    signalShutdownStarted = true;
+    // Must be synchronous: setupSignalHandler does not await async callbacks.
+    void resources.cleanup().then(() => exit(0)).catch((err) => {
+      log({
+        severity: 'ERROR',
+        error: 'UncaughtServerError',
+        message: `Debug server cleanup failed: ${err}`,
+        trace: err instanceof Error ? err.stack : undefined,
+      });
+      exit(1);
+    });
+  };
+  resources.removeSignalHandlers = setupDebugServerSignalHandlers(
+    signalHandler,
+  );
+
+  return resources;
+}
+
+async function resolveDebugServerConfig(
+  runtime: 'deno' | 'node',
+  cwd: string,
+  options: RuntimeConfigFileOptions,
+): Promise<{ buildInfo: BuildInfo }> {
+  const buildInfo = await resolveRuntimeBuildInfo(runtime, cwd, options);
+  buildInfo.debugBuild = true;
+  return { buildInfo };
+}
+
+/**
+ * Relative jsPath values resolve against the real runtime CWD (not the
+ * test-overridden effective CWD) so paths like './client/index.tsx' work
+ * from the project root where startDebugServer was invoked.
+ */
+function buildDebugServerEntryPoints<US extends Schema>(
+  options: DebugServerOptions<US>,
+): { entryPoints: EntryPoint[]; appConfig: AppConfig } {
+  const entryPoints = [
+    {
+      in: resolveBuildEntryPath(
+        path.isFileUrlPath(options.jsPath) || path.isAbsolute(options.jsPath)
+          ? options.jsPath
+          : path.join(getRuntime().getCWD(), options.jsPath),
+      ),
+      out: APP_ENTRY_POINT,
+    },
+  ];
+  const appConfig: AppConfig = {
+    buildDir: options.buildDir,
+    jsPath: options.jsPath,
+    htmlPath: options.htmlPath,
+    cssPath: options.cssPath,
+    assetsPath: options.assetsPath,
+    assetsFilter: options.assetsFilter,
+    denoJson: options.denoJson,
+    packageJson: options.packageJson,
+    minify: options.minify,
+    appName: options.appName,
+  };
+  return { entryPoints, appConfig };
+}
+
+async function runDebugServerBuild<US extends Schema>(
+  resources: DebugServerResources,
+  server: Server<US>,
+  entryPoints: EntryPoint[],
+  appConfig: AppConfig,
+  options: DebugServerOptions<US>,
+): Promise<void> {
+  await server.servicesForOrganization(options.orgId || 'localhost');
+  if (options.setup) await options.setup(server);
+  if (options.beforeBuild) await options.beforeBuild();
+  // createBuildContext is development-only and never minifies;
+  // appConfig.minify is intentionally not forwarded here.
+  resources.ctx = await createBuildContext(
+    entryPoints,
+    options.esbuildPlugins,
+  );
+  server.updateStaticAssets(
+    await buildAssets(resources.ctx, entryPoints, appConfig),
+  );
+  if (options.afterBuild) await options.afterBuild();
+  await server.start();
+}
+
+async function setupDebugServerWatcher<US extends Schema>(
+  resources: DebugServerResources,
+  server: Server<US>,
+  entryPoints: EntryPoint[],
+  appConfig: AppConfig,
+  options: DebugServerOptions<US>,
+): Promise<void> {
+  if (!options.watchDir) return;
+  resources.watcher = await watchDirectory(path.resolve(options.watchDir));
+  resources.rebuildTimer = new SimpleTimer(300, false, async () => {
+    if (resources.shuttingDown) return;
+    log({ severity: 'INFO', message: 'Bundling client code...' });
+    const bundlingStart = performance.now();
+    try {
+      const config = getGoatConfig();
+      const version = incrementBuildNumber(config.version);
+      if (options.beforeBuild) await options.beforeBuild();
+      server.updateStaticAssets(
+        await buildAssets(resources.ctx, entryPoints, appConfig),
+      );
+      if (options.afterBuild) await options.afterBuild();
+      config.version = version;
+      log({
+        severity: 'INFO',
+        message: `Bundling took ${
+          ((performance.now() - bundlingStart) / 1000).toFixed(2)
+        }sec`,
+      });
+    } catch (err: unknown) {
+      log({
+        severity: 'WARNING',
+        error: 'BuildFailure',
+        message: 'Build failed. Will try again on next save.',
+      });
+      log({
+        severity: 'WARNING',
+        error: 'BuildFailure',
+        message: err instanceof Error ? err.message : String(err),
+        trace: err instanceof Error ? err.stack : undefined,
+      });
+    }
+  });
+}
+
+async function runDebugServerWatcherLoop(
+  resources: DebugServerResources,
+  cwd: string,
+  options: LiveReloadOptions,
+): Promise<void> {
+  if (!resources.watcher || !resources.rebuildTimer) return;
+  const filterFunc = options.watchFilter || shouldRebuildAfterPathChange;
+  try {
+    await runDebugServerWatchLoop(
+      resources.watcher,
+      cwd,
+      filterFunc,
+      (relativePath) => {
+        log({
+          severity: 'INFO',
+          message: `Detected change at ${relativePath}`,
+        });
+        resources.rebuildTimer!.schedule();
+      },
+    );
+  } catch (err) {
+    if (!resources.shuttingDown) {
+      log({
+        severity: 'ERROR',
+        error: 'UncaughtServerError',
+        message: `Debug server file watcher failed for ${options.watchDir}: ${
+          String(err)
+        }`,
+        trace: err instanceof Error ? err.stack : undefined,
+      });
+    }
+    throw err;
+  }
+  if (resources.shuttingDown) {
+    await resources.cleanup();
+    return;
+  }
+  notReached('Debug server file watcher exited unexpectedly.');
 }
 
 /**
@@ -259,182 +481,40 @@ export async function startDebugServer<US extends Schema>(
   }
   _debugServerActive = true;
 
-  let removeSignalHandlers = () => {};
-  let cleanup: () => Promise<void> = async () => {};
+  let resources: DebugServerResources | undefined;
   try {
-    // Keep this runtime-specific config choice aligned with compile().
-    const configPath = runtime === 'node'
-      ? (options.packageJson || path.join(cwd, 'package.json'))
-      : (options.denoJson || path.join(cwd, 'deno.json'));
-    if (!await pathExists(configPath)) {
-      throw new Error(
-        `Config file not found at "${configPath}". Provide ${
-          runtime === 'node' ? 'packageJson' : 'denoJson'
-        } or run from a directory containing one.`,
-      );
-    }
-
-    const buildInfo = await generateBuildInfo(configPath);
-    buildInfo.debugBuild = true;
-    config.debug = true; // Turn on debug mode only for the active debug-server run
+    const { buildInfo } = await resolveDebugServerConfig(runtime, cwd, options);
+    config.debug = true;
 
     const server = new Server({
       ...(options as unknown as ServerOptions<US>),
       buildInfo,
     });
-
-    let ctx: ReBuildContext | undefined;
-    let watcher: FileWatcher | undefined;
-    let rebuildTimer: SimpleTimer | undefined;
-    let shuttingDown = false;
-    let resolveStopped!: () => void;
-    const stopped = new Promise<void>((resolve) => {
-      resolveStopped = resolve;
-    });
-    let cleanupPromise: Promise<void> | undefined;
-    cleanup = (): Promise<void> => {
-      // Cached promise: cleanup may be called from multiple paths (signal
-      // handler, error handler, onReady stop()) — return the in-flight
-      // promise instead of re-executing.
-      // Single-shot: after this completes no new services should start.
-      // If the lifecycle changes, clear the cache on service creation.
-      if (cleanupPromise) {
-        return cleanupPromise;
-      }
-      shuttingDown = true;
-      cleanupPromise = (async () => {
-        try {
-          watcher?.close();
-          rebuildTimer?.unschedule();
-          try {
-            await server.stop();
-          } finally {
-            ctx?.close();
-          }
-        } finally {
-          resolveStopped();
-        }
-      })();
-      return cleanupPromise;
-    };
-    let signalShutdownStarted = false;
-    const signalHandler = (): void => {
-      // setupSignalHandler does not await async handlers. Keep this callback
-      // synchronous and chain exit after cleanup so shutdown ordering is real.
-      if (signalShutdownStarted) {
-        return;
-      }
-      signalShutdownStarted = true;
-      void cleanup().then(() => {
-        exit(0);
-      }).catch((err) => {
-        log({
-          severity: 'ERROR',
-          error: 'UncaughtServerError',
-          message: `Debug server cleanup failed: ${err}`,
-          trace: err instanceof Error ? err.stack : undefined,
-        });
-        exit(1);
-      });
-    };
-    removeSignalHandlers = setupDebugServerSignalHandlers(signalHandler);
+    resources = createDebugServerLifecycle(server);
 
     log({ severity: 'INFO', message: 'Bundling client code...' });
-    let bundlingStart = performance.now();
-
-    const entryPoints = [
-      {
-        in: resolveBuildEntryPath(
-          path.isFileUrlPath(options.jsPath) || path.isAbsolute(options.jsPath)
-            ? options.jsPath
-            : path.join(getRuntime().getCWD(), options.jsPath),
-        ),
-        out: APP_ENTRY_POINT,
-      },
-    ];
-    const appConfig: AppConfig = {
-      buildDir: options.buildDir,
-      jsPath: options.jsPath,
-      htmlPath: options.htmlPath,
-      cssPath: options.cssPath,
-      assetsPath: options.assetsPath,
-      assetsFilter: options.assetsFilter,
-      denoJson: options.denoJson,
-      packageJson: options.packageJson,
-      minify: options.minify,
-      appName: options.appName,
-    };
-
-    await server.servicesForOrganization(options.orgId || 'localhost');
-
-    if (options.setup) {
-      await options.setup(server);
-    }
-
-    if (options.beforeBuild) {
-      await options.beforeBuild();
-    }
-
-    // createBuildContext is development-only and never minifies;
-    // appConfig.minify is intentionally not forwarded here.
-    ctx = await createBuildContext(
+    const bundlingStart = performance.now();
+    const { entryPoints, appConfig } = buildDebugServerEntryPoints(options);
+    await runDebugServerBuild(
+      resources,
+      server,
       entryPoints,
-      options.esbuildPlugins,
+      appConfig,
+      options,
     );
-    server.updateStaticAssets(
-      await buildAssets(ctx, entryPoints, appConfig),
+    log({
+      severity: 'INFO',
+      message: `Bundling took ${
+        ((performance.now() - bundlingStart) / 1000).toFixed(2)
+      }sec`,
+    });
+    await setupDebugServerWatcher(
+      resources,
+      server,
+      entryPoints,
+      appConfig,
+      options,
     );
-
-    if (options.afterBuild) {
-      await options.afterBuild();
-    }
-
-    await server.start();
-
-    if (options.watchDir) {
-      watcher = await watchDirectory(path.resolve(options.watchDir));
-      rebuildTimer = new SimpleTimer(300, false, async () => {
-        if (shuttingDown) return;
-        log({ severity: 'INFO', message: 'Bundling client code...' });
-        bundlingStart = performance.now();
-        try {
-          const config = getGoatConfig();
-          const version = incrementBuildNumber(config.version);
-
-          if (options.beforeBuild) {
-            await options.beforeBuild();
-          }
-
-          server.updateStaticAssets(
-            await buildAssets(ctx, entryPoints, appConfig),
-          );
-
-          if (options.afterBuild) {
-            await options.afterBuild();
-          }
-
-          config.version = version;
-          log({
-            severity: 'INFO',
-            message: `Bundling took ${
-              ((performance.now() - bundlingStart) / 1000).toFixed(2)
-            }sec`,
-          });
-        } catch (err: unknown) {
-          log({
-            severity: 'WARNING',
-            error: 'BuildFailure',
-            message: 'Build failed. Will try again on next save.',
-          });
-          log({
-            severity: 'WARNING',
-            error: 'BuildFailure',
-            message: err instanceof Error ? err.message : String(err),
-            trace: err instanceof Error ? err.stack : undefined,
-          });
-        }
-      });
-    }
 
     const serverUrl = debugServerOrigin(server, options);
 
@@ -442,65 +522,25 @@ export async function startDebugServer<US extends Schema>(
       await options.onReady({
         server,
         url: serverUrl,
-        stop: cleanup,
+        stop: resources.cleanup,
       });
     }
-    if (options.openBrowser !== false && !shuttingDown) {
+    if (options.openBrowser !== false && !resources.shuttingDown) {
       await openBrowser(serverUrl);
     }
-    if (shuttingDown) {
-      await stopped;
+    if (resources.shuttingDown) {
+      await resources.stopped;
       return;
     }
 
-    log({
-      severity: 'INFO',
-      message: `Bundling took ${
-        ((performance.now() - bundlingStart) / 1000).toFixed(2)
-      }sec`,
-    });
-
-    if (watcher && rebuildTimer) {
-      const filterFunc = options.watchFilter || shouldRebuildAfterPathChange;
-
-      try {
-        await runDebugServerWatchLoop(
-          watcher,
-          cwd,
-          filterFunc,
-          (relativePath) => {
-            log({
-              severity: 'INFO',
-              message: `Detected change at ${relativePath}`,
-            });
-            rebuildTimer.schedule();
-          },
-        );
-      } catch (err) {
-        if (!shuttingDown) {
-          log({
-            severity: 'ERROR',
-            error: 'UncaughtServerError',
-            message:
-              `Debug server file watcher failed for ${options.watchDir}: ${
-                String(err)
-              }`,
-            trace: err instanceof Error ? err.stack : undefined,
-          });
-        }
-        throw err;
-      }
-      if (shuttingDown) {
-        await cleanup();
-        return;
-      }
-      notReached('Debug server file watcher exited unexpectedly.');
+    if (resources.watcher) {
+      await runDebugServerWatcherLoop(resources, cwd, options);
     }
 
     // No watcher configured: wait until a signal or embedded caller stops us.
-    await stopped;
+    await resources.stopped;
   } catch (err) {
-    await cleanup().catch((cleanupErr) => {
+    await resources?.cleanup().catch((cleanupErr) => {
       log({
         severity: 'ERROR',
         error: 'UncaughtServerError',
@@ -511,7 +551,7 @@ export async function startDebugServer<US extends Schema>(
     });
     throw err;
   } finally {
-    removeSignalHandlers();
+    resources?.removeSignalHandlers();
     _debugServerActive = false;
     config.debug = originalDebug;
   }
