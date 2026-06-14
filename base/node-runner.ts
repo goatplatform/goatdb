@@ -1,48 +1,11 @@
-import { resolveBuildEntryPath } from '../build.ts';
+import {
+  type BuildPluginLike,
+  getDenoPlugin,
+  getEsbuild,
+  resolveBuildEntryPath,
+  stopEsbuildWorker,
+} from '../build.ts';
 import { log } from '../logging/log.ts';
-
-// Minimal esbuild Plugin type — avoids static npm import that would trigger
-// @deno/loader WASM initialization in Worker contexts.
-interface EsbuildPlugin {
-  name: string;
-  setup: (build: Record<string, unknown>) => void | Promise<void>;
-}
-
-// Lazy-load build-time dependencies so this module stays safe as a transitive
-// import inside runtime bundles that never call the build path.
-let esbuildModule: typeof import('esbuild') | undefined;
-let denoPluginModule:
-  | typeof import('@deno/esbuild-plugin')
-  | undefined;
-
-async function getEsbuild(): Promise<typeof import('esbuild')> {
-  if (!esbuildModule) {
-    const specifier = 'esbuild';
-    try {
-      esbuildModule = await import(specifier);
-    } catch (cause) {
-      throw new Error(
-        `esbuild is required for GoatDB server compilation but is not installed.\n` +
-          `Install it with: npm install esbuild\n` +
-          `(esbuild is an optional dependency of @goatdb/goatdb; ` +
-          `core DB and server functionality work without it.)\n` +
-          `Original error: ${String(cause)}`,
-        { cause },
-      );
-    }
-  }
-  return esbuildModule!;
-}
-
-async function getDenoPlugin(): Promise<
-  typeof import('@deno/esbuild-plugin').denoPlugin
-> {
-  if (!denoPluginModule) {
-    const specifier = '@deno/esbuild-plugin';
-    denoPluginModule = await import(specifier);
-  }
-  return denoPluginModule!.denoPlugin;
-}
 
 /**
  * Compiles a TypeScript file using esbuild for execution in Node.js and returns the build result.
@@ -64,7 +27,7 @@ export async function compileForNodeWithEsbuild(
         out: outName,
       },
     ],
-    plugins: [denoPlugin() as unknown as EsbuildPlugin],
+    plugins: [denoPlugin() as unknown as BuildPluginLike],
     outfile: outName,
     bundle: true,
     platform: 'node',
@@ -257,7 +220,10 @@ export async function nodeRun(
     };
   } finally {
     if (killTimer !== undefined) clearTimeout(killTimer);
-    await esbuildModule?.stop();
-    // Keep the cache alive for subsequent calls.
+    // WHY: Only stop esbuild's worker between cycles — do NOT clear the shared
+    // import cache (stopBackgroundCompiler) since other compilation callers in
+    // the same process may need it. The cache is cleared naturally when the
+    // top-level CLI command finishes.
+    await stopEsbuildWorker();
   }
 }

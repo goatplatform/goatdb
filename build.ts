@@ -250,6 +250,20 @@ export function adapterStubPlugin(
   };
 }
 
+/**
+ * Stops the esbuild background worker WITHOUT clearing the import cache.
+ * Use this when you only need to release the esbuild worker between
+ * compilation cycles but expect to compile again — avoids the cost and
+ * the shared-state side effects of a full {@link stopBackgroundCompiler}
+ * teardown.
+ */
+export async function stopEsbuildWorker(): Promise<void> {
+  if (esbuildImportState.promise) {
+    const mod = await esbuildImportState.promise;
+    await mod.stop();
+  }
+}
+
 export async function stopBackgroundCompiler(): Promise<void> {
   const esbuildPromise = resetImportState(esbuildImportState);
   // denoPlugin cleanup is fire-and-forget: @deno/esbuild-plugin has no destructor
