@@ -4820,6 +4820,62 @@ export function setupCliCompileDenoTests(): void {
 
   TEST(
     'CLI-Compile',
+    'compileForNodeWithEsbuild + nodeRun supports sequential compile-and-run cycles',
+    async (ctx: TestSuite) => {
+      const { compileForNodeWithEsbuild, nodeRun } = await import(
+        '../base/node-runner.ts'
+      );
+      const dir = await ctx.tempDir('node-runner-repeatable-cleanup');
+      const entryPath = path.join(dir, 'entry.ts');
+      const helperPath = path.join(dir, 'helper.ts');
+      try {
+        await writeTextFile(helperPath, 'export const value = 1;\n');
+        await writeTextFile(
+          entryPath,
+          [
+            'import { assertEquals } from "jsr:@std/assert";',
+            'import { value } from "./helper.ts";',
+            'assertEquals(value, 1);',
+          ].join('\n'),
+        );
+
+        const first = await compileForNodeWithEsbuild(
+          path.toFileUrl(entryPath).href,
+          'output-1',
+        );
+        const firstRun = await nodeRun(first);
+        assertTrue(
+          firstRun.success,
+          `first compiled bundle must execute successfully in Node.js: ${firstRun.stderrText}`,
+        );
+
+        await writeTextFile(helperPath, 'export const value = 2;\n');
+        await writeTextFile(
+          entryPath,
+          [
+            'import { assertEquals } from "jsr:@std/assert";',
+            'import { value } from "./helper.ts";',
+            'assertEquals(value, 2);',
+          ].join('\n'),
+        );
+
+        const second = await compileForNodeWithEsbuild(
+          path.toFileUrl(entryPath).href,
+          'output-2',
+        );
+        const secondRun = await nodeRun(second);
+        assertTrue(
+          secondRun.success,
+          `second compiled bundle must execute successfully after cleanup: ${secondRun.stderrText}`,
+        );
+      } finally {
+        await stopBackgroundCompiler();
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
     'runAcrossPlatforms surfaces Node.js stderr details on failure',
     async (ctx: TestSuite) => {
       const dir = await ctx.tempDir('node-runner-surface-stderr');
