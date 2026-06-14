@@ -24,7 +24,7 @@ import {
   readTextFile,
   writeTextFile,
 } from '../base/json-log/file-impl.ts';
-import { getEnvVar } from '../base/os.ts';
+import { getEnvVar, normalizeNodePlatform } from '../base/os.ts';
 import { sleep } from '../base/time.ts';
 import { getGoatConfig } from '../base/config.ts';
 import {
@@ -67,7 +67,8 @@ import {
   withTestOpenBrowser,
   withTestRuntimeId,
 } from '../base/runtime/index.ts';
-import { cli, type CliOptions } from '../base/development.ts';
+import { cli, type CliOptions, copyToClipboard } from '../base/development.ts';
+import { generateBuildInfo } from '../base/build-info.ts';
 import { runAcrossPlatforms } from '../base/multi-runner.ts';
 import { createTestDomainConfig } from './merge-test-utils.ts';
 import { withLogCapture } from './test-utils.ts';
@@ -550,6 +551,118 @@ export default function setupCliCompileTests() {
         });
       } finally {
         await stopBackgroundCompiler();
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'cli rejects browser runtime before spawning a process',
+    async () => {
+      await withTestRuntimeId('browser', async () => {
+        await assertThrows(
+          async () => {
+            await cli('node', '--version');
+          },
+          Error,
+          'CLI execution not supported in browser environment',
+        );
+      });
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'copyToClipboard returns false outside Deno runtime',
+    async () => {
+      await withTestRuntimeId('browser', async () => {
+        assertFalse(
+          await copyToClipboard('test'),
+          'copyToClipboard must be a no-op outside Deno runtime',
+        );
+      });
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'copyToClipboard returns false under node runtime override',
+    async () => {
+      await withTestRuntimeId('node', async () => {
+        assertFalse(
+          await copyToClipboard('test'),
+          'copyToClipboard must stay disabled when the effective runtime is node',
+        );
+      });
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'generateBuildInfo uses browser fallback under runtime override',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('build-info-browser-runtime');
+      const configPath = path.join(dir, 'package.json');
+      await writeTextFile(
+        configPath,
+        JSON.stringify({ name: 'browser-app', version: '1.2.3' }),
+      );
+
+      await withTestRuntimeId('browser', async () => {
+        const info = await generateBuildInfo(configPath);
+        assertEquals(info.createdBy, 'unknown');
+        assertEquals(info.appName, 'browser-app');
+        assertEquals(info.appVersion, '1.2.3');
+        assertEquals(info.builder.runtime, 'browser');
+        assertEquals(info.builder.target, 'browser');
+        assertEquals(info.builder.arch, 'unknown');
+        assertEquals(info.builder.os, 'browser');
+        assertEquals(info.builder.vendor, 'browser');
+        assertEquals(info.builder.env, null);
+      });
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'generateBuildInfo reports active server runtime builder details',
+    async (ctx: TestSuite) => {
+      const runtime = getEffectiveRuntimeId();
+      const dir = await ctx.tempDir('build-info-active-runtime');
+      const configPath = path.join(
+        dir,
+        runtime === 'node' ? 'package.json' : 'deno.json',
+      );
+      await writeTextFile(
+        configPath,
+        JSON.stringify({ name: 'active-runtime-app', version: '7.8.9' }),
+      );
+
+      const info = await generateBuildInfo(configPath);
+      assertEquals(info.appName, 'active-runtime-app');
+      assertEquals(info.appVersion, '7.8.9');
+      assertTrue(
+        info.creationDate.length > 0,
+        'creationDate must be populated',
+      );
+      assertTrue(info.createdBy.length > 0, 'createdBy must be populated');
+      assertEquals(info.builder.runtime, runtime);
+      if (runtime === 'node') {
+        const process = await import('node:process');
+        assertEquals(
+          info.builder.target,
+          `${normalizeNodePlatform(process.platform)}-${process.arch}`,
+        );
+        assertEquals(info.builder.arch, process.arch);
+        assertEquals(info.builder.os, normalizeNodePlatform(process.platform));
+        assertEquals(info.builder.vendor, 'node');
+        assertEquals(info.builder.env, null);
+      } else {
+        assertEquals(info.builder.target, Deno.build.target);
+        assertEquals(info.builder.arch, Deno.build.arch);
+        assertEquals(info.builder.os, Deno.build.os);
+        assertEquals(info.builder.vendor, Deno.build.vendor);
+        assertEquals(info.builder.env, Deno.build.env ?? null);
       }
     },
   );
@@ -4715,6 +4828,58 @@ export function setupCliCompileNodeTests(): void {
  * Gated at test-registry.ts level.
  */
 export function setupCliCompileDenoTests(): void {
+  TEST(
+    'CLI-Compile',
+    'cli honors node runtime override on Deno host',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('cli-node-runtime-override');
+      const scriptPath = path.join(dir, 'script.js');
+      await writeTextFile(scriptPath, 'console.log("node-override")');
+
+      await withTestRuntimeId('node', async () => {
+        const { result, exitCode } = await cli('node', scriptPath);
+        assertEquals(exitCode, 0);
+        assertEquals(result.trim(), 'node-override');
+      });
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'generateBuildInfo honors node runtime override on Deno host',
+    async (ctx: TestSuite) => {
+      const process = await import('node:process');
+      const dir = await ctx.tempDir('build-info-node-runtime');
+      const configPath = path.join(dir, 'package.json');
+      await writeTextFile(
+        configPath,
+        JSON.stringify({ name: 'node-app', version: '4.5.6' }),
+      );
+
+      await withTestRuntimeId('node', async () => {
+        const info = await generateBuildInfo(configPath);
+        assertEquals(info.appName, 'node-app');
+        assertEquals(info.appVersion, '4.5.6');
+        assertTrue(
+          info.createdBy.length > 0,
+          'node override must still populate createdBy on Deno host',
+        );
+        assertEquals(info.builder.runtime, 'node');
+        assertEquals(info.builder.arch, process.arch);
+        assertEquals(
+          info.builder.os,
+          normalizeNodePlatform(process.platform),
+        );
+        assertEquals(
+          info.builder.target,
+          `${normalizeNodePlatform(process.platform)}-${process.arch}`,
+        );
+        assertEquals(info.builder.vendor, 'node');
+        assertEquals(info.builder.env, null);
+      });
+    },
+  );
+
   TEST(
     'CLI-Compile',
     DENO_ONLY_FILTER_TEST,
