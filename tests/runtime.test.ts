@@ -247,7 +247,7 @@ export default function setupRuntimeTests(): void {
     });
   });
 
-  TEST('Runtime', 'browserOpenCommand rejects unsafe or malformed URLs', () => {
+  TEST('Runtime', 'isBrowserOpenUrl rejects unsafe or malformed URLs', () => {
     assertEquals(
       isBrowserOpenUrl('javascript:alert(1)'),
       false,
@@ -256,7 +256,7 @@ export default function setupRuntimeTests(): void {
     assertEquals(
       browserOpenCommand('darwin', 'javascript:alert(1)'),
       undefined,
-      'javascript: URLs must be rejected',
+      'browserOpenCommand must fail closed for javascript: URLs',
     );
     assertEquals(
       isBrowserOpenUrl('file:///etc/passwd'),
@@ -266,7 +266,7 @@ export default function setupRuntimeTests(): void {
     assertEquals(
       browserOpenCommand('linux', 'file:///etc/passwd'),
       undefined,
-      'file: URLs must be rejected',
+      'browserOpenCommand must fail closed for file: URLs',
     );
     assertEquals(
       isBrowserOpenUrl('data:text/html,<script>'),
@@ -276,13 +276,13 @@ export default function setupRuntimeTests(): void {
     assertEquals(
       browserOpenCommand('windows', 'data:text/html,<script>'),
       undefined,
-      'data: URLs must be rejected',
+      'browserOpenCommand must fail closed for data: URLs',
     );
     assertEquals(isBrowserOpenUrl(''), false, 'empty URL must be rejected');
     assertEquals(
       browserOpenCommand('darwin', ''),
       undefined,
-      'empty URL must be rejected',
+      'browserOpenCommand must fail closed for empty URLs',
     );
     assertEquals(
       isBrowserOpenUrl('https://'),
@@ -292,7 +292,7 @@ export default function setupRuntimeTests(): void {
     assertEquals(
       browserOpenCommand('linux', 'https://'),
       undefined,
-      'URLs without a host must be rejected',
+      'browserOpenCommand must fail closed for hostless URLs',
     );
     assertEquals(
       isBrowserOpenUrl(' https://example.com'),
@@ -302,7 +302,7 @@ export default function setupRuntimeTests(): void {
     assertEquals(
       browserOpenCommand('windows', ' https://example.com'),
       undefined,
-      'leading whitespace must be rejected instead of trimmed',
+      'browserOpenCommand must fail closed for whitespace-tainted URLs',
     );
     assertEquals(
       isBrowserOpenUrl('https://exa\nmple.com'),
@@ -312,7 +312,7 @@ export default function setupRuntimeTests(): void {
     assertEquals(
       browserOpenCommand('darwin', 'https://exa\nmple.com'),
       undefined,
-      'control characters must be rejected',
+      'browserOpenCommand must fail closed for control-character URLs',
     );
   });
 

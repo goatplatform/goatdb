@@ -78,8 +78,8 @@ export function browserOpenCommand(
   os: OperatingSystem,
   url: string,
 ): { cmd: string; args: string[] } | undefined {
-  // Only http/https URLs are safe to open via OS launchers.
-  // Reject file:, javascript:, data:, etc. to prevent misuse.
+  // Keep validation here too as defense-in-depth: adapters validate and log,
+  // but direct callers of this exported helper must still fail closed.
   if (!isBrowserOpenUrl(url)) {
     return undefined;
   }
