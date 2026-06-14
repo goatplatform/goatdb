@@ -194,6 +194,19 @@ async function withTestOverride<T, V>(
 
 /**
  * @internal Test-only scoped override for the effective runtime ID.
+ *
+ * IMPORTANT: This override only affects code that calls
+ * `getEffectiveRuntimeId()`. Code that directly accesses platform globals
+ * (`Deno.*`, `process.*`, `navigator.*`) will still use the host runtime's
+ * actual globals. Tests that override to 'deno' on a Node host (or vice
+ * versa) will crash if the code path touches those globals.
+ *
+ * Safe patterns:
+ * - `withTestRuntimeId('browser', ...)` — browser branches use literals
+ * - `withTestRuntimeId('node', ...)` on Deno — Deno provides Node compat
+ *
+ * Unsafe pattern:
+ * - `withTestRuntimeId('deno', ...)` on Node — `Deno.*` globals don't exist
  */
 export function withTestRuntimeId<T>(
   id: string,
