@@ -4901,24 +4901,27 @@ export function setupCliCompileDenoTests(): void {
 
   TEST(
     'CLI-Compile',
-    'nodeRun returns timeout failure after child teardown settles',
+    'nodeRun timeout cleanup does not poison a later compile-and-run cycle',
     async (ctx: TestSuite) => {
       const { compileForNodeWithEsbuild, nodeRun } = await import(
         '../base/node-runner.ts'
       );
       const dir = await ctx.tempDir('node-runner-timeout');
       const entryPath = path.join(dir, 'entry.ts');
-      await writeTextFile(entryPath, 'setInterval(() => {}, 1000);\n');
-      const result = await compileForNodeWithEsbuild(entryPath, 'output');
-      const originalSetTimeout = globalThis.setTimeout;
       try {
-        globalThis.setTimeout = ((handler, timeout, ...args) =>
-          originalSetTimeout(
-            handler,
-            typeof timeout === 'number' && timeout > 100 ? 20 : timeout,
-            ...args,
-          )) as typeof setTimeout;
-        const nodeResult = await nodeRun(result);
+        await writeTextFile(
+          entryPath,
+          [
+            'import { assertEquals } from "jsr:@std/assert";',
+            'assertEquals(1, 1);',
+            'setInterval(() => {}, 1000);',
+          ].join('\n'),
+        );
+        const result = await compileForNodeWithEsbuild(
+          path.toFileUrl(entryPath).href,
+          'output-timeout',
+        );
+        const nodeResult = await nodeRun(result, undefined, undefined, 20);
         assertFalse(nodeResult.success, 'timed out node run must fail');
         assertEquals(
           nodeResult.exitCode,
@@ -4926,11 +4929,28 @@ export function setupCliCompileDenoTests(): void {
           'timeout returns wrapper failure',
         );
         assertTrue(
-          nodeResult.stderrText.includes('Timed out after 300000ms'),
-          `timeout error should be surfaced, got: ${nodeResult.stderrText}`,
+          /^Timed out after \d+ms/.test(nodeResult.stderrText),
+          `timeout error should be surfaced with the generic prefix, got: ${nodeResult.stderrText}`,
+        );
+
+        await writeTextFile(
+          entryPath,
+          [
+            'import { assertEquals } from "jsr:@std/assert";',
+            'assertEquals(2, 2);',
+          ].join('\n'),
+        );
+        const recovery = await compileForNodeWithEsbuild(
+          path.toFileUrl(entryPath).href,
+          'output-recovery',
+        );
+        const recoveryRun = await nodeRun(recovery);
+        assertTrue(
+          recoveryRun.success,
+          `compile-and-run after timeout must still succeed: ${recoveryRun.stderrText}`,
         );
       } finally {
-        globalThis.setTimeout = originalSetTimeout;
+        await stopBackgroundCompiler();
       }
     },
   );
