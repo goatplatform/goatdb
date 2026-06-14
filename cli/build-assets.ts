@@ -159,8 +159,7 @@ export async function buildAssets(
     const esbuild = await getEsbuild();
 
     // Build options for client-side code (always browser target)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const buildOptions: any = {
+    const buildOptions: import('esbuild').BuildOptions = {
       entryPoints: entryPoints.map((ep) => ({
         ...ep,
         in: resolveBuildEntryPath(ep.in),
