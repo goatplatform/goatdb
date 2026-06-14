@@ -2320,6 +2320,87 @@ export default function setupCliCompileTests() {
 
   TEST(
     'CLI-Compile',
+    'compile discovers the default runtime config from the effective cwd',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('compile-effective-cwd-config');
+      const runtime = getRuntime();
+      const serverEntry = path.join(dir, 'server.ts');
+      const clientEntry = path.join(dir, 'client.ts');
+      const expectedConfigPath = path.join(
+        dir,
+        runtime.id === 'node' ? 'package.json' : 'deno.json',
+      );
+      await writeTextFile(serverEntry, 'export {};\n');
+      await writeTextFile(clientEntry, 'export {};\n');
+
+      try {
+        await withTestCWD(dir, async () => {
+          await assertThrows(
+            async () => {
+              await compile({
+                buildDir: path.join(dir, 'build'),
+                serverEntry,
+                jsPath: clientEntry,
+              });
+            },
+            Error,
+            `Config file not found at "${expectedConfigPath}"`,
+          );
+        });
+      } finally {
+        await stopBackgroundCompiler();
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'compile uses the default runtime config from the effective cwd when it exists',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('compile-effective-cwd-config-success');
+      const runtime = getRuntime();
+      const buildDir = path.join(dir, 'build');
+      const serverEntry = path.join(dir, 'server.ts');
+      const clientEntry = path.join(dir, 'client.ts');
+      const outputName = 'cwd-config-app';
+      const configPath = path.join(
+        dir,
+        runtime.id === 'node' ? 'package.json' : 'deno.json',
+      );
+      const outputFile = runtime.id === 'node'
+        ? path.join(
+          buildDir,
+          runtime.getOS() === 'windows' ? `${outputName}.exe` : outputName,
+        )
+        : path.join(buildDir, `${outputName}-${targetFromOSArch()}`);
+      await writeTextFile(serverEntry, 'export {};\n');
+      await writeTextFile(clientEntry, 'export {};\n');
+      await writeTextFile(
+        configPath,
+        JSON.stringify({ name: 'cwd-config-app', version: '1.2.3' }),
+      );
+
+      try {
+        await withTestCWD(dir, async () => {
+          await compile({
+            buildDir,
+            serverEntry,
+            jsPath: clientEntry,
+            outputName,
+          });
+        });
+        assertTrue(
+          await pathExists(outputFile),
+          `compile() must succeed using the default runtime config from the effective cwd and produce ${outputFile}`,
+        );
+      } finally {
+        await stopBackgroundCompiler();
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
     'package.json declares runtime build/watch deps as optional for exported server/build APIs',
     async () => {
       const pkgText = await readTextFile('package.json');
