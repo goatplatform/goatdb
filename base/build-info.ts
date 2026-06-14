@@ -1,4 +1,4 @@
-import { isDeno, isNode } from './common.ts';
+import { getEffectiveRuntimeId } from './runtime/index.ts';
 import { cli } from './development.ts';
 import { readTextFile } from './json-log/file-impl.ts';
 import { isWindows, normalizeNodePlatform } from './os.ts';
@@ -53,7 +53,8 @@ export interface BuildInfo extends JSONObject {
 }
 
 async function getCurrentUsername(): Promise<string> {
-  if (isDeno()) {
+  const runtime = getEffectiveRuntimeId();
+  if (runtime === 'deno') {
     if (isWindows()) {
       const username = Deno.env.get('USERNAME');
       if (username) return username;
@@ -63,7 +64,7 @@ async function getCurrentUsername(): Promise<string> {
     }
     const { result, exitCode } = await cli('whoami', { timeout: 10_000 });
     return exitCode === 0 ? result.trim() : 'unknown';
-  } else if (isNode()) {
+  } else if (runtime === 'node') {
     try {
       const os = await import('node:os');
       const username = os.userInfo().username;
@@ -99,8 +100,9 @@ export async function generateBuildInfo(
   info.creationDate = new Date().toISOString();
   // Created by
   info.createdBy = await getCurrentUsername();
+  const runtime = getEffectiveRuntimeId();
   // Builder info from current environment
-  if (isDeno()) {
+  if (runtime === 'deno') {
     info.builder = {
       runtime: 'deno',
       target: Deno.build.target,
@@ -109,7 +111,7 @@ export async function generateBuildInfo(
       vendor: Deno.build.vendor,
       env: Deno.build.env ?? null,
     };
-  } else if (isNode()) {
+  } else if (runtime === 'node') {
     info.builder = {
       runtime: 'node',
       target: `${normalizeNodePlatform(process.platform)}-${process.arch}`,
