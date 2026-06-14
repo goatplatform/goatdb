@@ -11,9 +11,9 @@ import {
 import type { AppConfig } from './app-config.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { buildAssets, type BuildAssetsOptions } from './build-assets.ts';
-import { generateBuildInfo } from '../base/build-info.ts';
 import { staticAssetsToJS } from '../system-assets/system-assets.ts';
-import { getRuntime } from '../base/runtime/index.ts';
+import { getEffectiveCWD, getRuntime } from '../base/runtime/index.ts';
+import { resolveRuntimeBuildInfo } from './runtime-build-info.ts';
 import type { OperatingSystem } from '../base/os.ts';
 import { cli } from '../base/development.ts';
 import { pathExists } from '../base/json-log/file-impl.ts';
@@ -237,18 +237,11 @@ async function bundleClientAssets(
     ),
   );
 
-  const configPath = runtime === 'node'
-    ? (options.packageJson || path.join(getRuntime().getCWD(), 'package.json'))
-    : (options.denoJson || path.join(getRuntime().getCWD(), 'deno.json'));
-  if (!await pathExists(configPath)) {
-    throw new Error(
-      `Config file not found at "${configPath}". ` +
-        `Provide ${
-          runtime === 'node' ? 'packageJson' : 'denoJson'
-        } or run from a directory containing one.`,
-    );
-  }
-  const buildInfo = await generateBuildInfo(configPath);
+  const buildInfo = await resolveRuntimeBuildInfo(
+    runtime ?? 'deno',
+    getEffectiveCWD(),
+    options,
+  );
 
   log({
     severity: 'INFO',
