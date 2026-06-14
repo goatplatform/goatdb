@@ -148,11 +148,16 @@ const kCssSourceMapDirectiveCommentPattern =
 function outputPathForFile(filePath: string): string {
   const normalizedPath = filePath.replaceAll('\\', '/');
   const parts = normalizedPath.split('/');
+  // sharedClientBuildOptions fixes esbuild outdir to 'output', so every
+  // emitted path must contain that segment before the relative asset path.
   const outputIndex = parts.lastIndexOf('output');
-  if (outputIndex >= 0 && outputIndex + 1 < parts.length) {
-    return parts.slice(outputIndex + 1).join('/');
+  if (outputIndex < 0 || outputIndex + 1 >= parts.length) {
+    throw new Error(
+      `Unexpected esbuild output path "${filePath}". ` +
+        'Expected a path under the configured outdir "output".',
+    );
   }
-  return path.basename(normalizedPath);
+  return parts.slice(outputIndex + 1).join('/');
 }
 
 function bundleKeyForFile(filePath: string): string {

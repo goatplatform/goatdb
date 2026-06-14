@@ -1,5 +1,5 @@
 import { TEST } from './mod.ts';
-import { assertEquals } from './asserts.ts';
+import { assertEquals, assertThrows } from './asserts.ts';
 import * as path from '../base/path.ts';
 import {
   bundleResultFromBuildResult,
@@ -203,6 +203,46 @@ export default function setupBuildTests(): void {
       assertEquals(result.bundles.app.source, 'console.log("app")');
       assertEquals(result.bundles.app.map, '{"version":3}');
       assertEquals(Array.from(result.assets['/assets/font.woff2']), [1, 2, 3]);
+    },
+  );
+
+  TEST(
+    'Build',
+    'bundleResultFromBuildResult fails loudly when esbuild output escapes the configured outdir',
+    () => {
+      assertThrows(
+        () => {
+          bundleResultFromBuildResult({
+            outputFiles: [{
+              path: '/tmp/esbuild/app.js',
+              text: 'console.log("app")',
+              contents: new TextEncoder().encode('console.log("app")'),
+            }],
+          });
+        },
+        Error,
+        'Expected a path under the configured outdir "output".',
+      );
+    },
+  );
+
+  TEST(
+    'Build',
+    'bundleResultFromBuildResult fails when esbuild output path ends at the outdir segment',
+    () => {
+      assertThrows(
+        () => {
+          bundleResultFromBuildResult({
+            outputFiles: [{
+              path: '/tmp/output',
+              text: '',
+              contents: new Uint8Array(),
+            }],
+          });
+        },
+        Error,
+        'Expected a path under the configured outdir "output".',
+      );
     },
   );
 }
