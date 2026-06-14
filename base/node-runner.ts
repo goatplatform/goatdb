@@ -134,12 +134,14 @@ async function forwardAndCaptureStream(
  * @param result - The esbuild BuildResult (output of compileForNodeWithEsbuild)
  * @param inspectBrk - Optional flag to enable Node.js inspector with break on start
  * @param env - Optional environment variables to set for the Node.js process
+ * @param timeoutMs - Optional override used by tests to keep timeout contracts fast
  * @returns Structured execution result including exit status and captured stderr text
  */
 export async function nodeRun(
   result: Awaited<ReturnType<typeof compileForNodeWithEsbuild>>,
   inspectBrk?: boolean,
   env?: Record<string, string>,
+  timeoutMs = NODE_RUN_TIMEOUT_MS,
 ): Promise<NodeRunResult> {
   let nodeProcess: Deno.ChildProcess | undefined;
   let stderrPromise: Promise<string> | undefined;
@@ -174,7 +176,7 @@ export async function nodeRun(
     // on to later tests; wait for process teardown before returning failure.
     const status = await raceWithTimeout(
       nodeProcess.status,
-      NODE_RUN_TIMEOUT_MS,
+      timeoutMs,
       () => {
         didTimeout = true;
         log({
