@@ -1,5 +1,5 @@
-import { isDeno, isNode } from './common.ts';
 import { isWindows } from './os.ts';
+import { getEffectiveRuntimeId } from './runtime/index.ts';
 import { log } from '../logging/log.ts';
 
 // Minimal type for objects with a toString method (used in Node.js streams)
@@ -9,7 +9,7 @@ type Stringable = { toString(): string };
 let childProcessModule: any = undefined;
 
 export async function copyToClipboard(value: string): Promise<boolean> {
-  if (!isDeno()) return false;
+  if (getEffectiveRuntimeId() !== 'deno') return false;
   try {
     if (Deno.build.os === 'darwin') {
       const process = new Deno.Command('pbcopy', {
@@ -87,7 +87,8 @@ export async function cli(
     cmdArgs = args as string[];
   }
 
-  if (isDeno()) {
+  const runtime = getEffectiveRuntimeId();
+  if (runtime === 'deno') {
     const ac = options.timeout ? new AbortController() : undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     if (ac && options.timeout) {
@@ -138,7 +139,7 @@ export async function cli(
     } finally {
       if (timer !== undefined) clearTimeout(timer);
     }
-  } else if (isNode()) {
+  } else if (runtime === 'node') {
     // Node.js environment - lazy load child_process module
     if (!childProcessModule) {
       childProcessModule = await import('node:child_process');
