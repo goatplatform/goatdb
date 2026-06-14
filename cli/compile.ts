@@ -287,9 +287,12 @@ async function compileDeno(options: CompileOptions): Promise<string> {
   await Deno.mkdir(buildDir, { recursive: true });
   const assetsJsonPath = path.join(buildDir, 'staticAssets.json');
   const buildInfoJsonPath = path.join(buildDir, 'buildInfo.json');
+  // deno compile automatically appends .exe on Windows targets.
+  // Match that convention so the returned path is what deno compile produces.
+  const execExt = targetOsArch.startsWith('windows') ? '.exe' : '';
   const outputFile = path.join(
     buildDir,
-    `${options.outputName || 'app'}-${targetOsArch}`,
+    `${options.outputName || 'app'}-${targetOsArch}${execExt}`,
   );
   let success = false;
   try {

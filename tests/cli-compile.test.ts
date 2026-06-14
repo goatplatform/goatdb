@@ -141,6 +141,25 @@ import {
 
 const kDebugServerReadyTimeoutMs = 15_000;
 
+function compiledBinaryPath(
+  runtime: ReturnType<typeof getRuntime>,
+  buildDir: string,
+  outputName: string,
+  target: {
+    os?: Parameters<typeof targetFromOSArch>[0];
+    arch?: Parameters<typeof targetFromOSArch>[1];
+  } = {},
+): string {
+  if (runtime.id === 'node') {
+    const execExt = (target.os ?? runtime.getOS()) === 'windows' ? '.exe' : '';
+    return path.join(buildDir, `${outputName}${execExt}`);
+  }
+
+  const targetOsArch = targetFromOSArch(target.os, target.arch);
+  const execExt = targetOsArch.startsWith('windows') ? '.exe' : '';
+  return path.join(buildDir, `${outputName}-${targetOsArch}${execExt}`);
+}
+
 function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
@@ -2367,12 +2386,7 @@ export default function setupCliCompileTests() {
         dir,
         runtime.id === 'node' ? 'package.json' : 'deno.json',
       );
-      const outputFile = runtime.id === 'node'
-        ? path.join(
-          buildDir,
-          runtime.getOS() === 'windows' ? `${outputName}.exe` : outputName,
-        )
-        : path.join(buildDir, `${outputName}-${targetFromOSArch()}`);
+      const outputFile = compiledBinaryPath(runtime, buildDir, outputName);
       await writeTextFile(serverEntry, 'export {};\n');
       await writeTextFile(clientEntry, 'export {};\n');
       await writeTextFile(
@@ -4215,16 +4229,11 @@ src: url('./goat-font.woff2') format('woff2');
       });
 
       // 4. Verify binary exists
-      const osName = runtime.getOS();
-
-      let binaryName: string;
-      if (runtime.id === 'deno') {
-        binaryName = `test-app-${targetFromOSArch()}`;
-      } else {
-        binaryName = osName === 'windows' ? 'test-app.exe' : 'test-app';
-      }
-
-      const binaryPath = path.join(testDir, 'build', binaryName);
+      const binaryPath = compiledBinaryPath(
+        runtime,
+        path.join(testDir, 'build'),
+        'test-app',
+      );
       assertTrue(
         await pathExists(binaryPath),
         `Binary should exist at ${binaryPath}`,
@@ -4909,6 +4918,48 @@ export function setupCliCompileNodeTests(): void {
  * Gated at test-registry.ts level.
  */
 export function setupCliCompileDenoTests(): void {
+  TEST(
+    'CLI-Compile',
+    'compile names Windows Deno targets with .exe from the requested target',
+    async (ctx: TestSuite) => {
+      const runtime = getRuntime();
+      const dir = await ctx.tempDir('compile-deno-windows-target-name');
+      const buildDir = path.join(dir, 'build');
+      const outputName = 'targeted-win-app';
+      const outputFile = compiledBinaryPath(runtime, buildDir, outputName, {
+        os: 'windows',
+        arch: 'x64',
+      });
+      const serverEntry = path.join(dir, 'server.ts');
+      const clientEntry = path.join(dir, 'client.ts');
+      const denoJson = path.join(dir, 'deno.json');
+      await writeTextFile(serverEntry, 'export {};\n');
+      await writeTextFile(clientEntry, 'export {};\n');
+      await writeTextFile(
+        denoJson,
+        JSON.stringify({ name: outputName, version: '1.2.3' }),
+      );
+
+      try {
+        await compile({
+          buildDir,
+          serverEntry,
+          jsPath: clientEntry,
+          outputName,
+          os: 'windows',
+          arch: 'x64',
+          denoJson,
+        });
+        assertTrue(
+          await pathExists(outputFile),
+          `compile() must name explicit Windows Deno targets with a .exe suffix: ${outputFile}`,
+        );
+      } finally {
+        await stopBackgroundCompiler();
+      }
+    },
+  );
+
   TEST(
     'CLI-Compile',
     'cli honors node runtime override on Deno host',
