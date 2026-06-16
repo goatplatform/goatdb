@@ -11,7 +11,7 @@
  * here.
  */
 
-import { isBrowser } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import type { BrowserStructuredNoMatchResult } from '../base/runtime-filter.ts';
 import { EXIT_CODE_NO_MATCH, NoMatchError } from '../base/test-runner-error.ts';
 import { TestsRunner, type TestSummary } from './mod.ts';
@@ -35,7 +35,10 @@ import setupJsonLogFormats from './json-log-formats.test.ts';
 import setupCommit from './commit.test.ts';
 import setupSession from './session.test.ts';
 import setupTrusted from './db-trusted.test.ts';
-import setupGoatRequest from './goat-request.test.ts';
+import setupBrowserRunnerTests from './browser-runner.test.ts';
+import setupGoatHeadersTests, {
+  setupGoatRequestWebTests,
+} from './goat-request.test.ts';
 import setupStaticAssetsEndpoint from './static-assets-endpoint.test.ts';
 import setupHealthCheckEndpoint from './health-check-endpoint.test.ts';
 import setupLiveQuery from './live-query.test.ts';
@@ -64,18 +67,19 @@ class TestConsoleLogStream implements LogStream {
  */
 export function registerBrowserTests(): void {
   // Install custom log stream to filter out metrics in browser tests
-  if (isBrowser()) {
+  if (getRuntime().id === 'browser') {
     setGlobalLoggerStreams([new TestConsoleLogStream()]);
   }
 
-  // Same test execution order as existing tests-entry.ts
-  // but excluding server-only tests
+  // Same test execution order as test-registry.ts,
+  // but excluding server-only tests.
 
   // FAST UNIT TESTS (0-1ms each) - Pure logic, no I/O
   setupAssertsTests(); // Assertion utility correctness
   setupOrderstamp(); // Utility functions for distributed timestamps
   setupItemPath(); // Path validation and parsing logic
   setupRuntimeTests(); // Runtime abstraction layer invariants
+  setupBrowserRunnerTests(); // Pure browser logging helpers
   setupHealthCheckEndpoint(); // Simple HTTP endpoint check
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
@@ -83,7 +87,8 @@ export function registerBrowserTests(): void {
   setupJsonLogFormats(); // GOAT binary/JSONL storage format roundtrip and edge cases
   setupCommit(); // Core commit/versioning logic
   setupSession(); // Authentication and session management
-  setupGoatRequest(); // HTTP request processing
+  setupGoatHeadersTests(); // Shared header abstraction contracts
+  setupGoatRequestWebTests(); // HTTP request processing over native Request
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
   setupLiveQuery(); // Live query membership updates on ManagedItem edits
@@ -152,7 +157,7 @@ async function main(): Promise<void> {
   // Print summary (will be captured by browser automation)
   TestsRunner.printSummary(summary);
 
-  if (isBrowser()) {
+  if (getRuntime().id === 'browser') {
     // Mark summary as completed for browser automation
     (summary as any).completed = true;
 
@@ -169,7 +174,7 @@ async function main(): Promise<void> {
 }
 
 // Auto-run when used as entry point or in browser
-if (isBrowser()) {
+if (getRuntime().id === 'browser') {
   void main();
 } else {
   notReached('Tests entry point should only be used in browser environment');

@@ -2,19 +2,17 @@
  * Tests for the FileImpl abstraction layer.
  *
  * Verifies that file operations (open, read, write, seek, truncate, remove,
- * copy, mkdir) work correctly on both Deno and Node.js runtimes.
- * Browser (OPFS) has separate coverage and is skipped here.
+ * copy, mkdir) work correctly across the server runtimes that back FileImpl
+ * with filesystem APIs.
  */
 
 import { TEST } from './mod.ts';
 import { assertEquals, assertTrue } from './asserts.ts';
 import * as path from '../base/path.ts';
 import { FileImplGet, readFile } from '../base/json-log/file-impl.ts';
-import { isBrowser } from '../base/common.ts';
 
 export default function setupFileImplTests() {
   TEST('FileImpl', 'open write read round-trip', async (ctx) => {
-    if (isBrowser()) return;
     const dir = await ctx.tempDir('file-impl-roundtrip');
     const impl = await FileImplGet();
     const filePath = path.join(dir, 'test.bin');
@@ -42,7 +40,6 @@ export default function setupFileImplTests() {
   });
 
   TEST('FileImpl', 'seek from end returns file size', async (ctx) => {
-    if (isBrowser()) return;
     const dir = await ctx.tempDir('file-impl-seek-end');
     const impl = await FileImplGet();
     const filePath = path.join(dir, 'test.bin');
@@ -58,7 +55,6 @@ export default function setupFileImplTests() {
   });
 
   TEST('FileImpl', 'truncate shortens file', async (ctx) => {
-    if (isBrowser()) return;
     const dir = await ctx.tempDir('file-impl-truncate');
     const impl = await FileImplGet();
     const filePath = path.join(dir, 'test.bin');
@@ -83,7 +79,6 @@ export default function setupFileImplTests() {
   });
 
   TEST('FileImpl', 'write large buffer completes fully', async (ctx) => {
-    if (isBrowser()) return;
     const dir = await ctx.tempDir('file-impl-large');
     const impl = await FileImplGet();
     const filePath = path.join(dir, 'large.bin');
@@ -117,7 +112,6 @@ export default function setupFileImplTests() {
   });
 
   TEST('FileImpl', 'flush does not throw', async (ctx) => {
-    if (isBrowser()) return;
     const dir = await ctx.tempDir('file-impl-flush');
     const impl = await FileImplGet();
     const filePath = path.join(dir, 'flush.bin');
@@ -133,7 +127,6 @@ export default function setupFileImplTests() {
   });
 
   TEST('FileImpl', 'read returns null at EOF', async (ctx) => {
-    if (isBrowser()) return;
     const dir = await ctx.tempDir('file-impl-eof');
     const impl = await FileImplGet();
     const filePath = path.join(dir, 'eof.bin');
@@ -151,7 +144,6 @@ export default function setupFileImplTests() {
   });
 
   TEST('FileImpl', 'remove file returns true then false', async (ctx) => {
-    if (isBrowser()) return;
     const dir = await ctx.tempDir('file-impl-remove-file');
     const impl = await FileImplGet();
     const filePath = path.join(dir, 'removeme.bin');
@@ -171,7 +163,6 @@ export default function setupFileImplTests() {
   });
 
   TEST('FileImpl', 'remove non-empty subdirectory recursively', async (ctx) => {
-    if (isBrowser()) return;
     const dir = await ctx.tempDir('file-impl-remove-dir');
     const impl = await FileImplGet();
     const nested = path.join(dir, 'sub', 'deep');
@@ -192,7 +183,6 @@ export default function setupFileImplTests() {
   });
 
   TEST('FileImpl', 'copyFile produces identical content', async (ctx) => {
-    if (isBrowser()) return;
     const dir = await ctx.tempDir('file-impl-copy');
     const impl = await FileImplGet();
     const srcPath = path.join(dir, 'src.bin');
@@ -221,7 +211,6 @@ export default function setupFileImplTests() {
   });
 
   TEST('FileImpl', 'readDir lists directory entries', async (ctx) => {
-    if (isBrowser()) return;
     const dir = await ctx.tempDir('file-impl-readdir');
     const impl = await FileImplGet();
     for (const name of ['a.txt', 'b.txt']) {

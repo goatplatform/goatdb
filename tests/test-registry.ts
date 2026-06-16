@@ -12,16 +12,21 @@
 
 import setupUntrusted from './db-untrusted.test.ts';
 import setupTrusted from './db-trusted.test.ts';
+import setupDBTrustedServer from './db-trusted-server.test.ts';
 import setupItemPath from './item-path.ts';
 import setupAssertsTests from './asserts.test.ts';
 import setupOrderstamp from './orderstamp-expose.test.ts';
 import setupSchemaRuntimeKeys from './schema-runtime-keys.test.ts';
-import setupGoatRequestTest from './goat-request.test.ts';
+import setupGoatHeadersTests, {
+  setupGoatRequestNodeTests,
+  setupGoatRequestWebTests,
+} from './goat-request.test.ts';
 import setupSession from './session.test.ts';
 import setupCommit from './commit.test.ts';
 import setupBinaryEncoding from './binary-encoding.test.ts';
 import setupServerArchitectureTest from './server-architecture.test.ts';
 import setupStaticAssetsEndpointTest from './static-assets-endpoint.test.ts';
+import setupBrowserRunnerTests from './browser-runner.test.ts';
 import setupFileImplTests from './file-impl.test.ts';
 import setupFileWatcherUnitTests, {
   setupFileWatcherDenoTests,
@@ -29,6 +34,7 @@ import setupFileWatcherUnitTests, {
   setupFileWatcherTests,
 } from './file-watcher.test.ts';
 import setupJsonLogFormats from './json-log-formats.test.ts';
+import setupJsonLogFormatsServer from './json-log-formats-server.test.ts';
 import setupNodeHttpServerTests from './node-http-server.test.ts';
 import setupHealthCheckEndpointTest from './health-check-endpoint.test.ts';
 import setupMinimalSync from './minimal-client-server-sync.test.ts';
@@ -53,6 +59,7 @@ import setupEmailServiceTests, {
   setupEmailServiceServerTests,
 } from './email-service.test.ts';
 import setupProgressTests from './progress.test.ts';
+import setupSystemInfoTests from './system-info.test.ts';
 import setupTestUtilsTests from './test-utils.test.ts';
 import setupTestRunnerTests, {
   setupPlaywrightPinningTests,
@@ -84,7 +91,7 @@ import setupLiveQuery from './live-query.test.ts';
 import setupWriteFailure from './write-failure.test.ts';
 import setupBuildDenoTests from './build-deno.test.ts';
 import { setupGitHooksDenoTests } from './githooks.test.ts';
-import { isBrowser, isDeno, isNode } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import { TestsRunner } from './mod.ts';
 
 let _registrationPromise: Promise<void> | undefined;
@@ -118,28 +125,32 @@ async function registerAllTestsImpl(): Promise<void> {
   setupItemPath(); // Path validation and parsing logic
   setupPathTests(); // Cross-platform path utilities
   setupBuildTests(); // Build utility contracts (normalizeBuildEntryPath, etc.)
-  if (!isBrowser()) {
+  if (getRuntime().id !== 'browser') {
     setupBuildServerTests(); // File URL decoding needs server filesystem APIs
   }
   setupFileWatcherUnitTests(); // File watcher path-filtering logic (pure logic, no I/O)
-  if (isDeno()) {
+  if (getRuntime().id === 'deno') {
     setupBuildDenoTests(); // Deno-only build coverage that imports Deno-only modules
   }
+  setupBrowserRunnerTests(); // Pure browser logging helpers shared across runtimes
   setupRuntimeTests(); // Runtime abstraction layer invariants
   setupTestUtilsTests(); // Shared test helper wrappers
   setupEmailServiceTests(); // Cross-runtime email service contracts
-  if (!isBrowser()) {
+  if (getRuntime().id !== 'browser') {
     setupEmailServiceServerTests(); // Default nodemailer path needs server package resolution
   }
-  if (isDeno()) {
+  if (getRuntime().id === 'deno') {
     setupRuntimeDenoTests(); // Deno-only runtime tests (signals, unsupported browser opening)
   }
-  if (isNode()) {
+  if (getRuntime().id === 'node') {
     setupRuntimeNodeTests(); // Node-only runtime tests (signals, unsupported browser opening)
   }
   setupProgressTests(); // TUI progress tracking - Task state machine, aggregation
+  if (getRuntime().id !== 'browser') {
+    setupSystemInfoTests(); // Env override fallback and warning taxonomy
+  }
   setupTestRunnerTests(); // Test filtering and no-match error behavior
-  if (isDeno()) {
+  if (getRuntime().id === 'deno') {
     setupTestRunnerDenoTests(); // Deno-only runner registration/cache coverage
     if (getEnvVar('GOATDB_REQUIRE_PLAYWRIGHT') === 'true') {
       setupTestRunnerBrowserCliTests(); // Browser CLI coverage; requires Playwright/browser tooling in the spawned child process
@@ -159,15 +170,21 @@ async function registerAllTestsImpl(): Promise<void> {
   setupCommit(); // Core commit/versioning logic
   setupSession(); // Authentication and session management
   setupSecurityBoundaries(); // Security boundary invariants (auth, sync, signatures)
-  setupGoatRequestTest(); // HTTP request processing
+  setupGoatHeadersTests(); // Shared header abstraction contracts
+  if (getRuntime().id === 'deno') {
+    setupGoatRequestWebTests(); // Request wrapper over the native Request implementation
+  }
+  if (getRuntime().id === 'node') {
+    setupGoatRequestNodeTests(); // Request wrapper over Node-style incoming requests
+  }
   setupCliInitTests(); // CLI scaffolding functionality
-  if (isDeno()) {
+  if (getRuntime().id === 'deno') {
     setupCliEntrypointDenoTests(); // Deno-only CLI entrypoint exit behavior
   }
-  if (isNode()) {
+  if (getRuntime().id === 'node') {
     setupCliInitNodeTests(); // Node-only scaffold template assertions
   }
-  if (!isBrowser()) {
+  if (getRuntime().id !== 'browser') {
     setupCliInitBuildTests(); // Full build of scaffolded project (needs esbuild)
   }
   setupMergeLCA(); // Lowest Common Ancestor / merge base
@@ -181,23 +198,31 @@ async function registerAllTestsImpl(): Promise<void> {
   setupAncestors(); // Commit ancestor field behavior
   setupSyncMessageMissing(); // SyncMessage missing-commit detection
   setupSyncConvergence(); // Multi-round sync convergence simulation
-  setupFileImplTests(); // FileImpl abstraction (Deno + Node.js)
-  setupJsonLogFormats(); // JSONLog storage format (GOAT binary + JSONL)
+  if (getRuntime().id !== 'browser') {
+    setupFileImplTests(); // FileImpl abstraction on server runtimes with filesystem APIs
+  }
+  setupJsonLogFormats(); // JSONLog storage format — browser-compatible roundtrip, dedup, large payload
+  if (getRuntime().id !== 'browser') {
+    setupJsonLogFormatsServer(); // Corruption recovery and format fallback (filesystem I/O)
+  }
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
-  if (isDeno()) {
+  if (getRuntime().id === 'deno') {
     setupFileWatcherDenoTests(); // Deno.watchFs smoke coverage
   }
-  if (isNode()) {
+  if (getRuntime().id === 'node') {
     setupFileWatcherTests(); // Polling watcher tests (~500ms each)
     setupFileWatcherNativeNodeTests(); // Runtime-selected Node watcher coverage
   }
   setupLiveQuery(); // Live query membership updates on ManagedItem edits
   setupWriteFailure(); // WriteFailure event after 3 consecutive I/O failures
-  setupTrusted(); // Database operations in trusted mode
+  setupTrusted(); // Database operations in trusted mode — browser-compatible
+  if (getRuntime().id !== 'browser') {
+    setupDBTrustedServer(); // Cross-session query cache and DB reopen persistence
+  }
   setupUntrusted(); // Database operations in untrusted mode
   await setupServerArchitectureTest(); // Server initialization and configuration
-  if (isNode()) {
+  if (getRuntime().id === 'node') {
     setupNodeHttpServerTests(); // Node.js HTTP server integration
   }
   setupStaticAssetsEndpointTest(); // File serving and asset management
@@ -209,13 +234,13 @@ async function registerAllTestsImpl(): Promise<void> {
   setupMergeSync(); // Merge behavior during sync
 
   // HEAVY END-TO-END TESTS (10-30s each) - Full system, network latency, multi-node
-  if (!isBrowser()) {
+  if (getRuntime().id !== 'browser') {
     setupCliCompileTests(); // CLI compilation (includes E2E compile test)
   }
-  if (isNode()) {
+  if (getRuntime().id === 'node') {
     setupCliCompileNodeTests(); // Node-only: SEA, signing, buildAssets enforcement
   }
-  if (isDeno()) {
+  if (getRuntime().id === 'deno') {
     setupCliCompileDenoTests(); // Deno-only: CSS bundling, node runner, cli timeout
   }
   setupE2ELatency(); // Client-to-client sync latency measurement

@@ -18,7 +18,7 @@
  */
 import * as path from '../base/path.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
-import { isBrowser } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import { getGoatConfig } from '../base/config.ts';
 import { GoatDB } from '../db/db.ts';
 import type { DBInstanceConfig } from '../db/db.ts';
@@ -173,7 +173,7 @@ export class TestSuite {
     // Use same tempDir mechanism for both environments (file system + OPFS abstraction)
     const tempPath = await this.tempDir(testId);
 
-    if (isBrowser()) {
+    if (getRuntime().id === 'browser') {
       // Browser: Client mode with server connection using OPFS path for isolation
       const port = getGoatConfig().serverPort;
       return new GoatDB<S>({
