@@ -914,7 +914,7 @@ export function setupTestRunnerBrowserCliTests(): void {
 
 /**
  * Registers only the Playwright version pinning CI workflow sync test.
- * Registered under `if (isDeno())` in test-registry.ts to avoid polling in Node.js.
+ * Registered under `if (getRuntime().id === 'deno')` in test-registry.ts to avoid polling in Node.js.
  */
 export function setupPlaywrightPinningTests(): void {
   TEST(
