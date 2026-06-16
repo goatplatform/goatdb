@@ -7,7 +7,7 @@ import { murmur3 } from '../base/hash.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import type { GoatDB } from '../db/db.ts';
 import type { ReadonlyJSONValue } from '../base/interfaces.ts';
-import { isBrowser } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import { CoroutineScheduler } from '../base/coroutine.ts';
 import {
   itemPathGetPart,
@@ -932,7 +932,7 @@ export class Query<
       }
     };
 
-    if (isBrowser()) {
+    if (getRuntime().id === 'browser') {
       let cancelCallback: undefined | (() => void);
       const cancelPromise = CoroutineScheduler.sharedScheduler().forEach(
         pathsIter,

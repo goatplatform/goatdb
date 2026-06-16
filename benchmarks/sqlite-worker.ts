@@ -1,5 +1,5 @@
 import { assert } from '../base/error.ts';
-import { isBrowser } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import { sleep } from '../base/sleep.ts';
 
 export interface SQLiteWorkerConfig {
@@ -56,7 +56,7 @@ export class SQLiteWorkerManager {
   }
 
   private async _initialize(): Promise<void> {
-    if (!isBrowser()) {
+    if (getRuntime().id !== 'browser') {
       throw new Error(
         'SQLite worker manager only supported in browser environment',
       );
@@ -181,7 +181,7 @@ export class SQLiteWorkerManager {
     this._ready = false;
     this._promiser = null;
 
-    if (isBrowser()) {
+    if (getRuntime().id === 'browser') {
       await sleep(10);
     }
   }

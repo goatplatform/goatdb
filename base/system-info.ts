@@ -1,5 +1,5 @@
 import { cli } from './development.ts';
-import { isBrowser, isDeno, isNode } from './common.ts';
+import { getRuntime } from './runtime/index.ts';
 import { getEnvVar, getOS, normalizeNodePlatform } from './os.ts';
 import { log } from '../logging/log.ts';
 
@@ -27,12 +27,12 @@ export async function getSystemInfo(): Promise<SystemInfo> {
     } catch {
       log({
         severity: 'WARNING',
-        error: 'SchemaValidationError',
+        error: 'ValidationError',
         message: '[GoatDB] Invalid JSON in GOATDB_SYSTEM_HARDWARE, ignoring',
       });
     }
   }
-  if (isBrowser()) {
+  if (getRuntime().id === 'browser') {
     return await getBrowserSystemInfo();
   } else {
     return await getServerSystemInfo();
@@ -40,7 +40,7 @@ export async function getSystemInfo(): Promise<SystemInfo> {
 }
 
 function getRuntimeInfo(): SystemInfo['runtime'] {
-  if (isBrowser()) {
+  if (getRuntime().id === 'browser') {
     const ua = navigator.userAgent;
     let version = null;
     if (ua.includes('Chrome/')) {
@@ -58,13 +58,13 @@ function getRuntimeInfo(): SystemInfo['runtime'] {
       runtime: 'browser',
       version: version || ua.split(' ').pop() || null,
     };
-  } else if (isDeno()) {
+  } else if (getRuntime().id === 'deno') {
     return {
       platform: `${Deno.build.os} ${Deno.build.arch}`,
       runtime: 'deno',
       version: Deno.version.deno,
     };
-  } else if (isNode()) {
+  } else if (getRuntime().id === 'node') {
     const os = require('node:os');
     const process = require('node:process');
     return {
@@ -159,7 +159,7 @@ async function getBrowserSystemInfo(): Promise<SystemInfo> {
 
 async function getCPUInfo(): Promise<string | null> {
   try {
-    if (isNode()) {
+    if (getRuntime().id === 'node') {
       return require('node:os').cpus()[0]?.model ?? null;
     } else if (Deno.build?.os === 'darwin') {
       const { result, exitCode } = await cli(
@@ -181,7 +181,7 @@ async function getCPUInfo(): Promise<string | null> {
 
 async function getMemoryInfo(): Promise<string | null> {
   try {
-    if (isNode()) {
+    if (getRuntime().id === 'node') {
       const bytes = require('node:os').totalmem();
       return `${Math.round(bytes / 1024 ** 3)}GB`;
     } else if (Deno.build?.os === 'darwin') {

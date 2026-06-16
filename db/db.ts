@@ -18,7 +18,8 @@ import {
   itemPathJoin,
   itemPathNormalize,
 } from './path.ts';
-import { isBrowser, mapIterable, uniqueId } from '../base/common.ts';
+import { mapIterable, uniqueId } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import type { SchemaDataType } from '../cfds/base/schema.ts';
 import { Item } from '../cfds/base/item.ts';
 import {
@@ -284,7 +285,8 @@ export class GoatDB<US extends Schema = Schema>
   constructor(config: DBInstanceConfig) {
     super();
     this._basePath = config.path;
-    this.mode = config.mode || (isBrowser() ? 'client' : 'server');
+    this.mode = config.mode ||
+      (getRuntime().id === 'browser' ? 'client' : 'server');
     this.registry = config.registry || DataRegistry.default;
     this.orgId = config?.orgId || getGoatConfig().orgId;
     this._repositories = new Map();
@@ -298,7 +300,7 @@ export class GoatDB<US extends Schema = Schema>
     this.storageFormat = config.storageFormat ?? 'goat';
     this.shardConfig = makeShardConfig({
       maxCommits: config.maxShardCommits ??
-        (isBrowser() ? 25_000 : 100_000),
+        (getRuntime().id === 'browser' ? 25_000 : 100_000),
       splitThreshold: config.splitThreshold,
       minCommits: config.minShardCommits,
     });
@@ -449,7 +451,7 @@ export class GoatDB<US extends Schema = Schema>
   async logout(): Promise<void> {
     await this.close();
     await remove(this._basePath);
-    if (isBrowser()) {
+    if (getRuntime().id === 'browser') {
       location.reload();
     }
   }

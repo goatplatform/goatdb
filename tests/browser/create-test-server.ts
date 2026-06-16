@@ -7,7 +7,7 @@
 import { Server } from '../../net/server/server.ts';
 import type { StaticAssets } from '../../system-assets/system-assets.ts';
 import type { Schema } from '../../cfds/base/schema.ts';
-import { isDeno } from '../../base/common.ts';
+import { getRuntime } from '../../base/runtime/index.ts';
 import { normalizeNodePlatform } from '../../base/os.ts';
 
 /**
@@ -48,7 +48,7 @@ export function createTestServer(options: TestServerOptions): TestServerResult {
   const buildInfo = {
     creationDate: new Date().toISOString(),
     createdBy: options.createdBy,
-    builder: isDeno()
+    builder: getRuntime().id === 'deno'
       ? { ...Deno.build, runtime: 'deno' as const, env: Deno.build.env ?? null }
       : {
         runtime: 'node' as const,

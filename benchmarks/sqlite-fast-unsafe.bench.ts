@@ -1,7 +1,7 @@
 import { BENCHMARK } from './mod.ts';
 import { assert } from '../base/error.ts';
 import { uniqueId } from '../base/common.ts';
-import { isBrowser } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import * as path from '@std/path';
 
 // Helper to create test data
@@ -108,7 +108,7 @@ async function getSqliteFastShared100kPath(): Promise<string> {
 
 export default function setup(): void {
   // Skip SQLite benchmarks in browser - only run in Deno/Node
-  if (isBrowser()) {
+  if (getRuntime().id === 'browser') {
     return; // No SQLite benchmarks in browser
   }
 

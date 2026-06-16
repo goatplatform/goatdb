@@ -5,7 +5,7 @@
 import { BenchmarkRunner } from './mod.ts';
 import { getEnvVar } from '../base/os.ts';
 import { exit } from '../base/process.ts';
-import { isBrowser } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 
 // Import benchmark setup functions
 import setupGoatDB from './goatdb.bench.ts';
@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   setupGoatDB();
 
   // Register platform-specific SQLite benchmarks
-  if (isBrowser()) {
+  if (getRuntime().id === 'browser') {
     setupSQLiteBrowser(); // Browser SQLite with OPFS
   } else {
     setupSQLite(); // Node/Deno SQLite with filesystem
@@ -32,7 +32,7 @@ async function main(): Promise<void> {
   // Run our custom benchmark system with new parameters
   const summary = await BenchmarkRunner.default.run(benchmarkName, outputJson);
 
-  if (isBrowser()) {
+  if (getRuntime().id === 'browser') {
     // In browser, set global results for automation with completed flag
     (globalThis as any).testResults = { ...summary, completed: true };
     globalThis.dispatchEvent(

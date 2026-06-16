@@ -16,7 +16,7 @@ import { assertEquals, assertTrue } from './asserts.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
-import { isDeno, isNode } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 
 export default async function setupServerArchitectureTest() {
   // Minimal DomainConfig for single-org
@@ -225,14 +225,14 @@ export default async function setupServerArchitectureTest() {
 
       // Verify the correct implementation is returned based on runtime
       if (
-        isDeno() ||
+        getRuntime().id === 'deno' ||
         (typeof globalThis !== 'undefined' && 'Headers' in globalThis)
       ) {
         assertTrue(
           headers instanceof Headers,
           'Should return Headers instance in Deno/browser',
         );
-      } else if (isNode()) {
+      } else if (getRuntime().id === 'node') {
         assertTrue(
           headers instanceof NodeHeadersPolyfill,
           'Should return NodeHeadersPolyfill in Node.js',

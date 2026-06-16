@@ -1,7 +1,8 @@
 import { BENCHMARK } from './mod.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { assert } from '../base/error.ts';
-import { isBrowser, mapIterable, uniqueId } from '../base/common.ts';
+import { mapIterable, uniqueId } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import type { GoatDB, StorageFormat } from '../db/db.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
 import * as path from '../base/path.ts';
@@ -666,7 +667,7 @@ function registerGoatDBBenchmarks(opts: GoatDBBenchmarkOptions): void {
   });
 
   // Write 100k items: meaningful for storage format comparison (non-browser only)
-  if (!isBrowser()) {
+  if (getRuntime().id !== 'browser') {
     BENCHMARK(suiteName, 'Write 100k items', {
       warmup: 1,
       iterations: 7,
@@ -712,7 +713,7 @@ export default function setup(): void {
     storageFormat: 'goat',
   });
 
-  if (!isBrowser()) {
+  if (getRuntime().id !== 'browser') {
     // Trusted: shows cost savings when signing is disabled (single-user/local)
     registerGoatDBBenchmarks({
       suiteName: 'GoatDB (Trusted)',

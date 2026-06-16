@@ -62,7 +62,7 @@ import type {
 } from './json-log-worker-req.ts';
 import type { FileImpl } from './file-impl-interface.ts';
 import { FileImplGet, readTextFile, writeTextFile } from './file-impl.ts';
-import { isNode } from '../common.ts';
+import { getRuntime } from '../runtime/index.ts';
 
 const FILE_READ_BUF_SIZE_BYTES = 1024 * 1024;
 const PAGE_SIZE = 1024;
@@ -635,7 +635,7 @@ let gPostMessage: PostMessageFunc | undefined;
 async function handleRequest(
   event: MessageEvent<WorkerFileReq> | WorkerFileReq,
 ): Promise<void> {
-  const req = isNode()
+  const req = getRuntime().id === 'node'
     ? (event as WorkerFileReq)
     : (event as MessageEvent<WorkerFileReq>).data;
   switch (req.type) {
@@ -828,7 +828,7 @@ export function jsonLogWorkerMain(): void {
       () => handleRequest(event),
       () => handleRequest(event),
     ).catch((_err) => {
-      const req = isNode()
+      const req = getRuntime().id === 'node'
         ? (event as WorkerFileReq)
         : (event as MessageEvent<WorkerFileReq>).data;
       const resp: WorkerErrorResp = {
@@ -839,7 +839,7 @@ export function jsonLogWorkerMain(): void {
       postWithLogs(resp as unknown as Record<string, unknown>);
     });
   };
-  if (isNode()) {
+  if (getRuntime().id === 'node') {
     const parentPort = require('node:worker_threads').parentPort;
     parentPort.on('message', safeHandler);
     gPostMessage = (msg, transfer) => parentPort.postMessage(msg, transfer);

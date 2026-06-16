@@ -7,7 +7,7 @@
  * @module GoatDB/Init
  */
 import * as path from '../base/path.ts';
-import { isDeno, isNode } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import { exit } from '../base/process.ts';
 import {
   copyFile,
@@ -106,7 +106,8 @@ export async function bootstrapProject(
   const opts: BootstrapOptions = options || {};
 
   const projectDir = opts.targetDir || await getCWD();
-  const runtime = isDeno() ? 'deno' : 'node';
+  const rid = getRuntime().id;
+  const runtime = rid === 'deno' ? 'deno' : 'node';
 
   // Resolve template directory with fallback for bundled environments
   const templateDir = await getTemplateDir();
@@ -188,7 +189,7 @@ export async function bootstrapProject(
   }
 
   // Copy configuration files based on runtime
-  if (isDeno()) {
+  if (getRuntime().id === 'deno') {
     await copyTemplateFile(
       templateDir,
       'deno/deno.json',
@@ -203,7 +204,7 @@ export async function bootstrapProject(
       await installDenoDependency('npm:yargs@17.7.2', projectDir);
       await installDenoDependency('npm:@types/react@19.0.8', projectDir);
     }
-  } else if (isNode()) {
+  } else if (getRuntime().id === 'node') {
     await copyNodePackageJson(templateDir, projectDir);
     await copyTemplateFile(
       templateDir,
@@ -223,7 +224,7 @@ export async function bootstrapProject(
 }
 
 export async function runCLI(args: readonly string[]): Promise<void> {
-  const usage = isDeno()
+  const usage = getRuntime().id === 'deno'
     ? 'Usage:\n  deno run -A jsr:@goatdb/goatdb init [dir]\n\nCommands:\n  init [dir]  Scaffold a new GoatDB project in [dir] (defaults to CWD)'
     : 'Usage:\n  npx -y @goatdb/goatdb init [dir]\n\nCommands:\n  init [dir]  Scaffold a new GoatDB project in [dir] (defaults to CWD)';
   if (
@@ -245,7 +246,7 @@ export async function runCLI(args: readonly string[]): Promise<void> {
 }
 
 // Node.js bin entry (Deno enters via mod.ts)
-if (isNode() && process.argv[1]) {
+if (getRuntime().id === 'node' && process.argv[1]) {
   Promise.all([
     import('node:url'),
     import('node:path'),

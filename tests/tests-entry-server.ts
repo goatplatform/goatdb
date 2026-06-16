@@ -8,7 +8,7 @@ import { TestsRunner, type TestSummary } from './mod.ts';
 import { registerAllTests } from './test-registry.ts';
 import { exit } from '../base/process.ts';
 import { getEnvVar } from '../base/os.ts';
-import { isBrowser } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import { assert } from '../base/error.ts';
 
 async function main(): Promise<void> {
@@ -44,7 +44,7 @@ async function main(): Promise<void> {
 }
 
 assert(
-  !isBrowser(),
+  getRuntime().id !== 'browser',
   'Tests entry point should only be used in server environment',
 );
 

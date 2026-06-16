@@ -12,7 +12,7 @@
 import { TEST, type TestSuite } from './mod.ts';
 import { assertEquals, assertExists, assertTrue } from './asserts.ts';
 import * as path from '../base/path.ts';
-import { isDeno, isNode } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import { stopBackgroundCompiler } from '../build.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { buildAssets } from '../cli/build-assets.ts';
@@ -29,7 +29,12 @@ export default function setupCliInitTests() {
     'should detect runtime correctly',
     async (ctx: TestSuite) => {
       // Test runtime detection
-      const runtime = isDeno() ? 'deno' : isNode() ? 'node' : 'browser';
+      const rid = getRuntime().id;
+      const runtime = rid === 'deno'
+        ? 'deno'
+        : rid === 'node'
+        ? 'node'
+        : 'browser';
       assertTrue(
         runtime === 'deno' || runtime === 'node',
         `Expected deno or node, got ${runtime}`,
@@ -89,12 +94,12 @@ export default function setupCliInitTests() {
       );
 
       // Verify runtime-specific config files
-      if (isDeno()) {
+      if (getRuntime().id === 'deno') {
         assertTrue(
           await pathExists(path.join(testDir, 'deno.json')),
           'deno.json should exist for Deno runtime',
         );
-      } else if (isNode()) {
+      } else if (getRuntime().id === 'node') {
         assertTrue(
           await pathExists(path.join(testDir, 'package.json')),
           'package.json should exist for Node runtime',
@@ -133,7 +138,7 @@ export default function setupCliInitTests() {
         path.join(testDir, 'client/index.tsx'),
       );
 
-      if (indexContent && isDeno()) {
+      if (indexContent && getRuntime().id === 'deno') {
         // Deno should use .tsx/.ts extensions
         assertTrue(
           indexContent.includes("from './app.tsx'"),
@@ -143,7 +148,7 @@ export default function setupCliInitTests() {
           indexContent.includes("from '../common/schema.ts'"),
           'Deno should use .ts extension',
         );
-      } else if (indexContent && isNode()) {
+      } else if (indexContent && getRuntime().id === 'node') {
         // Node.js should use .js extensions
         assertTrue(
           indexContent.includes("from './app.js'"),
@@ -406,7 +411,7 @@ export function setupCliInitNodeTests(): void {
 
 /**
  * Server-only test: builds the scaffolded project through buildAssets.
- * Gated by `if (!isBrowser())` in test-registry.ts.
+ * Gated by `if (getRuntime().id !== 'browser')` in test-registry.ts.
  */
 export function setupCliInitBuildTests(): void {
   TEST(
@@ -449,7 +454,8 @@ export function setupCliInitBuildTests(): void {
         path.join(stubsDir, 'goatdb-react.ts'),
         "export function useDBReady(): 'ready' { return 'ready'; }\n",
       );
-      const runtime = isDeno() ? 'deno' : 'node';
+      const rid = getRuntime().id;
+      const runtime = rid === 'deno' ? 'deno' : 'node';
 
       const stubbedImportPaths = {
         react: path.join(stubsDir, 'react.ts'),

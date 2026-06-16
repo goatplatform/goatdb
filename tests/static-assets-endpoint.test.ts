@@ -2,7 +2,6 @@ import { StaticAssetsEndpoint } from '../net/server/static-assets.ts';
 import { TEST } from './mod.ts';
 import { assertEquals, assertTrue } from './asserts.ts';
 import type { Schema } from '../cfds/base/schema.ts';
-import { isDeno, isNode } from '../base/common.ts';
 
 // Minimal test schema
 const TestSchema: Schema = {

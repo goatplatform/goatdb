@@ -9,7 +9,6 @@
  * - SimpleRenderer: Plain text output for CI/non-TTY
  */
 
-import { isBrowser } from '../base/common.ts';
 import {
   getRuntime,
   isInteractiveTerminal,
@@ -840,7 +839,7 @@ export class ProgressManager {
     const mode = opts.mode ?? 'compact';
 
     // Disable in browser
-    if (isBrowser()) {
+    if (getRuntime().id === 'browser') {
       this.enabled = false;
       return;
     }
@@ -1068,7 +1067,8 @@ export class ProgressBar {
   constructor(total: number, enabled = true) {
     this.total = total;
     // Disable progress bar in browser, if explicitly disabled, or if not a TTY
-    this.enabled = enabled && !isBrowser() && isInteractiveTerminal();
+    this.enabled = enabled && getRuntime().id !== 'browser' &&
+      isInteractiveTerminal();
   }
 
   /**

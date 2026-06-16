@@ -5,7 +5,7 @@
  */
 
 import { BenchmarkRunner } from './mod.ts';
-import { isBrowser } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import { getEnvVar } from '../base/os.ts';
 import { signalBrowserTestCompletion } from '../base/process.ts';
 import { notReached } from '../base/error.ts';
@@ -47,7 +47,7 @@ async function main(): Promise<void> {
   await clearOPFS();
 
   // Install custom log stream to filter out metrics in browser benchmarks
-  if (isBrowser()) {
+  if (getRuntime().id === 'browser') {
     setGlobalLoggerStreams([new BenchmarkConsoleLogStream()]);
 
     // Forward benchmark events to DOM
@@ -78,7 +78,7 @@ async function main(): Promise<void> {
   // Run benchmarks
   const summary = await BenchmarkRunner.default.run(benchmarkName, outputJson);
 
-  if (isBrowser()) {
+  if (getRuntime().id === 'browser') {
     // Set global results for automation with completed flag
     (globalThis as any).testResults = { ...summary, completed: true };
     globalThis.dispatchEvent(
@@ -92,7 +92,7 @@ async function main(): Promise<void> {
 }
 
 // Auto-run when used as entry point in browser
-if (isBrowser()) {
+if (getRuntime().id === 'browser') {
   main();
 } else {
   notReached(

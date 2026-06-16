@@ -1,4 +1,4 @@
-import { isBrowser } from './common.ts';
+import { getRuntime } from './runtime/index.ts';
 import { assert } from './error.ts';
 import { VCurrent, type VersionNumber } from './version-number.ts';
 
@@ -25,7 +25,7 @@ export function getGoatConfig(): GoatConfig {
     | GoatConfig
     | undefined;
   if (!config) {
-    assert(!isBrowser(), 'GoatDBConfig not found');
+    assert(getRuntime().id !== 'browser', 'GoatDBConfig not found');
     config = {
       version: VCurrent,
       debug: false,
