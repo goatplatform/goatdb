@@ -56,6 +56,8 @@ export interface LogEntryDeveloperError extends BaseErrorLogEntry {
  * - SessionError: Error occurred while handling session
  * - EmailSendFailed: Failed to send email
  * - EmailInitFailed: Failed to initialize email transport
+ * - BrowserConsoleError: Browser code emitted console.error/assert output
+ * - UncaughtClientError: Used for unhandled exceptions in the browser
  */
 export type OperationalError =
   | 'FetchError'
@@ -71,7 +73,9 @@ export type OperationalError =
   | 'EmailInitFailed'
   | 'MissingConfiguration'
   | 'StorageError'
-  | 'ValidationError';
+  | 'ValidationError'
+  | 'BrowserConsoleError'
+  | 'UncaughtClientError';
 
 /**
  * Interface for log entries that represent operational errors. Extends

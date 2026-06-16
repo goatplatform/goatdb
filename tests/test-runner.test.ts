@@ -53,6 +53,11 @@ async function runDenoCommandWithTimeout(args: string[]): Promise<{
   }
 }
 
+function hasStructuredLogMessage(output: string, message: string): boolean {
+  const escaped = message.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`"message"\\s*:\\s*"${escaped}"`).test(output);
+}
+
 export default function setupTestRunnerTests(): void {
   TEST(
     'TestRunner',
@@ -763,6 +768,36 @@ export function setupTestRunnerDenoTests(): void {
 }
 
 export function setupTestRunnerBrowserCliTests(): void {
+  TEST(
+    'TestRunner',
+    'tests/run.ts browser keeps FileImpl server-only and logs browser-runner startup structurally',
+    async () => {
+      const { code, stdoutText, stderrText } = await runDenoCommandWithTimeout([
+        'run',
+        '-A',
+        './tests/run.ts',
+        '--runtime=browser',
+        '--suite=FileImpl',
+        '--test=open write read round-trip',
+      ]);
+
+      assertEquals(code, EXIT_CODE_NO_MATCH, stderrText);
+      assertTrue(
+        stderrText.includes(
+          'Test execution failed: No tests matched --suite="FileImpl" --test="open write read round-trip"',
+        ),
+        'browser FileImpl coverage must not claim support while OPFS SyncAccessHandle is unavailable in this runner',
+      );
+      assertTrue(
+        hasStructuredLogMessage(
+          stdoutText,
+          'Starting HTTP debug server for browser tests...',
+        ),
+        'browser runner lifecycle should surface through structured logs instead of raw console output',
+      );
+    },
+  );
+
   TEST(
     'TestRunner',
     'tests/run.ts aggregate filters tolerate browser runtime no-match when Deno matched',

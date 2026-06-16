@@ -1,6 +1,8 @@
 import { PLAYWRIGHT_VERSION } from './playwright-version.ts';
 import { kMinuteMs, kSecondMs } from './date.ts';
 import { ProcessManager } from './process-manager.ts';
+import { logBrowserConsole, logBrowserPageError } from './browser-log.ts';
+import { log } from '../logging/log.ts';
 
 /**
  * Options for running browser-based tests or benchmarks.
@@ -103,13 +105,14 @@ function forwardStream(stream: ReadableStream<Uint8Array>): void {
  */
 export async function runBrowserTests(
   options: BrowserRunOptions = {},
-): Promise<any> {
+): Promise<unknown> {
   const isBenchmarkMode = options.mode === 'benchmark';
-  console.log(
-    `Starting HTTP debug server for browser ${
+  log({
+    severity: 'INFO',
+    message: `Starting HTTP debug server for browser ${
       isBenchmarkMode ? 'benchmarks' : 'tests'
     }...`,
-  );
+  });
 
   // Set environment variables for server configuration
   const env: Record<string, string> = {};
@@ -132,7 +135,7 @@ export async function runBrowserTests(
       : './tests/browser/debug-server-entry.ts',
   ];
 
-  console.log(`Running: deno ${serverArgs.join(' ')}`);
+  log({ severity: 'INFO', message: `Running: deno ${serverArgs.join(' ')}` });
 
   // Start server process with ProcessManager
   const processManager = new ProcessManager();
@@ -146,7 +149,7 @@ export async function runBrowserTests(
   forwardStream(serverProcess.stderr!);
 
   // Wait for server to emit ready message and extract the port
-  console.log('Waiting for server to start...');
+  log({ severity: 'INFO', message: 'Waiting for server to start...' });
   const READY_MESSAGE = isBenchmarkMode
     ? 'Browser benchmark server running at'
     : 'Browser test server running at';
@@ -166,7 +169,7 @@ export async function runBrowserTests(
 
   try {
     // Dynamic import Playwright (optional dependency)
-    console.log('Launching browser...');
+    log({ severity: 'INFO', message: 'Launching browser...' });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ns = 'npm'; // construct specifier to avoid Deno's npm scanner
     // String interpolation prevents Deno's static npm scanner from treating
@@ -225,46 +228,63 @@ export async function runBrowserTests(
     await client.send('Runtime.enable');
     await client.send('Debugger.enable');
 
-    // Console logging removed for clean output
+    // Forward browser-side failures through structured logs while avoiding
+    // duplicate low-value console noise.
 
     // Listen for page errors (Playwright automatically provides source-mapped stacks)
-    page.on('pageerror', (err) => {
-      console.error('[Browser Error]', err.message);
-      console.error(err.stack); // Already source-mapped by Playwright
+    page.on('pageerror', (err: { message?: string; stack?: string }) => {
+      logBrowserPageError(err);
     });
 
-    // Forward browser console output to terminal
-    page.on('console', (msg) => {
-      console.log(msg.text());
+    // Preserve browser console severity in structured logs while skipping
+    // console grouping noise that does not help diagnose test failures.
+    page.on('console', (msg: { type(): string; text(): string }) => {
+      logBrowserConsole(msg.type(), msg.text());
     });
 
     // Navigate to HTTPS test server (required for OPFS, Web Workers, Web Locks)
     const testUrl = `https://localhost:${port}`;
-    console.log(`Navigating to ${testUrl}...`);
+    log({ severity: 'INFO', message: `Navigating to ${testUrl}...` });
     await page.goto(testUrl, { waitUntil: 'domcontentloaded' });
 
     // Wait for test bundle to load and tests to start
     await page.waitForFunction(() => {
-      return typeof (window as any).GoatDBConfig !== 'undefined';
+      const browserWindow = window as typeof window & {
+        GoatDBConfig?: unknown;
+      };
+      return typeof browserWindow.GoatDBConfig !== 'undefined';
     }, { timeout: 10 * kSecondMs });
 
     await page.waitForFunction(
-      () => (window as any).testResults?.completed === true,
+      () => {
+        const browserWindow = window as typeof window & {
+          testResults?: { completed?: boolean };
+        };
+        return browserWindow.testResults?.completed === true;
+      },
       { timeout: timeoutMs },
     );
 
     // Get the test/benchmark results
-    const summary = await page.evaluate(() => (window as any).testResults);
+    const summary = await page.evaluate(() => {
+      const browserWindow = window as typeof window & {
+        testResults?: unknown;
+      };
+      return browserWindow.testResults;
+    });
 
     try {
       // Take screenshot in debug mode
       if (options.debug) {
-        console.log('Taking screenshot...');
+        log({ severity: 'INFO', message: 'Taking screenshot...' });
         await page.screenshot({
           path: 'browser-test-results.png',
           fullPage: true,
         });
-        console.log('Screenshot saved to browser-test-results.png');
+        log({
+          severity: 'INFO',
+          message: 'Screenshot saved to browser-test-results.png',
+        });
       }
 
       // Force browser close with timeout since GoatDB timers may keep event loop busy
@@ -274,12 +294,23 @@ export async function runBrowserTests(
           setTimeout(() => reject(new Error('Browser close timed out')), 5000)
         ),
       ]).catch((error) => {
-        console.warn('Browser close issue:', error.message);
+        log({
+          severity: 'WARNING',
+          message: `Browser close issue: ${error.message}`,
+        });
         // Browser close timed out - this is expected with GoatDB active timers
       });
       return summary;
     } catch (cleanupError) {
-      console.error('Error during cleanup:', cleanupError);
+      const message = cleanupError instanceof Error
+        ? cleanupError.message
+        : String(cleanupError);
+      log({
+        severity: 'ERROR',
+        error: 'UncaughtServerError',
+        message: `Error during cleanup: ${message}`,
+        trace: cleanupError instanceof Error ? cleanupError.stack : undefined,
+      });
       // Just return the summary - cleanup will happen at process level
       return summary;
     }
@@ -287,13 +318,20 @@ export async function runBrowserTests(
     if ((error as Error).name === 'TimeoutError') {
       const label = isBenchmarkMode ? 'benchmarks' : 'tests';
       const mins = Math.round(timeoutMs / kMinuteMs);
-      console.error(
-        `Browser ${label} timed out. Check the test runner page for details.`,
-      );
+      log({
+        severity: 'ERROR',
+        error: 'UncaughtServerError',
+        message:
+          `Browser ${label} timed out. Check the test runner page for details.`,
+      });
       throw new Error(`Browser ${label} timed out after ${mins} minutes`);
     } else if ((error as Error).message?.includes('Cannot resolve module')) {
-      console.error('Playwright not installed. Run: npm install playwright');
-      console.error('Or install browsers: npx playwright install chromium');
+      log({
+        severity: 'WARNING',
+        error: 'MissingConfiguration',
+        message:
+          'Playwright not installed. Run: npm install playwright. Or install browsers: npx playwright install chromium',
+      });
       throw new Error('Playwright dependency missing');
     }
     throw error;
