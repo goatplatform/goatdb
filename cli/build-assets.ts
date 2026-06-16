@@ -74,8 +74,10 @@ export function buildCombinedCSS(
   }
 
   // Multiple chunks: build a sections-format composite map.
-  const sections: { offset: { line: number; column: number }; map: object }[] =
-    [];
+  const sections: {
+    offset: { line: number; column: number };
+    map: Record<string, unknown>;
+  }[] = [];
   let lineOffset = 0;
 
   for (let i = 0; i < chunks.length; i++) {
