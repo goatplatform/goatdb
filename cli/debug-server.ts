@@ -33,6 +33,7 @@ import type { Schema } from '../cfds/base/schema.ts';
 import type { AppConfig } from './app-config.ts';
 import {
   type FileWatcher,
+  relativeWatchedPath,
   shouldRebuildAfterPathChange,
   watchDirectory,
 } from '../base/file-watcher.ts';
@@ -69,16 +70,32 @@ function setupDebugServerSignalHandlers(
   };
 }
 
-/** @internal Shared watch-loop so iterator failures surface to callers. */
+/** @internal Shared watch-loop so iterator failures surface to callers.
+ * @param watcher    File watcher to consume events from.
+ * @param watchRoot  Absolute watch root used to relativize descendant paths.
+ *                   Typically the resolved watchDir or cwd. Outside-root paths
+ *                   are passed through unchanged.
+ * @param filterFunc Filter receiving watchRoot-relative descendant paths.
+ * @param onMatch    Called for each path passing the filter.
+ */
 export async function runDebugServerWatchLoop(
   watcher: FileWatcher,
-  cwd: string,
+  watchRoot: string,
   filterFunc: (path: string) => boolean,
   onMatch: (relativePath: string) => void,
 ): Promise<void> {
+  const { posix, win32 } = await import('node:path');
+  const watchRootPathApi = watchRoot.includes('\\') ? win32 : posix;
+  const normalizedWatchRoot = watchRootPathApi.resolve(watchRoot);
+
   for await (const event of watcher) {
-    for (const p of event.paths) {
-      const relativePath = p.startsWith(cwd) ? p.substring(cwd.length + 1) : p;
+    for (const watchedPath of event.paths) {
+      const relativePath = relativeWatchedPath(
+        watchedPath,
+        normalizedWatchRoot,
+        posix,
+        win32,
+      );
       if (filterFunc(relativePath)) {
         onMatch(relativePath);
       }
@@ -295,7 +312,7 @@ async function setupDebugServerWatcher<US extends Schema>(
 
 async function runDebugServerWatcherLoop(
   resources: DebugServerResources,
-  cwd: string,
+  watchRoot: string,
   options: LiveReloadOptions,
 ): Promise<void> {
   if (!resources.watcher || !resources.rebuildTimer) return;
@@ -303,7 +320,7 @@ async function runDebugServerWatcherLoop(
   try {
     await runDebugServerWatchLoop(
       resources.watcher,
-      cwd,
+      watchRoot,
       filterFunc,
       (relativePath) => {
         log({
@@ -471,6 +488,9 @@ export async function startDebugServer<US extends Schema>(
     );
   }
   const cwd = getEffectiveCWD();
+  const watchRoot = options.watchDir
+    ? path.resolve(options.watchDir)
+    : undefined;
 
   // Guard against concurrent calls before any async work that would
   // corrupt config.debug save/restore.
@@ -534,7 +554,11 @@ export async function startDebugServer<US extends Schema>(
     }
 
     if (resources.watcher) {
-      await runDebugServerWatcherLoop(resources, cwd, options);
+      await runDebugServerWatcherLoop(
+        resources,
+        watchRoot || cwd,
+        options,
+      );
     }
 
     // No watcher configured: wait until a signal or embedded caller stops us.

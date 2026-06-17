@@ -2005,6 +2005,78 @@ export default function setupCliCompileTests() {
 
   TEST(
     'CLI-Compile',
+    'runDebugServerWatchLoop passes watchDir-relative paths to watchFilter',
+    async () => {
+      const matched: string[] = [];
+      const watcher: FileWatcher = {
+        async *[Symbol.asyncIterator]() {
+          yield {
+            paths: ['/tmp/project/nested-watch/trigger.txt'],
+            kind: 'modify',
+          };
+        },
+        close() {},
+      };
+
+      await runDebugServerWatchLoop(
+        watcher,
+        '/tmp/project/nested-watch',
+        (relativePath) => relativePath === 'trigger.txt',
+        (relativePath) => {
+          matched.push(relativePath);
+        },
+      );
+      assertEquals(
+        matched,
+        ['trigger.txt'],
+        'watchFilter must receive watchDir-relative paths even when watchDir is nested under cwd',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'runDebugServerWatchLoop keeps sibling-prefix outside-root paths absolute',
+    async () => {
+      const seenByFilter: string[] = [];
+      const matched: string[] = [];
+      const outsideRootPath = '/tmp/project/nested-watch-sibling/trigger.txt';
+      const watcher: FileWatcher = {
+        async *[Symbol.asyncIterator]() {
+          yield {
+            paths: [outsideRootPath],
+            kind: 'modify',
+          };
+        },
+        close() {},
+      };
+
+      await runDebugServerWatchLoop(
+        watcher,
+        '/tmp/project/nested-watch',
+        (relativePath) => {
+          seenByFilter.push(relativePath);
+          return true;
+        },
+        (relativePath) => {
+          matched.push(relativePath);
+        },
+      );
+      assertEquals(
+        seenByFilter,
+        [outsideRootPath],
+        'sibling-prefix paths outside watchDir must stay absolute for the watchFilter',
+      );
+      assertEquals(
+        matched,
+        [outsideRootPath],
+        'sibling-prefix paths outside watchDir must not be truncated to a fake relative path',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
     'runDebugServerWatchLoop surfaces terminal watcher failures',
     async () => {
       const seen: string[] = [];
