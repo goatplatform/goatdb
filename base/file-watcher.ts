@@ -380,7 +380,9 @@ export async function createNativeFsWatcher(
   }
   const underlying = fs.watch(watchDir, { recursive: true });
 
-  const { pushEvent, watcher } = createQueuedWatcher(() => underlying.close());
+  const { pushEvent, fail, watcher } = createQueuedWatcher(() =>
+    underlying.close()
+  );
 
   underlying.on('change', (eventType, filename) => {
     if (!filename) return;
@@ -396,6 +398,7 @@ export async function createNativeFsWatcher(
       : 'modify';
     pushEvent({ paths: [path], kind });
   });
+  underlying.on('error', fail);
 
   return watcher;
 }

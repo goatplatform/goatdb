@@ -4,6 +4,7 @@ import { withLogCapture } from './test-utils.ts';
 import type { FileWatchEvent } from '../base/file-watcher.ts';
 import {
   createChokidarWatcher,
+  createNativeFsWatcher,
   createPollingWatcher,
   relativeWatchedPath,
   shouldRebuildAfterPathChange,
@@ -1410,7 +1411,7 @@ export function setupFileWatcherNativeNodeTests(): void {
 
   // ---- Fake-chokidar ready-gating tests ----
 
-  class FakeChokidarWatcher {
+  class FakeEventWatcher {
     private handlers = new Map<string, Set<(...args: unknown[]) => void>>();
     private _closed = false;
 
@@ -1433,6 +1434,8 @@ export function setupFileWatcherNativeNodeTests(): void {
       for (const h of this.handlers.get(event) ?? []) h(...args);
     }
   }
+
+  class FakeChokidarWatcher extends FakeEventWatcher {}
 
   let lastChokidarOpts: Record<string, unknown> | null = null;
 
@@ -1593,6 +1596,41 @@ export function setupFileWatcherNativeNodeTests(): void {
       } finally {
         watcher.close();
       }
+    },
+  );
+
+  TEST(
+    'FileWatcher',
+    'native fs.watch errors terminate the iterator',
+    async () => {
+      const nativeWatcher = new FakeEventWatcher();
+      const fakeFs = {
+        watch(_dir: string, _options: { recursive: boolean }) {
+          return nativeWatcher;
+        },
+        realpathSync(dir: string) {
+          return dir;
+        },
+      } as unknown as typeof import('node:fs');
+      const watcher = await createNativeFsWatcher(
+        fakeFs,
+        '/watch-root',
+        'linux',
+      );
+      const iter = watcher[Symbol.asyncIterator]();
+      nativeWatcher.emit('error', new Error('native failed'));
+      await assertThrows(
+        async () => {
+          await iter.next();
+        },
+        Error,
+        'native failed',
+      );
+      assertEquals(
+        nativeWatcher.closed,
+        true,
+        'terminal native watcher errors must close the watcher',
+      );
     },
   );
 }
