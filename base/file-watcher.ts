@@ -344,16 +344,18 @@ export async function createChokidarWatcher(
   return watcher;
 }
 
-async function createNativeFsWatcher(
+/** @internal */
+export async function createNativeFsWatcher(
   fs: typeof import('node:fs'),
   dir: string,
+  platform?: string,
 ): Promise<FileWatcher> {
-  const process = globalThis.process;
+  const processPlatform = platform ?? globalThis.process.platform;
   // On Windows, recursive fs.watch via libuv has a known assertion crash
   // (src/win/fs-event.c:72, _wcsnicmp mismatch) due to short-path name
   // normalization. This is a regression in Node.js 24.16.0, tracked at
   // https://github.com/libuv/libuv/issues/5010. Use polling instead.
-  if (process.platform === 'win32') {
+  if (processPlatform === 'win32') {
     log({
       severity: 'WARNING',
       message: 'chokidar not available, using polling fallback on Windows',
