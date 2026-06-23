@@ -337,20 +337,25 @@ export class GoatDB<US extends Schema = Schema>
     return this._settingsProvider!.settings;
   }
 
+  private _currentTrustSession() {
+    return this._ready ? this._trustPool?.currentSession : undefined;
+  }
+
   /**
    * Returns whether this DB instance uses an anonymous session or a session
    * that's attached to a known user.
+   * Returns false before db.ready resolves.
    */
   get loggedIn(): boolean {
-    return this._trustPool?.currentSession.owner !== undefined;
+    return this._currentTrustSession()?.owner !== undefined;
   }
 
   /**
    * Returns the current user item or undefined if the current session is
-   * anonymous.
+   * anonymous. Returns undefined before db.ready resolves.
    */
   get currentUser(): ManagedItem<US> | undefined {
-    const userId = this._trustPool?.currentSession.owner;
+    const userId = this._currentTrustSession()?.owner;
     return userId ? this.item('sys', 'users', userId) : undefined;
   }
 
@@ -359,10 +364,14 @@ export class GoatDB<US extends Schema = Schema>
    * @throws This method throws if called before db.ready returns true.
    */
   get currentSession(): ManagedItem<SchemaTypeSession> {
-    const sessionId = this._trustPool?.currentSession.id;
+    assert(
+      this._ready,
+      'Session not available yet. Wait for db.ready before accessing the current session.',
+    );
+    const sessionId = this._currentTrustSession()?.id;
     assert(
       sessionId !== undefined,
-      'Session not available yet. Wait for db.ready before accessing the current session.',
+      'Trust pool is ready but session ID is missing. This is a bug — please report it.',
     );
     return this.item('sys', 'sessions', sessionId);
   }
