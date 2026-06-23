@@ -3,6 +3,8 @@ import { DataRegistry } from '../cfds/base/data-registry.ts';
 import {
   assertEquals,
   assertExists,
+  assertNotExists,
+  assertThrows,
   assertTrue,
   expectToContain,
 } from './asserts.ts';
@@ -20,6 +22,8 @@ const TestSchema = {
 
 const kDataRegistry = new DataRegistry();
 kDataRegistry.registerSchema(TestSchema);
+const kCurrentSessionUnavailableMessage =
+  'Session not available yet. Wait for db.ready before accessing the current session.';
 
 export default function setup(): void {
   TEST('Untrusted', 'initialization', async (ctx) => {
@@ -46,8 +50,65 @@ export default function setup(): void {
       assertEquals(db.currentUser?.key, 'root');
     } finally {
       await db.flushAll();
+      await db.close();
     }
   });
+
+  TEST(
+    'Untrusted',
+    'session-derived getters stay gated until readyPromise resolves',
+    async (ctx) => {
+      const proto = GoatDB.prototype as unknown as {
+        _createTrustPool(this: GoatDB): Promise<void>;
+      };
+      const originalCreateTrustPool = proto._createTrustPool;
+      let releaseReadyBoundary!: () => void;
+      const readyBoundary = new Promise<void>((resolve) => {
+        releaseReadyBoundary = resolve;
+      });
+      let trustPoolCreated!: () => void;
+      const trustPoolCreatedPromise = new Promise<void>((resolve) => {
+        trustPoolCreated = resolve;
+      });
+      // Prototype patching deterministically controls async initialization
+      // timing without adding test hooks to production code.
+      proto._createTrustPool = async function (this: GoatDB): Promise<void> {
+        await originalCreateTrustPool.call(this);
+        trustPoolCreated();
+        await readyBoundary;
+      };
+
+      const db = new GoatDB({
+        path: await ctx.tempDir('db-ready-boundary'),
+        orgId: 'test-org',
+        registry: kDataRegistry,
+      });
+
+      try {
+        await trustPoolCreatedPromise;
+        assertEquals(db.ready, false);
+        assertThrows(
+          () => db.currentSession,
+          Error,
+          kCurrentSessionUnavailableMessage,
+        );
+        assertEquals(db.loggedIn, false);
+        assertNotExists(db.currentUser);
+
+        releaseReadyBoundary();
+        await db.readyPromise();
+        assertEquals(db.ready, true);
+        assertExists(db.currentSession);
+        assertEquals(db.loggedIn, true);
+        assertEquals(db.currentUser?.key, 'root');
+      } finally {
+        proto._createTrustPool = originalCreateTrustPool;
+        releaseReadyBoundary();
+        await db.flushAll();
+        await db.close();
+      }
+    },
+  );
 
   TEST('Untrusted', 'Repository Operations', async (ctx) => {
     const db = new GoatDB({
@@ -81,6 +142,7 @@ export default function setup(): void {
       assertEquals(db.repository('/test/repo1'), undefined);
     } finally {
       await db.flushAll();
+      await db.close();
     }
   });
 
@@ -123,6 +185,7 @@ export default function setup(): void {
       assertEquals(keys[0], item.key);
     } finally {
       await db.flushAll();
+      await db.close();
     }
   });
 
@@ -158,6 +221,7 @@ export default function setup(): void {
       assertEquals(db.count('/test/bulk'), 2);
     } finally {
       await db.flushAll();
+      await db.close();
     }
   });
 
@@ -200,6 +264,7 @@ export default function setup(): void {
       query.close();
     } finally {
       await db.flushAll();
+      await db.close();
     }
   });
 
@@ -253,6 +318,7 @@ export default function setup(): void {
       assertTrue(elapsed2 < 50); // Should be nearly instant when already ready
     } finally {
       await db.flushAll();
+      await db.close();
     }
   });
 
@@ -264,38 +330,46 @@ export default function setup(): void {
       registry: kDataRegistry,
     });
 
-    await db.readyPromise();
+    try {
+      await db.readyPromise();
 
-    // Open a repository and create an item
-    await db.open('/test/close-commit');
-    const item = db.create('/test/close-commit', TestSchema, {
-      name: 'Close Commit Item',
-      count: 1,
-    });
-    const itemKey = item.key;
+      // Open a repository and create an item
+      await db.open('/test/close-commit');
+      const item = db.create('/test/close-commit', TestSchema, {
+        name: 'Close Commit Item',
+        count: 1,
+      });
+      const itemKey = item.key;
 
-    const newCount = item.get('count') + 1;
-    // Edit the item but do NOT flush/commit explicitly
-    item.set('count', newCount);
+      const newCount = (item.get('count') as number) + 1;
+      // Edit the item but do NOT flush/commit explicitly
+      item.set('count', newCount);
 
-    // Immediately close the repo (should commit changes)
-    await db.closeRepo('/test/close-commit');
+      // Immediately close the repo (should commit changes)
+      await db.closeRepo('/test/close-commit');
 
-    // Ensure the repo is not present in memory
-    assertEquals(db.repository('/test/close-commit'), undefined);
+      // Ensure the repo is not present in memory
+      assertEquals(db.repository('/test/close-commit'), undefined);
 
-    // Ensure the query persistence is not present in memory
-    assertEquals(db.queryPersistence?.repoExists('/test/close-commit'), false);
+      // Ensure the query persistence is not present in memory
+      assertEquals(
+        db.queryPersistence?.repoExists('/test/close-commit'),
+        false,
+      );
 
-    // Ensure the managed item is not present in memory
-    assertEquals(db.itemLoaded(`/test/close-commit/${itemKey}`), false);
+      // Ensure the managed item is not present in memory
+      assertEquals(db.itemLoaded(`/test/close-commit/${itemKey}`), false);
 
-    // Re-open the repo and access the item
-    await db.open('/test/close-commit');
-    const reloadedItem = db.item('/test/close-commit', itemKey);
+      // Re-open the repo and access the item
+      await db.open('/test/close-commit');
+      const reloadedItem = db.item('/test/close-commit', itemKey);
 
-    // The changes should have been saved
-    assertEquals(reloadedItem.get('name'), 'Close Commit Item');
-    assertEquals(reloadedItem.get('count'), newCount);
+      // The changes should have been saved
+      assertEquals(reloadedItem.get('name'), 'Close Commit Item');
+      assertEquals(reloadedItem.get('count'), newCount);
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
   });
 }
