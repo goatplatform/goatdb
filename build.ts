@@ -1,7 +1,6 @@
 // Note: We use ../base/path.ts instead of @std/path to avoid JSR dependencies
 // that would break when this module is transitively bundled into SEA binaries.
 import * as path from './base/path.ts';
-import { APP_ENTRY_POINT } from './net/server/static-assets.ts';
 import { readFile } from './base/json-log/file-impl.ts';
 import { getEffectiveRuntimeId, getRuntime } from './base/runtime/index.ts';
 import { log } from './logging/log.ts';
@@ -9,7 +8,7 @@ import { log } from './logging/log.ts';
 // IMPORTANT: `esbuild` and `@deno/esbuild-plugin` MUST remain `import type`.
 // Runtime imports of these Deno/JSR-specific packages break Node.js SEA binaries.
 // `readFile` is a GoatDB-internal utility and is safe as a runtime import.
-import type { Plugin } from 'esbuild';
+import type { Plugin, PluginBuild } from 'esbuild';
 import type { denoPlugin } from '@deno/esbuild-plugin';
 
 /** Specifier for esbuild — variable import prevents SEA bundler capture. */
@@ -40,8 +39,7 @@ export function getCachedImport<T>(
   importer: () => Promise<T>,
 ): Promise<T> {
   if (!state.promise) {
-    let pending: Promise<T>;
-    pending = importer().catch((err) => {
+    const pending = importer().catch((err) => {
       if (state.promise === pending) state.promise = undefined;
       throw err;
     });
@@ -59,10 +57,13 @@ export function resetImportState<T>(
   return pending;
 }
 
-// deno-lint-ignore no-explicit-any
-const esbuildImportState: ImportCacheState<any> = {};
-// deno-lint-ignore no-explicit-any
-const denoPluginImportState: ImportCacheState<any> = {};
+type DenoPluginModule = {
+  denoPlugin?: typeof denoPlugin;
+  default?: typeof denoPlugin;
+};
+
+const esbuildImportState: ImportCacheState<typeof import('esbuild')> = {};
+const denoPluginImportState: ImportCacheState<DenoPluginModule> = {};
 
 export async function getEsbuild(): Promise<typeof import('esbuild')> {
   return (await getCachedImport(
@@ -120,8 +121,7 @@ export interface BuildOutput {
  */
 export interface BuildPluginLike {
   name: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  setup(build: any): void;
+  setup(build: PluginBuild): void;
 }
 
 export const kAssetLoaders = {
@@ -419,8 +419,7 @@ export async function getClientBuildPlugins(
     // Double cast via unknown: @deno/esbuild-plugin's Plugin type may differ
     // nominally from our installed esbuild version due to JSR/npm version
     // skew, but they are structurally compatible at runtime.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    plugins.push((await getDenoPlugin())() as unknown as any);
+    plugins.push((await getDenoPlugin())() as unknown as Plugin);
   }
   return plugins;
 }
@@ -540,11 +539,10 @@ export async function createBuildContext(
       ...ep,
       in: resolveBuildEntryPath(ep.in),
     })),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     plugins: await getClientBuildPlugins(
       runtime as 'deno' | 'node',
       extraPlugins,
-    ) as any,
+    ),
     ...sharedClientBuildOptions(),
   });
   return {

@@ -1,5 +1,4 @@
 import * as path from '../base/path.ts';
-import { log } from '../logging/log.ts';
 import { assert } from '../base/error.ts';
 import {
   type BuildOutput,
