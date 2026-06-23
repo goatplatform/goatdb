@@ -1,7 +1,9 @@
 // Production build script
+import { getRuntime } from '@goatdb/goatdb';
 import { compile } from '@goatdb/goatdb/server/build';
 
 async function main(): Promise<void> {
+  const runtime = getRuntime();
   await compile({
     buildDir: 'build',
     serverEntry: 'server/server.ts',
@@ -12,7 +14,12 @@ async function main(): Promise<void> {
     // os: "linux",
     // arch: "arm64",
   });
-  Deno.exit();
+  runtime.exit(0);
 }
 
-if (import.meta.main) main();
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error(err);
+    getRuntime().exit(1);
+  });
+}

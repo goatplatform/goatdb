@@ -1,5 +1,6 @@
 // Development server with hot reload
 // See https://goatdb.dev/docs/server-logic for custom endpoints and middleware
+import { getRuntime } from '@goatdb/goatdb';
 import { Server } from '@goatdb/goatdb/server';
 import { registerSchemas } from '../common/schema.ts';
 
@@ -11,9 +12,13 @@ async function main(): Promise<void> {
     creationDate: new Date().toISOString(),
     createdBy: 'dev',
     builder: {
-      ...Deno.build,
       runtime: 'deno' as const,
-      env: Deno.build.env ?? null,
+      // Build.* used directly — getSystemInfo() lacks target/vendor/env
+      target: Deno.build.target,
+      arch: Deno.build.arch,
+      os: Deno.build.os,
+      vendor: Deno.build.vendor,
+      env: Deno.build.env ?? null, // null satisfies BuildInfo.builder.env type
     },
     appVersion: '0.0.1-dev',
     debugBuild: true,
@@ -41,4 +46,9 @@ async function main(): Promise<void> {
   console.log(`Development server running at http://localhost:${server.port}`);
 }
 
-if (import.meta.main) main().catch(console.error);
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error(err);
+    getRuntime().exit(1);
+  });
+}

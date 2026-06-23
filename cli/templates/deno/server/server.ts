@@ -1,6 +1,6 @@
 import yargs from 'yargs';
 import * as path from '@std/path';
-import { prettyJSON } from '@goatdb/goatdb';
+import { getRuntime, prettyJSON } from '@goatdb/goatdb';
 import {
   type BuildInfo,
   Server,
@@ -37,7 +37,7 @@ interface Arguments {
  */
 async function main(): Promise<void> {
   const buildInfo: BuildInfo = kBuildInfo as BuildInfo;
-  const args: Arguments = yargs(Deno.args)
+  const args: Arguments = yargs(Deno.args) // no runtime adapter equivalent for args
     .command(
       '<path>',
       'Start the server at the specified path',
@@ -56,39 +56,44 @@ async function main(): Promise<void> {
     .help()
     .parse();
   registerSchemas();
+  const runtime = getRuntime();
   if (args.info) {
     console.log(
       (buildInfo.appName || 'app') + ' v' + (buildInfo.appVersion || 'unknown'),
     );
     console.log(prettyJSON(buildInfo));
-    Deno.exit();
+    console.log('\nRuntime:', runtime.getSystemInfo());
+    runtime.exit(0);
   }
   const server = new Server({
     staticAssets: staticAssetsFromJS(encodedStaticAssets),
-    path: args.path || path.join(Deno.cwd(), 'server-data'),
+    path: args.path || path.join(runtime.getCWD(), 'server-data'),
     buildInfo,
     port: args.port,
   });
   await server.start();
   console.log(`GoatDB server running at http://localhost:${server.port}`);
-
   let stopping = false;
   const shutdown = () => {
     if (stopping) return;
     stopping = true;
-    setTimeout(() => Deno.exit(1), 5000);
-    server.stop().then(() => Deno.exit(0)).catch((e) => {
+    // Deno setTimeout returns a number (not a Timeout object), so .unref()
+    // is unavailable. The forced exit timer keeps the event loop alive for
+    // 5 s, which is acceptable — the process exits either gracefully or
+    // via the timeout.
+    setTimeout(() => runtime.exit(1), 5000);
+    server.stop().then(() => runtime.exit(0)).catch((e) => {
       console.error(e);
-      Deno.exit(1);
+      runtime.exit(1);
     });
   };
-  Deno.addSignalListener('SIGTERM', shutdown);
-  Deno.addSignalListener('SIGINT', shutdown);
+  runtime.setupSignalHandler('SIGTERM', shutdown);
+  runtime.setupSignalHandler('SIGINT', shutdown);
 }
 
 if (import.meta.main) {
   main().catch((err) => {
     console.error(err);
-    Deno.exit(1);
+    getRuntime().exit(1);
   });
 }
