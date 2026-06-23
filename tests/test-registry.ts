@@ -42,6 +42,7 @@ import setupE2ELatency from './e2e-latency.test.ts';
 import setupClusterLatency from './cluster-latency.test.ts';
 import setupCliInitTests, {
   setupCliInitBuildTests,
+  setupCliInitDenoTests,
   setupCliInitNodeTests,
 } from './cli-init.test.ts';
 import { setupCliEntrypointDenoTests } from './cli-entrypoints.test.ts';
@@ -179,6 +180,7 @@ async function registerAllTestsImpl(): Promise<void> {
   }
   setupCliInitTests(); // CLI scaffolding functionality
   if (getRuntime().id === 'deno') {
+    setupCliInitDenoTests(); // Deno-only scaffold template assertions
     setupCliEntrypointDenoTests(); // Deno-only CLI entrypoint exit behavior
   }
   if (getRuntime().id === 'node') {

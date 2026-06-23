@@ -23,6 +23,71 @@ import {
   writeTextFile,
 } from '../base/json-log/file-impl.ts';
 
+const kRuntimeImportPattern =
+  /import\s*{[^}]*\bgetRuntime\b[^}]*}\s*from ['"]@goatdb\/goatdb['"];?/;
+const kDenoRefPattern = /Deno\.[A-Za-z0-9_.]+/g;
+
+async function runDenoCommand(
+  args: string[],
+  cwd: string = getRuntime().getCWD(),
+): Promise<{
+  code: number;
+  stdout: string;
+  stderr: string;
+}> {
+  const output = await new Deno.Command(Deno.execPath(), {
+    args,
+    cwd,
+    stdout: 'piped',
+    stderr: 'piped',
+  }).output();
+  return {
+    code: output.code,
+    stdout: new TextDecoder().decode(output.stdout),
+    stderr: new TextDecoder().decode(output.stderr),
+  };
+}
+
+async function bootstrapScaffoldProject(
+  ctx: TestSuite,
+  name: string,
+): Promise<string> {
+  const testDir = await ctx.tempDir(name);
+  const initModule = await import('../cli/init.ts');
+  await initModule.bootstrapProject({
+    targetDir: testDir,
+    skipDependencies: true,
+  });
+  return testDir;
+}
+
+function countMatches(text: string, pattern: RegExp): number {
+  return text.match(pattern)?.length ?? 0;
+}
+
+function assertUsesRuntimeAdapter(content: string, name: string): void {
+  assertTrue(
+    kRuntimeImportPattern.test(content),
+    `${name} must import the runtime adapter`,
+  );
+  assertTrue(
+    !content.includes('Deno.exit('),
+    `${name} must avoid direct Deno exits`,
+  );
+}
+
+function assertAllowedDenoRefs(
+  content: string,
+  name: string,
+  allowed: (ref: string) => boolean,
+): void {
+  const refs = content.match(kDenoRefPattern) ?? [];
+  assertTrue(
+    refs.every(allowed),
+    `${name} contains unsupported direct Deno refs: ${refs.join(', ')}`,
+  );
+}
+
 export default function setupCliInitTests() {
   TEST(
     'CLI-Init',
@@ -291,17 +356,151 @@ export default function setupCliInitTests() {
   );
 }
 
+export function setupCliInitDenoTests(): void {
+  TEST(
+    'CLI-Init',
+    'deno scaffold keeps runtime coupling explicit without locking harmless refactors',
+    async (ctx: TestSuite) => {
+      const testDir = await bootstrapScaffoldProject(
+        ctx,
+        'init-deno-runtime-template',
+      );
+
+      const serverContent = await readTextFile(
+        path.join(testDir, 'server/server.ts'),
+      );
+      const buildContent = await readTextFile(
+        path.join(testDir, 'server/build.ts'),
+      );
+      const debugServerContent = await readTextFile(
+        path.join(testDir, 'server/debug-server.ts'),
+      );
+
+      const serverText = serverContent ?? '';
+      const buildText = buildContent ?? '';
+      const debugServerText = debugServerContent ?? '';
+
+      // Keep these assertions semantic: enforce the runtime boundary and the
+      // small set of allowed direct Deno APIs without freezing exact control
+      // flow or local expression shapes.
+      assertUsesRuntimeAdapter(serverText, 'Deno server template');
+      assertTrue(
+        serverText.includes('runtime.getSystemInfo()'),
+        'Deno server template must print runtime info via the runtime adapter',
+      );
+      assertTrue(
+        serverText.includes('runtime.getCWD()'),
+        'Deno server template must resolve the default data dir via the runtime adapter',
+      );
+      assertEquals(
+        countMatches(serverText, /runtime\.setupSignalHandler\(/g),
+        2,
+        'Deno server template must register SIGTERM and SIGINT through the runtime adapter',
+      );
+      assertTrue(
+        serverText.includes('runtime.exit(0)'),
+        'Deno server template must exit success paths through the runtime adapter',
+      );
+      assertTrue(
+        countMatches(serverText, /runtime\.exit\(1\)/g) >= 2,
+        'Deno server template must route fatal and forced exits through the runtime adapter',
+      );
+      assertTrue(
+        !serverText.includes('Deno.addSignalListener('),
+        'Deno server template must avoid direct Deno signal wiring',
+      );
+      assertAllowedDenoRefs(
+        serverText,
+        'Deno server template',
+        (ref) => ref === 'Deno.args',
+      );
+
+      assertUsesRuntimeAdapter(buildText, 'Deno build template');
+      assertTrue(
+        buildText.includes('runtime.exit(0)'),
+        'Deno build template must exit successfully through the runtime adapter',
+      );
+      assertTrue(
+        buildText.includes('getRuntime().exit(1)'),
+        'Deno build template must exit non-zero on build failure through the runtime adapter',
+      );
+
+      assertUsesRuntimeAdapter(debugServerText, 'Deno debug server template');
+      assertTrue(
+        debugServerText.includes("runtime: 'deno' as const"),
+        'Deno debug server template must declare a Deno builder runtime',
+      );
+      assertTrue(
+        debugServerText.includes('getRuntime().exit(1)'),
+        'Deno debug server template must exit non-zero on startup failure through the runtime adapter',
+      );
+      assertAllowedDenoRefs(
+        debugServerText,
+        'Deno debug server template',
+        (ref) => ref.startsWith('Deno.build.'),
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Init',
+    'deno scaffold server entrypoints typecheck with the repo config',
+    async (ctx: TestSuite) => {
+      const testDir = await bootstrapScaffoldProject(
+        ctx,
+        'init-deno-server-typecheck',
+      );
+      const rootConfig = path.join(getRuntime().getCWD(), 'deno.json');
+      const buildDir = path.join(testDir, 'build');
+      await mkdir(buildDir);
+      await writeTextFile(path.join(buildDir, 'staticAssets.json'), '{}\n');
+      await writeTextFile(
+        path.join(buildDir, 'buildInfo.json'),
+        JSON.stringify({
+          appVersion: '0.0.1-test',
+          builder: {
+            runtime: 'deno',
+            target: 'test-target',
+            arch: 'x86_64',
+            os: 'linux',
+            vendor: 'unknown',
+            env: null,
+          },
+        }) + '\n',
+      );
+
+      for (
+        const entry of [
+          'server/server.ts',
+          'server/build.ts',
+          'server/debug-server.ts',
+        ]
+      ) {
+        const result = await runDenoCommand([
+          'check',
+          '--config',
+          rootConfig,
+          path.join(testDir, entry),
+        ]);
+        assertEquals(
+          result.code,
+          0,
+          `${entry} must typecheck using the repo Deno config\n${result.stderr}`,
+        );
+      }
+    },
+  );
+}
+
 export function setupCliInitNodeTests(): void {
   TEST(
     'CLI-Init',
     'node scaffold keeps SEA templates self-contained and explicit about exits',
     async (ctx: TestSuite) => {
-      const testDir = await ctx.tempDir('init-node-sea-template');
-      const initModule = await import('../cli/init.ts');
-      await initModule.bootstrapProject({
-        targetDir: testDir,
-        skipDependencies: true,
-      });
+      const testDir = await bootstrapScaffoldProject(
+        ctx,
+        'init-node-sea-template',
+      );
 
       const seaContent = await readTextFile(
         path.join(testDir, 'server/server-sea.ts'),
@@ -363,12 +562,10 @@ export function setupCliInitNodeTests(): void {
     'CLI-Init',
     'node scaffold non-SEA server template uses runtime adapter shutdown wiring',
     async (ctx: TestSuite) => {
-      const testDir = await ctx.tempDir('init-node-server-template');
-      const initModule = await import('../cli/init.ts');
-      await initModule.bootstrapProject({
-        targetDir: testDir,
-        skipDependencies: true,
-      });
+      const testDir = await bootstrapScaffoldProject(
+        ctx,
+        'init-node-server-template',
+      );
 
       const serverContent = await readTextFile(
         path.join(testDir, 'server/server.ts'),
