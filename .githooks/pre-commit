@@ -3,14 +3,16 @@
 #
 # Scope: regenerates system assets, checks formatting, and type-checks staged
 # TypeScript files.
-# Auto-activates if not yet configured (first commit after clone).
+# Requires `git config core.hooksPath .githooks` (or `deno task setup:hooks`)
+# before Git will invoke it on commit.
 # Runs `deno task build`, `deno fmt --check`, and `deno check` for staged
 # `*.ts` / `*.tsx` files.
 # To skip: `git commit --no-verify`.
 
 set -e
 
-# Auto-activate .githooks if not already active
+# If invoked manually or via an alternate hooks path, align future commits to
+# the repo-local .githooks directory.
 repo_root=$(git rev-parse --show-toplevel)
 expected_hooks_dir="$repo_root/.githooks"
 configured_hooks_path=$(git config core.hooksPath || true)
@@ -30,7 +32,7 @@ case "$active_hooks_dir" in
 esac
 
 if [ "$(resolve_dir "$active_hooks_dir")" != "$(resolve_dir "$expected_hooks_dir")" ]; then
-    echo "-> [pre-commit] configuring .githooks as hooks directory..."
+    echo "-> [pre-commit] configuring repo hooksPath to .githooks for future commits..."
     git config core.hooksPath .githooks
     echo "-> [pre-commit] ...done (this is a one-time setup)"
 fi

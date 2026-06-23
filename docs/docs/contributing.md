@@ -58,8 +58,7 @@ with [Claude Code](https://www.anthropic.com/claude-code),
 git clone https://github.com/goatplatform/goatdb.git
 cd goatdb
 
-# Optional: pre-register the pre-commit hook (auto-remediates stale system assets)
-# The hook self-configures on first commit, so this is optional
+# Register the pre-commit hook (auto-remediates stale system assets)
 deno task setup:hooks
 
 # Verify cross-platform functionality
@@ -73,10 +72,10 @@ deno task docs:serve  # Docusaurus docs server
 
 :::tip[Hooks Auto-Remediate]
 
-The pre-commit hook self-configures your hooks directory on the first commit (if
-needed), then runs `deno task build` and `deno fmt --check` on every commit. If
-build regenerates `system-assets/assets.json`, the hook stages the update
-automatically — no manual rebuild needed.
+Register the pre-commit hook once with `deno task setup:hooks`, then it runs
+`deno task build` and `deno fmt --check` on every commit. If build regenerates
+`system-assets/assets.json`, the hook stages the update automatically — no
+manual rebuild needed.
 
 The hook blocks a commit in two cases:
 
