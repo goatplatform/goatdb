@@ -12,7 +12,7 @@ export default defineConfig({
   format: ['esm'],
   dts: true,
   outDir: 'dist',
-  target: 'node24',
+  target: 'node26',
   platform: 'node',
   clean: true,
   tsconfig: 'tsconfig.node.json',

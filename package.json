@@ -17,6 +17,9 @@
     "type": "git",
     "url": "https://github.com/goatplatform/goatdb"
   },
+  "engines": {
+    "node": ">=26"
+  },
   "bin": {
     "goatdb": "./dist/cli/init.js"
   },
@@ -47,7 +50,7 @@
   },
   "devDependencies": {
     "@deno/esbuild-plugin": "npm:@jsr/deno__esbuild-plugin@^1.2.1",
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.0.0",
     "@types/nodemailer": "^6.4.17",
     "@types/react": "^19.0.0",
     "tsup": "^8.0.0",

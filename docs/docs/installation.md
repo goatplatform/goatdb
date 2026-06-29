@@ -34,7 +34,7 @@ anywhere), but Node.js is equally capable for production use.
 
 ### Node.js Installation
 
-Requires **Node.js 24 or later**.
+Requires **Node.js 26 or later**.
 
 Install using one of the following package managers:
 
