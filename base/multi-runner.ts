@@ -4,11 +4,7 @@ import {
   type RuntimeFilterOutcome,
   validateFilteredRuntimeOutcomes,
 } from './runtime-filter.ts';
-import {
-  EXIT_CODE_NO_MATCH,
-  NO_MATCH_MESSAGE_PREFIX,
-  NoMatchError,
-} from './test-runner-error.ts';
+import { EXIT_CODE_NO_MATCH, NoMatchError } from './test-runner-error.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
 import { printSummary, type TestSummary } from './test-summary.ts';
 
@@ -49,6 +45,18 @@ interface WorkerTestCompleteMessage {
 interface WorkerDoneMessage {
   type: 'done';
   payload: { exitCode: number; summary: TestSummary };
+}
+
+function asTestSummary(value: unknown): TestSummary | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const summary = value as Partial<TestSummary>;
+  return typeof summary.totalTests === 'number' &&
+      typeof summary.passed === 'number' &&
+      typeof summary.failed === 'number' &&
+      typeof summary.duration === 'number' &&
+      Array.isArray(summary.results)
+    ? summary as TestSummary
+    : undefined;
 }
 
 type WorkerOutgoingMessage =
@@ -438,10 +446,9 @@ export async function runAcrossPlatforms(
       nodeEnv,
     );
     if (!nodeResult.success) {
-      if (
-        nodeResult.exitCode === EXIT_CODE_NO_MATCH &&
-        nodeResult.stderrText.includes(NO_MATCH_MESSAGE_PREFIX)
-      ) {
+      // Exit code 2 is the cross-runtime no-match contract (matches Deno's
+      // worker path). The Node entry point controls this code directly.
+      if (nodeResult.exitCode === EXIT_CODE_NO_MATCH) {
         if (shouldAllowRuntimeNoMatch) {
           console.log(
             '=== ⚡️ Node.js: no matching tests in this runtime, skipping ===',
@@ -497,12 +504,15 @@ export async function runAcrossPlatforms(
 
       if (config.onBrowserResult) await config.onBrowserResult(summary);
 
-      // Handle both test and benchmark result formats
-      const browserSummary = summary.summary ?? summary;
-      const failed = browserSummary.failed ?? 0;
-      const passed = browserSummary.passed ?? 0;
+      // Handle both direct browser test summaries and benchmark wrappers.
+      const browserSummary = asTestSummary(summary) ||
+        asTestSummary(
+          (summary as { summary?: unknown } | null | undefined)?.summary,
+        );
+      const failed = browserSummary?.failed ?? 0;
+      const passed = browserSummary?.passed ?? 0;
 
-      if (!isBrowserStructuredNoMatchResult(summary)) {
+      if (browserSummary && !isBrowserStructuredNoMatchResult(summary)) {
         printSummary(browserSummary);
       }
 
