@@ -7,18 +7,20 @@ import { registerSchemas } from '../common/schema.ts';
 async function main(): Promise<void> {
   registerSchemas();
 
-  // Create minimal build info for development
+  const runtime = getRuntime();
+  const systemInfo = runtime.getSystemInfo();
+
+  // Development builds should reflect the active runtime adapter, not host globals.
   const buildInfo = {
     creationDate: new Date().toISOString(),
     createdBy: 'dev',
     builder: {
       runtime: 'deno' as const,
-      // Build.* used directly — getSystemInfo() lacks target/vendor/env
-      target: Deno.build.target,
-      arch: Deno.build.arch,
-      os: Deno.build.os,
-      vendor: Deno.build.vendor,
-      env: Deno.build.env ?? null, // null satisfies BuildInfo.builder.env type
+      target: systemInfo.target ?? 'unknown',
+      arch: systemInfo.arch ?? 'unknown',
+      os: systemInfo.os ?? 'unknown',
+      vendor: systemInfo.vendor ?? 'unknown',
+      env: systemInfo.env ?? null,
     },
     appVersion: '0.0.1-dev',
     debugBuild: true,
@@ -46,7 +48,7 @@ async function main(): Promise<void> {
   console.log(`Development server running at http://localhost:${server.port}`);
 }
 
-if (import.meta.main) {
+if (getRuntime().isMainModule(import.meta.url)) {
   main().catch((err) => {
     console.error(err);
     getRuntime().exit(1);

@@ -6,9 +6,8 @@ import {
 import { getRuntime, prettyJSON } from '@goatdb/goatdb';
 import { registerSchemas } from '../common/schema.js';
 import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, resolve } from 'node:path';
 // These imported files will be automatically generated during compilation
 import encodedStaticAssets from '../build/staticAssets.json' with {
   type: 'json',
@@ -40,8 +39,9 @@ interface Arguments {
  *   server.registerMiddleware(new MyRateLimitMiddleware());
  */
 async function main(): Promise<void> {
+  const runtime = getRuntime();
   const buildInfo: BuildInfo = kBuildInfo as BuildInfo;
-  const args = yargs(hideBin(process.argv))
+  const args = yargs(runtime.getArgs())
     .version(buildInfo.appVersion)
     .option('port', {
       type: 'number',
@@ -68,8 +68,8 @@ async function main(): Promise<void> {
       (buildInfo.appName || 'app') + ' v' + (buildInfo.appVersion || 'unknown'),
     );
     console.log(prettyJSON(buildInfo));
-    console.log('\nRuntime:', getRuntime().getSystemInfo());
-    getRuntime().exit(0);
+    console.log('\nRuntime:', runtime.getSystemInfo());
+    runtime.exit(0);
   }
 
   const server = new Server({
@@ -81,7 +81,6 @@ async function main(): Promise<void> {
 
   await server.start();
 
-  const runtime = getRuntime();
   let stopping = false;
   const shutdown = () => {
     if (stopping) return;
@@ -102,10 +101,7 @@ async function main(): Promise<void> {
   console.log(`GoatDB server running at http://localhost:${server.port}`);
 }
 
-// Node.js ESM main detection (cross-platform)
-if (
-  process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])
-) {
+if (getRuntime().isMainModule(import.meta.url)) {
   main().catch((err) => {
     console.error('Server startup failed:', err);
     getRuntime().exit(1);

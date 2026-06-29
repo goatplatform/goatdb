@@ -36,8 +36,9 @@ interface Arguments {
  *   server.registerMiddleware(new MyRateLimitMiddleware());
  */
 async function main(): Promise<void> {
+  const runtime = getRuntime();
   const buildInfo: BuildInfo = kBuildInfo as BuildInfo;
-  const args: Arguments = yargs(Deno.args) // no runtime adapter equivalent for args
+  const args: Arguments = yargs(runtime.getArgs())
     .command(
       '<path>',
       'Start the server at the specified path',
@@ -56,7 +57,6 @@ async function main(): Promise<void> {
     .help()
     .parse();
   registerSchemas();
-  const runtime = getRuntime();
   if (args.info) {
     console.log(
       (buildInfo.appName || 'app') + ' v' + (buildInfo.appVersion || 'unknown'),
@@ -91,7 +91,7 @@ async function main(): Promise<void> {
   runtime.setupSignalHandler('SIGINT', shutdown);
 }
 
-if (import.meta.main) {
+if (getRuntime().isMainModule(import.meta.url)) {
   main().catch((err) => {
     console.error(err);
     getRuntime().exit(1);

@@ -1,24 +1,26 @@
 // Development server with hot reload
 // See https://goatdb.dev/docs/server-logic for custom endpoints and middleware
-import { normalizeNodePlatform, Server } from '@goatdb/goatdb/server';
+import { getRuntime } from '@goatdb/goatdb';
+import { Server } from '@goatdb/goatdb/server';
 import { registerSchemas } from '../common/schema.js';
-import { fileURLToPath } from 'node:url';
-import { resolve } from 'node:path';
 
 async function main(): Promise<void> {
   registerSchemas();
 
-  // Create minimal build info for development
+  const runtime = getRuntime();
+  const systemInfo = runtime.getSystemInfo();
+
+  // Development builds should reflect the active runtime adapter, not host globals.
   const buildInfo = {
     creationDate: new Date().toISOString(),
     createdBy: 'dev',
     builder: {
       runtime: 'node' as const,
-      target: `${process.arch}-${process.platform}`,
-      arch: process.arch,
-      os: normalizeNodePlatform(process.platform),
-      vendor: 'unknown',
-      env: null,
+      target: systemInfo.target ?? 'unknown',
+      arch: systemInfo.arch ?? 'unknown',
+      os: systemInfo.os ?? 'unknown',
+      vendor: systemInfo.vendor ?? 'unknown',
+      env: systemInfo.env ?? null,
     },
     appVersion: '0.0.1-dev',
     debugBuild: true,
@@ -48,9 +50,9 @@ async function main(): Promise<void> {
   console.log(`Development server running at http://localhost:${server.port}`);
 }
 
-// Node.js ESM main detection (cross-platform)
-if (
-  process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])
-) {
-  main().catch(console.error);
+if (getRuntime().isMainModule(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err);
+    getRuntime().exit(1);
+  });
 }

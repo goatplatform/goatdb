@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   runtime.exit(0);
 }
 
-if (import.meta.main) {
+if (getRuntime().isMainModule(import.meta.url)) {
   main().catch((err) => {
     console.error(err);
     getRuntime().exit(1);

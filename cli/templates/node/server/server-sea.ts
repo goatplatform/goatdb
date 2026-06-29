@@ -106,11 +106,14 @@ function parseArgs(
   return result;
 }
 
-function printHelp(info: BuildInfo): void {
+function printHelp(
+  info: BuildInfo,
+  runtime: ReturnType<typeof getRuntime>,
+): void {
   console.log(`
 ${info.appName || 'app'} v${info.appVersion || 'unknown'}
 
-Usage: ${basename(process.argv[0])} [options] [path]
+Usage: ${basename(runtime.getExecPath())} [options] [path]
 
 Options:
   --port, -p <number>   Port to run the server on (default: 8080)
@@ -165,10 +168,10 @@ async function main(): Promise<void> {
   const sea = requireSea(runtime);
   const { encodedAssets, buildInfo } = loadEmbeddedAssets(sea, runtime);
 
-  const args = parseArgs(process.argv.slice(2), runtime);
+  const args = parseArgs(runtime.getArgs(), runtime);
 
   if (args.help) {
-    printHelp(buildInfo);
+    printHelp(buildInfo, runtime);
     runtime.exit(0);
   }
 
