@@ -54,6 +54,14 @@ export interface SystemInfo {
   readonly os?: string;
   readonly arch?: string;
   readonly version?: string;
+  /**
+   * Build target triple. Format varies by runtime:
+   * Deno returns the Rust target (e.g. "x86_64-unknown-linux-gnu"),
+   * Node returns "${normalizedOs}-${arch}" (e.g. "linux-x64").
+   */
+  readonly target?: string;
+  readonly vendor?: string;
+  readonly env?: string | null;
 }
 
 /**
@@ -101,6 +109,17 @@ export interface RuntimeAdapter {
    * Gets system information (OS, arch, runtime version).
    */
   getSystemInfo(): SystemInfo;
+
+  /**
+   * Returns command-line arguments for the current program.
+   * Deno returns Deno.args, Node returns process.argv.slice(2), browser returns [].
+   */
+  getArgs(): string[];
+
+  /**
+   * Checks whether the given module URL is the runtime entry point.
+   */
+  isMainModule(moduleUrl: string): boolean;
 
   /**
    * Gets the current working directory.
@@ -173,6 +192,8 @@ let _testRuntimeId: string | undefined;
 let _testCWD: string | undefined;
 /** @internal Test-only: overrides browser opening. */
 let _testOpenBrowser: ((url: string) => Promise<void>) | undefined;
+/** @internal Test-only: overrides getRuntime() with a wrapped adapter. */
+let _testRuntimeOverride: RuntimeAdapter | undefined;
 // Note: module-level globals are safe under sequential test execution. If
 // parallel test execution is ever enabled, these must move to a per-test
 // isolation strategy (e.g. AsyncLocalStorage or test-scoped contexts).
@@ -235,6 +256,30 @@ export function withTestCWD<T>(
       _testCWD = value;
     },
     dir,
+    fn,
+  );
+}
+
+/**
+ * @internal Test-only scoped override for getRuntime().
+ *
+ * Replaces the cached runtime adapter with `override` for the duration of
+ * `fn`. All callers of getRuntime() inside the callback see the override.
+ * The previous cached value is restored in the finally block.
+ *
+ * Unlike mutating the adapter singleton, this is safe under sequential test
+ * execution and avoids cross-test pollution.
+ */
+export function withTestRuntimeOverride<T>(
+  override: RuntimeAdapter,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return withTestOverride(
+    () => _testRuntimeOverride,
+    (value) => {
+      _testRuntimeOverride = value;
+    },
+    override,
     fn,
   );
 }
@@ -312,6 +357,11 @@ export function registerRuntime(adapter: RuntimeAdapter): void {
  * @throws If no adapter matches the current environment
  */
 export function getRuntime(): RuntimeAdapter {
+  // Test override takes priority over the cached adapter.
+  if (_testRuntimeOverride) {
+    return _testRuntimeOverride;
+  }
+
   if (cachedRuntime) {
     return cachedRuntime;
   }

@@ -61,12 +61,28 @@ export const BrowserAdapter: RuntimeAdapter = {
           runtime: 'browser',
           os: navigator.platform ?? undefined,
           version: navigator.userAgent ?? undefined,
+          target: undefined,
+          vendor: undefined,
+          env: null,
         };
       }
     } catch {
       // Ignore errors accessing navigator
     }
-    return { runtime: 'browser' };
+    return {
+      runtime: 'browser',
+      target: undefined,
+      vendor: undefined,
+      env: null,
+    };
+  },
+
+  getArgs(): string[] {
+    return [];
+  },
+
+  isMainModule(_moduleUrl: string): boolean {
+    return false;
   },
 
   getCWD(): string {

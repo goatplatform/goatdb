@@ -88,7 +88,24 @@ export const DenoAdapter: RuntimeAdapter = {
       os: Deno.build.os,
       arch: Deno.build.arch,
       version: Deno.version.deno,
+      target: Deno.build.target,
+      vendor: Deno.build.vendor,
+      env: Deno.build.env ?? null,
     };
+  },
+
+  getArgs(): string[] {
+    return [...Deno.args];
+  },
+
+  isMainModule(moduleUrl: string): boolean {
+    try {
+      const mainModule = (Deno as { mainModule?: string }).mainModule;
+      return typeof mainModule === 'string' &&
+        new URL(moduleUrl).href === new URL(mainModule).href;
+    } catch {
+      return false;
+    }
   },
 
   getCWD(): string {
