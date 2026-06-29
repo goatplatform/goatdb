@@ -41,7 +41,6 @@ export async function compileForNodeWithEsbuild(
       '@deno/esbuild-plugin',
       '@jsr/deno__esbuild-plugin',
       'chokidar',
-      'postject',
     ],
     banner: {
       // Aliased to __createRequire__ to avoid potential naming conflicts with
