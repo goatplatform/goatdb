@@ -615,6 +615,114 @@ export function setupTestRunnerDenoTests(): void {
 
   TEST(
     'TestRunner',
+    'runAcrossPlatforms treats Node exit code 2 as no-match',
+    async (ctx) => {
+      const tempDir = await ctx.tempDir('node-exit-code-two-no-match');
+      const entry = `${tempDir}/node-exit-code-two-no-match.ts`;
+      await Deno.writeTextFile(
+        entry,
+        `process.stderr.write('custom exit code two text\\n');
+process.exit(2);
+`,
+      );
+
+      const code = `
+        import { runAcrossPlatforms } from './base/multi-runner.ts';
+        import { NoMatchError } from './base/test-runner-error.ts';
+
+        try {
+          await runAcrossPlatforms({
+            entryPointServer: ${JSON.stringify(entry)},
+            entryPointBrowser: ${JSON.stringify(entry)},
+            runtimes: ['node'],
+            mode: 'test',
+            suite: 'MissingSuite',
+          });
+          Deno.exit(3);
+        } catch (error) {
+          if (
+            error instanceof NoMatchError &&
+            error.message === 'No tests matched --suite="MissingSuite"'
+          ) {
+            Deno.exit(0);
+          }
+          console.error((error as Error).message);
+          Deno.exit(1);
+        }
+      `;
+      const cmd = new Deno.Command(Deno.execPath(), {
+        args: ['eval', '--ext=ts', '--node-modules-dir=false', code],
+        cwd: getRuntime().getCWD(),
+        stdout: 'piped',
+        stderr: 'piped',
+      });
+      const { code: exitCode, stderr } = await cmd.output();
+      const stderrText = new TextDecoder().decode(stderr);
+
+      assertEquals(
+        exitCode,
+        0,
+        'Node exit code 2 must map to no-match for filtered runs',
+      );
+      assertTrue(
+        !stderrText.includes('Node.js execution failed:'),
+        'Node exit code 2 must not surface as a generic execution failure',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
+    'runAcrossPlatforms does not treat Node exit code 1 with no-match text as no-match',
+    async (ctx) => {
+      const tempDir = await ctx.tempDir('node-exit-code-one-not-no-match');
+      const entry = `${tempDir}/node-exit-code-one-not-no-match.ts`;
+      await Deno.writeTextFile(
+        entry,
+        `process.stderr.write('No tests matched --suite="MissingSuite"\\n');
+process.exit(1);
+`,
+      );
+
+      const code = `
+        import { runAcrossPlatforms } from './base/multi-runner.ts';
+
+        try {
+          await runAcrossPlatforms({
+            entryPointServer: ${JSON.stringify(entry)},
+            entryPointBrowser: ${JSON.stringify(entry)},
+            runtimes: ['node'],
+            mode: 'test',
+            suite: 'MissingSuite',
+          });
+          Deno.exit(3);
+        } catch (error) {
+          const message = (error as Error).message;
+          if (message === 'Node.js execution failed: No tests matched --suite="MissingSuite"') {
+            Deno.exit(0);
+          }
+          console.error(message);
+          Deno.exit(1);
+        }
+      `;
+      const cmd = new Deno.Command(Deno.execPath(), {
+        args: ['eval', '--ext=ts', '--node-modules-dir=false', code],
+        cwd: getRuntime().getCWD(),
+        stdout: 'piped',
+        stderr: 'piped',
+      });
+      const { code: exitCode } = await cmd.output();
+
+      assertEquals(
+        exitCode,
+        0,
+        'Node exit code 1 must stay a generic execution failure',
+      );
+    },
+  );
+
+  TEST(
+    'TestRunner',
     'tests/run.ts surfaces no-match errors through the Deno worker path',
     async () => {
       const { code, stderrText, elapsedMs } = await runDenoCommandWithTimeout([
@@ -699,7 +807,7 @@ export function setupTestRunnerDenoTests(): void {
         Deno.exit(0);
       `;
       const cmd = new Deno.Command(Deno.execPath(), {
-        args: ['eval', '--ext=ts', code],
+        args: ['eval', '--ext=ts', '--node-modules-dir=false', code],
         cwd: getRuntime().getCWD(),
         stdout: 'piped',
         stderr: 'piped',

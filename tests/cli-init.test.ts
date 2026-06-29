@@ -22,10 +22,16 @@ import {
   readTextFile,
   writeTextFile,
 } from '../base/json-log/file-impl.ts';
+import {
+  compileToNodeEsm,
+  getRealpathSync,
+  runNodeCommand,
+} from './test-utils.ts';
 
 const kRuntimeImportPattern =
   /import\s*{[^}]*\bgetRuntime\b[^}]*}\s*from ['"]@goatdb\/goatdb['"];?/;
 const kDenoRefPattern = /Deno\.[A-Za-z0-9_.]+/g;
+const kProcessRefPattern = /process\.[A-Za-z0-9_.]+/g;
 
 async function runDenoCommand(
   args: string[],
@@ -61,10 +67,6 @@ async function bootstrapScaffoldProject(
   return testDir;
 }
 
-function countMatches(text: string, pattern: RegExp): number {
-  return text.match(pattern)?.length ?? 0;
-}
-
 function assertUsesRuntimeAdapter(content: string, name: string): void {
   assertTrue(
     kRuntimeImportPattern.test(content),
@@ -85,6 +87,25 @@ function assertAllowedDenoRefs(
   assertTrue(
     refs.every(allowed),
     `${name} contains unsupported direct Deno refs: ${refs.join(', ')}`,
+  );
+}
+
+function assertNoProcessRefs(content: string, name: string): void {
+  const refs = content.match(kProcessRefPattern) ?? [];
+  assertEquals(refs, [], `${name} must avoid direct process refs`);
+}
+
+function assertAvoidsDirectMainModuleRefs(
+  content: string,
+  name: string,
+): void {
+  assertTrue(
+    !content.includes('import.meta.main'),
+    `${name} must avoid direct import.meta.main`,
+  );
+  assertTrue(
+    !content.includes('process.argv[1]'),
+    `${name} must avoid direct process.argv[1] main-module detection`,
   );
 }
 
@@ -392,17 +413,21 @@ export function setupCliInitDenoTests(): void {
         serverText.includes('runtime.getCWD()'),
         'Deno server template must resolve the default data dir via the runtime adapter',
       );
-      assertEquals(
-        countMatches(serverText, /runtime\.setupSignalHandler\(/g),
-        2,
-        'Deno server template must register SIGTERM and SIGINT through the runtime adapter',
+      assertTrue(
+        serverText.includes("runtime.setupSignalHandler('SIGTERM'"),
+        'Deno server template must register SIGTERM through the runtime adapter',
+      );
+      assertTrue(
+        serverText.includes("runtime.setupSignalHandler('SIGINT'"),
+        'Deno server template must register SIGINT through the runtime adapter',
       );
       assertTrue(
         serverText.includes('runtime.exit(0)'),
         'Deno server template must exit success paths through the runtime adapter',
       );
-      assertTrue(
-        countMatches(serverText, /runtime\.exit\(1\)/g) >= 2,
+      assertEquals(
+        (serverText.match(/runtime\.exit\(1\)/g) ?? []).length,
+        2,
         'Deno server template must route fatal and forced exits through the runtime adapter',
       );
       assertTrue(
@@ -412,8 +437,9 @@ export function setupCliInitDenoTests(): void {
       assertAllowedDenoRefs(
         serverText,
         'Deno server template',
-        (ref) => ref === 'Deno.args',
+        () => false,
       );
+      assertAvoidsDirectMainModuleRefs(serverText, 'Deno server template');
 
       assertUsesRuntimeAdapter(buildText, 'Deno build template');
       assertTrue(
@@ -424,6 +450,7 @@ export function setupCliInitDenoTests(): void {
         buildText.includes('getRuntime().exit(1)'),
         'Deno build template must exit non-zero on build failure through the runtime adapter',
       );
+      assertAvoidsDirectMainModuleRefs(buildText, 'Deno build template');
 
       assertUsesRuntimeAdapter(debugServerText, 'Deno debug server template');
       assertTrue(
@@ -437,7 +464,11 @@ export function setupCliInitDenoTests(): void {
       assertAllowedDenoRefs(
         debugServerText,
         'Deno debug server template',
-        (ref) => ref.startsWith('Deno.build.'),
+        () => false,
+      );
+      assertAvoidsDirectMainModuleRefs(
+        debugServerText,
+        'Deno debug server template',
       );
     },
   );
@@ -478,6 +509,7 @@ export function setupCliInitDenoTests(): void {
       ) {
         const result = await runDenoCommand([
           'check',
+          '--node-modules-dir=false',
           '--config',
           rootConfig,
           path.join(testDir, entry),
@@ -508,6 +540,16 @@ export function setupCliInitNodeTests(): void {
       const buildContent = await readTextFile(
         path.join(testDir, 'server/build.ts'),
       );
+      const debugServerContent = await readTextFile(
+        path.join(testDir, 'server/debug-server.ts'),
+      );
+
+      assertNoProcessRefs(seaContent ?? '', 'SEA template');
+      assertNoProcessRefs(buildContent ?? '', 'Node build template');
+      assertNoProcessRefs(
+        debugServerContent ?? '',
+        'Node debug server template',
+      );
 
       // Count signal-handler registrations — must be exactly 2 (SIGTERM, SIGINT).
       const sigHandlerCount =
@@ -524,14 +566,13 @@ export function setupCliInitNodeTests(): void {
         'SEA template must use a string-literal encoding, not BufferEncoding',
       );
 
-      // Fatal exit sites must be `return runtime.exit(N)` so the type-checker
-      // verifies the `never` return type — bare `runtime.exit(N)` is allowed
-      // only on the success path of `main()`.
+      // Fatal helper exits must be `return runtime.exit(1)` so the type-checker
+      // verifies the `never` return type instead of relying on fallthrough.
       const fatalExitCount =
-        (seaContent?.match(/return runtime\.exit\([01]\)/g) ?? []).length;
+        (seaContent?.match(/return runtime\.exit\(1\)/g) ?? []).length;
       assertTrue(
         fatalExitCount >= 2,
-        'SEA template must make fatal exits explicit for type-checking',
+        'SEA template must make helper fatal exits explicit for type-checking',
       );
 
       // setTimeout returns a Timeout with .unref() in Node, but the SEA bundle
@@ -555,6 +596,22 @@ export function setupCliInitNodeTests(): void {
         /getRuntime\(\)\.exit\(1\)/.test(buildContent ?? ''),
         'build template must exit non-zero on build failure',
       );
+      assertAvoidsDirectMainModuleRefs(
+        buildContent ?? '',
+        'Node build template',
+      );
+      assertTrue(
+        (debugServerContent ?? '').includes("runtime: 'node' as const"),
+        'Node debug server template must declare a Node builder runtime',
+      );
+      assertTrue(
+        (debugServerContent ?? '').includes('getRuntime().exit(1)'),
+        'Node debug server template must exit non-zero on startup failure through the runtime adapter',
+      );
+      assertAvoidsDirectMainModuleRefs(
+        debugServerContent ?? '',
+        'Node debug server template',
+      );
     },
   );
 
@@ -571,36 +628,133 @@ export function setupCliInitNodeTests(): void {
         path.join(testDir, 'server/server.ts'),
       );
 
-      assertEquals(
-        (serverContent?.match(/runtime\.setupSignalHandler\(/g) ?? []).length,
-        2,
-        'non-SEA server template must register both SIGTERM and SIGINT through the runtime adapter',
+      assertTrue(
+        (serverContent ?? '').includes("runtime.setupSignalHandler('SIGTERM'"),
+        'non-SEA server template must register SIGTERM through the runtime adapter',
       );
       assertTrue(
-        (serverContent ?? '').includes(
-          "console.log('\\nRuntime:', getRuntime().getSystemInfo())",
-        ),
+        (serverContent ?? '').includes("runtime.setupSignalHandler('SIGINT'"),
+        'non-SEA server template must register SIGINT through the runtime adapter',
+      );
+      assertTrue(
+        (serverContent ?? '').includes('runtime.getSystemInfo()'),
         'non-SEA server template must print runtime info via the runtime adapter',
       );
       assertTrue(
-        (serverContent ?? '').includes('getRuntime().exit(0)'),
-        'non-SEA server template must exit info mode through the runtime adapter',
+        (serverContent ?? '').includes('runtime.exit(0)'),
+        'non-SEA server template must route success exits through the runtime adapter',
       );
       assertTrue(
-        (serverContent ?? '').includes(
-          'const forceExit = setTimeout(() => runtime.exit(1), 5000);',
+        (serverContent ?? '').includes('runtime.exit(1)'),
+        'non-SEA server template must route failure exits through the runtime adapter',
+      );
+      assertTrue(
+        (serverContent ?? '').includes('server.stop()'),
+        'non-SEA server template must perform graceful shutdown through server.stop()',
+      );
+      assertNoProcessRefs(
+        serverContent ?? '',
+        'non-SEA server template',
+      );
+      assertAvoidsDirectMainModuleRefs(
+        serverContent ?? '',
+        'non-SEA server template',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Init',
+    'node scaffold package.json requires Node 26',
+    async (ctx: TestSuite) => {
+      const testDir = await bootstrapScaffoldProject(
+        ctx,
+        'init-node-package-engines',
+      );
+      const packageContent = await readTextFile(
+        path.join(testDir, 'package.json'),
+      );
+      const pkg = JSON.parse(packageContent ?? '{}') as {
+        engines?: { node?: unknown };
+      };
+      assertEquals(
+        pkg.engines?.node,
+        '>=26.0.0',
+        'node scaffold package.json must advertise the Node 26 floor',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Init',
+    'node scaffold debug server executes as a native Node ESM main module',
+    async (ctx: TestSuite) => {
+      const testDir = await bootstrapScaffoldProject(
+        ctx,
+        'init-node-debug-server-esm',
+      );
+      const stubsDir = path.join(testDir, 'test-stubs');
+      const buildDir = path.join(testDir, 'build');
+      await mkdir(stubsDir);
+      await mkdir(buildDir);
+
+      const nodeAdapterUrl = path.join(
+        getRuntime().getCWD(),
+        'base/runtime/adapters/node.ts',
+      );
+      const goatdbStub = path.join(stubsDir, 'goatdb.ts');
+      const goatdbServerStub = path.join(stubsDir, 'goatdb-server.ts');
+      await writeTextFile(
+        goatdbStub,
+        [
+          `import { NodeAdapter } from ${JSON.stringify(nodeAdapterUrl)};`,
+          'export class DataRegistry {',
+          '  static default = new DataRegistry();',
+          '  registerSchema(_schema: unknown): void {}',
+          '}',
+          'export function getRuntime() { return NodeAdapter; }',
+        ].join('\n') + '\n',
+      );
+      await writeTextFile(
+        goatdbServerStub,
+        [
+          'export class Server {',
+          '  port: number;',
+          '  constructor(options: { port?: number }) {',
+          '    this.port = options.port ?? 8080;',
+          '  }',
+          '  async start(): Promise<void> {}',
+          '  async stop(): Promise<void> {}',
+          '}',
+        ].join('\n') + '\n',
+      );
+
+      const outputPath = path.join(buildDir, 'debug-server.mjs');
+      await compileToNodeEsm(
+        path.join(testDir, 'server/debug-server.ts'),
+        outputPath,
+        {
+          '@goatdb/goatdb': goatdbStub,
+          '@goatdb/goatdb/server': goatdbServerStub,
+        },
+      );
+      const result = await runNodeCommand([
+        (await getRealpathSync())(outputPath),
+      ], testDir);
+      assertEquals(
+        result.code,
+        0,
+        `scaffold debug server must execute successfully in native Node ESM\nstdout: ${result.stdout}\nstderr: ${result.stderr}`,
+      );
+      assertTrue(
+        result.stdout.includes('Starting GoatDB development server...'),
+        'scaffold debug server must enter main() when executed as the entry module',
+      );
+      assertTrue(
+        result.stdout.includes(
+          'Development server running at http://localhost:8080',
         ),
-        'non-SEA server template must force-exit shutdown through the runtime adapter',
-      );
-      assertTrue(
-        (serverContent ?? '').includes(
-          'server.stop().then(() => runtime.exit(0)).catch((e) => {',
-        ),
-        'non-SEA server template must route graceful shutdown exit through the runtime adapter',
-      );
-      assertTrue(
-        !(serverContent ?? '').includes('process.on('),
-        'non-SEA server template must avoid direct process signal wiring',
+        'scaffold debug server must reach the post-start log in native Node ESM',
       );
     },
   );

@@ -1,5 +1,7 @@
 import { TEST } from './mod.ts';
 import { assertEquals, assertThrows, assertTrue } from './asserts.ts';
+import * as path from '../base/path.ts';
+import { writeTextFile } from '../base/json-log/file-impl.ts';
 import { BrowserAdapter } from '../base/runtime/adapters/browser.ts';
 import { DenoAdapter } from '../base/runtime/adapters/deno.ts';
 import { NodeAdapter } from '../base/runtime/adapters/node.ts';
@@ -16,7 +18,13 @@ import {
 import { exit, withTestExitOverride } from '../base/process.ts';
 import type { LogEntry } from '../logging/log.ts';
 import type { NormalizedLogEntry } from '../logging/entry.ts';
-import { withLogCapture } from './test-utils.ts';
+import {
+  compileToNodeEsm,
+  getRealpathSync,
+  runNodeCommand,
+  testNodeSpawnedEntry,
+  withLogCapture,
+} from './test-utils.ts';
 
 declare const __BUNDLE_TARGET__: string | undefined;
 
@@ -63,32 +71,52 @@ export default function setupRuntimeTests(): void {
     );
   });
 
-  // C-001: Registration Order
-  TEST('Runtime', 'adapters registered in correct order (C-001)', () => {
-    const adapters = getRegisteredAdapters();
-    // When bundled, __BUNDLE_TARGET__ is defined and only one adapter registers.
-    // When unbundled (Deno, Node dev), all three register.
-    if (typeof __BUNDLE_TARGET__ === 'undefined') {
-      assertTrue(adapters.length >= 3, 'Should have at least 3 adapters');
-      assertEquals(adapters[0].id, 'deno', 'First adapter should be Deno');
-      assertEquals(
-        adapters[1].id,
-        'browser',
-        'Second adapter should be Browser',
-      );
-      assertEquals(adapters[2].id, 'node', 'Third adapter should be Node');
-    } else {
+  // C-001: At least one adapter registers at module load time.
+  TEST(
+    'Runtime',
+    'registered adapter matches the current runtime (C-001)',
+    () => {
+      const adapters = getRegisteredAdapters();
       assertTrue(
         adapters.length >= 1,
-        'Should have at least 1 adapter when bundled',
+        'Should have at least one registered adapter',
+      );
+      // Behavioral invariant: getRuntime() succeeds and returns a detected adapter.
+      const runtime = getRuntime();
+      assertTrue(
+        typeof runtime.id === 'string' && runtime.id.length > 0,
+        'Detected runtime must have a non-empty id',
+      );
+    },
+  );
+
+  TEST(
+    'Runtime',
+    'registered adapters preserve the documented detection order',
+    () => {
+      const adapters = getRegisteredAdapters();
+      if (
+        typeof __BUNDLE_TARGET__ !== 'undefined' &&
+        __BUNDLE_TARGET__ === 'browser'
+      ) {
+        assertEquals(
+          adapters,
+          [BrowserAdapter],
+          'Browser bundles must only register the browser adapter',
+        );
+        return;
+      }
+      assertTrue(
+        adapters.length >= 3,
+        'Unbundled test runs must register Deno, Browser, and Node adapters',
       );
       assertEquals(
-        adapters[0].id,
-        __BUNDLE_TARGET__,
-        `Bundled adapter should match target "${__BUNDLE_TARGET__}"`,
+        adapters.slice(0, 3),
+        [DenoAdapter, BrowserAdapter, NodeAdapter],
+        'Runtime adapter order must remain Deno > Browser > Node',
       );
-    }
-  });
+    },
+  );
 
   // I-003: testConfig is frozen
   TEST('Runtime', 'testConfig is frozen (I-003)', () => {
@@ -356,6 +384,47 @@ export default function setupRuntimeTests(): void {
   // is exercised indirectly through the debug-server lifecycle tests in
   // cli-compile.test.ts. Direct testing would require sending real OS signals
   // or accessing internal closure state, which is invasive.
+
+  TEST(
+    'Runtime',
+    'browser adapter exposes empty args and never reports a main module',
+    () => {
+      assertEquals(
+        BrowserAdapter.getArgs(),
+        [],
+        'Browser adapter args must always be empty',
+      );
+      assertEquals(
+        BrowserAdapter.isMainModule(import.meta.url),
+        false,
+        'Browser adapter must never report a main module',
+      );
+    },
+  );
+
+  TEST(
+    'Runtime',
+    'browser adapter getSystemInfo returns minimal fields',
+    () => {
+      const info = BrowserAdapter.getSystemInfo();
+      assertEquals(
+        info.runtime,
+        'browser',
+        'Browser adapter must report runtime as browser',
+      );
+      assertEquals(
+        info.target,
+        undefined,
+        'Browser adapter must not expose target',
+      );
+      assertEquals(
+        info.vendor,
+        undefined,
+        'Browser adapter must not expose vendor',
+      );
+      assertEquals(info.env, null, 'Browser adapter must expose env as null');
+    },
+  );
 }
 
 /**
@@ -372,6 +441,99 @@ export function setupRuntimeDenoTests(): void {
       // Register and immediately unregister — no signal is sent.
       cleanup();
       cleanup(); // idempotent (second call must not throw)
+    },
+  );
+
+  TEST(
+    'Runtime',
+    'deno adapter exposes args, main-module detection, and build target metadata',
+    () => {
+      const runtime = getRuntime();
+      const info = runtime.getSystemInfo();
+      assertEquals(
+        info.target,
+        Deno.build.target,
+        'Deno adapter must mirror Deno.build.target',
+      );
+      assertEquals(
+        info.vendor,
+        Deno.build.vendor,
+        'Deno adapter must mirror Deno.build.vendor',
+      );
+      assertEquals(
+        info.env,
+        Deno.build.env ?? null,
+        'Deno adapter must mirror Deno.build.env',
+      );
+      assertTrue(
+        !runtime.isMainModule(import.meta.url),
+        'non-entry modules must not be classified as the Deno main module',
+      );
+    },
+  );
+
+  TEST(
+    'Runtime',
+    'deno adapter getArgs returns CLI args through a spawned subprocess',
+    async (ctx) => {
+      const tempDir = await ctx.tempDir('deno-args-test');
+      const entry = `${tempDir}/entry.ts`;
+      const runtimeUrl = new URL(
+        '../base/runtime/index.ts',
+        import.meta.url,
+      ).href;
+      await Deno.writeTextFile(
+        entry,
+        [
+          `import { getRuntime } from '${runtimeUrl}';`,
+          'const args = getRuntime().getArgs();',
+          'Deno.exit(args.length === 2 && args[0] === "--custom-arg" && args[1] === "value" ? 0 : 1);',
+        ].join('\n'),
+      );
+      const cmd = new Deno.Command(Deno.execPath(), {
+        args: ['run', '-A', entry, '--custom-arg', 'value'],
+        cwd: getRuntime().getCWD(),
+        stdout: 'piped',
+        stderr: 'piped',
+      });
+      const { code } = await cmd.output();
+      assertEquals(
+        code,
+        0,
+        'Deno adapter getArgs must return the actual CLI arguments',
+      );
+    },
+  );
+
+  TEST(
+    'Runtime',
+    'deno adapter isMainModule returns true for the actual entry module',
+    async (ctx) => {
+      const tempDir = await ctx.tempDir('is-main-module-positive');
+      const entry = `${tempDir}/entry.ts`;
+      const runtimeUrl = new URL(
+        '../base/runtime/index.ts',
+        import.meta.url,
+      ).href;
+      await Deno.writeTextFile(
+        entry,
+        `import { getRuntime } from '${runtimeUrl}';
+const result = getRuntime().isMainModule(import.meta.url);
+Deno.exit(result ? 0 : 1);
+`,
+      );
+      const cmd = new Deno.Command(Deno.execPath(), {
+        args: ['run', '-A', entry],
+        cwd: getRuntime().getCWD(),
+        stdout: 'piped',
+        stderr: 'piped',
+      });
+      const { code } = await cmd.output();
+      assertEquals(
+        code,
+        0,
+        'isMainModule must return true when called from the entry module',
+      );
     },
   );
 
@@ -437,6 +599,74 @@ export function setupRuntimeDenoTests(): void {
 export function setupRuntimeNodeTests(): void {
   TEST(
     'Runtime',
+    'node adapter normalizeMainModulePath handles edge cases',
+    async () => {
+      // Dynamic import to access @internal exports
+      const mod = await import('../base/runtime/adapters/node.ts');
+      const norm = mod.normalizeMainModulePath as (p: string) => string;
+      const resolve = mod.resolveMainModuleEntry as (
+        e: string,
+        cwd: string,
+      ) => string;
+      const fileUrl = mod.fileUrlToMainModulePath as (
+        u: string,
+      ) => string;
+
+      // Simple absolute path
+      assertEquals(norm('/a/b/c.ts'), '/a/b/c.ts');
+      // With parent traversal
+      assertEquals(norm('/a/b/../c.ts'), '/a/c.ts');
+      // With self references
+      assertEquals(norm('/a/b/./c.ts'), '/a/b/c.ts');
+      // Trailing parent stays within root
+      assertEquals(norm('/a/../../..'), '/');
+      // Windows path
+      assertEquals(
+        norm('C:/a/b.ts'),
+        process.platform === 'win32' ? 'c:/a/b.ts' : 'C:/a/b.ts',
+      );
+      // UNC path preserved
+      assertEquals(
+        norm('//server/share/dir/file.ts'),
+        '//server/share/dir/file.ts',
+      );
+      // UNC with parent traversal above share (should not escape)
+      assertEquals(norm('//server/share/dir/../..'), '//server/share');
+      // Empty / dot
+      assertEquals(norm(''), '.');
+      assertEquals(norm('.'), '.');
+
+      // resolveMainModuleEntry: absolute path stays absolute
+      assertEquals(resolve('/a/b.ts', '/cwd'), '/a/b.ts');
+      // Relative path resolved against cwd
+      assertEquals(resolve('b.ts', '/cwd'), '/cwd/b.ts');
+      // Relative with parent
+      assertEquals(resolve('../b.ts', '/cwd/dir'), '/cwd/b.ts');
+
+      // fileUrlToMainModulePath: simple file URL
+      assertEquals(fileUrl('file:///a/b.ts'), '/a/b.ts');
+      // URL with host (UNC via file URL)
+      assertEquals(
+        fileUrl('file://server/share/dir/file.ts'),
+        '//server/share/dir/file.ts',
+      );
+      // Windows-style file URL (file:///C:/a/b.ts)
+      assertEquals(
+        fileUrl('file:///C:/a/b.ts'),
+        process.platform === 'win32' ? 'c:/a/b.ts' : 'C:/a/b.ts',
+      );
+      // Percent-encoded characters
+      assertEquals(fileUrl('file:///a/b%20c.ts'), '/a/b c.ts');
+      // Non-file URL throws
+      assertThrows(
+        () => fileUrl('https://example.com/a.ts'),
+        TypeError,
+        'only supports file URLs',
+      );
+    },
+  );
+  TEST(
+    'Runtime',
     'node adapter setupSignalHandler returns callable cleanup',
     () => {
       const cleanup = NodeAdapter.setupSignalHandler('SIGINT', () => {});
@@ -445,6 +675,200 @@ export function setupRuntimeNodeTests(): void {
       cleanup(); // idempotent
     },
   );
+
+  TEST(
+    'Runtime',
+    'node adapter exposes args, main-module detection, and target metadata',
+    () => {
+      const runtime = getRuntime();
+      const info = runtime.getSystemInfo();
+      const expectedOs = process.platform === 'win32'
+        ? 'windows'
+        : process.platform === 'darwin'
+        ? 'darwin'
+        : process.platform === 'linux'
+        ? 'linux'
+        : 'unknown';
+      assertEquals(
+        info.target,
+        `${expectedOs}-${process.arch}`,
+        'Node adapter must expose the canonical normalized target string for templates',
+      );
+      assertEquals(
+        info.vendor,
+        'node',
+        'Node adapter must report vendor as node',
+      );
+      assertEquals(
+        info.env,
+        null,
+        'Node adapter must report env as null (not available)',
+      );
+      assertTrue(
+        !runtime.isMainModule(import.meta.url),
+        'non-entry modules must not be classified as the Node main module',
+      );
+    },
+  );
+
+  TEST(
+    'Runtime',
+    'node adapter getArgs returns CLI args through a spawned subprocess',
+    async (ctx) => {
+      const dir = await ctx.tempDir('node-args-test');
+      const entryPath = path.join(dir, 'entry.ts');
+      const outputPath = path.join(dir, 'entry.mjs');
+      const runtimeUrl = path.join(
+        getRuntime().getCWD(),
+        'base/runtime/index.ts',
+      );
+      await writeTextFile(
+        entryPath,
+        [
+          `import { getRuntime } from ${JSON.stringify(runtimeUrl)};`,
+          'const args = getRuntime().getArgs();',
+          'if (args.length !== 2 || args[0] !== "--custom-arg" || args[1] !== "value") throw new Error("Unexpected args: " + JSON.stringify(args));',
+        ].join('\n'),
+      );
+      await compileToNodeEsm(entryPath, outputPath);
+      const result = await runNodeCommand(
+        [(await getRealpathSync())(outputPath), '--custom-arg', 'value'],
+        dir,
+      );
+      assertEquals(
+        result.code,
+        0,
+        `Node adapter getArgs must return the actual CLI arguments\nstdout: ${result.stdout}\nstderr: ${result.stderr}`,
+      );
+    },
+  );
+
+  TEST(
+    'Runtime',
+    'node adapter isMainModule works without globalThis.require',
+    async (ctx) => {
+      const runtimeUrl = path.join(
+        getRuntime().getCWD(),
+        'base/runtime/index.ts',
+      );
+      const result = await testNodeSpawnedEntry(
+        ctx,
+        'node-is-main-no-require',
+        [
+          "if (typeof globalThis.require !== 'undefined') throw new Error('globalThis.require must be undefined in Node ESM');",
+          'if (!getRuntime().isMainModule(import.meta.url)) throw new Error("entry module was not detected");',
+        ],
+        runtimeUrl,
+      );
+      assertEquals(
+        result.code,
+        0,
+        `Node isMainModule must work without globalThis.require\nstdout: ${result.stdout}\nstderr: ${result.stderr}`,
+      );
+    },
+  );
+
+  TEST(
+    'Runtime',
+    'node adapter isMainModule detects the entry module in a spawned subprocess',
+    async (ctx) => {
+      const runtimeUrl = path.join(
+        getRuntime().getCWD(),
+        'base/runtime/index.ts',
+      );
+      const result = await testNodeSpawnedEntry(
+        ctx,
+        'node-is-main-esm',
+        [
+          'if (!getRuntime().isMainModule(import.meta.url)) throw new Error("entry module was not detected");',
+        ],
+        runtimeUrl,
+      );
+      assertEquals(
+        result.code,
+        0,
+        `Node isMainModule must detect the entry module\nstdout: ${result.stdout}\nstderr: ${result.stderr}`,
+      );
+    },
+  );
+
+  if (process.platform !== 'win32') {
+    TEST(
+      'Runtime',
+      'node adapter isMainModule detects symlinked entry modules',
+      async (ctx) => {
+        const dir = await ctx.tempDir('node-is-main-symlink');
+        const entryPath = path.join(dir, 'entry.ts');
+        const outputPath = path.join(dir, 'entry.mjs');
+        const linkPath = path.join(dir, 'entry-link.mjs');
+        const runtimeUrl = path.join(
+          getRuntime().getCWD(),
+          'base/runtime/index.ts',
+        );
+        await writeTextFile(
+          entryPath,
+          [
+            `import { getRuntime } from ${JSON.stringify(runtimeUrl)};`,
+            'if (!getRuntime().isMainModule(import.meta.url)) throw new Error("symlinked entry module was not detected");',
+          ].join('\n'),
+        );
+        await compileToNodeEsm(entryPath, outputPath);
+        const fs = await import('node:fs/promises');
+        await fs.symlink(outputPath, linkPath);
+        const result = await runNodeCommand([linkPath], dir);
+        assertEquals(
+          result.code,
+          0,
+          `Node isMainModule must treat symlinked entrypoints as the main module\nstdout: ${result.stdout}\nstderr: ${result.stderr}`,
+        );
+      },
+    );
+  }
+
+  if (process.platform === 'win32') {
+    TEST(
+      'Runtime',
+      'node adapter isMainModule treats Windows drive-letter casing as equivalent',
+      async (ctx) => {
+        const dir = await ctx.tempDir('node-is-main-drive-case');
+        const entryPath = path.join(dir, 'entry.ts');
+        const outputPath = path.join(dir, 'entry.mjs');
+        const runtimeUrl = path.join(
+          getRuntime().getCWD(),
+          'base/runtime/index.ts',
+        );
+        await writeTextFile(
+          entryPath,
+          [
+            `import { getRuntime } from ${JSON.stringify(runtimeUrl)};`,
+            'const { pathToFileURL } = await import("node:url");',
+            'const entryPath = process.argv[1];',
+            'if (typeof entryPath !== "string" || entryPath.length === 0) throw new Error("no argv[1]");',
+            'const flippedDriveLetter = /^[A-Za-z]:/.test(entryPath)',
+            '  ? entryPath[0] === entryPath[0].toUpperCase()',
+            '    ? entryPath[0].toLowerCase() + entryPath.slice(1)',
+            '    : entryPath[0].toUpperCase() + entryPath.slice(1)',
+            '  : entryPath;',
+            'const prevEntry = process.argv[1];',
+            'process.argv[1] = flippedDriveLetter;',
+            'const detected = getRuntime().isMainModule(pathToFileURL(prevEntry).href);',
+            'process.argv[1] = prevEntry;',
+            'if (!detected) throw new Error("drive-letter casing not ignored");',
+          ].join('\n'),
+        );
+        await compileToNodeEsm(entryPath, outputPath);
+        const result = await runNodeCommand(
+          [(await getRealpathSync())(outputPath)],
+          dir,
+        );
+        assertEquals(
+          result.code,
+          0,
+          `Node isMainModule must ignore drive-letter casing\nstdout: ${result.stdout}\nstderr: ${result.stderr}`,
+        );
+      },
+    );
+  }
 
   TEST(
     'Runtime',

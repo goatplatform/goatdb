@@ -31,6 +31,7 @@ import {
   bundleServerForSEA,
   compile,
   denoTarget,
+  kMinNodeMajor,
   signExecutable,
   targetFromOSArch,
 } from '../cli/compile.ts';
@@ -66,6 +67,7 @@ import {
   withTestCWD,
   withTestOpenBrowser,
   withTestRuntimeId,
+  withTestRuntimeOverride,
 } from '../base/runtime/index.ts';
 import { cli, type CliOptions, copyToClipboard } from '../base/development.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
@@ -187,6 +189,42 @@ function withTimeout<T>(
       },
     );
   });
+}
+
+async function writeFakeNodeSeaBuilder(
+  fakeNodePath: string,
+  recordPath: string,
+): Promise<void> {
+  await writeTextFile(
+    fakeNodePath,
+    [
+      '#!/usr/bin/env node',
+      'const fs = require("node:fs");',
+      `const recordPath = ${JSON.stringify(recordPath)};`,
+      'const [, , flag, configPath] = process.argv;',
+      'if (flag !== "--build-sea" || typeof configPath !== "string") {',
+      '  console.error("unexpected argv", process.argv.slice(2));',
+      '  process.exit(1);',
+      '}',
+      'const config = JSON.parse(fs.readFileSync(configPath, "utf8"));',
+      'fs.writeFileSync(recordPath, JSON.stringify({ argv: process.argv.slice(2), output: config.output }));',
+      'fs.writeFileSync(config.output, "fake-sea-binary\\n");',
+    ].join('\n') + '\n',
+  );
+  const fs = await import('node:fs/promises');
+  await fs.chmod(fakeNodePath, 0o755);
+}
+
+function createFakeNodeAdapter(
+  fakeNodePath: string,
+): ReturnType<typeof getRuntime> {
+  const real = getRuntime();
+  const realInfo = real.getSystemInfo();
+  return {
+    ...real,
+    getExecPath: () => fakeNodePath,
+    getSystemInfo: () => ({ ...realInfo, version: '26.0.0' }),
+  };
 }
 
 /**
@@ -2458,6 +2496,8 @@ export default function setupCliCompileTests() {
         dir,
         runtime.id === 'node' ? 'package.json' : 'deno.json',
       );
+      const fakeNodePath = path.join(dir, 'fake-node');
+      const recordPath = path.join(dir, 'fake-node-record.json');
       const outputFile = compiledBinaryPath(runtime, buildDir, outputName);
       await writeTextFile(serverEntry, 'export {};\n');
       await writeTextFile(clientEntry, 'export {};\n');
@@ -2465,15 +2505,27 @@ export default function setupCliCompileTests() {
         configPath,
         JSON.stringify({ name: 'cwd-config-app', version: '1.2.3' }),
       );
+      if (runtime.id === 'node') {
+        await writeFakeNodeSeaBuilder(fakeNodePath, recordPath);
+      }
 
       try {
         await withTestCWD(dir, async () => {
-          await compile({
-            buildDir,
-            serverEntry,
-            jsPath: clientEntry,
-            outputName,
-          });
+          const runCompile = () =>
+            compile({
+              buildDir,
+              serverEntry,
+              jsPath: clientEntry,
+              outputName,
+            });
+          if (runtime.id === 'node') {
+            await withTestRuntimeOverride(
+              createFakeNodeAdapter(fakeNodePath),
+              runCompile,
+            );
+          } else {
+            await runCompile();
+          }
         });
         assertTrue(
           await pathExists(outputFile),
@@ -2506,6 +2558,32 @@ export default function setupCliCompileTests() {
         typeof pkg.optionalDependencies?.chokidar,
         'string',
         'debug-server watch mode lazy-loads chokidar at runtime; it must appear in optionalDependencies',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'examples/nodejs-basic package.json matches the Node engine floor',
+    async () => {
+      const pkgText = await readTextFile('examples/nodejs-basic/package.json');
+      assertExists(
+        pkgText,
+        'examples/nodejs-basic/package.json must be readable for packaging checks',
+      );
+      const pkg = JSON.parse(pkgText) as {
+        devDependencies?: Record<string, string>;
+        engines?: { node?: string };
+      };
+      assertEquals(
+        pkg.engines?.node,
+        `>=${kMinNodeMajor}.0.0`,
+        'the shipped Node example must advertise the current repo Node floor',
+      );
+      assertEquals(
+        pkg.devDependencies?.['@types/node'],
+        `^${kMinNodeMajor}.0.0`,
+        'the shipped Node example must pin @types/node to the current repo Node floor',
       );
     },
   );
@@ -4927,6 +5005,66 @@ export function setupCliCompileNodeTests(): void {
         text.includes('module.exports'),
         'CJS output must assign module.exports',
       );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'compile uses the active runtime executable for Node SEA builds',
+    async (ctx) => {
+      const runtime = getRuntime();
+      const dir = await ctx.tempDir('compile-node-sea-runtime-exec');
+      const buildDir = path.join(dir, 'build');
+      const serverEntry = path.join(dir, 'server.ts');
+      const clientEntry = path.join(dir, 'client.ts');
+      const packageJson = path.join(dir, 'package.json');
+      const fakeNodePath = path.join(dir, 'fake-node');
+      const recordPath = path.join(dir, 'fake-node-record.json');
+      const outputName = 'runtime-exec-app';
+      const outputFile = compiledBinaryPath(runtime, buildDir, outputName);
+      await writeTextFile(serverEntry, 'export {}\n');
+      await writeTextFile(clientEntry, 'export {}\n');
+      await writeTextFile(
+        packageJson,
+        JSON.stringify({ name: outputName, version: '1.2.3' }) + '\n',
+      );
+      await writeFakeNodeSeaBuilder(fakeNodePath, recordPath);
+
+      try {
+        await withTestRuntimeOverride(
+          createFakeNodeAdapter(fakeNodePath),
+          async () => {
+            await compile({
+              buildDir,
+              serverEntry,
+              jsPath: clientEntry,
+              packageJson,
+              outputName,
+            });
+          },
+        );
+        const record = JSON.parse(
+          (await readTextFile(recordPath)) || 'null',
+        ) as {
+          argv?: string[];
+          output?: string;
+        } | null;
+        assertExists(
+          record,
+          'SEA build must invoke the runtime executable instead of PATH node',
+        );
+        assertEquals(
+          record?.argv,
+          ['--build-sea', path.join(buildDir, 'sea-config.json')],
+        );
+        assertEquals(record?.output, outputFile);
+        assertTrue(
+          await pathExists(outputFile),
+          'runtime executable test double must receive the SEA output path',
+        );
+      } finally {
+        await stopBackgroundCompiler();
+      }
     },
   );
 
