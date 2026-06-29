@@ -306,9 +306,9 @@ deno task build
 npm run build
 ```
 
-> **Node.js SEA builds** use `postject` (installed automatically with GoatDB).
-> See the [CLI & Build Tools](./cli#building-standalone-executables) for
-> details.
+> **Node.js SEA builds** use `node --build-sea` (available since Node.js
+> 25.5.0). See the [CLI & Build Tools](./cli#building-standalone-executables)
+> for details.
 
 ### Configuring the Build
 

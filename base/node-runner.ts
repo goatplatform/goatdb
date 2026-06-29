@@ -32,7 +32,7 @@ export async function compileForNodeWithEsbuild(
     bundle: true,
     platform: 'node',
     format: 'esm',
-    target: 'node24',
+    target: 'node26',
     write: false,
     sourcemap: 'inline',
     external: [

@@ -31,8 +31,7 @@
   },
   "optionalDependencies": {
     "chokidar": "^4.0.3",
-    "esbuild": "^0.25.4",
-    "postject": "1.0.0-alpha.6"
+    "esbuild": "^0.25.4"
   },
   "peerDependencies": {
     "nodemailer": "^6.10.0",

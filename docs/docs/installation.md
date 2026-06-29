@@ -41,9 +41,8 @@ Install using one of the following package managers:
 :::tip[Building Standalone Executables]
 
 To compile Node.js applications to standalone executables using SEA (Single
-Executable Applications), GoatDB uses
-[postject](https://github.com/nicolo-ribaudo/postject), which is installed
-automatically as an optional dependency. No manual setup required. See
+Executable Applications), GoatDB uses the built-in `node --build-sea` flag
+(available since Node.js 25.5.0). No additional dependencies required. See
 [Node.js SEA docs](https://nodejs.org/api/single-executable-applications.html).
 
 :::

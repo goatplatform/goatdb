@@ -63,7 +63,6 @@
     "react": "npm:react@^19.1.0",
     "source-map": "npm:source-map@^0.7.4",
     "sql.js": "npm:sql.js@^1.11.0",
-    "postject": "npm:postject@1.0.0-alpha.6",
     "yargs": "npm:yargs@^17.7.2"
   },
   "nodeModulesDir": "auto"

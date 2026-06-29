@@ -14,13 +14,13 @@ import { buildAssets, type BuildAssetsOptions } from './build-assets.ts';
 import { staticAssetsToJS } from '../system-assets/system-assets.ts';
 import { getEffectiveCWD, getRuntime } from '../base/runtime/index.ts';
 import { resolveRuntimeBuildInfo } from './runtime-build-info.ts';
-import type { OperatingSystem } from '../base/os.ts';
+
 import { cli } from '../base/development.ts';
 import { pathExists } from '../base/json-log/file-impl.ts';
 import { log } from '../logging/log.ts';
 
 /** Minimum supported Node.js major version. Update here when raising the engine floor. */
-export const kMinNodeMajor = 24;
+export const kMinNodeMajor = 26;
 
 /**
  * Represents the target operating system for compilation.
@@ -351,32 +351,36 @@ async function compileDeno(options: CompileOptions): Promise<string> {
 
 /**
  * SEA configuration file structure for Node.js Single Executable Applications.
+ * Used with `node --build-sea` (available since Node.js 25.5.0).
  */
 interface SEAConfig {
   main: string;
   output: string;
-  disableExperimentalSEAWarning: boolean;
-  useCodeCache: boolean;
-  useSnapshot: boolean;
+  mainFormat?: 'commonjs' | 'module';
+  disableExperimentalSEAWarning?: boolean;
+  useCodeCache?: boolean;
+  useSnapshot?: boolean;
   assets?: Record<string, string>;
 }
 
 /**
  * Compiles a GoatDB application using Node.js Single Executable Application (SEA).
  *
- * SEA builds are multi-step:
+ * Uses `node --build-sea` (available since Node.js 25.5.0) which replaces the
+ * legacy multi-step postject pipeline. The `--build-sea` flag handles blob
+ * generation, binary copy, signature removal (macOS), injection, and
+ * re-signing internally via LIEF.
+ *
+ * Steps:
  * 1. Bundle client assets (ESM for browser)
  * 2. Bundle server entry to CJS
- * 3. Generate SEA config
- * 4. Create SEA preparation blob
- * 5. Copy Node.js binary and inject blob
- * 6. Sign executable (macOS/Windows)
+ * 3. Generate SEA config pointing to final executable path
+ * 4. Run `node --build-sea sea-config.json` (single command)
+ * 5. Sign executable (macOS/Windows, optional)
  *
  * Cross-compilation is not supported because Node.js binaries are
  * platform-specific (compiled C++). Unlike Deno's Rust-based cross-compiler,
  * Node.js SEA requires building on the target platform.
- *
- * postject is installed automatically as an optional dependency of `@goatdb/goatdb`.
  */
 async function compileNodeSEA(options: CompileOptions): Promise<string> {
   const resolvedEntry = resolveBuildEntryPath(options.serverEntry);
@@ -417,14 +421,16 @@ async function compileNodeSEA(options: CompileOptions): Promise<string> {
     );
   }
 
-  // Fail-fast: verify postject is resolvable before expensive bundling
-  try {
-    await import('postject');
-  } catch {
+  // Guard: verify Node.js version meets the project minimum for SEA builds.
+  // Fail fast before expensive bundling operations.
+  const nodeVersion = runtime.getSystemInfo().version;
+  const nodeMajor = nodeVersion?.split('.')[0];
+  if (nodeMajor && parseInt(nodeMajor, 10) < kMinNodeMajor) {
     throw new Error(
-      'postject is required for Node.js SEA builds but could not be resolved.\n' +
-        'Try re-running `npm install` in your project (postject is an optional dependency of @goatdb/goatdb).\n' +
-        'If that fails, install manually: npm install postject',
+      `Node.js >= ${kMinNodeMajor} is required for SEA builds. ` +
+        `Current version: ${nodeVersion}.\n` +
+        `Use nvm to switch: nvm install ${kMinNodeMajor} && nvm use ${kMinNodeMajor}\n` +
+        `Or download from: https://nodejs.org`,
     );
   }
 
@@ -444,7 +450,6 @@ async function compileNodeSEA(options: CompileOptions): Promise<string> {
   const assetsJsonPath = path.join(buildDir, 'staticAssets.json');
   const buildInfoJsonPath = path.join(buildDir, 'buildInfo.json');
   const serverBundlePath = path.join(buildDir, 'server-bundle.cjs');
-  const seaBlobPath = path.join(buildDir, 'sea-prep.blob');
   const seaConfigPath = path.join(buildDir, 'sea-config.json');
   const outputName = options.outputName || 'app';
   const execExt = osName === 'windows' ? '.exe' : '';
@@ -464,11 +469,12 @@ async function compileNodeSEA(options: CompileOptions): Promise<string> {
     log({ severity: 'INFO', message: 'Bundling server for SEA...' });
     await bundleServerForSEA(resolvedEntry, serverBundlePath);
 
-    // Generate SEA config
+    // Generate SEA config — output points to final executable
     log({ severity: 'INFO', message: 'Generating SEA configuration...' });
     const seaConfig: SEAConfig = {
       main: serverBundlePath,
-      output: seaBlobPath,
+      output: outputFile,
+      mainFormat: 'commonjs',
       disableExperimentalSEAWarning: true,
       useCodeCache: true,
       useSnapshot: false,
@@ -479,27 +485,24 @@ async function compileNodeSEA(options: CompileOptions): Promise<string> {
     };
     await fs.writeFile(seaConfigPath, JSON.stringify(seaConfig, null, 2));
 
-    // Generate SEA blob
-    log({ severity: 'INFO', message: 'Generating SEA blob...' });
-    const seaResult = await cli(
-      'node',
-      '--experimental-sea-config',
+    // Single `node --build-sea` handles blob generation, binary copy,
+    // signature removal (macOS), injection, and re-signing. Use the active
+    // runtime executable so the version guard and the actual build target stay
+    // in sync even when PATH points at a different Node binary.
+    log({ severity: 'INFO', message: 'Building SEA executable...' });
+    const buildResult = await cli(
+      runtime.getExecPath(),
+      '--build-sea',
       seaConfigPath,
-      { cwd: buildDir, timeout: 120_000 },
+      { timeout: 120_000 },
     );
-    if (seaResult.exitCode !== 0) {
-      throw new Error(`Failed to generate SEA blob: ${seaResult.result}`);
+    if (buildResult.exitCode !== 0) {
+      throw new Error(`SEA build failed: ${buildResult.result}`);
     }
 
-    // Copy Node.js binary
-    log({ severity: 'INFO', message: 'Creating executable...' });
-    await fs.copyFile(runtime.getExecPath(), outputFile);
-    if (osName !== 'windows') {
-      await fs.chmod(outputFile, 0o755);
-    }
-
-    // Inject SEA blob using postject
-    await injectBlob(outputFile, await fs.readFile(seaBlobPath), osName);
+    // Built-in ad-hoc signing (macOS) is handled by --build-sea.
+    // Distribution signing via signExecutable() runs separately below
+    // if options.signing is set.
     success = true;
   } finally {
     try {
@@ -512,7 +515,6 @@ async function compileNodeSEA(options: CompileOptions): Promise<string> {
       buildInfoJsonPath,
       serverBundlePath,
       seaConfigPath,
-      seaBlobPath,
     ];
     // Remove partial binary on failure
     if (!success) {
@@ -590,55 +592,6 @@ export async function bundleServerForSEA(
 }
 
 /**
- * Injects the SEA blob into the executable using postject's JS API.
- * Handles platform-specific signing requirements.
- */
-async function injectBlob(
-  execPath: string,
-  blobData: Uint8Array,
-  osName: OperatingSystem,
-): Promise<void> {
-  const sentinelFuse = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2';
-  const { inject } = await import('postject');
-
-  if (osName === 'darwin') {
-    // macOS: Remove existing signature before injection
-    log({
-      severity: 'INFO',
-      message: 'Removing macOS code signature for injection...',
-    });
-    const removeResult = await cli('codesign', '--remove-signature', execPath, {
-      timeout: 120_000,
-    });
-    if (removeResult.exitCode !== 0) {
-      throw new Error(
-        `Failed to remove macOS signature: ${removeResult.result}`,
-      );
-    }
-
-    // Inject with macOS-specific segment
-    await inject(execPath, 'NODE_SEA_BLOB', blobData, {
-      sentinelFuse,
-      machoSegmentName: 'NODE_SEA',
-    });
-
-    // Ad-hoc sign after injection
-    log({ severity: 'INFO', message: 'Ad-hoc signing macOS executable...' });
-    const adHocResult = await cli('codesign', '--sign', '-', execPath, {
-      timeout: 120_000,
-    });
-    if (adHocResult.exitCode !== 0) {
-      throw new Error(
-        `Failed to ad-hoc sign macOS executable: ${adHocResult.result}`,
-      );
-    }
-  } else {
-    // Linux/Windows: Standard injection
-    await inject(execPath, 'NODE_SEA_BLOB', blobData, { sentinelFuse });
-  }
-}
-
-/**
  * Signs the compiled executable for distribution.
  * Supports macOS codesign/notarization and Windows signtool.
  *
@@ -685,7 +638,7 @@ export async function signExecutable(
       }
       args.push('--entitlements', options.entitlements);
     }
-    // --force: replaces the ad-hoc signature applied after postject blob injection
+    // --force: replaces the ad-hoc signature applied by --build-sea
     args.push('--force');
     if (identity !== '-') {
       args.push('--timestamp');
