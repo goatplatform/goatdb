@@ -8,6 +8,9 @@ import {
 import { TEST } from './mod.ts';
 import { isBrowser } from '../base/common.ts';
 import type { GoatDB } from '../db/db.ts';
+import { Query } from '../repo/query.ts';
+import { QueryPersistence } from '../repo/query-persistance.ts';
+import { QueryPersistenceFile } from '../db/persistance/query-file.ts';
 
 // Define a test schema
 const TestSchema = {
@@ -19,8 +22,14 @@ const TestSchema = {
   },
 } as const;
 
+const OtherTestSchema = {
+  ...TestSchema,
+  ns: 'other-test',
+} as const;
+
 const kDataRegistry = new DataRegistry();
 kDataRegistry.registerSchema(TestSchema);
+kDataRegistry.registerSchema(OtherTestSchema);
 export default function setup(): void {
   TEST('Trusted', 'initialization', async (ctx) => {
     const db = await ctx.createDB('db-init', {
@@ -223,6 +232,74 @@ export default function setup(): void {
       await db.close();
     }
   });
+
+  TEST(
+    'Trusted',
+    'query IDs retain raw config and explicit empty IDs',
+    async (ctx) => {
+      const db = await ctx.createDB('db-query-ids', {
+        registry: kDataRegistry,
+      });
+      const queries: Array<{ close(): void }> = [];
+      const persistence = new QueryPersistence(
+        new QueryPersistenceFile(db.path),
+      );
+
+      try {
+        await db.readyPromise();
+        db.create('/test/query-ids', TestSchema, { name: 'Item', count: 1 });
+        await db.flush('/test/query-ids');
+        await persistence.storage!.store('/test/query-ids', {
+          version: 1,
+          queries: { '': { age: 1, results: [] } },
+        });
+        assertExists(
+          await persistence.get('/test/query-ids', ''),
+          'empty query IDs must be retrieved from persistence',
+        );
+
+        const base = { source: '/test/query-ids', schema: TestSchema };
+        const byName = db.query({ ...base, sortBy: 'name' });
+        queries.push(byName);
+        const sameByName = db.query({ ...base, sortBy: 'name' });
+        const byCount = db.query({ ...base, sortBy: 'count' });
+        queries.push(byCount);
+        const otherNs = db.query({
+          ...base,
+          schema: OtherTestSchema,
+          sortBy: 'name',
+        });
+        queries.push(otherNs);
+        assertEquals(byName, sameByName);
+        assertTrue(byName.id !== byCount.id, 'sort fields must change the ID');
+        assertTrue(
+          byName.id !== otherNs.id,
+          'schema namespace must change the ID',
+        );
+
+        const dbEmptyId = db.query({ ...base, id: '' });
+        queries.push(dbEmptyId);
+        assertEquals(dbEmptyId, db.query({ ...base, id: '' }));
+        assertEquals(dbEmptyId.id, '');
+        await dbEmptyId.loadingFinished();
+
+        const directByName = new Query({ db, ...base, sortBy: 'name' });
+        const directByCount = new Query({ db, ...base, sortBy: 'count' });
+        const directEmptyId = new Query({ db, ...base, id: '' });
+        queries.push(directByName, directByCount, directEmptyId);
+        assertTrue(
+          directByName.id !== directByCount.id,
+          'direct Query sort fields must change the ID',
+        );
+        assertEquals(directEmptyId.id, '');
+      } finally {
+        await persistence.close();
+        for (const query of queries) query.close();
+        await db.flushAll();
+        await db.close();
+      }
+    },
+  );
 
   TEST('Trusted', 'query cache cross-session correctness', async (ctx) => {
     // Regression test: ageForKey was keyed by item key but looked up by full
