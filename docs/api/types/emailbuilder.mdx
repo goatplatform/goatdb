@@ -10,5 +10,10 @@ Takes email info and server config and returns a formatted email message.
 
 ## Definition
 
-**Type:** <code>EmailBuilder = (info: [EmailInfo](/api/types/emailinfo), config: ServerOptions) =&gt; EmailMessage</code>
+**Type:** <code>EmailBuilder = (info: [EmailInfo](/api/types/emailinfo), config: ServerOptions) =&gt; [EmailMessage](/api/types/emailmessage)</code>
+
+`EmailMessage` is a portable explicit subset: builders may return text-only or
+HTML-only messages, address objects or address lists, plus headers and
+attachments without importing nodemailer types. Import it from
+`@goatdb/goatdb/server/email`.
 

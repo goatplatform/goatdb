@@ -5,6 +5,7 @@ export default defineConfig({
     mod: 'mod.ts',
     'react/hooks': 'react/hooks.ts',
     server: 'server.ts',
+    'server/email': 'server/email.ts',
     'server-build': 'server-build.ts',
     'cli/init': 'cli/init.ts', // package.json "bin" entry, not in "exports"
     'cli/link': 'cli/link.ts',

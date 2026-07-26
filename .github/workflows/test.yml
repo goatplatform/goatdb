@@ -55,17 +55,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          # Pin to 24.15.0 for version consistency across all CI jobs
-          node-version: '24.15.0'
+          # Exercise the published minimum separately from the latest Node 26 CI job.
+          node-version: '26.0.0'
 
       - name: Install npm dependencies
         run: npm install
 
       - name: Build npm package
         run: npm run build:npm
+
+      - name: Typecheck the packed npm email export
+        run: |
+          npm run prepare:npm-package
+          tmpdir=$(mktemp -d)
+          trap 'rm -rf "$tmpdir"' EXIT
+          npm pack --pack-destination "$tmpdir"
+          tarball=$(find "$tmpdir" -maxdepth 1 -name '*.tgz' -print -quit)
+          mkdir "$tmpdir/consumer"
+          npm install --prefix "$tmpdir/consumer" --ignore-scripts "$tarball"
+          cat > "$tmpdir/consumer/index.ts" <<'EOF'
+          import type { EmailMessage } from '@goatdb/goatdb/server/email';
+
+          const message: EmailMessage = {
+            to: [{ name: 'User', address: 'user@test.invalid' }],
+            attachments: [{ filename: 'note.txt', content: new Uint8Array([1]) }],
+            emailType: 'Login',
+          };
+          // @ts-expect-error recipients must be email addresses
+          const invalidMessage: EmailMessage = { to: 42 };
+          void [message, invalidMessage];
+          EOF
+          cat > "$tmpdir/consumer/tsconfig.json" <<'EOF'
+          { "compilerOptions": { "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true } }
+          EOF
+          ./node_modules/.bin/tsc --noEmit --project "$tmpdir/consumer/tsconfig.json"
 
   test-browser:
     name: Browser Tests

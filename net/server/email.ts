@@ -1,4 +1,19 @@
 import type { ServerServices } from './server.ts';
+import type { EmailContent, EmailMessage } from './email-message.ts';
+export type {
+  EmailAddress,
+  EmailAddressList,
+  EmailAddressObject,
+  EmailAlternative,
+  EmailAttachment,
+  EmailContent,
+  EmailContentPart,
+  EmailEnvelope,
+  EmailHeaders,
+  EmailHeaderValue,
+  EmailMessage,
+} from './email-message.ts';
+import { Buffer } from 'node:buffer';
 import type { SendMailOptions, Transporter } from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
 import type SESTransport from 'nodemailer/lib/ses-transport/index.js';
@@ -18,7 +33,6 @@ async function getNodemailer(): Promise<typeof import('nodemailer')> {
   return _nodemailer!;
 }
 import { BaseService } from './service.ts';
-import type { EmailType } from '../../logging/metrics.ts';
 import {
   DefaultEmailBuilder,
   type EmailBuilder,
@@ -96,17 +110,6 @@ export type EmailConfig = NodeMailerConfig & {
 };
 
 /**
- * Interface for email message configuration.
- * Extends SendMailOptions with additional email type tracking.
- *
- * @property emailType - Optional type identifier for the email being sent.
- *                      Used for metrics tracking and logging.
- */
-export interface EmailMessage extends SendMailOptions {
-  emailType?: EmailType;
-}
-
-/**
  * Error type indicating email service initialization failed.
  * This branded marker is primarily useful inside the email service and its
  * tests, where initialization failures must be distinguished from send-time
@@ -131,6 +134,46 @@ function asEmailInitError(err: unknown): EmailInitError {
   const error = toError(err) as EmailInitError;
   error.emailInitFailed = true;
   return error;
+}
+
+function toNodemailerContent(content: EmailContent | undefined) {
+  return content instanceof Uint8Array ? Buffer.from(content) : content;
+}
+
+function toNodemailerPart<
+  T extends { content?: EmailContent; raw?: EmailContent },
+>(
+  part: T,
+): T {
+  return {
+    ...part,
+    content: toNodemailerContent(part.content),
+    raw: toNodemailerContent(part.raw),
+  };
+}
+
+function toNodemailerMessage(message: EmailMessage): SendMailOptions {
+  return {
+    ...message,
+    text: toNodemailerContent(message.text),
+    html: toNodemailerContent(message.html),
+    watchHtml: toNodemailerContent(message.watchHtml),
+    amp:
+      (message.amp
+        ? toNodemailerPart(message.amp)
+        : undefined) as SendMailOptions['amp'],
+    icalEvent:
+      (message.icalEvent
+        ? toNodemailerPart(message.icalEvent)
+        : undefined) as SendMailOptions['icalEvent'],
+    raw: toNodemailerContent(message.raw),
+    attachments: message.attachments?.map((attachment) =>
+      toNodemailerPart(attachment)
+    ) as SendMailOptions['attachments'],
+    alternatives: message.alternatives?.map((alternative) =>
+      toNodemailerPart(alternative)
+    ) as SendMailOptions['alternatives'],
+  };
 }
 
 export class EmailService<US extends Schema>
@@ -192,7 +235,9 @@ export class EmailService<US extends Schema>
         replyTo: this._config.replyTo,
         ...builder(info, this.services),
       };
-      const success = await this._transporter!.sendMail(msg);
+      const success = await this._transporter!.sendMail(
+        toNodemailerMessage(msg),
+      );
       if (success) {
         (this._emailLogger ?? this.services.logger).log({
           severity: 'METRIC',

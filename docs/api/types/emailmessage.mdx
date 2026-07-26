@@ -1,0 +1,18 @@
+---
+title: EmailMessage
+sidebar_label: EmailMessage
+---
+
+# EmailMessage
+
+Portable message shape returned by an [EmailBuilder](/api/types/emailbuilder).
+Import it from `@goatdb/goatdb/server/email`; this subpath has no server-only
+dependencies.
+
+The portable shape supports the standard Nodemailer message fields, including
+addresses, message metadata, text/HTML alternatives, headers, envelopes, and
+attachments. Address fields accept strings, `{ name?, address }` objects, or
+lists. Text, HTML, raw, and attachment content accept strings or `Uint8Array`;
+these are converted to Node buffers only at the Nodemailer boundary. The
+`emailType` field accepts GoatDB's supported classifications (`Login` and
+`AnalyticsReport`).

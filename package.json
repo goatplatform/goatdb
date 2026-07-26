@@ -9,6 +9,7 @@
     ".": "./mod.ts",
     "./react": "./react/hooks.ts",
     "./server": "./server.ts",
+    "./server/email": "./server/email.ts",
     "./server/build": "./server-build.ts",
     "./link": "./cli/link.ts"
   },
@@ -24,7 +25,8 @@
     "goatdb": "./dist/cli/init.js"
   },
   "scripts": {
-    "build:npm": "tsup"
+    "build:npm": "tsup",
+    "prepare:npm-package": "deno run --node-modules-dir=none -A npm-package.ts"
   },
   "dependencies": {
     "@goatdb/orderstamp": "npm:@jsr/goatdb__orderstamp@^1.1.1",

@@ -1,5 +1,6 @@
-import { TEST } from './mod.ts';
+import { TEST, type TestSuite } from './mod.ts';
 import { assertEquals, assertFalse, assertTrue } from './asserts.ts';
+import * as path from '../base/path.ts';
 import type { Logger } from '../logging/log.ts';
 import { createCapturedLogger } from './test-utils.ts';
 import { EmailService, isEmailInitError } from '../net/server/email.ts';
@@ -27,6 +28,37 @@ function createBuildInfo(): BuildInfo {
  *  provide a subset of the full ServerServices interface. */
 function makeMinimalServices(logger: Logger): any {
   return { logger, buildInfo: createBuildInfo() };
+}
+
+type CapturedMessage = {
+  to?: string | string[];
+  subject?: string;
+  text?: string | Uint8Array;
+  html?: string | Uint8Array;
+  from?: string;
+  sender?: string;
+  cc?: string | string[];
+  bcc?: string | string[];
+  replyTo?: string | string[];
+  headers?: Record<string, string>;
+  attachments?: { filename?: string; content?: unknown }[];
+};
+
+async function runDenoCommand(
+  args: string[],
+  cacheDir: string,
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  const output = await new Deno.Command(Deno.execPath(), {
+    args,
+    env: { DENO_DIR: cacheDir },
+    stdout: 'piped',
+    stderr: 'piped',
+  }).output();
+  return {
+    code: output.code,
+    stdout: new TextDecoder().decode(output.stdout),
+    stderr: new TextDecoder().decode(output.stderr),
+  };
 }
 
 export default function setupEmailServiceTests(): void {
@@ -116,6 +148,60 @@ export default function setupEmailServiceTests(): void {
         2,
         'successful sends must emit EmailSent metrics',
       );
+    },
+  );
+
+  TEST(
+    'EmailService',
+    'passes through standard nodemailer message fields from custom builders',
+    async () => {
+      let capturedMessage: CapturedMessage | undefined;
+
+      const email = new EmailService({
+        from: 'system@test.invalid',
+        sender: 'sender@test.invalid',
+        cc: ['cc@test.invalid'],
+        bcc: ['bcc@test.invalid'],
+        replyTo: 'reply@test.invalid',
+        builder: () => ({
+          to: 'custom@test.invalid',
+          subject: 'Custom subject',
+          text: 'Custom text',
+          html: '<p>Custom html</p>',
+          headers: { 'x-goatdb': 'present' },
+          attachments: [{ filename: 'note.txt', content: 'hello' }],
+        }),
+        createTransport() {
+          return {
+            sendMail: async (msg: CapturedMessage) => {
+              capturedMessage = msg;
+              return true;
+            },
+          } as unknown as import('nodemailer').Transporter;
+        },
+      });
+      const { logger } = createCapturedLogger();
+      await email.setup(makeMinimalServices(logger));
+
+      const sent = await email.send({
+        type: 'Login',
+        magicLink: 'https://example.com/custom',
+        to: 'ignored@test.invalid',
+      });
+
+      assertTrue(sent, 'custom builder send must succeed');
+      assertEquals(capturedMessage?.to, 'custom@test.invalid');
+      assertEquals(capturedMessage?.subject, 'Custom subject');
+      assertEquals(capturedMessage?.text, 'Custom text');
+      assertEquals(capturedMessage?.html, '<p>Custom html</p>');
+      assertEquals(capturedMessage?.from, 'system@test.invalid');
+      assertEquals(capturedMessage?.sender, 'sender@test.invalid');
+      assertEquals(capturedMessage?.cc, ['cc@test.invalid']);
+      assertEquals(capturedMessage?.bcc, ['bcc@test.invalid']);
+      assertEquals(capturedMessage?.replyTo, 'reply@test.invalid');
+      assertEquals(capturedMessage?.headers?.['x-goatdb'], 'present');
+      assertEquals(capturedMessage?.attachments?.[0]?.filename, 'note.txt');
+      assertEquals(capturedMessage?.attachments?.[0]?.content, 'hello');
     },
   );
 
@@ -254,6 +340,68 @@ export default function setupEmailServiceTests(): void {
   );
 }
 
+export function setupEmailServiceDenoTests(): void {
+  TEST(
+    'EmailService',
+    'public EmailMessage facade typechecks offline without node_modules',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('email-message-deno-check');
+      const entryPath = path.join(dir, 'email-message-check.ts');
+      const root = Deno.cwd();
+      const configPath = path.join(root, 'deno.json');
+      const packagePath = path.join(root, 'package.json');
+      const denoConfig = JSON.parse(await Deno.readTextFile(configPath)) as {
+        exports: Record<string, string>;
+      };
+      const packageConfig = JSON.parse(
+        await Deno.readTextFile(packagePath),
+      ) as {
+        exports: Record<string, string>;
+      };
+      const emailExport = denoConfig.exports['./server/email'];
+      assertEquals(emailExport, './server/email.ts');
+      assertEquals(packageConfig.exports['./server/email'], emailExport);
+      const emailModule = path.toFileUrl(path.join(root, emailExport)).href;
+
+      await Deno.writeTextFile(
+        entryPath,
+        [
+          `import type { EmailMessage } from ${JSON.stringify(emailModule)};`,
+          'const message: EmailMessage = {',
+          "  to: [{ name: 'User', address: 'user@test.invalid' }],",
+          "  headers: { 'x-goatdb': ['present'] },",
+          "  attachments: [{ filename: 'note.txt', content: new Uint8Array([1]) }],",
+          "  emailType: 'Login',",
+          '};',
+          '// @ts-expect-error recipients must be email addresses',
+          'const invalidRecipient: EmailMessage = { to: 42 };',
+          '// @ts-expect-error header values must be strings',
+          'const invalidHeader: EmailMessage = { headers: { test: 42 } };',
+          '// @ts-expect-error attachment content must be portable',
+          'const invalidAttachment: EmailMessage = { attachments: [{ content: 42 }] };',
+          'void [message, invalidRecipient, invalidHeader, invalidAttachment];',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await runDenoCommand([
+        'check',
+        '--no-remote',
+        '--node-modules-dir=false',
+        '--config',
+        configPath,
+        entryPath,
+      ], path.join(dir, 'deno-dir'));
+
+      assertEquals(
+        result.code,
+        0,
+        `Public EmailMessage facade must typecheck offline from a fresh cache without node_modules\n${result.stderr}`,
+      );
+    },
+  );
+}
+
 export function setupEmailServiceServerTests(): void {
   TEST(
     'EmailService',
@@ -264,6 +412,12 @@ export function setupEmailServiceServerTests(): void {
           from: 'system@test.invalid',
           streamTransport: true,
           buffer: true,
+          builder: () => ({
+            attachments: [{
+              filename: 'bytes.bin',
+              content: new Uint8Array([1]),
+            }],
+          }),
         } as import('../net/server/email.ts').EmailConfig,
       );
       const { captured, logger } = createCapturedLogger();
@@ -285,6 +439,50 @@ export function setupEmailServiceServerTests(): void {
         ).length,
         1,
         'default nodemailer transport path must emit EmailSent metric',
+      );
+    },
+  );
+
+  TEST(
+    'EmailService',
+    'converts portable binary message content before sending',
+    async () => {
+      const { Buffer } = await import('node:buffer');
+      let captured: CapturedMessage | undefined;
+      const email = new EmailService({
+        from: 'system@test.invalid',
+        builder: () => ({
+          text: new Uint8Array([1, 2]),
+          html: new Uint8Array([3, 4]),
+          attachments: [{ content: new Uint8Array([5, 6]) }],
+        }),
+        createTransport() {
+          return {
+            sendMail: async (message: CapturedMessage) => {
+              captured = message;
+              return true;
+            },
+          } as unknown as import('nodemailer').Transporter;
+        },
+      });
+      const { logger } = createCapturedLogger();
+      await email.setup(makeMinimalServices(logger));
+      assertTrue(
+        await email.send({
+          type: 'Login',
+          magicLink: 'https://example.com/binary',
+          to: 'binary@test.invalid',
+        }),
+      );
+
+      assertTrue(captured?.text instanceof Buffer);
+      assertTrue(captured?.html instanceof Buffer);
+      assertTrue(captured?.attachments?.[0]?.content instanceof Buffer);
+      assertEquals(Array.from(captured?.text as Uint8Array), [1, 2]);
+      assertEquals(Array.from(captured?.html as Uint8Array), [3, 4]);
+      assertEquals(
+        Array.from(captured?.attachments?.[0]?.content as Uint8Array),
+        [5, 6],
       );
     },
   );

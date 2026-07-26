@@ -57,6 +57,7 @@ import setupRuntimeTests, {
   setupRuntimeNodeTests,
 } from './runtime.test.ts';
 import setupEmailServiceTests, {
+  setupEmailServiceDenoTests,
   setupEmailServiceServerTests,
 } from './email-service.test.ts';
 import setupProgressTests from './progress.test.ts';
@@ -141,6 +142,7 @@ async function registerAllTestsImpl(): Promise<void> {
     setupEmailServiceServerTests(); // Default nodemailer path needs server package resolution
   }
   if (getRuntime().id === 'deno') {
+    setupEmailServiceDenoTests(); // Deno --node-modules-dir=false regression guard for EmailMessage
     setupRuntimeDenoTests(); // Deno-only runtime tests (signals, unsupported browser opening)
   }
   if (getRuntime().id === 'node') {

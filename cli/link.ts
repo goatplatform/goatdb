@@ -135,6 +135,7 @@ export const goatEntryPoints = {
   '': 'mod.ts',
   '/react': 'react/hooks.ts',
   '/server': 'server.ts',
+  '/server/email': 'server/email.ts',
   '/server/build': 'server-build.ts',
   '/link': 'cli/link.ts',
 } as const;

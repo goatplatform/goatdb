@@ -80,6 +80,16 @@ and GoatDB adheres to
   // In your JS/TS entry: import './src/styles.css';
   ```
 
+- **`EmailMessage` decoupled from nodemailer types**: `EmailMessage` no longer
+  extends nodemailer's `SendMailOptions`. It is now a portable explicit type
+  defined in `net/server/email-message.ts`, importable from
+  `@goatdb/goatdb/server/email` without pulling in nodemailer. Custom email
+  builders can now typecheck under Deno's `--node-modules-dir=false` mode.
+  `Uint8Array` content is automatically converted to `Buffer` before sending.
+  All common message fields (from, to, cc, bcc, subject, text, html, headers,
+  attachments) are preserved. Users relying on nodemailer-specific
+  `SendMailOptions` fields not in the portable subset may need to adjust.
+
 ### Added
 
 - `GoatDB.insert()` — bulk API for batch item creation without ancestor

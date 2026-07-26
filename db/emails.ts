@@ -1,5 +1,5 @@
 import { notReached } from '../base/error.ts';
-import type { EmailMessage } from '../net/server/email.ts';
+import type { EmailMessage } from '../net/server/email-message.ts';
 import type { ServerOptions } from '../net/server/server.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 
