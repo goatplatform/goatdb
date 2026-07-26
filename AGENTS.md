@@ -2,7 +2,7 @@
 
 ## Tech Stack
 
-- **Runtime**: Deno v2.x, Node.js 24.x
+- **Runtime**: Deno v2.x, Node.js 26.x
 - **Language**: TypeScript (strict, explicit `.ts` imports required)
 - **Browser Tests**: Playwright/Chromium
 - **Package**: JSR @goatdb/goatdb

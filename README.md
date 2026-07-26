@@ -54,7 +54,7 @@ deno add jsr:@goatdb/goatdb
 deno run -A jsr:@goatdb/goatdb init   # scaffold a new project
 ```
 
-**Node.js** (24+):
+**Node.js** (26+):
 
 ```bash
 npx jsr add @goatdb/goatdb

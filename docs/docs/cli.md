@@ -22,7 +22,7 @@ deno run -A jsr:@goatdb/goatdb init
 deno run -A jsr:@goatdb/goatdb init ./my-app   # optional target directory
 ```
 
-**Node.js** (requires Node.js 24+):
+**Node.js** (requires Node.js 26+):
 
 ```bash
 npx -y @goatdb/goatdb init

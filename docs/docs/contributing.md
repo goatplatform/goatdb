@@ -45,7 +45,7 @@ single TypeScript codebase.
 ## Getting Started
 
 **Prerequisites**: **Deno v2.x** ([install here](https://deno.com/)) and
-**Node.js v24+** for [cross-runtime testing](/docs/architecture).
+**Node.js v26+** for [cross-runtime testing](/docs/architecture).
 
 **AI-Enhanced Development**: GoatDB is optimized for AI-assisted development
 with [Claude Code](https://www.anthropic.com/claude-code),

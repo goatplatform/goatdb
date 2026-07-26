@@ -26,9 +26,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          # Pin to 24.15.0 to avoid libuv assertion crash on Windows
-          # (Node.js 24.16.0 regression, tracked at libuv#5010)
-          node-version: '24.15.0'
+          node-version: '26.x'
 
       - name: Static analysis (type check + module graph)
         run: |
@@ -87,8 +85,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          # Pin to 24.15.0 for version consistency across all CI jobs
-          node-version: '24.15.0'
+          node-version: '26.x'
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4

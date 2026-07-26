@@ -24,7 +24,7 @@ jobs:
           deno-version: v2.x
       - uses: actions/setup-node@v4
         with:
-          node-version: '24.x'
+          node-version: '26.x'
       - name: Install docs dependencies
         run: npm install
         working-directory: docs

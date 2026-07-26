@@ -2547,8 +2547,14 @@ export default function setupCliCompileTests() {
         'package.json must be readable for packaging checks',
       );
       const pkg = JSON.parse(pkgText) as {
+        engines?: { node?: string };
         optionalDependencies?: Record<string, string>;
       };
+      assertEquals(
+        pkg.engines?.node,
+        `>=${kMinNodeMajor}`,
+        'package.json must advertise the canonical Node engine floor',
+      );
       assertEquals(
         typeof pkg.optionalDependencies?.esbuild,
         'string',

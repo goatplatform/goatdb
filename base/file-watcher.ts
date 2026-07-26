@@ -353,7 +353,8 @@ export async function createNativeFsWatcher(
   const processPlatform = platform ?? globalThis.process.platform;
   // On Windows, recursive fs.watch via libuv has a known assertion crash
   // (src/win/fs-event.c:72, _wcsnicmp mismatch) due to short-path name
-  // normalization. This is a regression in Node.js 24.16.0, tracked at
+  // normalization. Introduced in Node.js 24.16.0 and still unresolved in
+  // Node.js 26.x (libuv fix merged but unreleased). Tracked at
   // https://github.com/libuv/libuv/issues/5010. Use polling instead.
   if (processPlatform === 'win32') {
     log({
@@ -407,8 +408,9 @@ export async function createNativeFsWatcher(
  * Polling-based file watcher for Windows.
  *
  * Recursive fs.watch on Windows is unreliable due to a libuv assertion crash
- * (Node.js 24.16.0 regression, libuv#5010). This fallback periodically scans
- * the directory tree and emits events for new, modified, and deleted files.
+ * (introduced in Node.js 24.16.0, still unresolved in 26.x; libuv#5010).
+ * This fallback periodically scans the directory tree and emits events for
+ * new, modified, and deleted files.
  *
  * @param fs The node:fs module
  * @param dir The directory to watch

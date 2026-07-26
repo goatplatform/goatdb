@@ -168,7 +168,7 @@ tolerance.
 Yes. Node.js is a fully supported, first-class runtime alongside Deno. GoatDB
 provides a complete Node.js adapter including HTTP server
 (`node:http`/`node:https`), file I/O, crypto, workers, and Single Executable
-Application (SEA) compilation. Node.js 24+ is required. See the
+Application (SEA) compilation. Node.js 26+ is required. See the
 [installation guide](/docs/install) for setup instructions and the
 [examples](https://github.com/goatplatform/goatdb/tree/main/examples) for
 working Node.js projects.

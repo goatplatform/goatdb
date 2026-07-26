@@ -16,6 +16,7 @@ import { getRuntime } from '../base/runtime/index.ts';
 import { stopBackgroundCompiler } from '../build.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { buildAssets } from '../cli/build-assets.ts';
+import { kMinNodeMajor } from '../cli/compile.ts';
 import {
   mkdir,
   pathExists,
@@ -675,12 +676,18 @@ export function setupCliInitNodeTests(): void {
         path.join(testDir, 'package.json'),
       );
       const pkg = JSON.parse(packageContent ?? '{}') as {
+        devDependencies?: Record<string, string>;
         engines?: { node?: unknown };
       };
       assertEquals(
         pkg.engines?.node,
-        '>=26.0.0',
-        'node scaffold package.json must advertise the Node 26 floor',
+        `>=${kMinNodeMajor}.0.0`,
+        'node scaffold package.json must advertise the canonical Node floor',
+      );
+      assertEquals(
+        pkg.devDependencies?.['@types/node'],
+        `^${kMinNodeMajor}.0.0`,
+        'node scaffold package.json must pin @types/node to the canonical Node floor',
       );
     },
   );
