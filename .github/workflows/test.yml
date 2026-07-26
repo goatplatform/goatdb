@@ -80,6 +80,7 @@ jobs:
           npm pack --pack-destination "$tmpdir"
           tarball=$(find "$tmpdir" -maxdepth 1 -name '*.tgz' -print -quit)
           mkdir "$tmpdir/consumer"
+          cp .npmrc "$tmpdir/consumer/"
           npm install --prefix "$tmpdir/consumer" --ignore-scripts "$tarball"
           cat > "$tmpdir/consumer/index.ts" <<'EOF'
           import type { EmailMessage } from '@goatdb/goatdb/server/email';
