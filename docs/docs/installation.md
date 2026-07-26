@@ -53,6 +53,20 @@ Executable Applications), GoatDB uses the built-in `node --build-sea` flag
 npx jsr add @goatdb/goatdb
 ```
 
+GoatDB's npm package has JSR-backed dependencies. `jsr add` configures the
+`@jsr` registry automatically. If you install the package directly with npm, add
+this to your project's `.npmrc` first:
+
+```ini
+@jsr:registry=https://npm.jsr.io
+```
+
+Then install it normally:
+
+```bash
+npm install @goatdb/goatdb
+```
+
 **Yarn:**
 
 ```bash
