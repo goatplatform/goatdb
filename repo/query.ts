@@ -280,19 +280,11 @@ export class Query<
    * @param config.sortDescending Optional flag to reverse sort order
    * @param config.liveUpdates Optional flag for live uncommitted updates (default true)
    */
-  constructor({
-    db,
-    id,
-    source,
-    predicate,
-    sortBy,
-    sortDescending,
-    ctx,
-    schema,
-    limit,
-    liveUpdates,
-  }: QueryConfig<IS, OS, CTX>) {
+  constructor(config: QueryConfig<IS, OS, CTX>) {
     super();
+    this.id = resolveQueryId(config);
+    const { db, sortDescending, ctx, schema, limit, liveUpdates } = config;
+    let { source, predicate, sortBy } = config;
     this.db = db;
     if (typeof source === 'string') {
       source = itemPathGetRepoId(source);
@@ -310,17 +302,6 @@ export class Query<
     } else if (typeof sortBy === 'function' && sortDescending) {
       sortBy = (info) => (sortBy as SortDescriptor<OS, CTX>)(info) * -1;
     }
-    this.id = id ||
-      generateQueryId(
-        source as QuerySource,
-        predicate,
-        sortBy,
-        ctx,
-        schema?.ns,
-        sortDescending,
-        limit,
-        liveUpdates,
-      );
     this.context = ctx as CTX;
     this.source = source;
     this.scheme = schema;
@@ -972,6 +953,38 @@ export class Query<
 
 const gGeneratedQueryIds = new Map<string, string>();
 
+/** Resolves an explicit ID or derives one from the unnormalized query config. */
+export function resolveQueryId<
+  IS extends Schema = Schema,
+  OS extends IS = IS,
+  CTX extends ReadonlyJSONValue = ReadonlyJSONValue,
+>(
+  config: Pick<
+    QueryConfig<IS, OS, CTX>,
+    | 'id'
+    | 'source'
+    | 'predicate'
+    | 'sortBy'
+    | 'ctx'
+    | 'schema'
+    | 'sortDescending'
+    | 'limit'
+    | 'liveUpdates'
+  >,
+): string {
+  return config.id ??
+    generateQueryId(
+      config.source,
+      config.predicate,
+      config.sortBy,
+      config.ctx,
+      config.schema?.ns,
+      config.sortDescending,
+      config.limit,
+      config.liveUpdates,
+    );
+}
+
 /**
  * Generates a unique identifier for a query based on its configuration.
  * The ID is deterministic and will be the same for queries with identical:
@@ -993,7 +1006,7 @@ export function generateQueryId<
   OS extends IS = IS,
   CTX extends ReadonlyJSONValue = ReadonlyJSONValue,
 >(
-  source: QuerySource,
+  source: QuerySource<IS, OS>,
   predicate: Predicate<IS, CTX> | undefined,
   sortDescriptor:
     | keyof SchemaDataType<OS>
@@ -1005,32 +1018,33 @@ export function generateQueryId<
   limit?: number,
   liveUpdates?: boolean,
 ): string {
-  let key: string;
-  if (typeof source === 'string') {
-    key = source;
-  } else if (source instanceof Repository) {
-    key = source.path;
-  } else {
-    key = source.id;
-  }
-  key += '|';
-  key += predicate ? predicate.toString() : 'null';
-  key += '|';
-  key += sortDescriptor ? sortDescriptor.toString() : 'null';
-  key += '|';
-  key += JSON.stringify(ctx);
-  key += '|';
-  key += ns;
-  key += '|';
-  key += sortDescending ?? '';
-  key += '|';
-  key += limit ?? '';
-  key += '|';
-  key += liveUpdates ?? '';
+  const sourceId = typeof source === 'string'
+    ? source
+    : source instanceof Repository
+    ? source.path
+    : source.id;
+  const key = [
+    sourceId,
+    predicate,
+    sortDescriptor,
+    ctx,
+    ns,
+    sortDescending,
+    limit,
+    liveUpdates,
+  ].map(queryIdPart).join('');
   let hash = gGeneratedQueryIds.get(key);
   if (!hash) {
     hash = murmur3(key, 0).toString(36);
     gGeneratedQueryIds.set(key, hash);
   }
   return hash;
+}
+
+function queryIdPart(value: unknown): string {
+  if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
+  const type = typeof value;
+  const text = type === 'object' ? JSON.stringify(value) : String(value);
+  return `${type}:${text.length}:${text}`;
 }
