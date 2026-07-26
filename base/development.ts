@@ -58,6 +58,10 @@ function isCliOptions(arg: unknown): arg is CliOptions {
   return typeof arg === 'object' && arg !== null && !Array.isArray(arg);
 }
 
+function quoteWindowsShellArgument(arg: string): string {
+  return `"${arg.replaceAll('"', '""')}"`;
+}
+
 /**
  * Executes a command line interface command and waits for it to complete.
  *
@@ -155,7 +159,11 @@ export async function cli(
       // hardcoded commands — never user-supplied input.
       if (onWindows) spawnOptions.shell = true;
 
-      const proc = spawn(cmd, cmdArgs, spawnOptions);
+      const command = onWindows ? quoteWindowsShellArgument(cmd) : cmd;
+      const commandArgs = onWindows
+        ? cmdArgs.map(quoteWindowsShellArgument)
+        : cmdArgs;
+      const proc = spawn(command, commandArgs, spawnOptions);
       let settled = false;
       let timedOut = false;
       let timer: ReturnType<typeof setTimeout> | undefined;

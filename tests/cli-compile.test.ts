@@ -24,7 +24,7 @@ import {
   readTextFile,
   writeTextFile,
 } from '../base/json-log/file-impl.ts';
-import { getEnvVar, normalizeNodePlatform } from '../base/os.ts';
+import { getEnvVar, isWindows, normalizeNodePlatform } from '../base/os.ts';
 import { sleep } from '../base/time.ts';
 import { getGoatConfig } from '../base/config.ts';
 import {
@@ -163,6 +163,15 @@ function compiledBinaryPath(
   return path.join(buildDir, `${outputName}-${targetOsArch}${execExt}`);
 }
 
+function assertConfigBuildInfo(
+  buildInfo: { appName?: unknown; appVersion?: unknown },
+  appName: string,
+  appVersion: string,
+): void {
+  assertEquals(buildInfo.appName, appName);
+  assertEquals(buildInfo.appVersion, appVersion);
+}
+
 function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
@@ -193,27 +202,42 @@ function withTimeout<T>(
 }
 
 async function writeFakeNodeSeaBuilder(
-  fakeNodePath: string,
+  fakeNodeBasePath: string,
   recordPath: string,
-): Promise<void> {
-  await writeTextFile(
-    fakeNodePath,
-    [
-      '#!/usr/bin/env node',
-      'const fs = require("node:fs");',
-      `const recordPath = ${JSON.stringify(recordPath)};`,
-      'const [, , flag, configPath] = process.argv;',
-      'if (flag !== "--build-sea" || typeof configPath !== "string") {',
-      '  console.error("unexpected argv", process.argv.slice(2));',
-      '  process.exit(1);',
-      '}',
-      'const config = JSON.parse(fs.readFileSync(configPath, "utf8"));',
-      'fs.writeFileSync(recordPath, JSON.stringify({ argv: process.argv.slice(2), output: config.output }));',
-      'fs.writeFileSync(config.output, "fake-sea-binary\\n");',
-    ].join('\n') + '\n',
-  );
-  const fs = await import('node:fs/promises');
-  await fs.chmod(fakeNodePath, 0o755);
+): Promise<string> {
+  const jsContent = [
+    'const fs = require("node:fs");',
+    `const recordPath = ${JSON.stringify(recordPath)};`,
+    'const [, , flag, configPath] = process.argv;',
+    'if (flag !== "--build-sea" || typeof configPath !== "string") {',
+    '  console.error("unexpected argv", process.argv.slice(2));',
+    '  process.exit(1);',
+    '}',
+    'const config = JSON.parse(fs.readFileSync(configPath, "utf8"));',
+    'const buildInfo = JSON.parse(fs.readFileSync(config.assets["buildInfo.json"], "utf8"));',
+    'fs.writeFileSync(recordPath, JSON.stringify({ argv: process.argv.slice(2), output: config.output, buildInfo }));',
+    'fs.writeFileSync(config.output, "fake-sea-binary\\n");',
+  ].join('\n') + '\n';
+
+  // On Windows, cmd.exe doesn't understand shebangs. Write a .cmd wrapper
+  // that calls node on a companion .js file. On Unix, write a shebang script.
+  if (isWindows()) {
+    await writeTextFile(fakeNodeBasePath + '.js', jsContent);
+    await writeTextFile(
+      fakeNodeBasePath + '.cmd',
+      '@node "%~dpn0.js" %*\r\n',
+    );
+    // Return the .cmd path — spawn will find it via PATHEXT on Windows.
+    return fakeNodeBasePath + '.cmd';
+  } else {
+    await writeTextFile(
+      fakeNodeBasePath,
+      '#!/usr/bin/env node\n' + jsContent,
+    );
+    const _fs = await import('node:fs/promises');
+    await _fs.chmod(fakeNodeBasePath, 0o755);
+    return fakeNodeBasePath;
+  }
 }
 
 function createFakeNodeAdapter(
@@ -2477,61 +2501,6 @@ export default function setupCliCompileTests() {
             `Config file not found at "${expectedConfigPath}"`,
           );
         });
-      } finally {
-        await stopBackgroundCompiler();
-      }
-    },
-  );
-
-  TEST(
-    'CLI-Compile',
-    'compile uses the default runtime config from the effective cwd when it exists',
-    async (ctx: TestSuite) => {
-      const dir = await ctx.tempDir('compile-effective-cwd-config-success');
-      const runtime = getRuntime();
-      const buildDir = path.join(dir, 'build');
-      const serverEntry = path.join(dir, 'server.ts');
-      const clientEntry = path.join(dir, 'client.ts');
-      const outputName = 'cwd-config-app';
-      const configPath = path.join(
-        dir,
-        runtime.id === 'node' ? 'package.json' : 'deno.json',
-      );
-      const fakeNodePath = path.join(dir, 'fake-node');
-      const recordPath = path.join(dir, 'fake-node-record.json');
-      const outputFile = compiledBinaryPath(runtime, buildDir, outputName);
-      await writeTextFile(serverEntry, 'export {};\n');
-      await writeTextFile(clientEntry, 'export {};\n');
-      await writeTextFile(
-        configPath,
-        JSON.stringify({ name: 'cwd-config-app', version: '1.2.3' }),
-      );
-      if (runtime.id === 'node') {
-        await writeFakeNodeSeaBuilder(fakeNodePath, recordPath);
-      }
-
-      try {
-        await withTestCWD(dir, async () => {
-          const runCompile = () =>
-            compile({
-              buildDir,
-              serverEntry,
-              jsPath: clientEntry,
-              outputName,
-            });
-          if (runtime.id === 'node') {
-            await withTestRuntimeOverride(
-              createFakeNodeAdapter(fakeNodePath),
-              runCompile,
-            );
-          } else {
-            await runCompile();
-          }
-        });
-        assertTrue(
-          await pathExists(outputFile),
-          `compile() must succeed using the default runtime config from the effective cwd and produce ${outputFile}`,
-        );
       } finally {
         await stopBackgroundCompiler();
       }
@@ -5233,11 +5202,11 @@ export function setupCliCompileNodeTests(): void {
     async (ctx) => {
       const runtime = getRuntime();
       const dir = await ctx.tempDir('compile-node-sea-runtime-exec');
-      const buildDir = path.join(dir, 'build');
+      const buildDir = path.join(dir, 'build with spaces');
       const serverEntry = path.join(dir, 'server.ts');
       const clientEntry = path.join(dir, 'client.ts');
       const packageJson = path.join(dir, 'package.json');
-      const fakeNodePath = path.join(dir, 'fake-node');
+      const fakeNodeBasePath = path.join(dir, 'fake node');
       const recordPath = path.join(dir, 'fake-node-record.json');
       const outputName = 'runtime-exec-app';
       const outputFile = compiledBinaryPath(runtime, buildDir, outputName);
@@ -5247,7 +5216,10 @@ export function setupCliCompileNodeTests(): void {
         packageJson,
         JSON.stringify({ name: outputName, version: '1.2.3' }) + '\n',
       );
-      await writeFakeNodeSeaBuilder(fakeNodePath, recordPath);
+      const fakeNodePath = await writeFakeNodeSeaBuilder(
+        fakeNodeBasePath,
+        recordPath,
+      );
 
       try {
         await withTestRuntimeOverride(
@@ -5267,6 +5239,7 @@ export function setupCliCompileNodeTests(): void {
         ) as {
           argv?: string[];
           output?: string;
+          buildInfo?: { appName?: unknown; appVersion?: unknown };
         } | null;
         assertExists(
           record,
@@ -5333,6 +5306,60 @@ export function setupCliCompileNodeTests(): void {
         }, 'x'), 5000)`,
       'node',
     ),
+  );
+
+  TEST(
+    'CLI-Compile',
+    'compile uses package.json config from the effective cwd',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('compile-effective-cwd-config-node');
+      const buildDir = path.join(dir, 'build');
+      const serverEntry = path.join(dir, 'server.ts');
+      const clientEntry = path.join(dir, 'client.ts');
+      const outputName = 'cwd-config-app';
+      const appName = 'config-derived-node-app';
+      const appVersion = '7.8.9';
+      const packageJson = path.join(dir, 'package.json');
+      const outputFile = compiledBinaryPath(getRuntime(), buildDir, outputName);
+      const fakeNodeBasePath = path.join(dir, 'fake-node');
+      const recordPath = path.join(dir, 'fake-node-record.json');
+      await writeTextFile(serverEntry, 'export {};\n');
+      await writeTextFile(clientEntry, 'export {};\n');
+      await writeTextFile(
+        packageJson,
+        JSON.stringify({ name: appName, version: appVersion }),
+      );
+
+      try {
+        const fakeNodePath = await writeFakeNodeSeaBuilder(
+          fakeNodeBasePath,
+          recordPath,
+        );
+        await withTestCWD(dir, async () => {
+          await withTestRuntimeOverride(
+            createFakeNodeAdapter(fakeNodePath),
+            () =>
+              compile({
+                buildDir,
+                serverEntry,
+                jsPath: clientEntry,
+                outputName,
+              }),
+          );
+        });
+        assertTrue(
+          await pathExists(outputFile),
+          `compile() must succeed with package.json config and produce ${outputFile}`,
+        );
+        const record = JSON.parse(
+          (await readTextFile(recordPath)) || 'null',
+        ) as { buildInfo?: { appName?: unknown; appVersion?: unknown } } | null;
+        assertExists(record?.buildInfo);
+        assertConfigBuildInfo(record.buildInfo!, appName, appVersion);
+      } finally {
+        await stopBackgroundCompiler();
+      }
+    },
   );
 
   TEST(
@@ -5751,5 +5778,55 @@ export function setupCliCompileDenoTests(): void {
         }, 'x'), 5000)`,
       'deno',
     ),
+  );
+
+  TEST(
+    'CLI-Compile',
+    'compile uses deno.json config from the effective cwd',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('compile-effective-cwd-config-deno');
+      const buildDir = path.join(dir, 'build');
+      const serverEntry = path.join(dir, 'server.ts');
+      const clientEntry = path.join(dir, 'client.ts');
+      const outputName = 'cwd-config-app';
+      const appName = 'config-derived-deno-app';
+      const appVersion = '7.8.9';
+      const denoJson = path.join(dir, 'deno.json');
+      const outputFile = compiledBinaryPath(getRuntime(), buildDir, outputName);
+      await writeTextFile(
+        serverEntry,
+        'import buildInfo from "./build/buildInfo.json" with { type: "json" };\n' +
+          'console.log(JSON.stringify(buildInfo));\n',
+      );
+      await writeTextFile(clientEntry, 'export {};\n');
+      await writeTextFile(
+        denoJson,
+        JSON.stringify({ name: appName, version: appVersion }),
+      );
+
+      try {
+        await withTestCWD(dir, async () => {
+          await compile({
+            buildDir,
+            serverEntry,
+            jsPath: clientEntry,
+            outputName,
+          });
+        });
+        assertTrue(
+          await pathExists(outputFile),
+          `compile() must succeed with deno.json config and produce ${outputFile}`,
+        );
+        const { result, exitCode } = await cli(outputFile);
+        assertEquals(exitCode, 0);
+        assertConfigBuildInfo(
+          JSON.parse(result) as { appName?: unknown; appVersion?: unknown },
+          appName,
+          appVersion,
+        );
+      } finally {
+        await stopBackgroundCompiler();
+      }
+    },
   );
 }
