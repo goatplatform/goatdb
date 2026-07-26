@@ -8,7 +8,7 @@ import { log } from './logging/log.ts';
 // IMPORTANT: `esbuild` and `@deno/esbuild-plugin` MUST remain `import type`.
 // Runtime imports of these Deno/JSR-specific packages break Node.js SEA binaries.
 // `readFile` is a GoatDB-internal utility and is safe as a runtime import.
-import type { Plugin, PluginBuild } from 'esbuild';
+import type { Message, Plugin, PluginBuild } from 'esbuild';
 import type { denoPlugin } from '@deno/esbuild-plugin';
 
 /** Specifier for esbuild — variable import prevents SEA bundler capture. */
@@ -163,6 +163,49 @@ function outputPathForFile(filePath: string): string {
 function bundleKeyForFile(filePath: string): string {
   return outputPathForFile(filePath)
     .replace(/\.(js\.map|css\.map|js|css)$/, '');
+}
+
+/** Normalizes esbuild's rejected BuildFailure and resolved result errors. */
+export function normalizeEsbuildFailure(
+  error: unknown,
+  prefix?: string,
+): Error {
+  const errors = (error as { errors?: unknown })?.errors;
+  const message = Array.isArray(errors)
+    ? errors.map((item) => {
+      if (item && typeof item === 'object' && 'text' in item) {
+        const diagnostic = item as Message;
+        const location = diagnostic.location;
+        const prefix = location?.file
+          ? `${location.file}:${location.line}:${location.column}: `
+          : '';
+        return `${prefix}${diagnostic.text}`;
+      }
+      return String(item);
+    }).join('\n')
+    : error instanceof Error
+    ? error.message
+    : String(error);
+  return new Error(prefix ? `${prefix}: ${message}` : message, {
+    cause: error,
+  });
+}
+
+/** Runs an esbuild operation and surfaces all compilation failures consistently. */
+export async function runEsbuild<T extends { errors: readonly Message[] }>(
+  build: () => Promise<T>,
+  prefix?: string,
+): Promise<T> {
+  let result: T;
+  try {
+    result = await build();
+  } catch (error) {
+    throw normalizeEsbuildFailure(error, prefix);
+  }
+  if (result.errors.length > 0) {
+    throw normalizeEsbuildFailure({ errors: result.errors }, prefix);
+  }
+  return result;
 }
 
 export function bundleResultFromBuildResult(
@@ -546,7 +589,8 @@ export async function createBuildContext(
     ...sharedClientBuildOptions(),
   });
   return {
-    rebuild: async () => bundleResultFromBuildResult(await ctx.rebuild()),
+    rebuild: async () =>
+      bundleResultFromBuildResult(await runEsbuild(ctx.rebuild)),
     close: () => ctx.dispose(),
   };
 }

@@ -49,6 +49,7 @@ import {
   buildAssets,
   buildCombinedCSS,
   countNewlines,
+  runOneShotBuildWithCleanup,
 } from '../cli/build-assets.ts';
 import {
   runDebugServerWatchLoop,
@@ -3596,6 +3597,128 @@ src: url('./goat-font.woff2') format('woff2');
 
   TEST(
     'CLI-Compile',
+    'runOneShotBuildWithCleanup throws cleanup failures after successful builds',
+    async () => {
+      let cleanedUp = false;
+      await assertThrows(
+        () =>
+          runOneShotBuildWithCleanup(
+            async () => 'ok',
+            async () => {
+              cleanedUp = true;
+              throw new Error('cleanup-sentinel');
+            },
+          ),
+        Error,
+        'cleanup-sentinel',
+      );
+      assertTrue(cleanedUp, 'cleanup must still run after successful builds');
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'runOneShotBuildWithCleanup preserves build failures and logs cleanup failures',
+    async () => {
+      let cleanedUp = false;
+      await withLogCapture(async (captured) => {
+        await assertThrows(
+          () =>
+            runOneShotBuildWithCleanup(
+              async () => {
+                throw new Error('build-sentinel');
+              },
+              async () => {
+                cleanedUp = true;
+                throw new Error('cleanup-sentinel');
+              },
+            ),
+          Error,
+          'build-sentinel',
+        );
+        assertTrue(
+          captured.some((entry) =>
+            entry.severity === 'ERROR' &&
+            entry.error === 'UncaughtServerError' &&
+            entry.message.includes('cleanup-sentinel')
+          ),
+          'cleanup failures after a build failure must be logged',
+        );
+      });
+      assertTrue(cleanedUp, 'cleanup must still run when the build fails');
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'runOneShotBuildWithCleanup keeps esbuild alive when requested',
+    async () => {
+      let cleanedUp = false;
+      const result = await runOneShotBuildWithCleanup(
+        async () => 'ok',
+        async () => {
+          cleanedUp = true;
+        },
+        true,
+      );
+      assertEquals(result, 'ok');
+      assertFalse(
+        cleanedUp,
+        'keepEsbuildAlive must defer cleanup to its caller',
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'buildAssets one-shot failure surfaces esbuild errors and later one-shot builds still succeed',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('build-assets-one-shot-failure');
+      const entryPath = path.join(dir, 'entry.ts');
+      const cssPath = path.join(dir, 'style.css');
+      const entryPoints = [{ in: entryPath, out: APP_ENTRY_POINT }];
+
+      try {
+        await writeTextFile(entryPath, "import './missing.css';\nexport {};\n");
+        await assertThrows(
+          () =>
+            buildAssets(
+              undefined,
+              entryPoints,
+              {
+                buildDir: dir,
+                jsPath: entryPath,
+              },
+              { runtime: 'node', keepEsbuildAlive: false },
+            ),
+          Error,
+          'missing.css',
+        );
+
+        await writeTextFile(cssPath, ':root { --one-shot-recovered: 1; }\n');
+        await writeTextFile(entryPath, "import './style.css';\nexport {};\n");
+        const assets = await buildAssets(
+          undefined,
+          entryPoints,
+          {
+            buildDir: dir,
+            jsPath: entryPath,
+          },
+          { runtime: 'node', keepEsbuildAlive: false },
+        );
+        const css = new TextDecoder().decode(assets['/index.css'].data);
+        assertTrue(
+          css.includes('--one-shot-recovered'),
+          'a failed one-shot build must not poison the next one-shot build',
+        );
+      } finally {
+        await stopBackgroundCompiler();
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
     'buildAssets with ReBuildContext collects CSS on initial build and after rebuild',
     async (ctx: TestSuite) => {
       const dir = await ctx.tempDir('build-assets-rebuild-css');
@@ -3632,6 +3755,62 @@ src: url('./goat-font.woff2') format('woff2');
         assertTrue(
           !css2.includes('--rebuild-v1'),
           'Stale CSS must not appear after rebuild',
+        );
+      } finally {
+        rebuildCtx.close();
+        await stopBackgroundCompiler();
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'createBuildContext rebuild failure surfaces esbuild errors and later rebuilds still succeed',
+    async (ctx: TestSuite) => {
+      const dir = await ctx.tempDir('build-ctx-rebuild-failure');
+      const cssPath = path.join(dir, 'style.css');
+      const entryPath = path.join(dir, 'entry.ts');
+      await writeTextFile(cssPath, ':root { --ctx-rebuild-v1: 1; }\n');
+      await writeTextFile(entryPath, "import './style.css';\nexport {};\n");
+      const entryPoints = [{ in: entryPath, out: APP_ENTRY_POINT }];
+      const rebuildCtx = await createBuildContext(entryPoints);
+      try {
+        const assets1 = await buildAssets(rebuildCtx, entryPoints, {
+          buildDir: dir,
+          jsPath: entryPath,
+        });
+        assertTrue(
+          new TextDecoder().decode(assets1['/index.css'].data).includes(
+            '--ctx-rebuild-v1',
+          ),
+          'initial rebuild-context build must succeed before the failure case',
+        );
+
+        await writeTextFile(entryPath, "import './missing.css';\nexport {};\n");
+        await assertThrows(
+          () =>
+            buildAssets(rebuildCtx, entryPoints, {
+              buildDir: dir,
+              jsPath: entryPath,
+            }),
+          Error,
+          'missing.css',
+        );
+
+        await writeTextFile(cssPath, ':root { --ctx-rebuild-v2: 1; }\n');
+        await writeTextFile(entryPath, "import './style.css';\nexport {};\n");
+        const assets2 = await buildAssets(rebuildCtx, entryPoints, {
+          buildDir: dir,
+          jsPath: entryPath,
+        });
+        const css2 = new TextDecoder().decode(assets2['/index.css'].data);
+        assertTrue(
+          css2.includes('--ctx-rebuild-v2'),
+          'a failed rebuild must not poison the next rebuild',
+        );
+        assertTrue(
+          !css2.includes('--ctx-rebuild-v1'),
+          'successful rebuild after a failure must not serve stale CSS',
         );
       } finally {
         rebuildCtx.close();
@@ -4962,6 +5141,40 @@ export function setupCliCompileNodeTests(): void {
 
   TEST(
     'CLI-Compile',
+    'bundleServerForSEA prefixes esbuild failures with server bundle context',
+    async (ctx) => {
+      const dir = await ctx.tempDir('bundle-sea-failure-prefix');
+      const entryPath = path.join(dir, 'entry.ts');
+      const outPath = path.join(dir, 'bundle.cjs');
+      await writeTextFile(entryPath, "import './missing.ts';\nexport {};\n");
+
+      try {
+        try {
+          await bundleServerForSEA(entryPath, outPath);
+          throw new Error('Expected bundleServerForSEA() to throw');
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          assertTrue(
+            message.startsWith('Server bundle failed:'),
+            'SEA bundle failures must be prefixed with server bundle context',
+          );
+          assertTrue(
+            message.includes('missing.ts'),
+            'SEA bundle failures must still surface the underlying entry error',
+          );
+        }
+        assertFalse(
+          await pathExists(outPath),
+          'failed SEA bundling must not leave an output file behind',
+        );
+      } finally {
+        await stopBackgroundCompiler();
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
     'bundleServerForSEA accepts file:// URL entry points',
     async (ctx) => {
       const dir = await ctx.tempDir('bundle-sea-file-url');
@@ -5328,6 +5541,32 @@ export function setupCliCompileDenoTests(): void {
         nodeResult.success,
         `compiled bundle must execute successfully in Node.js: ${nodeResult.stderrText}`,
       );
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'compileForNodeWithEsbuild throws compilation failures',
+    async (ctx: TestSuite) => {
+      const { compileForNodeWithEsbuild } = await import(
+        '../base/node-runner.ts'
+      );
+      const dir = await ctx.tempDir('node-esbuild-error');
+      const entryPath = path.join(dir, 'entry.ts');
+      await writeTextFile(entryPath, "import './missing.ts';\n");
+      try {
+        await assertThrows(
+          () =>
+            compileForNodeWithEsbuild(
+              path.toFileUrl(entryPath).href,
+              'output',
+            ),
+          Error,
+          'missing.ts',
+        );
+      } finally {
+        await stopBackgroundCompiler();
+      }
     },
   );
 

@@ -6,6 +6,7 @@ import {
   kDenoEsbuildPluginSpecifier,
   kJsrDenoEsbuildPluginSpecifier,
   resolveBuildEntryPath,
+  runEsbuild,
   stopBackgroundCompiler,
 } from '../build.ts';
 import type { AppConfig } from './app-config.ts';
@@ -556,39 +557,35 @@ export async function bundleServerForSEA(
   // Defensive fallback — version is always present in a running Node.js process.
   const nodeMajor = getRuntime().getSystemInfo().version?.split('.')[0] ||
     String(kMinNodeMajor);
-  const result = await esbuild.build({
-    entryPoints: [resolvedEntry],
-    plugins: [adapterStubPlugin(['deno', 'browser'])],
-    bundle: true,
-    platform: 'node',
-    target: `node${nodeMajor}`,
-    format: 'cjs',
-    outfile: output,
-    minify: true,
-    define: {
-      '__BUNDLE_TARGET__': '"node"',
-      // Prevent CLI entry-point code (if (import.meta.main) {...}) from
-      // being bundled into the server SEA binary.
-      'import.meta.main': 'false',
-    },
-    // External packages:
-    // - node:* - Node.js built-ins
-    // - Build-time dependencies that shouldn't be in runtime bundle
-    // Note: JSR packages (@std/*) are resolved from node_modules (via Deno's
-    // nodeModulesDir setting) and bundled into the SEA binary.
-    external: [
-      'node:*',
-      'esbuild', // Defense-in-depth: also hidden via eval() import
-      kDenoEsbuildPluginSpecifier, // Deno-specific build plugin
-      kJsrDenoEsbuildPluginSpecifier, // JSR-imported version
-    ],
-    logLevel: 'warning',
-  });
-  if (result.errors.length > 0) {
-    throw new Error(
-      `Server bundle failed:\n${result.errors.map((e) => e.text).join('\n')}`,
-    );
-  }
+  await runEsbuild(() =>
+    esbuild.build({
+      entryPoints: [resolvedEntry],
+      plugins: [adapterStubPlugin(['deno', 'browser'])],
+      bundle: true,
+      platform: 'node',
+      target: `node${nodeMajor}`,
+      format: 'cjs',
+      outfile: output,
+      minify: true,
+      define: {
+        '__BUNDLE_TARGET__': '"node"',
+        // Prevent CLI entry-point code (if (import.meta.main) {...}) from
+        // being bundled into the server SEA binary.
+        'import.meta.main': 'false',
+      },
+      // External packages:
+      // - node:* - Node.js built-ins
+      // - Build-time dependencies that shouldn't be in runtime bundle
+      // Note: JSR packages (@std/*) are resolved from node_modules (via Deno's
+      // nodeModulesDir setting) and bundled into the SEA binary.
+      external: [
+        'node:*',
+        'esbuild', // Defense-in-depth: also hidden via eval() import
+        kDenoEsbuildPluginSpecifier, // Deno-specific build plugin
+        kJsrDenoEsbuildPluginSpecifier, // JSR-imported version
+      ],
+      logLevel: 'warning',
+    }), 'Server bundle failed');
 }
 
 /**

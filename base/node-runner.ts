@@ -3,6 +3,7 @@ import {
   getDenoPlugin,
   getEsbuild,
   resolveBuildEntryPath,
+  runEsbuild,
   stopEsbuildWorker,
 } from '../build.ts';
 import { log } from '../logging/log.ts';
@@ -20,39 +21,41 @@ export async function compileForNodeWithEsbuild(
 ) {
   const esbuild = await getEsbuild();
   const denoPlugin = await getDenoPlugin();
-  return await esbuild.build({
-    entryPoints: [
-      {
-        in: resolveBuildEntryPath(inputFile),
-        out: outName,
+  return await runEsbuild(() =>
+    esbuild.build({
+      entryPoints: [
+        {
+          in: resolveBuildEntryPath(inputFile),
+          out: outName,
+        },
+      ],
+      plugins: [denoPlugin() as unknown as BuildPluginLike],
+      outfile: outName,
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      target: 'node26',
+      write: false,
+      sourcemap: 'inline',
+      external: [
+        'nodemailer',
+        'esbuild',
+        '@deno/esbuild-plugin',
+        '@jsr/deno__esbuild-plugin',
+        'chokidar',
+      ],
+      banner: {
+        // Aliased to __createRequire__ to avoid potential naming conflicts with
+        // npm packages that also declare `createRequire` in their bundle headers.
+        js:
+          "import { createRequire as __createRequire__ } from 'node:module';const require = __createRequire__(import.meta.url);globalThis.require = require;",
       },
-    ],
-    plugins: [denoPlugin() as unknown as BuildPluginLike],
-    outfile: outName,
-    bundle: true,
-    platform: 'node',
-    format: 'esm',
-    target: 'node26',
-    write: false,
-    sourcemap: 'inline',
-    external: [
-      'nodemailer',
-      'esbuild',
-      '@deno/esbuild-plugin',
-      '@jsr/deno__esbuild-plugin',
-      'chokidar',
-    ],
-    banner: {
-      // Aliased to __createRequire__ to avoid potential naming conflicts with
-      // npm packages that also declare `createRequire` in their bundle headers.
-      js:
-        "import { createRequire as __createRequire__ } from 'node:module';const require = __createRequire__(import.meta.url);globalThis.require = require;",
-    },
-    logOverride: {
-      'empty-import-meta': 'silent',
-      'direct-eval': 'silent',
-    },
-  });
+      logOverride: {
+        'empty-import-meta': 'silent',
+        'direct-eval': 'silent',
+      },
+    })
+  );
 }
 
 /** Timeout for Node.js subprocess execution (matching Deno worker timeout). */

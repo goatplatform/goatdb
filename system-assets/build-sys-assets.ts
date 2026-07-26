@@ -5,6 +5,7 @@ import {
   getDenoPlugin,
   getEsbuild,
   normalizeBuildEntryPath,
+  runEsbuild,
 } from '../build.ts';
 import { type StaticAssets, staticAssetsToJS } from './system-assets.ts';
 
@@ -19,28 +20,30 @@ export async function buildSysAssetsBundle(): Promise<StaticAssets> {
   const denoPlugin = await getDenoPlugin();
   const repoPath = await getRepositoryPath();
   const outputDir = path.join(repoPath, 'system-assets');
-  const result = await esbuild.build({
-    entryPoints: [
-      {
-        // path.join(repoPath, ...) produces an already-absolute path; no resolve step needed
-        in: normalizeBuildEntryPath(
-          path.join(repoPath, 'base', 'json-log', 'json-log-worker-entry.ts'),
-        ),
-        out: 'json-log-worker',
+  const result = await runEsbuild(() =>
+    esbuild.build({
+      entryPoints: [
+        {
+          // path.join(repoPath, ...) produces an already-absolute path; no resolve step needed
+          in: normalizeBuildEntryPath(
+            path.join(repoPath, 'base', 'json-log', 'json-log-worker-entry.ts'),
+          ),
+          out: 'json-log-worker',
+        },
+      ],
+      // Let esbuild transpile TypeScript so the final bundle map is composed from
+      // file-relative sources instead of the loader's repo-relative inline maps.
+      plugins: [denoPlugin({ noTranspile: true })],
+      bundle: true,
+      write: false,
+      sourcemap: 'external',
+      outdir: outputDir,
+      // minify: true,
+      logOverride: {
+        'empty-import-meta': 'silent',
       },
-    ],
-    // Let esbuild transpile TypeScript so the final bundle map is composed from
-    // file-relative sources instead of the loader's repo-relative inline maps.
-    plugins: [denoPlugin({ noTranspile: true })],
-    bundle: true,
-    write: false,
-    sourcemap: 'external',
-    outdir: outputDir,
-    // minify: true,
-    logOverride: {
-      'empty-import-meta': 'silent',
-    },
-  });
+    })
+  );
 
   await Deno.mkdir(outputDir, { recursive: true });
   const assets: StaticAssets = {};

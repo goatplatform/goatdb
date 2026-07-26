@@ -137,7 +137,9 @@ export async function compileToNodeEsm(
   outputFile: string,
   stubbedImportPaths: Record<string, string> = {},
 ): Promise<void> {
-  const { getEsbuild, stopEsbuildWorker } = await import('../build.ts');
+  const { getEsbuild, runEsbuild, stopEsbuildWorker } = await import(
+    '../build.ts'
+  );
   const { dirname, join } = await import('node:path');
   const { existsSync } = await import('node:fs');
   const esbuild = await getEsbuild();
@@ -168,20 +170,22 @@ export async function compileToNodeEsm(
   };
 
   try {
-    await esbuild.build({
-      entryPoints: [inputFile],
-      outfile: outputFile,
-      bundle: true,
-      platform: 'node',
-      format: 'esm',
-      target: 'node26',
-      write: true,
-      plugins: [resolveLocalJsImports, stubPlugin],
-      logOverride: {
-        'empty-import-meta': 'silent',
-        'direct-eval': 'silent',
-      },
-    });
+    await runEsbuild(() =>
+      esbuild.build({
+        entryPoints: [inputFile],
+        outfile: outputFile,
+        bundle: true,
+        platform: 'node',
+        format: 'esm',
+        target: 'node26',
+        write: true,
+        plugins: [resolveLocalJsImports, stubPlugin],
+        logOverride: {
+          'empty-import-meta': 'silent',
+          'direct-eval': 'silent',
+        },
+      })
+    );
   } finally {
     // Safe under sequential test execution — stopEsbuildWorker clears the
     // shared singleton worker. Must not be used concurrently within a suite.

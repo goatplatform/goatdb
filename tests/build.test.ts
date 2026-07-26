@@ -5,6 +5,7 @@ import {
   bundleResultFromBuildResult,
   normalizeBuildEntryPath,
   resolveBuildEntryPath,
+  runEsbuild,
 } from '../build.ts';
 
 export default function setupBuildTests(): void {
@@ -176,6 +177,76 @@ export default function setupBuildTests(): void {
       'file://localhost/path/to/file',
     );
   });
+
+  TEST(
+    'Build',
+    'runEsbuild normalizes rejected build failures',
+    async () => {
+      await assertThrows(
+        () =>
+          runEsbuild(() =>
+            Promise.reject({
+              errors: [{ text: 'rejected-error' } as import('esbuild').Message],
+            })
+          ),
+        Error,
+        'rejected-error',
+      );
+    },
+  );
+
+  TEST(
+    'Build',
+    'runEsbuild includes every resolved diagnostic',
+    async () => {
+      await assertThrows(
+        () =>
+          runEsbuild(async () => ({
+            errors: [
+              { text: 'first-error' } as import('esbuild').Message,
+              { text: 'second-error' } as import('esbuild').Message,
+            ],
+          })),
+        Error,
+        'first-error\nsecond-error',
+      );
+    },
+  );
+
+  TEST(
+    'Build',
+    'normalizeEsbuildFailure preserves non-esbuild failures',
+    async () => {
+      await assertThrows(
+        () => runEsbuild(() => Promise.reject(new Error('plain-error'))),
+        Error,
+        'plain-error',
+      );
+      await assertThrows(
+        () => runEsbuild(() => Promise.reject('string-error')),
+        Error,
+        'string-error',
+      );
+    },
+  );
+
+  TEST(
+    'Build',
+    'runEsbuild prefixes normalized failures',
+    async () => {
+      await assertThrows(
+        () =>
+          runEsbuild(
+            async () => ({
+              errors: [{ text: 'resolved-error' } as import('esbuild').Message],
+            }),
+            'client build',
+          ),
+        Error,
+        'client build: resolved-error',
+      );
+    },
+  );
 
   TEST(
     'Build',

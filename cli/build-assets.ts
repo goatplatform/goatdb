@@ -9,10 +9,12 @@ import {
   isReBuildContext,
   type ReBuildContext,
   resolveBuildEntryPath,
+  runEsbuild,
   sharedClientBuildOptions,
   stopBackgroundCompiler,
 } from '../build.ts';
 import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
+import { log } from '../logging/log.ts';
 import type { AppConfig } from './app-config.ts';
 import {
   type Asset,
@@ -123,6 +125,37 @@ export interface BuildAssetsOptions {
   esbuildPlugins?: BuildPluginLike[];
 }
 
+/** @internal Cleanup failures must stay visible unless the build already failed. */
+export async function runOneShotBuildWithCleanup<T>(
+  build: () => Promise<T>,
+  cleanup: () => Promise<void>,
+  keepAlive?: boolean,
+): Promise<T> {
+  let buildFailed = false;
+  try {
+    return await build();
+  } catch (err) {
+    buildFailed = true;
+    throw err;
+  } finally {
+    if (!keepAlive) {
+      try {
+        await cleanup();
+      } catch (err) {
+        if (!buildFailed) throw err;
+        log({
+          severity: 'ERROR',
+          error: 'UncaughtServerError',
+          message: `Background compiler cleanup failed after build failure: ${
+            String(err)
+          }`,
+          trace: err instanceof Error ? err.stack : undefined,
+        });
+      }
+    }
+  }
+}
+
 /**
  * Bundles client-side assets using esbuild and assembles the complete
  * {@link StaticAssets} map served by GoatDB's HTTP layer.
@@ -144,7 +177,6 @@ export async function buildAssets(
   options?: BuildAssetsOptions,
 ): Promise<StaticAssets> {
   let buildOutput: BuildOutput;
-  let shouldStopEsbuild = false;
   const targetRuntime = options?.runtime ?? 'deno';
   if (ctx && isReBuildContext(ctx)) {
     if (options?.esbuildPlugins?.length) {
@@ -173,14 +205,15 @@ export async function buildAssets(
       minify: appConfig.minify,
     };
 
-    buildOutput = bundleResultFromBuildResult(
-      await esbuild.build(buildOptions),
+    buildOutput = await runOneShotBuildWithCleanup(
+      async () => {
+        return bundleResultFromBuildResult(
+          await runEsbuild(() => esbuild.build(buildOptions)),
+        );
+      },
+      stopBackgroundCompiler,
+      options?.keepEsbuildAlive,
     );
-    shouldStopEsbuild = true;
-  }
-
-  if (shouldStopEsbuild && !options?.keepEsbuildAlive) {
-    await stopBackgroundCompiler();
   }
 
   // System assets are always included and are placed at the root
