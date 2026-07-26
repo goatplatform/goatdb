@@ -133,7 +133,12 @@ export type QueryConfig<
    * If a field name is provided, results will be sorted by that field's values
    * using standard comparison rules. */
   sortBy?: SortDescriptor<OS, CTX> | keyof SchemaDataType<OS>;
-  /** Optional flag that if true, flips the natural order of the sortBy */
+  /** Optional flag that if true, flips the natural order of the sortBy
+   *
+   * WARNING: When adding a field that changes query behavior (sorting,
+   * filtering, limiting, live updates), you MUST also add it to the key
+   * computation in `generateQueryId()` below so the cache identity captures
+   * the difference. Otherwise distinct configurations will collide. */
   sortDescending?: boolean;
   /** Optional schema to restrict query results to */
   schema?: IS;
@@ -272,6 +277,8 @@ export class Query<
    * @param config.ctx Optional context data passed to predicate/sort functions
    * @param config.schema Optional schema type for the query
    * @param config.limit Optional maximum number of results (0 for unlimited)
+   * @param config.sortDescending Optional flag to reverse sort order
+   * @param config.liveUpdates Optional flag for live uncommitted updates (default true)
    */
   constructor({
     db,
@@ -310,6 +317,9 @@ export class Query<
         sortBy,
         ctx,
         schema?.ns,
+        sortDescending,
+        limit,
+        liveUpdates,
       );
     this.context = ctx as CTX;
     this.source = source;
@@ -970,6 +980,9 @@ const gGeneratedQueryIds = new Map<string, string>();
  * - Sort descriptor
  * - Context data
  * - Schema namespace
+ * - sortDescending flag
+ * - limit value
+ * - liveUpdates flag
  *
  * @param IS The input schema type for items in the query
  * @param OS The output schema type for items in the query
@@ -988,6 +1001,9 @@ export function generateQueryId<
     | undefined,
   ctx: CTX | undefined,
   ns: string | null | undefined,
+  sortDescending?: boolean,
+  limit?: number,
+  liveUpdates?: boolean,
 ): string {
   let key: string;
   if (typeof source === 'string') {
@@ -1005,6 +1021,12 @@ export function generateQueryId<
   key += JSON.stringify(ctx);
   key += '|';
   key += ns;
+  key += '|';
+  key += sortDescending ?? '';
+  key += '|';
+  key += limit ?? '';
+  key += '|';
+  key += liveUpdates ?? '';
   let hash = gGeneratedQueryIds.get(key);
   if (!hash) {
     hash = murmur3(key, 0).toString(36);

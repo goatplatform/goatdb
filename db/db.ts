@@ -698,6 +698,9 @@ export class GoatDB<US extends Schema = Schema>
         config.sortBy,
         config.ctx,
         config.schema?.ns,
+        config.sortDescending,
+        config.limit,
+        config.liveUpdates,
       );
     }
     let q = this._openQueries.get(id);
