@@ -289,6 +289,100 @@ export default function setup(): void {
     },
   );
 
+  // --- Sentinel serialization ----------------------------------------------
+  TEST(
+    'QueryId',
+    'undefined, null, and string sentinels produce distinct IDs',
+    () => {
+      const sort = () => 0;
+      const ids = [
+        generateQueryId(kSource, kPredicate, kSortBy, kCtx, undefined),
+        generateQueryId(kSource, kPredicate, kSortBy, kCtx, null),
+        generateQueryId(kSource, kPredicate, kSortBy, kCtx, 'undefined'),
+        generateQueryId(kSource, kPredicate, kSortBy, kCtx, 'null'),
+        generateQueryId(kSource, kPredicate, kSortBy, kCtx, ''),
+        generateQueryId(kSource, kPredicate, undefined, kCtx, kNs),
+        generateQueryId(kSource, kPredicate, 'undefined', kCtx, kNs),
+        generateQueryId(kSource, kPredicate, 'null', kCtx, kNs),
+        generateQueryId(kSource, kPredicate, '', kCtx, kNs),
+        generateQueryId(kSource, kPredicate, sort, kCtx, kNs),
+      ];
+      assertEquals(new Set(ids).size, ids.length);
+    },
+  );
+
+  // --- ns independence ------------------------------------------------------
+  TEST(
+    'QueryId',
+    'different ns values produce different IDs',
+    () => {
+      const a = generateQueryId(
+        kSource,
+        kPredicate,
+        kSortBy,
+        kCtx,
+        'ns-a',
+      );
+      const b = generateQueryId(
+        kSource,
+        kPredicate,
+        kSortBy,
+        kCtx,
+        'ns-b',
+      );
+      const c = generateQueryId(
+        kSource,
+        kPredicate,
+        kSortBy,
+        kCtx,
+        undefined,
+      );
+      const d = generateQueryId(
+        kSource,
+        kPredicate,
+        kSortBy,
+        kCtx,
+        null,
+      );
+      assertTrue(a !== b, 'ns-a vs ns-b');
+      assertTrue(a !== c, 'ns-a vs undefined');
+      assertTrue(a !== d, 'ns-a vs null');
+      assertTrue(c !== d, 'undefined vs null');
+    },
+  );
+
+  // --- sortBy independence --------------------------------------------------
+  TEST(
+    'QueryId',
+    'different sortBy values produce different IDs',
+    () => {
+      const a = generateQueryId(
+        kSource,
+        kPredicate,
+        'name' as string,
+        kCtx,
+        kNs,
+      );
+      const b = generateQueryId(
+        kSource,
+        kPredicate,
+        'date' as string,
+        kCtx,
+        kNs,
+      );
+      const c = generateQueryId(
+        kSource,
+        kPredicate,
+        undefined,
+        kCtx,
+        kNs,
+      );
+      assertTrue(a !== b, 'name vs date');
+      assertTrue(a !== c, 'name vs undefined');
+      assertTrue(b !== c, 'date vs undefined');
+    },
+  );
+
   // --- Predicate / sortBy independence (pre-existing, lock down) ------------
   TEST(
     'QueryId',
