@@ -422,19 +422,6 @@ async function compileNodeSEA(options: CompileOptions): Promise<string> {
     );
   }
 
-  // Guard: verify Node.js version meets the project minimum for SEA builds.
-  // Fail fast before expensive bundling operations.
-  const nodeVersion = runtime.getSystemInfo().version;
-  const nodeMajor = nodeVersion?.split('.')[0];
-  if (nodeMajor && parseInt(nodeMajor, 10) < kMinNodeMajor) {
-    throw new Error(
-      `Node.js >= ${kMinNodeMajor} is required for SEA builds. ` +
-        `Current version: ${nodeVersion}.\n` +
-        `Use nvm to switch: nvm install ${kMinNodeMajor} && nvm use ${kMinNodeMajor}\n` +
-        `Or download from: https://nodejs.org`,
-    );
-  }
-
   const buildDir = path.resolve(options.buildDir!);
 
   const compileStart = performance.now();
@@ -463,6 +450,22 @@ async function compileNodeSEA(options: CompileOptions): Promise<string> {
       'node',
       true,
     );
+
+    // Guard: verify Node.js version meets the project minimum for SEA builds.
+    // Fail fast before expensive bundling operations (server bundle + --build-sea).
+    // Ran after bundleClientAssets so that client bundling, plugin forwarding, and
+    // config validation (resolveRuntimeBuildInfo) surface their errors first.
+    const nodeVersion = runtime.getSystemInfo().version;
+    const nodeMajor = nodeVersion?.split('.')[0];
+    if (nodeMajor && parseInt(nodeMajor, 10) < kMinNodeMajor) {
+      throw new Error(
+        `Node.js >= ${kMinNodeMajor} is required for SEA builds. ` +
+          `Current version: ${nodeVersion}.\n` +
+          `Use nvm to switch: nvm install ${kMinNodeMajor} && nvm use ${kMinNodeMajor}\n` +
+          `Or download from: https://nodejs.org`,
+      );
+    }
+
     await fs.writeFile(assetsJsonPath, assetsJson);
     await fs.writeFile(buildInfoJsonPath, buildInfoJson);
 
