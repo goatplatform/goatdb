@@ -708,6 +708,7 @@ export class GoatDB<US extends Schema = Schema>
       q = new Query({
         ...config,
         db: this as unknown as GoatDB,
+        id,
       }) as unknown as Query<
         Schema,
         Schema,
