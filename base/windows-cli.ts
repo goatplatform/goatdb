@@ -105,6 +105,11 @@ function assertSafeBatchValues(values: string[]): void {
       'Cannot execute a batch command with literal "%": cmd.exe expands environment variables',
     );
   }
+  if (values.some((value) => value.includes('!'))) {
+    throw new Error(
+      'Cannot execute a batch command with literal "!": cmd.exe delayed expansion corrupts values',
+    );
+  }
   if (values.some((value) => /[\r\n]/.test(value))) {
     throw new Error('Cannot execute a batch command with a line break');
   }

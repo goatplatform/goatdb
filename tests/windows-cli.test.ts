@@ -18,19 +18,25 @@ function nativeArgumentCommand(values: string[]): [string, ...string[]] {
   return [runtime.getExecPath(), ...prefix, ...values];
 }
 
-function batchScript(values: string[]): string {
-  return [
-    '@echo off',
-    'setlocal DisableDelayedExpansion',
-    ...values.map((value) => `echo [${value}]`),
-  ]
-    .join('\r\n');
-}
-
 async function createBatch(ctx: TestSuite, name: string): Promise<string> {
   const dir = await ctx.tempDir(name);
   const script = path.join(dir, 'echo-args.cmd');
-  await writeTextFile(script, batchScript(['%~1', '%~2']));
+  // Safe batch pattern: capture args with quotes preserved (via %n), then use
+  // delayed expansion + for/f to strip outer quotes safely. This avoids
+  // exposing cmd.exe metacharacters (&, |, etc.) that %~n would activate
+  // during parse-time expansion.
+  const content = [
+    '@echo off',
+    'setlocal DisableDelayedExpansion',
+    'set "raw1=%1"',
+    'set "raw2=%2"',
+    'setlocal EnableDelayedExpansion',
+    'for /f "tokens=*" %%a in ("!raw1!") do set "arg1=%%~a"',
+    'for /f "tokens=*" %%a in ("!raw2!") do set "arg2=%%~a"',
+    'echo [!arg1!]',
+    'echo [!arg2!]',
+  ].join('\r\n');
+  await writeTextFile(script, content);
   return script;
 }
 
@@ -90,6 +96,76 @@ export default function setupWindowsCliTests(): void {
         Error,
         'literal "%"',
       );
+    },
+  );
+
+  TEST(
+    'Windows-CLI',
+    'batch commands reject literal exclamation values',
+    async (ctx) => {
+      const script = await createBatch(ctx, 'windows-cli-exclamation');
+      await assertThrows(
+        () => cli(script, 'literal!value'),
+        Error,
+        'literal "!"',
+      );
+    },
+  );
+
+  TEST(
+    'Windows-CLI',
+    'batch commands reject line break values',
+    async (ctx) => {
+      const script = await createBatch(ctx, 'windows-cli-newline');
+      await assertThrows(
+        () => cli(script, 'line\nvalue'),
+        Error,
+        'line break',
+      );
+    },
+  );
+
+  TEST(
+    'Windows-CLI',
+    'batch commands preserve pipe character',
+    async (ctx) => {
+      const script = await createBatch(ctx, 'windows-cli-pipe');
+      const { exitCode, result } = await cli(script, 'first', 'a|b');
+      assertEquals(exitCode, 0);
+      assertEquals(result.trim().split(/\r?\n/), ['[first]', '[a|b]']);
+    },
+  );
+
+  TEST(
+    'Windows-CLI',
+    'batch commands preserve redirection characters',
+    async (ctx) => {
+      const script = await createBatch(ctx, 'windows-cli-redirect');
+      const { exitCode, result } = await cli(script, 'first', 'a>b<c');
+      assertEquals(exitCode, 0);
+      assertEquals(result.trim().split(/\r?\n/), ['[first]', '[a>b<c]']);
+    },
+  );
+
+  TEST(
+    'Windows-CLI',
+    'batch commands preserve caret character',
+    async (ctx) => {
+      const script = await createBatch(ctx, 'windows-cli-caret');
+      const { exitCode, result } = await cli(script, 'first', 'a^b');
+      assertEquals(exitCode, 0);
+      assertEquals(result.trim().split(/\r?\n/), ['[first]', '[a^b]']);
+    },
+  );
+
+  TEST(
+    'Windows-CLI',
+    'batch commands preserve embedded double quotes',
+    async (ctx) => {
+      const script = await createBatch(ctx, 'windows-cli-embedded-quote');
+      const { exitCode, result } = await cli(script, 'first', 'a"b');
+      assertEquals(exitCode, 0);
+      assertEquals(result.trim().split(/\r?\n/), ['[first]', '[a"b]']);
     },
   );
 
