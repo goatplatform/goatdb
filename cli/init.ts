@@ -17,7 +17,7 @@ import {
   readTextFile,
   writeTextFile,
 } from '../base/json-log/file-impl.ts';
-import { cli } from '../base/development.ts';
+import { cli } from '../base/cli.ts';
 import { kMinNodeMajor } from './compile.ts';
 
 /**

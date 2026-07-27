@@ -70,7 +70,8 @@ import {
   withTestRuntimeId,
   withTestRuntimeOverride,
 } from '../base/runtime/index.ts';
-import { cli, type CliOptions, copyToClipboard } from '../base/development.ts';
+import { cli, type CliOptions } from '../base/cli.ts';
+import { copyToClipboard } from '../base/development.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
 import { runAcrossPlatforms } from '../base/multi-runner.ts';
 import { createTestDomainConfig } from './merge-test-utils.ts';

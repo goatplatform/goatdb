@@ -1,5 +1,5 @@
 import { getEffectiveRuntimeId } from './runtime/index.ts';
-import { cli } from './development.ts';
+import { cli } from './cli.ts';
 import { readTextFile } from './json-log/file-impl.ts';
 import { isWindows, normalizeNodePlatform } from './os.ts';
 import type { JSONObject } from './interfaces.ts';

@@ -16,7 +16,7 @@ import { staticAssetsToJS } from '../system-assets/system-assets.ts';
 import { getEffectiveCWD, getRuntime } from '../base/runtime/index.ts';
 import { resolveRuntimeBuildInfo } from './runtime-build-info.ts';
 
-import { cli } from '../base/development.ts';
+import { cli } from '../base/cli.ts';
 import { pathExists } from '../base/json-log/file-impl.ts';
 import { log } from '../logging/log.ts';
 

@@ -1,4 +1,4 @@
-import { cli } from './development.ts';
+import { cli } from './cli.ts';
 import { getRuntime } from './runtime/index.ts';
 import { getEnvVar, getOS, normalizeNodePlatform } from './os.ts';
 import { log } from '../logging/log.ts';
