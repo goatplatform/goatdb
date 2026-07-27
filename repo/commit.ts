@@ -43,6 +43,53 @@ import {
 } from '../base/core-types/encoding/binary-commit.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { log } from '../logging/log.ts';
+
+let _monoLastTimestamp: number | undefined;
+let _nowFn: () => number = Date.now;
+
+/** @internal Override the clock function for testing. */
+export function setMonotonicNowFn(fn: () => number): void {
+  _nowFn = fn;
+}
+
+/** @internal Reset monotonic state (clock and timestamp) for testing. */
+export function resetMonotonicState(): void {
+  _monoLastTimestamp = undefined;
+  _nowFn = Date.now;
+}
+
+function nextFloat64(value: number): number {
+  // Defensive: callers already validate; this guards against direct misuse.
+  assert(
+    Number.isFinite(value) && value >= 0,
+    'nextFloat64: non-finite or negative value',
+  );
+  if (value < 2 ** -1022) return value + Number.MIN_VALUE;
+  return value + 2 ** (Math.floor(Math.log2(value)) - 52);
+}
+
+/** @internal Generate a strictly increasing timestamp in this runtime.
+ *
+ * Date.now() has 1ms resolution, so commits created in the same millisecond
+ * would otherwise be ordered by their random IDs. A stalled or regressed
+ * clock advances to the next representable float64 value instead. This can
+ * move the timestamp ahead of wall time, but preserves local creation order.
+ * Independent runtimes still use the commit ID as a deterministic tiebreaker.
+ */
+export function nextMonotonicTimestamp(): number {
+  const now = _nowFn();
+  assert(
+    Number.isFinite(now) && now >= 0,
+    'nextMonotonicTimestamp: non-finite or negative clock',
+  );
+  if (_monoLastTimestamp === undefined || now > _monoLastTimestamp) {
+    _monoLastTimestamp = now;
+  } else {
+    _monoLastTimestamp = nextFloat64(_monoLastTimestamp);
+  }
+  return _monoLastTimestamp;
+}
+
 export type CommitResolver = (commitId: string) => Commit;
 
 const gTextDecoder = new TextDecoder();

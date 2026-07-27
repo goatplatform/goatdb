@@ -1,4 +1,10 @@
-import { Commit, FieldCommit } from '../repo/commit.ts';
+import {
+  Commit,
+  FieldCommit,
+  nextMonotonicTimestamp,
+  resetMonotonicState,
+  setMonotonicNowFn,
+} from '../repo/commit.ts';
 import { Item } from '../cfds/base/item.ts';
 import { Edit } from '../cfds/base/edit.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
@@ -37,6 +43,15 @@ function makeTestEdit(srcChecksum: string, dstChecksum: string) {
     srcChecksum,
     dstChecksum,
   });
+}
+
+function withMonotonicClock(fn: () => void): void {
+  resetMonotonicState();
+  try {
+    fn();
+  } finally {
+    resetMonotonicState();
+  }
 }
 
 export default function setup() {
@@ -222,4 +237,143 @@ export default function setup() {
     });
     decoder.finalize();
   });
+
+  TEST(
+    'Commit',
+    'nextMonotonicTimestamp is monotonic within a stalled ms',
+    () => {
+      withMonotonicClock(() => {
+        setMonotonicNowFn(() => 1_700_000_000_000);
+        const t1 = nextMonotonicTimestamp();
+        const t2 = nextMonotonicTimestamp();
+        const t3 = nextMonotonicTimestamp();
+        assertTrue(t1 < t2, 't1 < t2');
+        assertTrue(t2 < t3, 't2 < t3');
+      });
+    },
+  );
+
+  TEST('Commit', 'nextMonotonicTimestamp uses a new clock ms directly', () => {
+    withMonotonicClock(() => {
+      const ms1 = 1_700_000_000_000;
+      const ms2 = ms1 + 1;
+      setMonotonicNowFn(() => ms1);
+      const t1 = nextMonotonicTimestamp();
+      const t2 = nextMonotonicTimestamp();
+      setMonotonicNowFn(() => ms2);
+      const t3 = nextMonotonicTimestamp();
+      assertTrue(t1 < t2, 't1 < t2 within same ms');
+      assertEquals(t3, ms2, 'new ms returns raw Date.now()');
+    });
+  });
+
+  TEST('Commit', 'nextMonotonicTimestamp handles clock regression', () => {
+    withMonotonicClock(() => {
+      setMonotonicNowFn(() => 1_700_000_000_000);
+      const t1 = nextMonotonicTimestamp();
+      setMonotonicNowFn(() => 1_699_999_999_000);
+      assertTrue(nextMonotonicTimestamp() > t1, 'timestamp remains monotonic');
+    });
+  });
+
+  TEST('Commit', 'nextMonotonicTimestamp handles the Unix epoch', () => {
+    withMonotonicClock(() => {
+      setMonotonicNowFn(() => 0);
+      const t1 = nextMonotonicTimestamp();
+      const t2 = nextMonotonicTimestamp();
+      assertEquals(t1, 0, 'first timestamp is the clock value');
+      assertTrue(t2 > t1, 'second timestamp advances from zero');
+    });
+  });
+
+  TEST(
+    'Commit',
+    'nextMonotonicTimestamp remains monotonic beyond one ms',
+    () => {
+      withMonotonicClock(() => {
+        const ms = 1_700_000_000_000;
+        setMonotonicNowFn(() => ms);
+        let previous = nextMonotonicTimestamp();
+        for (let i = 0; i < 5_000; i++) {
+          const timestamp = nextMonotonicTimestamp();
+          assertTrue(
+            timestamp > previous,
+            'timestamps remain strictly increasing',
+          );
+          previous = timestamp;
+        }
+        assertTrue(
+          previous > ms + 1,
+          'logical time advances when the clock stalls',
+        );
+      });
+    },
+  );
+
+  TEST('Commit', 'resetMonotonicState cleans module state', () => {
+    withMonotonicClock(() => {
+      setMonotonicNowFn(() => 42);
+      nextMonotonicTimestamp();
+      nextMonotonicTimestamp();
+      resetMonotonicState();
+      setMonotonicNowFn(() => 99);
+      assertEquals(nextMonotonicTimestamp(), 99);
+    });
+  });
+
+  TEST('Commit', 'nextMonotonicTimestamp rejects negative clock', () => {
+    withMonotonicClock(() => {
+      setMonotonicNowFn(() => -1);
+      assertThrows(() => nextMonotonicTimestamp());
+    });
+  });
+
+  TEST('Commit', 'nextMonotonicTimestamp rejects Infinity clock', () => {
+    withMonotonicClock(() => {
+      setMonotonicNowFn(() => Infinity);
+      assertThrows(() => nextMonotonicTimestamp());
+    });
+  });
+
+  TEST('Commit', 'nextMonotonicTimestamp rejects NaN clock', () => {
+    withMonotonicClock(() => {
+      setMonotonicNowFn(() => NaN);
+      assertThrows(() => nextMonotonicTimestamp());
+    });
+  });
+
+  TEST(
+    'Commit',
+    'nextFloat64 maintains precision at high iteration count',
+    () => {
+      withMonotonicClock(() => {
+        // Use realistic Date.now() range (~1.7e12)
+        const startMs = 1_700_000_000_000;
+        setMonotonicNowFn(() => startMs);
+        let previous = nextMonotonicTimestamp();
+        const iterations = 100_000;
+        for (let i = 0; i < iterations; i++) {
+          const next = nextMonotonicTimestamp();
+          // Invariant: each timestamp is strictly greater
+          assertTrue(
+            next > previous,
+            `iteration ${i}: monotonicity violated (next=${next}, prev=${previous})`,
+          );
+          // Invariant: no precision loss (advancement > 0)
+          assertTrue(
+            next - previous > 0,
+            `iteration ${i}: no advancement`,
+          );
+          previous = next;
+        }
+        // Verify total advancement is reasonable (doesn't overflow into next ms too quickly)
+        // At 1.7e12 range, ULP ≈ 0.000244ms, so 100k iterations should advance ~24ms
+        const totalAdvancement = previous - startMs;
+        assertTrue(
+          totalAdvancement > 10 && totalAdvancement < 100,
+          `total advancement ${totalAdvancement}ms is outside expected range [10, 100]`,
+        );
+      });
+    },
+  );
 }
