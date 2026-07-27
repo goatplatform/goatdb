@@ -68,7 +68,7 @@ import setupTestRunnerTests, {
   setupTestRunnerBrowserCliTests,
   setupTestRunnerDenoTests,
 } from './test-runner.test.ts';
-import { getEnvVar } from '../base/os.ts';
+import { getEnvVar, isWindows } from '../base/os.ts';
 import setupMergeAdjList from './merge-adjlist.test.ts';
 import setupMergeBloom from './merge-bloom.test.ts';
 import setupBloomFPR from './bloom-fpr.test.ts';
@@ -95,6 +95,7 @@ import setupBuildDenoTests from './build-deno.test.ts';
 import { setupGitHooksDenoTests } from './githooks.test.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 import { TestsRunner } from './mod.ts';
+import setupWindowsCliTests from './windows-cli.test.ts';
 
 let _registrationPromise: Promise<void> | undefined;
 let _registrationCallCount = 0;
@@ -246,6 +247,9 @@ async function registerAllTestsImpl(): Promise<void> {
   }
   if (getRuntime().id === 'deno') {
     setupCliCompileDenoTests(); // Deno-only: CSS bundling, node runner, cli timeout
+  }
+  if (isWindows()) {
+    setupWindowsCliTests(); // Real Windows command execution and batch escaping
   }
   setupE2ELatency(); // Client-to-client sync latency measurement
   setupClusterLatency(); // Multi-server cluster sync performance
