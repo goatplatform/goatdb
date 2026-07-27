@@ -87,6 +87,7 @@ export function createTestDomainConfig() {
 // --- Helpers ---
 
 export interface RawCommitOpts {
+  id?: string;
   session?: string;
   orgId?: string;
   key: string;
@@ -112,6 +113,7 @@ export function createRawCommit(opts: RawCommitOpts): Commit {
     kMergeTestRegistry,
   );
   return Commit.create({
+    id: opts.id,
     session: opts.session ?? 'test-session',
     orgId: opts.orgId ?? 'test-org',
     key: opts.key,
