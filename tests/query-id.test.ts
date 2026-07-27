@@ -1,12 +1,12 @@
 /**
- * Unit tests for `generateQueryId` — the deterministic cache-key function
- * that powers query deduplication and persistence.
+ * Unit tests for deterministic query identifiers that power query
+ * deduplication and persistence.
  *
  * These are pure-function tests (no DB, no I/O) so they run in <1ms.
  */
 import { assertEquals, assertTrue } from './asserts.ts';
 import { TEST } from './mod.ts';
-import { generateQueryId } from '../repo/query.ts';
+import { generateQueryId, resolveQueryId } from '../repo/query.ts';
 
 // Stable inputs used as baseline for all tests.
 const kSource = '/data/items';
@@ -76,64 +76,38 @@ export default function setup(): void {
 
   TEST(
     'QueryId',
-    'sortDescending:undefined produces a distinct ID from false and true',
+    'sortDescending:undefined resolves to the default false ID',
     () => {
-      const undef = generateQueryId(
-        kSource,
-        kPredicate,
-        kSortBy,
-        kCtx,
-        kNs,
-        undefined,
-        10,
-        true,
-      );
-      const falsy = generateQueryId(
-        kSource,
-        kPredicate,
-        kSortBy,
-        kCtx,
-        kNs,
-        false,
-        10,
-        true,
-      );
-      const truthy = generateQueryId(
-        kSource,
-        kPredicate,
-        kSortBy,
-        kCtx,
-        kNs,
-        true,
-        10,
-        true,
-      );
-      assertTrue(undef !== falsy, 'undefined vs false');
-      assertTrue(undef !== truthy, 'undefined vs true');
-      assertTrue(falsy !== truthy, 'false vs true');
+      const undef = resolveQueryId({ source: kSource });
+      const falsy = resolveQueryId({
+        source: kSource,
+        sortDescending: false,
+      });
+      const truthy = resolveQueryId({
+        source: kSource,
+        sortDescending: true,
+      });
+      assertEquals(undef, falsy);
+      assertTrue(undef !== truthy, 'false vs true');
     },
   );
 
   // --- limit independence ---------------------------------------------------
   TEST(
     'QueryId',
-    'different limit values produce different IDs',
+    'limit:undefined resolves to the default zero ID',
     () => {
-      const ids = [undefined, 0, 1, 10, 100].map((limit) =>
-        generateQueryId(
-          kSource,
-          kPredicate,
-          kSortBy,
-          kCtx,
-          kNs,
-          false,
-          limit,
-          true,
-        )
+      const defaults = [undefined, 0].map((limit) =>
+        resolveQueryId({ source: kSource, limit })
       );
-      // All 5 must be unique
-      const unique = new Set(ids);
-      assertEquals(unique.size, ids.length, `collision among limits: ${ids}`);
+      const nonDefaults = [1, 10, 100].map((limit) =>
+        resolveQueryId({ source: kSource, limit })
+      );
+      assertEquals(defaults[0], defaults[1]);
+      assertEquals(
+        new Set([...defaults, ...nonDefaults]).size,
+        nonDefaults.length + 1,
+      );
     },
   );
 
@@ -168,41 +142,19 @@ export default function setup(): void {
 
   TEST(
     'QueryId',
-    'liveUpdates:undefined produces a distinct ID from false and true',
+    'liveUpdates:undefined resolves to the default true ID',
     () => {
-      const undef = generateQueryId(
-        kSource,
-        kPredicate,
-        kSortBy,
-        kCtx,
-        kNs,
-        false,
-        10,
-        undefined,
-      );
-      const falsy = generateQueryId(
-        kSource,
-        kPredicate,
-        kSortBy,
-        kCtx,
-        kNs,
-        false,
-        10,
-        false,
-      );
-      const truthy = generateQueryId(
-        kSource,
-        kPredicate,
-        kSortBy,
-        kCtx,
-        kNs,
-        false,
-        10,
-        true,
-      );
-      assertTrue(undef !== falsy, 'undefined vs false');
-      assertTrue(undef !== truthy, 'undefined vs true');
-      assertTrue(falsy !== truthy, 'false vs true');
+      const undef = resolveQueryId({ source: kSource });
+      const falsy = resolveQueryId({
+        source: kSource,
+        liveUpdates: false,
+      });
+      const truthy = resolveQueryId({
+        source: kSource,
+        liveUpdates: true,
+      });
+      assertEquals(undef, truthy);
+      assertTrue(undef !== falsy, 'true vs false');
     },
   );
 

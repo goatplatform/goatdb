@@ -953,7 +953,7 @@ export class Query<
 
 const gGeneratedQueryIds = new Map<string, string>();
 
-/** Resolves an explicit ID or derives one from the unnormalized query config. */
+/** Resolves an explicit ID or derives one from the normalized query config. */
 export function resolveQueryId<
   IS extends Schema = Schema,
   OS extends IS = IS,
@@ -979,9 +979,9 @@ export function resolveQueryId<
       config.sortBy,
       config.ctx,
       config.schema?.ns,
-      config.sortDescending,
-      config.limit,
-      config.liveUpdates,
+      config.sortDescending ?? false,
+      config.limit || 0,
+      config.liveUpdates ?? true,
     );
 }
 

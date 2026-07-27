@@ -235,7 +235,7 @@ export default function setup(): void {
 
   TEST(
     'Trusted',
-    'query IDs retain raw config and explicit empty IDs',
+    'query IDs normalize defaults and retain explicit empty IDs',
     async (ctx) => {
       const db = await ctx.createDB('db-query-ids', {
         registry: kDataRegistry,
@@ -259,6 +259,19 @@ export default function setup(): void {
         );
 
         const base = { source: '/test/query-ids', schema: TestSchema };
+        const defaults = db.query(base);
+        queries.push(defaults);
+        assertEquals(
+          defaults,
+          db.query({
+            ...base,
+            sortDescending: false,
+            limit: 0,
+            liveUpdates: true,
+          }),
+          'omitted and explicit defaults must deduplicate',
+        );
+
         const byName = db.query({ ...base, sortBy: 'name' });
         queries.push(byName);
         const sameByName = db.query({ ...base, sortBy: 'name' });
