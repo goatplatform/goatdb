@@ -376,4 +376,121 @@ export default function setup() {
       });
     },
   );
+
+  TEST('Commit', 'Commit.create uses monotonic timestamps', () => {
+    withMonotonicClock(() => {
+      setMonotonicNowFn(() => 1_700_000_000_000);
+      const c1 = Commit.create({
+        session: 'sess',
+        orgId: 'org',
+        key: 'k',
+        contents: makeTestItem('a'),
+        parents: [],
+        ancestors: [],
+      });
+      const c2 = Commit.create({
+        session: 'sess',
+        orgId: 'org',
+        key: 'k',
+        contents: makeTestItem('b'),
+        parents: [],
+        ancestors: [],
+      });
+      assertTrue(
+        c1.timestamp < c2.timestamp,
+        'later commit has later timestamp',
+      );
+    });
+  });
+
+  TEST('Commit', 'Commit.create falls back for a falsy timestamp', () => {
+    withMonotonicClock(() => {
+      const now = 1_700_000_000_000;
+      setMonotonicNowFn(() => now);
+      const commit = Commit.create({
+        session: 'sess',
+        orgId: 'org',
+        key: 'k',
+        contents: makeTestItem('a'),
+        parents: [],
+        ancestors: [],
+        timestamp: 0,
+      });
+      assertEquals(commit.timestamp, now);
+    });
+  });
+
+  TEST(
+    'Commit',
+    'deserialization with missing ts gets reasonable timestamp',
+    () => {
+      withMonotonicClock(() => {
+        const commit = Commit.create({
+          session: 'sess',
+          orgId: 'org',
+          key: 'k',
+          contents: makeTestItem('a'),
+          parents: [],
+          ancestors: [],
+          timestamp: 1,
+        });
+        const js = { ...commit.toJS() };
+        delete (js as any).ts;
+        const decoder = JSONCyclicalDecoder.get(js);
+        const decoded = Commit.fromJS('org', decoder, DataRegistry.default);
+        decoder.finalize();
+        // Contract: deserialized commits without timestamps get valid values
+        assertTrue(decoded.timestamp > 0, 'has valid timestamp');
+        assertTrue(Number.isFinite(decoded.timestamp), 'timestamp is finite');
+        assertTrue(
+          decoded.timestamp <= Date.now(),
+          'timestamp not in the future',
+        );
+      });
+    },
+  );
+
+  TEST(
+    'Commit',
+    'deserialization doesn\'t advance monotonic clock',
+    () => {
+      withMonotonicClock(() => {
+        const now = 1_700_000_000_000;
+        setMonotonicNowFn(() => now);
+        // First call sets _monoLastTimestamp
+        const t1 = nextMonotonicTimestamp();
+        assertEquals(t1, now);
+        // Deserialize 100 commits without ts
+        const commit = Commit.create({
+          session: 'sess',
+          orgId: 'org',
+          key: 'k',
+          contents: makeTestItem('a'),
+          parents: [],
+          ancestors: [],
+          timestamp: 1,
+        });
+        const js = { ...commit.toJS() };
+        for (let i = 0; i < 100; i++) {
+          const noTs = { ...js };
+          delete (noTs as any).ts;
+          const decoder = JSONCyclicalDecoder.get(noTs);
+          const decoded = Commit.fromJS('org', decoder, DataRegistry.default);
+          decoder.finalize();
+          // Contract: deserialized commits get valid timestamps
+          assertTrue(decoded.timestamp > 0, 'has valid timestamp');
+          assertTrue(Number.isFinite(decoded.timestamp), 'timestamp is finite');
+        }
+        // Invariant: monotonic clock shouldn't advance from deserialization
+        // (If deserialization used nextMonotonicTimestamp, clock would be 100 ULPs ahead)
+        const tAfter = nextMonotonicTimestamp();
+        assertTrue(
+          tAfter - now < 1,
+          `monotonic clock advanced too far after deserializations: ${
+            tAfter - now
+          }`,
+        );
+      });
+    },
+  );
 }

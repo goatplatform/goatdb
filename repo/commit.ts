@@ -513,7 +513,9 @@ export class FieldCommit extends Commit {
       if (ts instanceof Date) {
         ts = ts.getTime();
       }
-      this._timestamp = ts || Date.now();
+      // `||` (not `??`) so `timestamp: 0` is treated as "not provided" —
+      // consistent with CommitConfig where `undefined` means "use monotonic clock".
+      this._timestamp = ts || nextMonotonicTimestamp();
       this._contents = commitContentsClone(contents);
       // Actively ensure nobody tries to mutate our record. Commits must be
       // immutable.
@@ -629,6 +631,7 @@ export class FieldCommit extends Commit {
     assert(this._key !== undefined, 'commit: missing required field "k"');
     this._session = decoder.get<string>('s')!;
     assert(this._session !== undefined, 'commit: missing required field "s"');
+    // Deserialization uses wall time: reading existing data, not creating new commits
     this._timestamp = decoder.get<number>('ts') ?? Date.now();
     this._parents = decoder.get<string[]>('p') || [];
     this._ancestors = decoder.get<string[]>('a') || []; // Replaces old bloom fields 'af'/'ac'
