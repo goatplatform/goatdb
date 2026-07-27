@@ -5207,7 +5207,8 @@ export function setupCliCompileNodeTests(): void {
       const serverEntry = path.join(dir, 'server.ts');
       const clientEntry = path.join(dir, 'client.ts');
       const packageJson = path.join(dir, 'package.json');
-      const fakeNodeBasePath = path.join(dir, 'fake node');
+      // The executable path exercises cmd.exe quoting for spaces and metacharacters.
+      const fakeNodeBasePath = path.join(dir, 'fake node & shell');
       const recordPath = path.join(dir, 'fake-node-record.json');
       const outputName = 'runtime-exec-app';
       const outputFile = compiledBinaryPath(runtime, buildDir, outputName);
