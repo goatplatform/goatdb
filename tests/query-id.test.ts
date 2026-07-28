@@ -6,7 +6,12 @@
  */
 import { assertEquals, assertTrue } from './asserts.ts';
 import { TEST } from './mod.ts';
-import { generateQueryId, resolveQueryId } from '../repo/query.ts';
+import {
+  generatedQueryIdsSize,
+  generateQueryId,
+  resetGeneratedQueryIds,
+  resolveQueryId,
+} from '../repo/query.ts';
 
 // Stable inputs used as baseline for all tests.
 const kSource = '/data/items';
@@ -218,6 +223,29 @@ export default function setup(): void {
     },
   );
 
+  // --- Generated-ID cache --------------------------------------------------
+  TEST(
+    'QueryId',
+    'generated-ID cache keeps at most 10,000 entries',
+    () => {
+      resetGeneratedQueryIds();
+      try {
+        for (let i = 0; i <= 10_000; i++) {
+          generateQueryId(
+            `/data/query-id-${i}`,
+            kPredicate,
+            kSortBy,
+            kCtx,
+            kNs,
+          );
+        }
+        assertEquals(generatedQueryIdsSize(), 10_000);
+      } finally {
+        resetGeneratedQueryIds();
+      }
+    },
+  );
+
   // --- Source type variants -------------------------------------------------
   TEST(
     'QueryId',
@@ -238,6 +266,25 @@ export default function setup(): void {
         kNs,
       );
       assertTrue(a !== b, `IDs should differ: ${a}`);
+    },
+  );
+
+  TEST(
+    'QueryId',
+    'equivalent repository and item paths produce the same ID',
+    () => {
+      const sources = [
+        '/data/items',
+        'data/items/',
+        '/data/items/item',
+        '/data/items/item/embed',
+      ];
+      const generatedIds = sources.map((source) =>
+        generateQueryId(source, kPredicate, kSortBy, kCtx, kNs)
+      );
+      const resolvedIds = sources.map((source) => resolveQueryId({ source }));
+      assertEquals(new Set(generatedIds).size, 1);
+      assertEquals(new Set(resolvedIds).size, 1);
     },
   );
 

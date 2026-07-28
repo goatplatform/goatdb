@@ -286,9 +286,7 @@ export class Query<
     const { db, sortDescending, ctx, schema, limit, liveUpdates } = config;
     let { source, predicate, sortBy } = config;
     this.db = db;
-    if (typeof source === 'string') {
-      source = itemPathGetRepoId(source);
-    }
+    source = querySourceNormalize(source);
     if (!predicate) {
       predicate = () => true;
     }
@@ -951,7 +949,22 @@ export class Query<
   }
 }
 
+/**
+ * Bound generated-ID memoization to 10,000 entries. New entries past capacity
+ * evict the oldest entry (FIFO) so long-lived processes cannot retain every ID.
+ */
 const gGeneratedQueryIds = new Map<string, string>();
+const MAX_GENERATED_QUERY_IDS = 10_000;
+
+/** @internal Reset the generated query ID cache (for testing). */
+export function resetGeneratedQueryIds(): void {
+  gGeneratedQueryIds.clear();
+}
+
+/** @internal Get the generated query ID cache size (for testing). */
+export function generatedQueryIdsSize(): number {
+  return gGeneratedQueryIds.size;
+}
 
 /** Resolves an explicit ID or derives one from the normalized query config. */
 export function resolveQueryId<
@@ -1018,11 +1031,7 @@ export function generateQueryId<
   limit?: number,
   liveUpdates?: boolean,
 ): string {
-  const sourceId = typeof source === 'string'
-    ? source
-    : source instanceof Repository
-    ? source.path
-    : source.id;
+  const sourceId = querySourceId(querySourceNormalize(source));
   const key = [
     sourceId,
     predicate,
@@ -1037,8 +1046,25 @@ export function generateQueryId<
   if (!hash) {
     hash = murmur3(key, 0).toString(36);
     gGeneratedQueryIds.set(key, hash);
+    if (gGeneratedQueryIds.size > MAX_GENERATED_QUERY_IDS) {
+      const oldest = gGeneratedQueryIds.keys().next().value!;
+      gGeneratedQueryIds.delete(oldest);
+    }
   }
   return hash;
+}
+
+function querySourceNormalize<IS extends Schema, OS extends IS>(
+  source: QuerySource<IS, OS>,
+): QuerySource<IS, OS> {
+  return typeof source === 'string' ? itemPathGetRepoId(source) : source;
+}
+
+function querySourceId<IS extends Schema, OS extends IS>(
+  source: QuerySource<IS, OS>,
+): string {
+  if (typeof source === 'string') return source;
+  return source instanceof Repository ? source.path : source.id;
 }
 
 function queryIdPart(value: unknown): string {

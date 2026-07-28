@@ -5,6 +5,7 @@ import {
   resetMonotonicState,
   setMonotonicNowFn,
 } from '../repo/commit.ts';
+import { resetGeneratedQueryIds } from '../repo/query.ts';
 import { Item } from '../cfds/base/item.ts';
 import { Edit } from '../cfds/base/edit.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
@@ -47,10 +48,12 @@ function makeTestEdit(srcChecksum: string, dstChecksum: string) {
 
 function withMonotonicClock(fn: () => void): void {
   resetMonotonicState();
+  resetGeneratedQueryIds();
   try {
     fn();
   } finally {
     resetMonotonicState();
+    resetGeneratedQueryIds();
   }
 }
 

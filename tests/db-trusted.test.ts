@@ -271,6 +271,11 @@ export default function setup(): void {
           }),
           'omitted and explicit defaults must deduplicate',
         );
+        assertEquals(
+          defaults,
+          db.query({ ...base, source: '/test/query-ids/item' }),
+          'repository and item paths must deduplicate',
+        );
 
         const byName = db.query({ ...base, sortBy: 'name' });
         queries.push(byName);
@@ -296,10 +301,27 @@ export default function setup(): void {
         assertEquals(dbEmptyId.id, '');
         await dbEmptyId.loadingFinished();
 
+        const directRepoPath = new Query({ db, ...base });
+        const directItemPath = new Query({
+          db,
+          ...base,
+          source: '/test/query-ids/item',
+        });
         const directByName = new Query({ db, ...base, sortBy: 'name' });
         const directByCount = new Query({ db, ...base, sortBy: 'count' });
         const directEmptyId = new Query({ db, ...base, id: '' });
-        queries.push(directByName, directByCount, directEmptyId);
+        queries.push(
+          directRepoPath,
+          directItemPath,
+          directByName,
+          directByCount,
+          directEmptyId,
+        );
+        assertEquals(
+          directRepoPath.id,
+          directItemPath.id,
+          'direct Query repository and item paths must have the same ID',
+        );
         assertTrue(
           directByName.id !== directByCount.id,
           'direct Query sort fields must change the ID',

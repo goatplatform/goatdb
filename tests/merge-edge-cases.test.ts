@@ -1,6 +1,7 @@
 import { TEST } from './mod.ts';
 import { assertEquals, assertExists, assertTrue } from './asserts.ts';
 import { resetMonotonicState, setMonotonicNowFn } from '../repo/commit.ts';
+import { resetGeneratedQueryIds } from '../repo/query.ts';
 import {
   createRawCommit,
   kMergeTestRegistry,
@@ -19,6 +20,7 @@ export default function setup() {
         await db.open('/merge-test/edge-monotonic');
         const repo = db.repository('/merge-test/edge-monotonic')!;
         resetMonotonicState();
+        resetGeneratedQueryIds();
         setMonotonicNowFn(() => 1_700_000_000_000);
         const earlier = createRawCommit({
           id: 'z-earlier',
@@ -36,6 +38,7 @@ export default function setup() {
         assertEquals(repo.headForKey('k1')?.id, later.id);
       } finally {
         resetMonotonicState();
+        resetGeneratedQueryIds();
         await db.flushAll();
         await db.close();
       }
@@ -53,6 +56,7 @@ export default function setup() {
         await db.readyPromise();
         await db.open('/merge-test/edge1');
         const repo = db.repository('/merge-test/edge1')!;
+        resetGeneratedQueryIds();
 
         const now = Date.now();
         // Create 2 commits with identical timestamps but different data/IDs
