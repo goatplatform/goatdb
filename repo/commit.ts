@@ -58,6 +58,12 @@ export function resetMonotonicState(): void {
   _nowFn = Date.now;
 }
 
+/**
+ * Returns the next representable float64 value strictly above the input.
+ * Used by the monotonic clock to guarantee strictly increasing timestamps
+ * when Date.now() stalls (same millisecond for consecutive commits).
+ * @internal
+ */
 function nextFloat64(value: number): number {
   // Defensive: callers already validate; this guards against direct misuse.
   assert(
