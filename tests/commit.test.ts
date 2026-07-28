@@ -455,7 +455,7 @@ export default function setup() {
 
   TEST(
     'Commit',
-    'deserialization doesn\'t advance monotonic clock',
+    "deserialization doesn't advance monotonic clock",
     () => {
       withMonotonicClock(() => {
         const now = 1_700_000_000_000;
