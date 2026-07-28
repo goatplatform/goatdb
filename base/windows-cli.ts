@@ -129,7 +129,14 @@ function serializeBatchCommand(command: string, args: string[]): string {
 function batchCommand(command: string, args: string[]): WindowsCommand {
   return {
     command: windowsCommandProcessor(),
-    args: ['/d', '/v:off', '/s', '/c', serializeBatchCommand(command, args)],
+    args: [
+      '/d',
+      '/v:off',
+      '/s',
+      // Concatenate /c with the quoted command — /s strips outer quotes
+      // only when " immediately follows /c (no space between them).
+      `/c${serializeBatchCommand(command, args)}`,
+    ],
     requiresRawWindowsCommandLine: true,
   };
 }
