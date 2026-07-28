@@ -35,12 +35,7 @@ import type {
   ReadonlyJSONObject,
   ReadonlyJSONValue,
 } from '../base/interfaces.ts';
-import {
-  generateQueryId,
-  Query,
-  type QueryConfig,
-  type QuerySource,
-} from '../repo/query.ts';
+import { Query, type QueryConfig, resolveQueryId } from '../repo/query.ts';
 import { sendLoginEmail } from '../net/rest-api.ts';
 import { normalizeEmail } from '../base/string.ts';
 import { FileImplGet, pathExists } from '../base/json-log/file-impl.ts';
@@ -690,21 +685,13 @@ export class GoatDB<US extends Schema = Schema>
   query<IS extends Schema, CTX extends ReadonlyJSONValue, OS extends IS = IS>(
     config: Omit<QueryConfig<IS, OS, CTX>, 'db'>,
   ): Query<IS, OS, CTX> {
-    let id = config.id;
-    if (!id) {
-      id = generateQueryId(
-        config.source as QuerySource,
-        config.predicate,
-        config.sortBy,
-        config.ctx,
-        config.schema?.ns,
-      );
-    }
+    const id = resolveQueryId(config);
     let q = this._openQueries.get(id);
     if (!q) {
       q = new Query({
         ...config,
         db: this as unknown as GoatDB,
+        id,
       }) as unknown as Query<
         Schema,
         Schema,
