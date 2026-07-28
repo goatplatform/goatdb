@@ -1,7 +1,7 @@
 import { isWindows } from './os.ts';
 import { getEffectiveCWD, getEffectiveRuntimeId } from './runtime/index.ts';
 import { log } from '../logging/log.ts';
-import { resolveWindowsCommand } from './windows-cli.ts';
+import { resolveWindowsCommand, type WindowsCommand } from './windows-cli.ts';
 
 // Minimal type for objects with a toString method (used in Node.js streams)
 type Stringable = { toString(): string };
@@ -52,18 +52,27 @@ function logTimeout(timeout: number, command: string, args: string[]): void {
   });
 }
 
+async function resolveCliExecution(
+  command: string,
+  args: string[],
+  options: CliOptions,
+): Promise<WindowsCommand> {
+  if (!isWindows()) {
+    return { command, args, requiresRawWindowsCommandLine: false };
+  }
+  return await resolveWindowsCommand(
+    command,
+    args,
+    options.cwd ?? getEffectiveCWD(),
+  );
+}
+
 async function runDenoCommand(
   command: string,
   args: string[],
   options: CliOptions,
 ): Promise<CliResult> {
-  const execution = isWindows()
-    ? await resolveWindowsCommand(
-      command,
-      args,
-      options.cwd ?? getEffectiveCWD(),
-    )
-    : { command, args };
+  const execution = await resolveCliExecution(command, args, options);
   const controller = options.timeout ? new AbortController() : undefined;
   const timer = controller && options.timeout
     ? setTimeout(() => controller.abort(), options.timeout)
@@ -75,6 +84,9 @@ async function runDenoCommand(
       stderr: 'piped',
       cwd: options.cwd,
       signal: controller?.signal,
+      ...(execution.requiresRawWindowsCommandLine
+        ? { windowsRawArguments: true }
+        : {}),
     }).spawn();
     const { stdout, stderr, code } = await process.output();
     if (controller?.signal.aborted) {
@@ -102,8 +114,16 @@ async function getChildProcess(): Promise<any> {
   return childProcessModule;
 }
 
-function nodeSpawnOptions(options: CliOptions): Record<string, unknown> {
-  return options.cwd ? { cwd: options.cwd } : {};
+function nodeSpawnOptions(
+  options: CliOptions,
+  requiresRawWindowsCommandLine: boolean,
+): Record<string, unknown> {
+  return {
+    ...(options.cwd ? { cwd: options.cwd } : {}),
+    ...(requiresRawWindowsCommandLine
+      ? { windowsVerbatimArguments: true }
+      : {}),
+  };
 }
 
 function killWindowsProcessTree(proc: any, spawn: any): void {
@@ -148,13 +168,7 @@ async function runNodeCommand(
   options: CliOptions,
 ): Promise<CliResult> {
   const { spawn } = await getChildProcess();
-  const execution = isWindows()
-    ? await resolveWindowsCommand(
-      command,
-      args,
-      options.cwd ?? getEffectiveCWD(),
-    )
-    : { command, args };
+  const execution = await resolveCliExecution(command, args, options);
   return new Promise((resolve) => {
     let result = '';
     let settled = false;
@@ -164,7 +178,7 @@ async function runNodeCommand(
     const proc = spawn(
       execution.command,
       execution.args,
-      nodeSpawnOptions(options),
+      nodeSpawnOptions(options, execution.requiresRawWindowsCommandLine),
     );
     const settle = (value: CliResult) => {
       if (settled) return;

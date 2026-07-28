@@ -5,6 +5,7 @@ import { getEffectiveRuntimeId } from './runtime/index.ts';
 export interface WindowsCommand {
   command: string;
   args: string[];
+  requiresRawWindowsCommandLine: boolean;
 }
 
 const kDefaultPathExtensions = ['.COM', '.EXE', '.BAT', '.CMD'];
@@ -129,6 +130,7 @@ function batchCommand(command: string, args: string[]): WindowsCommand {
   return {
     command: windowsCommandProcessor(),
     args: ['/d', '/v:off', '/s', '/c', serializeBatchCommand(command, args)],
+    requiresRawWindowsCommandLine: true,
   };
 }
 
@@ -141,5 +143,9 @@ export async function resolveWindowsCommand(
   const resolved = await resolveCommand(command, cwd);
   return resolved.found && isBatchFile(resolved.command)
     ? batchCommand(resolved.command, args)
-    : { command: resolved.command, args };
+    : {
+      command: resolved.command,
+      args,
+      requiresRawWindowsCommandLine: false,
+    };
 }
