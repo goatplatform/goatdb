@@ -133,7 +133,12 @@ export type QueryConfig<
    * If a field name is provided, results will be sorted by that field's values
    * using standard comparison rules. */
   sortBy?: SortDescriptor<OS, CTX> | keyof SchemaDataType<OS>;
-  /** Optional flag that if true, flips the natural order of the sortBy */
+  /** Optional flag that if true, flips the natural order of the sortBy
+   *
+   * WARNING: When adding a field that changes query behavior (sorting,
+   * filtering, limiting, live updates), you MUST also add it to the key
+   * computation in `generateQueryId()` below so the cache identity captures
+   * the difference. Otherwise distinct configurations will collide. */
   sortDescending?: boolean;
   /** Optional schema to restrict query results to */
   schema?: IS;
@@ -272,24 +277,16 @@ export class Query<
    * @param config.ctx Optional context data passed to predicate/sort functions
    * @param config.schema Optional schema type for the query
    * @param config.limit Optional maximum number of results (0 for unlimited)
+   * @param config.sortDescending Optional flag to reverse sort order
+   * @param config.liveUpdates Optional flag for live uncommitted updates (default true)
    */
-  constructor({
-    db,
-    id,
-    source,
-    predicate,
-    sortBy,
-    sortDescending,
-    ctx,
-    schema,
-    limit,
-    liveUpdates,
-  }: QueryConfig<IS, OS, CTX>) {
+  constructor(config: QueryConfig<IS, OS, CTX>) {
     super();
+    this.id = resolveQueryId(config);
+    const { db, sortDescending, ctx, schema, limit, liveUpdates } = config;
+    let { source, predicate, sortBy } = config;
     this.db = db;
-    if (typeof source === 'string') {
-      source = itemPathGetRepoId(source);
-    }
+    source = querySourceNormalize(source);
     if (!predicate) {
       predicate = () => true;
     }
@@ -303,14 +300,6 @@ export class Query<
     } else if (typeof sortBy === 'function' && sortDescending) {
       sortBy = (info) => (sortBy as SortDescriptor<OS, CTX>)(info) * -1;
     }
-    this.id = id ||
-      generateQueryId(
-        source as QuerySource,
-        predicate,
-        sortBy,
-        ctx,
-        schema?.ns,
-      );
     this.context = ctx as CTX;
     this.source = source;
     this.scheme = schema;
@@ -960,7 +949,54 @@ export class Query<
   }
 }
 
+/**
+ * Bound generated-ID memoization to 10,000 entries. New entries past capacity
+ * evict the oldest entry (FIFO) so long-lived processes cannot retain every ID.
+ */
 const gGeneratedQueryIds = new Map<string, string>();
+const MAX_GENERATED_QUERY_IDS = 10_000;
+
+/** @internal Reset the generated query ID cache (for testing). */
+export function resetGeneratedQueryIds(): void {
+  gGeneratedQueryIds.clear();
+}
+
+/** @internal Get the generated query ID cache size (for testing). */
+export function generatedQueryIdsSize(): number {
+  return gGeneratedQueryIds.size;
+}
+
+/** Resolves an explicit ID or derives one from the normalized query config. */
+export function resolveQueryId<
+  IS extends Schema = Schema,
+  OS extends IS = IS,
+  CTX extends ReadonlyJSONValue = ReadonlyJSONValue,
+>(
+  config: Pick<
+    QueryConfig<IS, OS, CTX>,
+    | 'id'
+    | 'source'
+    | 'predicate'
+    | 'sortBy'
+    | 'ctx'
+    | 'schema'
+    | 'sortDescending'
+    | 'limit'
+    | 'liveUpdates'
+  >,
+): string {
+  return config.id ??
+    generateQueryId(
+      config.source,
+      config.predicate,
+      config.sortBy,
+      config.ctx,
+      config.schema?.ns,
+      config.sortDescending ?? false,
+      config.limit || 0,
+      config.liveUpdates ?? true,
+    );
+}
 
 /**
  * Generates a unique identifier for a query based on its configuration.
@@ -970,6 +1006,9 @@ const gGeneratedQueryIds = new Map<string, string>();
  * - Sort descriptor
  * - Context data
  * - Schema namespace
+ * - sortDescending flag
+ * - limit value
+ * - liveUpdates flag
  *
  * @param IS The input schema type for items in the query
  * @param OS The output schema type for items in the query
@@ -980,7 +1019,7 @@ export function generateQueryId<
   OS extends IS = IS,
   CTX extends ReadonlyJSONValue = ReadonlyJSONValue,
 >(
-  source: QuerySource,
+  source: QuerySource<IS, OS>,
   predicate: Predicate<IS, CTX> | undefined,
   sortDescriptor:
     | keyof SchemaDataType<OS>
@@ -988,27 +1027,50 @@ export function generateQueryId<
     | undefined,
   ctx: CTX | undefined,
   ns: string | null | undefined,
+  sortDescending?: boolean,
+  limit?: number,
+  liveUpdates?: boolean,
 ): string {
-  let key: string;
-  if (typeof source === 'string') {
-    key = source;
-  } else if (source instanceof Repository) {
-    key = source.path;
-  } else {
-    key = source.id;
-  }
-  key += '|';
-  key += predicate ? predicate.toString() : 'null';
-  key += '|';
-  key += sortDescriptor ? sortDescriptor.toString() : 'null';
-  key += '|';
-  key += JSON.stringify(ctx);
-  key += '|';
-  key += ns;
+  const sourceId = querySourceId(querySourceNormalize(source));
+  const key = [
+    sourceId,
+    predicate,
+    sortDescriptor,
+    ctx,
+    ns,
+    sortDescending,
+    limit,
+    liveUpdates,
+  ].map(queryIdPart).join('');
   let hash = gGeneratedQueryIds.get(key);
   if (!hash) {
     hash = murmur3(key, 0).toString(36);
     gGeneratedQueryIds.set(key, hash);
+    if (gGeneratedQueryIds.size > MAX_GENERATED_QUERY_IDS) {
+      const oldest = gGeneratedQueryIds.keys().next().value!;
+      gGeneratedQueryIds.delete(oldest);
+    }
   }
   return hash;
+}
+
+function querySourceNormalize<IS extends Schema, OS extends IS>(
+  source: QuerySource<IS, OS>,
+): QuerySource<IS, OS> {
+  return typeof source === 'string' ? itemPathGetRepoId(source) : source;
+}
+
+function querySourceId<IS extends Schema, OS extends IS>(
+  source: QuerySource<IS, OS>,
+): string {
+  if (typeof source === 'string') return source;
+  return source instanceof Repository ? source.path : source.id;
+}
+
+function queryIdPart(value: unknown): string {
+  if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
+  const type = typeof value;
+  const text = type === 'object' ? JSON.stringify(value) : String(value);
+  return `${type}:${text.length}:${text}`;
 }

@@ -7,6 +7,16 @@ import {
 import { TEST } from './mod.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 import { kDataRegistry, TestSchema } from './test-schemas.ts';
+import type { GoatDB } from '../db/db.ts';
+import { Query } from '../repo/query.ts';
+import { QueryPersistence } from '../repo/query-persistance.ts';
+import { QueryPersistenceFile } from '../db/persistance/query-file.ts';
+
+const OtherTestSchema = {
+  ...TestSchema,
+  ns: 'other-test',
+} as const;
+kDataRegistry.registerSchema(OtherTestSchema);
 export default function setup(): void {
   TEST('Trusted', 'initialization', async (ctx) => {
     const db = await ctx.createDB('db-init', {
@@ -210,6 +220,181 @@ export default function setup(): void {
     }
   });
 
+  TEST(
+    'Trusted',
+    'query IDs normalize defaults and retain explicit empty IDs',
+    async (ctx) => {
+      const db = await ctx.createDB('db-query-ids', {
+        registry: kDataRegistry,
+      });
+      const queries: Array<{ close(): void }> = [];
+      const persistence = new QueryPersistence(
+        new QueryPersistenceFile(db.path),
+      );
+
+      try {
+        await db.readyPromise();
+        db.create('/test/query-ids', TestSchema, { name: 'Item', count: 1 });
+        await db.flush('/test/query-ids');
+        await persistence.storage!.store('/test/query-ids', {
+          version: 1,
+          queries: { '': { age: 1, results: [] } },
+        });
+        assertExists(
+          await persistence.get('/test/query-ids', ''),
+          'empty query IDs must be retrieved from persistence',
+        );
+
+        const base = { source: '/test/query-ids', schema: TestSchema };
+        const defaults = db.query(base);
+        queries.push(defaults);
+        assertEquals(
+          defaults,
+          db.query({
+            ...base,
+            sortDescending: false,
+            limit: 0,
+            liveUpdates: true,
+          }),
+          'omitted and explicit defaults must deduplicate',
+        );
+        assertEquals(
+          defaults,
+          db.query({ ...base, source: '/test/query-ids/item' }),
+          'repository and item paths must deduplicate',
+        );
+
+        const byName = db.query({ ...base, sortBy: 'name' });
+        queries.push(byName);
+        const sameByName = db.query({ ...base, sortBy: 'name' });
+        const byCount = db.query({ ...base, sortBy: 'count' });
+        queries.push(byCount);
+        const otherNs = db.query({
+          ...base,
+          schema: OtherTestSchema,
+          sortBy: 'name',
+        });
+        queries.push(otherNs);
+        assertEquals(byName, sameByName);
+        assertTrue(byName.id !== byCount.id, 'sort fields must change the ID');
+        assertTrue(
+          byName.id !== otherNs.id,
+          'schema namespace must change the ID',
+        );
+
+        const dbEmptyId = db.query({ ...base, id: '' });
+        queries.push(dbEmptyId);
+        assertEquals(dbEmptyId, db.query({ ...base, id: '' }));
+        assertEquals(dbEmptyId.id, '');
+        await dbEmptyId.loadingFinished();
+
+        const directRepoPath = new Query({ db, ...base });
+        const directItemPath = new Query({
+          db,
+          ...base,
+          source: '/test/query-ids/item',
+        });
+        const directByName = new Query({ db, ...base, sortBy: 'name' });
+        const directByCount = new Query({ db, ...base, sortBy: 'count' });
+        const directEmptyId = new Query({ db, ...base, id: '' });
+        queries.push(
+          directRepoPath,
+          directItemPath,
+          directByName,
+          directByCount,
+          directEmptyId,
+        );
+        assertEquals(
+          directRepoPath.id,
+          directItemPath.id,
+          'direct Query repository and item paths must have the same ID',
+        );
+        assertTrue(
+          directByName.id !== directByCount.id,
+          'direct Query sort fields must change the ID',
+        );
+        assertEquals(directEmptyId.id, '');
+      } finally {
+        await persistence.close();
+        for (const query of queries) query.close();
+        await db.flushAll();
+        await db.close();
+      }
+    },
+  );
+
+  TEST('Trusted', 'query cache cross-session correctness', async (ctx) => {
+    // Regression test: ageForKey was keyed by item key but looked up by full
+    // path, causing stale cache hits after DB reopen (items changed after cache
+    // write were silently missed).
+    if (getRuntime().id === 'browser') {
+      return; // Server-only: requires direct path reopen
+    }
+
+    const dbPath = await ctx.tempDir('db-query-cache');
+
+    // Session 1: populate and run a query to seed the cache.
+    const db1 = new (await import('../db/db.ts')).GoatDB({
+      path: dbPath,
+      orgId: 'test-org',
+      trusted: true,
+      registry: kDataRegistry,
+    });
+    let targetKey: string;
+    try {
+      await db1.readyPromise();
+      db1.create('/test/qcache', TestSchema, { name: 'A', count: 5 });
+      const target = db1.create('/test/qcache', TestSchema, {
+        name: 'B',
+        count: 5,
+      });
+      targetKey = target.key;
+      db1.create('/test/qcache', TestSchema, { name: 'C', count: 30 });
+      await db1.flush('/test/qcache');
+
+      const q1 = db1.query({
+        source: '/test/qcache',
+        schema: TestSchema,
+        predicate: ({ item }) => item.get('count') > 15,
+      });
+      await q1.loadingFinished();
+      assertEquals(q1.results().length, 1); // Only C passes
+      q1.close();
+
+      // Mutate B so it now passes the predicate.
+      const b = db1.item<typeof TestSchema>('/test/qcache', targetKey);
+      b.set('count', 20);
+      await db1.flushAll();
+    } finally {
+      await db1.close();
+    }
+
+    // Session 2: reopen and re-run the query — B must now appear.
+    const db2 = new (await import('../db/db.ts')).GoatDB({
+      path: dbPath,
+      orgId: 'test-org',
+      trusted: true,
+      registry: kDataRegistry,
+    });
+    try {
+      await db2.readyPromise();
+      const q2 = db2.query({
+        source: '/test/qcache',
+        schema: TestSchema,
+        predicate: ({ item }) => item.get('count') > 15,
+      });
+      await q2.loadingFinished();
+      const names = q2.results().map((i) => i.get('name'));
+      assertEquals(names.length, 2, 'B should now appear after cache fix');
+      expectToContain(names, 'B');
+      expectToContain(names, 'C');
+      q2.close();
+    } finally {
+      await db2.flushAll();
+      await db2.close();
+    }
+  });
+
   TEST('Trusted', 'ManagedItem loading state management', async (ctx) => {
     const db = await ctx.createDB('db-loading', {
       registry: kDataRegistry,
@@ -376,6 +561,45 @@ export default function setup(): void {
     } finally {
       await db.flushAll();
       await db.close();
+    }
+  });
+
+  TEST('Trusted', 'insert persistence across reopen', async (ctx) => {
+    if (getRuntime().id === 'browser') return; // Server-only: requires direct path reopen
+    const dbPath = await ctx.tempDir('db-insert-persist');
+    const { GoatDB: DB } = await import('../db/db.ts');
+    const db1: GoatDB = new DB({
+      path: dbPath,
+      orgId: 'test-org',
+      trusted: true,
+      registry: kDataRegistry,
+    });
+    try {
+      await db1.readyPromise();
+      await db1.insert('/test/insert-persist', TestSchema, [
+        { key: 'p1', data: { name: 'Persist1' } },
+        { key: 'p2', data: { name: 'Persist2' } },
+      ]);
+      await db1.flushAll();
+    } finally {
+      await db1.close();
+    }
+    const db2: GoatDB = new DB({
+      path: dbPath,
+      orgId: 'test-org',
+      trusted: true,
+      registry: kDataRegistry,
+    });
+    try {
+      await db2.readyPromise();
+      await db2.open('/test/insert-persist');
+      assertEquals(db2.count('/test/insert-persist'), 2);
+      const keys = Array.from(db2.keys('/test/insert-persist'));
+      expectToContain(keys, 'p1');
+      expectToContain(keys, 'p2');
+    } finally {
+      await db2.flushAll();
+      await db2.close();
     }
   });
 

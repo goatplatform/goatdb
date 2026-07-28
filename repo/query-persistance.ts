@@ -182,7 +182,7 @@ export class QueryPersistence {
       this._cachedDataForRepo.set(repoId, map || new Map());
     }
 
-    return queryId ? map?.get(queryId) : undefined;
+    return queryId === undefined ? undefined : map?.get(queryId);
   }
 
   /**
