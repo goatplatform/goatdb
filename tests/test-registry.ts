@@ -96,7 +96,9 @@ import setupBuildDenoTests from './build-deno.test.ts';
 import { setupGitHooksDenoTests } from './githooks.test.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 import { TestsRunner } from './mod.ts';
-import setupWindowsCliTests from './windows-cli.test.ts';
+import setupWindowsCliTests, {
+  setupBatchSerializationTests,
+} from './windows-cli.test.ts';
 
 let _registrationPromise: Promise<void> | undefined;
 let _registrationCallCount = 0;
@@ -250,6 +252,7 @@ async function registerAllTestsImpl(): Promise<void> {
   if (getRuntime().id === 'deno') {
     setupCliCompileDenoTests(); // Deno-only: CSS bundling, node runner, cli timeout
   }
+  setupBatchSerializationTests(); // Pure string round-trip, all platforms
   if (isWindows()) {
     setupWindowsCliTests(); // Real Windows command execution and batch escaping
   }
