@@ -117,10 +117,19 @@ function assertSafeBatchValues(values: string[]): void {
 }
 
 function quoteBatchValue(value: string): string {
-  return `"${value.replaceAll('"', '""')}"`;
+  // Backslash runs before a quote position (an embedded `"` or the closing
+  // quote added below) must double: MSVCRT argv parsing in the final exe reads
+  // `\"` as a literal quote, which destroys the argument boundary. cmd.exe
+  // treats `\` literally, so doubling is safe for both parsers in the chain.
+  const escaped = value.replaceAll(
+    /(\\*)("|$)/g,
+    (_match, backslashes: string, quote: string) =>
+      backslashes.repeat(2) + (quote ? '""' : ''),
+  );
+  return `"${escaped}"`;
 }
 
-function serializeBatchCommand(command: string, args: string[]): string {
+export function serializeBatchCommand(command: string, args: string[]): string {
   const values = [command, ...args];
   assertSafeBatchValues(values);
   return `"${values.map(quoteBatchValue).join(' ')}"`;
