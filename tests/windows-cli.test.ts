@@ -9,6 +9,25 @@ import {
 import { cli } from '../base/cli.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 
+const kSupportedBatchValues = [
+  'space value',
+  'amp&value',
+  'pipe|value',
+  'redirect>out<input',
+  'caret^value',
+  'quote"value',
+  '',
+  'trailing\\',
+  'space & pipe| redirect>< caret^ quote" trailing\\',
+];
+
+const kRejectedBatchValues = [
+  ['literal percent', 'literal%value', 'literal "%"'],
+  ['literal exclamation', 'literal!value', 'literal "!"'],
+  ['carriage return', 'line\rvalue', 'line break'],
+  ['line feed', 'line\nvalue', 'line break'],
+] as const;
+
 function nativeArgumentCommand(values: string[]): [string, ...string[]] {
   const runtime = getRuntime();
   const code = runtime.id === 'deno'
