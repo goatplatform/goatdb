@@ -18,6 +18,38 @@ function nativeArgumentCommand(values: string[]): [string, ...string[]] {
   return [runtime.getExecPath(), ...prefix, ...values];
 }
 
+async function writeBatchFile(
+  dir: string,
+  name: string,
+  lines: string[],
+): Promise<string> {
+  const script = path.join(dir, name);
+  await writeTextFile(script, lines.join('\r\n'));
+  return script;
+}
+
+async function createBatchArgumentRecorder(
+  ctx: TestSuite,
+  name: string,
+): Promise<string> {
+  const dir = await ctx.tempDir(name);
+  const recorder = path.join(dir, 'record-args.js');
+  const runtime = getRuntime();
+  const runtimeArgs = runtime.id === 'deno' ? ['run'] : [];
+  await writeTextFile(
+    recorder,
+    "const args = typeof Deno === 'undefined' ? process.argv.slice(2) : Deno.args;\nconsole.log(JSON.stringify(args));",
+  );
+  const command = [runtime.getExecPath(), ...runtimeArgs]
+    .map((value) => `"${value}"`).join(' ');
+  return await writeBatchFile(
+    dir,
+    'record-args.cmd',
+    // `%*` forwards original args; the runtime records argv without batch echo parsing.
+    [`@${command} "%~dp0record-args.js" %*`],
+  );
+}
+
 async function createBatch(ctx: TestSuite, name: string): Promise<string> {
   const dir = await ctx.tempDir(name);
   const script = path.join(dir, 'echo-args.cmd');
