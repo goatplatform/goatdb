@@ -69,28 +69,6 @@ async function createBatchArgumentRecorder(
   );
 }
 
-async function createBatch(ctx: TestSuite, name: string): Promise<string> {
-  const dir = await ctx.tempDir(name);
-  const script = path.join(dir, 'echo-args.cmd');
-  // Safe batch pattern: capture args with quotes preserved (via %n), then use
-  // delayed expansion + for/f to strip outer quotes safely. This avoids
-  // exposing cmd.exe metacharacters (&, |, etc.) that %~n would activate
-  // during parse-time expansion.
-  const content = [
-    '@echo off',
-    'setlocal DisableDelayedExpansion',
-    'set "raw1=%1"',
-    'set "raw2=%2"',
-    'setlocal EnableDelayedExpansion',
-    'for /f "tokens=*" %%a in ("!raw1!") do set "arg1=%%~a"',
-    'for /f "tokens=*" %%a in ("!raw2!") do set "arg2=%%~a"',
-    'echo [!arg1!]',
-    'echo [!arg2!]',
-  ].join('\r\n');
-  await writeTextFile(script, content);
-  return script;
-}
-
 async function copyRuntimeAsLocalCommandProcessor(dir: string): Promise<void> {
   const runtime = getRuntime();
   await writeFile(
@@ -99,18 +77,15 @@ async function copyRuntimeAsLocalCommandProcessor(dir: string): Promise<void> {
   );
 }
 
-export default function setupWindowsCliTests(): void {
+function setupNativeArgumentTests(): void {
   TEST(
     'Windows-CLI',
     'native executables preserve raw argv values',
     async () => {
       const values = [
-        'space value',
-        'amp&value',
+        ...kSupportedBatchValues,
         'percent%value',
-        'quote"value',
-        'trailing\\',
-        '',
+        'exclamation!value',
       ];
       const [command, ...args] = nativeArgumentCommand(values);
       const { exitCode, result } = await cli(command, ...args);
@@ -118,126 +93,56 @@ export default function setupWindowsCliTests(): void {
       assertEquals(JSON.parse(result), values);
     },
   );
+}
 
+function setupBatchArgumentTests(): void {
   TEST(
     'Windows-CLI',
-    'batch commands preserve safe quoted values',
+    'batch commands preserve supported values',
     async (ctx) => {
-      const script = await createBatch(ctx, 'windows cli batch');
-      const { exitCode, result } = await cli(
-        script,
-        'safe space',
-        'safe&value',
+      const script = await createBatchArgumentRecorder(
+        ctx,
+        'windows cli batch',
       );
+      const { exitCode, result } = await cli(script, ...kSupportedBatchValues);
       assertEquals(exitCode, 0);
-      assertEquals(result.trim().split(/\r?\n/), [
-        '[safe space]',
-        '[safe&value]',
-      ]);
+      assertEquals(JSON.parse(result), kSupportedBatchValues);
     },
   );
+}
 
-  TEST(
-    'Windows-CLI',
-    'batch commands reject literal percent values',
-    async (ctx) => {
-      const script = await createBatch(ctx, 'windows-cli-percent');
-      await assertThrows(
-        () => cli(script, 'literal%value'),
-        Error,
-        'literal "%"',
+function setupRejectedBatchArgumentTests(): void {
+  for (const [name, value, message] of kRejectedBatchValues) {
+    TEST('Windows-CLI', `batch commands reject ${name}`, async (ctx) => {
+      const script = await createBatchArgumentRecorder(
+        ctx,
+        `windows-cli-${name.replaceAll(' ', '-')}`,
       );
-    },
-  );
+      await assertThrows(() => cli(script, value), Error, message);
+    });
+  }
+}
 
-  TEST(
-    'Windows-CLI',
-    'batch commands reject literal exclamation values',
-    async (ctx) => {
-      const script = await createBatch(ctx, 'windows-cli-exclamation');
-      await assertThrows(
-        () => cli(script, 'literal!value'),
-        Error,
-        'literal "!"',
-      );
-    },
-  );
-
-  TEST(
-    'Windows-CLI',
-    'batch commands reject line break values',
-    async (ctx) => {
-      const script = await createBatch(ctx, 'windows-cli-newline');
-      await assertThrows(
-        () => cli(script, 'line\nvalue'),
-        Error,
-        'line break',
-      );
-    },
-  );
-
-  TEST(
-    'Windows-CLI',
-    'batch commands preserve pipe character',
-    async (ctx) => {
-      const script = await createBatch(ctx, 'windows-cli-pipe');
-      const { exitCode, result } = await cli(script, 'first', 'a|b');
-      assertEquals(exitCode, 0);
-      assertEquals(result.trim().split(/\r?\n/), ['[first]', '[a|b]']);
-    },
-  );
-
-  TEST(
-    'Windows-CLI',
-    'batch commands preserve redirection characters',
-    async (ctx) => {
-      const script = await createBatch(ctx, 'windows-cli-redirect');
-      const { exitCode, result } = await cli(script, 'first', 'a>b<c');
-      assertEquals(exitCode, 0);
-      assertEquals(result.trim().split(/\r?\n/), ['[first]', '[a>b<c]']);
-    },
-  );
-
-  TEST(
-    'Windows-CLI',
-    'batch commands preserve caret character',
-    async (ctx) => {
-      const script = await createBatch(ctx, 'windows-cli-caret');
-      const { exitCode, result } = await cli(script, 'first', 'a^b');
-      assertEquals(exitCode, 0);
-      assertEquals(result.trim().split(/\r?\n/), ['[first]', '[a^b]']);
-    },
-  );
-
-  TEST(
-    'Windows-CLI',
-    'batch commands preserve embedded double quotes',
-    async (ctx) => {
-      const script = await createBatch(ctx, 'windows-cli-embedded-quote');
-      const { exitCode, result } = await cli(script, 'first', 'a"b');
-      assertEquals(exitCode, 0);
-      assertEquals(result.trim().split(/\r?\n/), ['[first]', '[a"b]']);
-    },
-  );
-
+function setupCommandProcessorTests(): void {
   TEST(
     'Windows-CLI',
     'batch commands do not select a local cmd.exe',
     async (ctx) => {
-      const dir = await ctx.tempDir('windows cli command processor');
-      const script = await createBatch(ctx, 'windows cli command processor');
-      await copyRuntimeAsLocalCommandProcessor(dir);
-      const { exitCode, result } = await cli(
-        script,
-        'safe space',
-        'safe&value',
-        { cwd: dir },
-      );
-      assertEquals(exitCode, 0);
-      assertEquals(result.trim().split(/\r?\n/), [
-        '[safe space]',
-        '[safe&value]',
+      const dir = await ctx.tempDir('windows-cli-command-processor');
+      const script = await writeBatchFile(dir, 'sentinel.cmd', [
+        '@echo sentinel',
       ]);
+      await copyRuntimeAsLocalCommandProcessor(dir);
+      const { exitCode, result } = await cli(script, { cwd: dir });
+      assertEquals(exitCode, 0);
+      assertEquals(result.trim(), 'sentinel');
     },
   );
+}
+
+export default function setupWindowsCliTests(): void {
+  setupNativeArgumentTests();
+  setupBatchArgumentTests();
+  setupRejectedBatchArgumentTests();
+  setupCommandProcessorTests();
 }
