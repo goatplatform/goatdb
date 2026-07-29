@@ -8,6 +8,7 @@ import {
 } from '../base/json-log/file-impl.ts';
 import { cli } from '../base/cli.ts';
 import { getRuntime } from '../base/runtime/index.ts';
+import { serializeBatchCommand } from '../base/windows-cli.ts';
 
 const kSupportedBatchValues = [
   'space value',
@@ -18,6 +19,8 @@ const kSupportedBatchValues = [
   'quote"value',
   '',
   'trailing\\',
+  'double trailing\\\\',
+  'back\\"slash',
   'space & pipe| redirect>< caret^ quote" trailing\\',
 ];
 
@@ -136,6 +139,75 @@ function setupCommandProcessorTests(): void {
       const { exitCode, result } = await cli(script, { cwd: dir });
       assertEquals(exitCode, 0);
       assertEquals(result.trim(), 'sentinel');
+    },
+  );
+}
+
+/**
+ * Implements the documented MSVCRT / CommandLineToArgvW argv rules used by the
+ * final exe on Windows: 2n backslashes + `"` toggle quoting, 2n+1 backslashes
+ * + `"` yield a literal quote, and inside quotes `""` is a literal quote.
+ */
+function parseMsvcrtCommandLine(commandLine: string): string[] {
+  const args: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  let hasArg = false;
+  for (let i = 0; i < commandLine.length;) {
+    let backslashes = 0;
+    while (commandLine[i] === '\\') {
+      backslashes++;
+      i++;
+    }
+    if (commandLine[i] === '"') {
+      current += '\\'.repeat(backslashes >> 1);
+      if (backslashes % 2 === 0) {
+        if (inQuotes && commandLine[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else {
+        current += '"';
+      }
+      hasArg = true;
+      i++;
+    } else {
+      current += '\\'.repeat(backslashes);
+      if (commandLine[i] === undefined) break;
+      if ((commandLine[i] === ' ' || commandLine[i] === '\t') && !inQuotes) {
+        args.push(current);
+        current = '';
+        hasArg = false;
+        while (commandLine[i] === ' ' || commandLine[i] === '\t') i++;
+      } else {
+        current += commandLine[i];
+        hasArg = true;
+        i++;
+      }
+    }
+  }
+  if (hasArg || current.length > 0) args.push(current);
+  return args;
+}
+
+// Pure string round-trip: registered on every platform so non-Windows CI also
+// guards the serialization contract. The execution tests below only run when
+// this file's setup is registered on Windows (see test-registry.ts).
+export function setupBatchSerializationTests(): void {
+  TEST(
+    'Windows-CLI',
+    'batch serialization survives MSVCRT argv parsing',
+    () => {
+      const values = ['batch.cmd', ...kSupportedBatchValues];
+      const serialized = serializeBatchCommand(
+        'batch.cmd',
+        kSupportedBatchValues,
+      );
+      // cmd.exe /s strips the outer quotes before the final exe parses argv.
+      const commandLine = serialized.slice(1, -1);
+      assertEquals(parseMsvcrtCommandLine(commandLine), values);
     },
   );
 }
