@@ -10,12 +10,11 @@ import * as path from '../base/path.ts';
 import { SimpleTimer } from '../base/timer.ts';
 import { tuple4Get, tuple4Set } from '../base/tuple.ts';
 import type { VersionNumber } from '../base/version-number.ts';
-import { createBuildContext, type ReBuildContext } from '../build.ts';
+import { type ClientBundleSpec, createBuildContext } from '../build.ts';
 import { getGoatConfig } from '../base/config.ts';
 import { Server, type ServerOptions } from '../net/server/server.ts';
-import { buildAssets } from './build-assets.ts';
+import { appEntryPoints, buildAssets } from './build-assets.ts';
 import { notReached } from '../base/error.ts';
-import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
 import { isLinux, isMac, isWindows } from '../base/os.ts';
 import { isDeno, isNode } from '../base/common.ts';
@@ -39,8 +38,9 @@ function incrementBuildNumber(version: VersionNumber): VersionNumber {
  */
 export type LiveReloadOptions = {
   /**
-   * Full path to watch for changes. When a file changes under this path the
-   * server will trigger a rebuild and reload of the client code.
+   * Full path to watch for changes. Defaults to the current working directory.
+   * When a file changes under this path the server rebuilds and reloads the
+   * client code. Plugin `watchFiles` and `watchDirs` do not expand this path.
    */
   watchDir?: string;
   /**
@@ -136,6 +136,18 @@ function getCwd(): string {
   return '/';
 }
 
+export function debugClientBundleSpec(
+  options: AppConfig,
+  runtime: 'deno' | 'node',
+): ClientBundleSpec {
+  return {
+    entryPoints: appEntryPoints(options),
+    runtime,
+    minify: options.minify,
+    userPlugins: options.esbuildPlugins,
+  };
+}
+
 /**
  * Starts a local debug server with live reload.
  *
@@ -176,12 +188,11 @@ export async function startDebugServer<US extends Schema>(
   console.log('Bundling client code...');
   let bundlingStart = performance.now();
 
-  const entryPoints = [
-    {
-      in: path.resolve(options.jsPath),
-      out: APP_ENTRY_POINT,
-    },
-  ];
+  const buildSpec = debugClientBundleSpec(
+    options,
+    isNode() ? 'node' : 'deno',
+  );
+  const entryPoints = buildSpec.entryPoints;
 
   await server.servicesForOrganization(options.orgId || 'localhost');
 
@@ -193,7 +204,7 @@ export async function startDebugServer<US extends Schema>(
     await options.beforeBuild();
   }
 
-  const ctx = await createBuildContext(entryPoints);
+  const ctx = await createBuildContext(buildSpec);
   server.updateStaticAssets(
     await buildAssets(ctx, entryPoints, options),
   );
@@ -239,8 +250,8 @@ export async function startDebugServer<US extends Schema>(
     });
   }
 
-  if (options.watchDir) {
-    watcher = await watchDirectory(path.resolve(options.watchDir));
+  {
+    watcher = await watchDirectory(path.resolve(options.watchDir ?? cwd));
 
     rebuildTimer = new SimpleTimer(300, false, async () => {
       console.log('Bundling client code...');
@@ -274,7 +285,6 @@ export async function startDebugServer<US extends Schema>(
     });
 
     const filterFunc = options.watchFilter || shouldRebuildAfterPathChange;
-    const cwd = getCwd();
 
     for await (const event of watcher) {
       for (const p of event.paths) {

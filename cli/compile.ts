@@ -5,8 +5,11 @@ import {
   stopBackgroundCompiler,
 } from '../build.ts';
 import type { AppConfig } from './app-config.ts';
-import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
-import { buildAssets, type BuildAssetsOptions } from './build-assets.ts';
+import {
+  appEntryPoints,
+  buildAssets,
+  type BuildAssetsOptions,
+} from './build-assets.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
 import { staticAssetsToJS } from '../system-assets/system-assets.ts';
 import { getRuntime } from '../base/runtime/index.ts';
@@ -190,9 +193,7 @@ async function bundleClientAssets(
 ): Promise<{ assetsJson: string; buildInfoJson: string }> {
   console.log('Bundling client code...');
   const bundlingStart = performance.now();
-  const entryPoints = [
-    { in: path.resolve(options.jsPath), out: APP_ENTRY_POINT },
-  ];
+  const entryPoints = appEntryPoints(options);
   const minify = options.minify !== false;
   const buildAssetsOpts: BuildAssetsOptions = {
     runtime: runtime ?? 'deno',

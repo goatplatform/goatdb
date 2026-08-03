@@ -1,5 +1,4 @@
-import { buildAssets } from '../../cli/build-assets.ts';
-import { APP_ENTRY_POINT } from '../../net/server/static-assets.ts';
+import { appEntryPoints, buildAssets } from '../../cli/build-assets.ts';
 import { FileImplGet } from '../../base/json-log/file-impl.ts';
 import * as path from '../../base/path.ts';
 import { getEnvVar } from '../../base/os.ts';
@@ -14,14 +13,15 @@ async function browserTestsServerMain() {
   try {
     console.log('Starting HTTPS debug server for browser tests...');
 
+    const appConfig = {
+      buildDir: './build',
+      jsPath: './tests/tests-entry-browser.ts',
+      htmlPath: './tests/browser/test-runner.html',
+    };
     const staticAssets = await buildAssets(
       undefined,
-      [{ in: './tests/tests-entry-browser.ts', out: APP_ENTRY_POINT }],
-      {
-        buildDir: './build',
-        jsPath: './tests/tests-entry-browser.ts',
-        htmlPath: './tests/browser/test-runner.html',
-      },
+      appEntryPoints(appConfig),
+      appConfig,
     );
 
     const customConfig: Record<string, unknown> = {
