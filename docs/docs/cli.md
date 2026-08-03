@@ -216,3 +216,60 @@ Watch options:
 | `beforeBuild` / `afterBuild` | — | Async hooks that run before/after each rebuild |
 
 `orgId` simulates a specific organization's environment locally. `setup` is called after the server and database are initialized but before HTTP listening begins — use it to access the GoatDB instance for server-side logic (event handlers, background processes, custom endpoints).
+
+---
+
+### Custom esbuild Plugins
+
+Both `compile()` and `startDebugServer()` accept an `esbuildPlugins` option for injecting custom [esbuild plugins](https://esbuild.github.io/plugins/) — custom loaders, transforms, or CSS processors (Tailwind, PostCSS wrappers, etc.).
+
+```typescript
+import {
+  compile,
+  type EsbuildPlugin,
+  startDebugServer,
+} from '@goatdb/goatdb/server/build';
+
+const bannerPlugin: EsbuildPlugin = {
+  name: 'banner',
+  setup(build) {
+    build.onEnd((result) => {
+      console.log(`Built with ${result.errors.length} errors`);
+    });
+  },
+};
+
+await compile({
+  // ...
+  esbuildPlugins: [bannerPlugin],
+});
+
+await startDebugServer({
+  // ...
+  esbuildPlugins: [bannerPlugin], // applied on every dev rebuild too
+});
+```
+
+GoatDB's runtime adapter stubs and Deno resolver run first. Your plugins run after resolution but before the Deno loader, so custom `onLoad` callbacks can process resolved local files such as CSS. GoatDB's Deno loader remains the fallback for files your plugins do not handle.
+
+:::tip Dev-server rebuilds
+The debug server watches only `watchDir` (the current directory by default). esbuild's `watchFiles`/`watchDirs` do not add directories to GoatDB's watcher, so keep plugin auxiliary inputs under `watchDir` or configure a common parent.
+:::
+
+#### CSS output
+
+`cssPath` is bundled through esbuild (minified, sourcemapped, and processed by your plugins). CSS imported from client code — directly or via plugins — is concatenated into the same `/index.css`:
+
+1. The `cssPath` stylesheet first (base styles).
+2. CSS imported from the JS entry (`jsPath`) next.
+3. Any remaining entry chunks, in entry order.
+
+Relative `url()` references in bundled CSS (images, fonts) are emitted under `/assets/` with content-hashed names and keep resolving automatically.
+
+:::caution Behavior change
+`cssPath` is now processed by esbuild (previously it was copied verbatim into `/index.css`). Relative `url()` targets must exist on disk at build time — they are bundled and content-hashed, so references to files served from other routes (e.g. `assetsPath`) no longer resolve. Production builds also minify CSS by default (`minify` defaults to `true` in `compile()`); pass `minify: false` to keep it readable.
+:::
+
+:::info CSS sourcemaps
+A combined CSS sourcemap (`/index.css.map`) is emitted only when there is a single CSS chunk. With multiple chunks the map is omitted — composing sourcemaps across concatenated files is not supported by esbuild.
+:::
