@@ -29,6 +29,7 @@ import setupE2ELatency from './e2e-latency.test.ts';
 import setupClusterLatency from './cluster-latency.test.ts';
 import setupCliInitTests from './cli-init.test.ts';
 import setupCliCompileTests from './cli-compile.test.ts';
+import setupCliBuildAssetsTests from './cli-build-assets.test.ts';
 import setupPathTests from './path.test.ts';
 import setupRuntimeTests from './runtime.test.ts';
 import setupProgressTests from './progress.test.ts';
@@ -110,6 +111,7 @@ export async function registerAllTests(): Promise<void> {
   await setupServerArchitectureTest(); // Server initialization and configuration
   setupNodeHttpServerTests(); // Node.js HTTP server integration
   setupStaticAssetsEndpointTest(); // File serving and asset management
+  setupCliBuildAssetsTests(); // Client bundling plugins, CSS, and assets
   setupMergeRichText(); // Rich text merge operations
   setupMergeConvergence(); // CRDT convergence properties
 
