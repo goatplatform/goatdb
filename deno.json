@@ -25,6 +25,7 @@
     "exclude": [
       "benchmarks/browser/assets/",
       "system-assets/bloom_filter.js",
+      "system-assets/assets.json",
       "external/"
     ]
   },
