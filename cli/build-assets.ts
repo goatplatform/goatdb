@@ -1,5 +1,6 @@
 import { APP_ENTRY_POINT } from '../base/app-entry-point.ts';
 import * as path from '../base/path.ts';
+import { composeCssSourcemap } from './css-sourcemap.ts';
 import {
   type BundleResult,
   clientBuildOptions,
@@ -141,31 +142,50 @@ function stripSourcemapUrl(css: string): string {
  * Concatenates all CSS chunks into a single /index.css. Order: the cssPath
  * entry ('index') first — preserving its historical base-stylesheet role —
  * then the app entry (CSS imported from JS), then any remaining entries.
- * A single chunk keeps its sourcemap; multi-chunk output has no combined map
- * (composing maps requires a VLQ composer, which esbuild does not provide).
+ * A single chunk keeps its own (flat) sourcemap; multi-chunk output is composed
+ * into an indexed map (sections), positioning each chunk's verbatim map at its
+ * start line in the concatenation.
  */
 function cssStaticAssets(
   bundles: Record<string, BundleResult>,
   entryPoints: EntryPoint[],
 ): StaticAssets {
-  const orderedNames = [
-    ...new Set(['index', APP_ENTRY_POINT, ...entryPoints.map((e) => e.out)]),
-  ];
-  const chunks = orderedNames
-    .map((name) => bundles[name])
-    .filter((bundle) => bundle?.css) as BundleResult[];
+  const chunks = orderedCssChunks(bundles, entryPoints);
   if (chunks.length === 0) {
     return {};
   }
   const encoder = new TextEncoder();
-  if (chunks.length === 1) {
-    return singleCssStaticAsset(chunks[0] as BundleResult, encoder);
+  return chunks.length === 1
+    ? singleCssStaticAsset(chunks[0] as BundleResult, encoder)
+    : multiCssStaticAssets(chunks, encoder);
+}
+
+function orderedCssChunks(
+  bundles: Record<string, BundleResult>,
+  entryPoints: EntryPoint[],
+): BundleResult[] {
+  const orderedNames = [
+    ...new Set(['index', APP_ENTRY_POINT, ...entryPoints.map((e) => e.out)]),
+  ];
+  return orderedNames
+    .map((name) => bundles[name])
+    .filter((bundle) => bundle?.css) as BundleResult[];
+}
+
+function multiCssStaticAssets(
+  chunks: BundleResult[],
+  encoder: TextEncoder,
+): StaticAssets {
+  const parts = chunks.map((bundle) => stripSourcemapUrl(bundle.css!));
+  const combined = parts.join('\n');
+  const cssMap = composeCssSourcemap(parts, chunks.map((b) => b.cssMap));
+  if (!cssMap) {
+    return { '/index.css': textAsset(encoder, combined, 'text/css') };
   }
-  const combined = chunks.map((bundle) => stripSourcemapUrl(bundle.css!)).join(
-    '\n',
-  );
+  const linkedCss = `${combined}\n/*# sourceMappingURL=index.css.map */\n`;
   return {
-    '/index.css': { data: encoder.encode(combined), contentType: 'text/css' },
+    '/index.css.map': textAsset(encoder, cssMap, 'application/json'),
+    '/index.css': textAsset(encoder, linkedCss, 'text/css'),
   };
 }
 
@@ -173,20 +193,25 @@ function singleCssStaticAsset(
   bundle: BundleResult,
   encoder: TextEncoder,
 ): StaticAssets {
-  let css = bundle.css!;
-  const result: StaticAssets = {};
-  if (bundle.cssMap) {
-    css = css.replace(
-      kCssSourcemapUrlPattern,
-      '/*# sourceMappingURL=index.css.map */\n',
-    );
-    result['/index.css.map'] = {
-      data: encoder.encode(bundle.cssMap),
-      contentType: 'application/json',
-    };
+  if (!bundle.cssMap) {
+    return { '/index.css': textAsset(encoder, bundle.css!, 'text/css') };
   }
-  result['/index.css'] = { data: encoder.encode(css), contentType: 'text/css' };
-  return result;
+  const css = bundle.css!.replace(
+    kCssSourcemapUrlPattern,
+    '/*# sourceMappingURL=index.css.map */\n',
+  );
+  return {
+    '/index.css.map': textAsset(encoder, bundle.cssMap, 'application/json'),
+    '/index.css': textAsset(encoder, css, 'text/css'),
+  };
+}
+
+function textAsset(
+  encoder: TextEncoder,
+  text: string,
+  contentType: ContentType,
+): Asset {
+  return { data: encoder.encode(text), contentType };
 }
 
 // Files emitted by esbuild's 'file' loader for relative url() in CSS. Served

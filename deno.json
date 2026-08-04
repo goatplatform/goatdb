@@ -53,6 +53,7 @@
   },
   "imports": {
     "@goatdb/orderstamp": "jsr:@goatdb/orderstamp@^1.1.1",
+    "@jridgewell/trace-mapping": "npm:@jridgewell/trace-mapping@^0.3.31",
     "@luca/esbuild-deno-loader": "jsr:@luca/esbuild-deno-loader@^0.11.1",
     "@std/data-structures": "jsr:@std/data-structures@^1.0.8",
     "@std/expect": "jsr:@std/expect@^1.0.16",

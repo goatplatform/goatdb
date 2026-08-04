@@ -1,12 +1,19 @@
+import { APP_ENTRY_POINT } from '../base/app-entry-point.ts';
 import { isBrowser, isDeno, isNode } from '../base/common.ts';
 import { readTextFile, writeTextFile } from '../base/json-log/file-impl.ts';
 import * as path from '../base/path.ts';
-import { createBuildContext, stopBackgroundCompiler } from '../build.ts';
+import {
+  createBuildContext,
+  type EntryPoint,
+  stopBackgroundCompiler,
+} from '../build.ts';
 import { appEntryPoints, buildAssets } from '../cli/build-assets.ts';
+import { composeCssSourcemap } from '../cli/css-sourcemap.ts';
 import type { AppConfig } from '../cli/app-config.ts';
 import { debugClientBundleSpec } from '../cli/debug-server.ts';
 import type { StaticAssets } from '../system-assets/system-assets.ts';
 import type { Plugin } from 'esbuild';
+import { AnyMap, originalPositionFor } from '@jridgewell/trace-mapping';
 import { assertEquals, assertExists, assertTrue } from './asserts.ts';
 import { TEST, type TestFunc, type TestSuite } from './mod.ts';
 
@@ -14,15 +21,15 @@ const kSuite = 'CLI-BuildAssets';
 
 type Fixture = { dir: string; config: AppConfig };
 
-function serverTest(test: (ctx: TestSuite) => Promise<void>): TestFunc {
+function serverTest(test: (ctx: TestSuite) => Promise<void> | void): TestFunc {
   return (ctx) => isBrowser() ? undefined : test(ctx);
 }
 
-function denoTest(test: (ctx: TestSuite) => Promise<void>): TestFunc {
+function denoTest(test: (ctx: TestSuite) => Promise<void> | void): TestFunc {
   return (ctx) => isDeno() ? test(ctx) : undefined;
 }
 
-function nodeTest(test: (ctx: TestSuite) => Promise<void>): TestFunc {
+function nodeTest(test: (ctx: TestSuite) => Promise<void> | void): TestFunc {
   return (ctx) => isNode() ? test(ctx) : undefined;
 }
 
@@ -72,6 +79,61 @@ function decodeAsset(assets: StaticAssets, key: string): string {
 function asError(value: unknown): Error {
   assertTrue(value instanceof Error, 'Expected operation to fail with Error');
   return value as Error;
+}
+
+// ---- CSS sourcemap contract helpers -------------------------------------------
+
+// 1-based line / 0-based column of charIndex, per source-map query convention
+// (lines are 1-based, columns 0-based, both in UTF-16 code units — JS string
+// indices already count UTF-16 units).
+function lineColumnOf(text: string, charIndex: number): {
+  line: number;
+  column: number;
+} {
+  let line = 1;
+  let lastNewline = -1;
+  for (let i = 0; i < charIndex; i++) {
+    if (text.charCodeAt(i) === 10) {
+      line++;
+      lastNewline = i;
+    }
+  }
+  return { line, column: charIndex - lastNewline - 1 };
+}
+
+/**
+ * Contract probe: the marker must appear in /index.css and its generated
+ * position must resolve, through the served map, to the authored source with
+ * the given basename, whose embedded sourcesContent contains the marker.
+ * Positions are computed dynamically from the built output and resolution goes
+ * through an independent consumer that accepts both flat and indexed maps, so
+ * the probe survives bundler swaps and map-format changes.
+ */
+function assertCssProbe(
+  assets: StaticAssets,
+  marker: string,
+  sourceBasename: string,
+): void {
+  const css = decodeAsset(assets, '/index.css');
+  const mapAsset = assets['/index.css.map'];
+  assertExists(mapAsset, `Expected /index.css.map to exist (probe ${marker})`);
+  const tracer = new AnyMap(
+    JSON.parse(new TextDecoder().decode(mapAsset.data)),
+  );
+  const idx = css.indexOf(marker);
+  assertTrue(idx >= 0, `Marker '${marker}' must appear in /index.css`);
+  const original = originalPositionFor(tracer, lineColumnOf(css, idx));
+  assertTrue(
+    original.source !== null,
+    `Position of '${marker}' must map to an original source`,
+  );
+  assertEquals(path.basename(original.source!), sourceBasename);
+  const sourceIdx = tracer.sources.indexOf(original.source!);
+  const content = tracer.sourcesContent?.[sourceIdx];
+  assertTrue(
+    (content?.includes(marker)) === true,
+    `sourcesContent of ${sourceBasename} must contain '${marker}'`,
+  );
 }
 
 function bundleTarget(source: string): unknown {
@@ -211,23 +273,167 @@ async function jsImportedCssTest(ctx: TestSuite): Promise<void> {
   assertTrue(decodeAsset(assets, '/index.css').includes('from-js'));
 }
 
-async function cssOrderingAndMapsTest(ctx: TestSuite): Promise<void> {
+async function cssSourcemapMultiChunkTest(ctx: TestSuite): Promise<void> {
+  // Base stylesheet (cssPath) plus JS-imported CSS: two chunks merged into a
+  // single /index.css whose composed sourcemap must resolve rules from both.
+  // The unicode line after .probe-base pins line counting across a line whose
+  // UTF-16 length differs from its byte length.
   const value = await fixture(ctx, 'css-order', "import './component.css';");
   value.config.cssPath = await addFile(
     value,
     'base.css',
-    '.base { color: blue; }',
+    '.probe-base { color: blue; }\n.probe-unicode::after { content: "héllo wörld"; }\n.probe-base-2 { color: navy; }',
   );
-  await addFile(value, 'component.css', '.component { color: red; }');
+  await addFile(value, 'component.css', '.probe-component { color: red; }');
   const assets = await buildFixture(value);
   const css = decodeAsset(assets, '/index.css');
-  const baseIdx = css.indexOf('.base');
-  const componentIdx = css.indexOf('.component');
-  assertTrue(baseIdx >= 0, '.base must be present in CSS');
-  assertTrue(componentIdx >= 0, '.component must be present in CSS');
-  assertTrue(baseIdx < componentIdx, '.base must precede .component');
-  assertTrue(!css.includes('sourceMappingURL='));
-  assertEquals(assets['/index.css.map'], undefined);
+  const baseIdx = css.indexOf('.probe-base');
+  const componentIdx = css.indexOf('.probe-component');
+  assertTrue(baseIdx >= 0, '.probe-base must be present in CSS');
+  assertTrue(componentIdx >= 0, '.probe-component must be present in CSS');
+  assertTrue(
+    baseIdx < componentIdx,
+    '.probe-base must precede .probe-component',
+  );
+  // Contract: exactly one trailing sourceMappingURL comment.
+  assertEquals(
+    css.split('sourceMappingURL=').length - 1,
+    1,
+    'Exactly one sourceMappingURL comment must remain in /index.css',
+  );
+  assertTrue(
+    css.trimEnd().endsWith('/*# sourceMappingURL=index.css.map */'),
+    'The map comment must reference index.css.map at the end',
+  );
+  // Contract: a served, correctly-typed map resolving every chunk's rules.
+  const mapAsset = assets['/index.css.map'];
+  assertExists(mapAsset, 'Expected /index.css.map to exist');
+  assertEquals(mapAsset.contentType, 'application/json');
+  assertCssProbe(assets, '.probe-base', 'base.css');
+  assertCssProbe(assets, '.probe-base-2', 'base.css');
+  assertCssProbe(assets, '.probe-component', 'component.css');
+  // Contract: self-contained maps — every source embeds its original content.
+  const tracer = new AnyMap(
+    JSON.parse(new TextDecoder().decode(mapAsset.data)),
+  );
+  const sourcesContent = tracer.sourcesContent ?? [];
+  for (let i = 0; i < tracer.sources.length; i++) {
+    assertTrue(
+      sourcesContent[i] != null,
+      `sourcesContent must be embedded for ${tracer.sources[i]}`,
+    );
+  }
+  // Implementation-format pin (documented choice, not a hard contract): the
+  // composed map is an indexed map with one section per chunk, all columns 0
+  // (chunks are line-aligned), starting at (0,0). Exact offset values are
+  // verified by the composer unit test against known inputs; here the probe
+  // assertions above already prove offsets are correct end-to-end (a shifted
+  // offset lands the marker on an unmapped line and resolution returns null).
+  const mapJson = JSON.parse(new TextDecoder().decode(mapAsset.data));
+  assertEquals(mapJson.version, 3);
+  assertEquals(mapJson.file, 'index.css');
+  assertEquals(mapJson.sections.length, 2);
+  assertEquals(mapJson.sections[0].offset, { line: 0, column: 0 });
+  assertTrue(
+    mapJson.sections[1].offset.line > mapJson.sections[0].offset.line,
+    'Section offsets must be strictly increasing',
+  );
+  for (const section of mapJson.sections) {
+    assertEquals(section.offset.column, 0);
+  }
+}
+
+async function cssSourcemapThreeChunkTest(ctx: TestSuite): Promise<void> {
+  // Three CSS chunks (base, JS-imported, extra entry) must all resolve through
+  // one composed map, in cascade order.
+  const value = await fixture(ctx, 'css-three', "import './app.css';");
+  const basePath = await addFile(
+    value,
+    'base.css',
+    '.probe-base { color: blue; }',
+  );
+  await addFile(value, 'app.css', '.probe-app { color: red; }');
+  const extraPath = await addFile(
+    value,
+    'extra.css',
+    '.probe-extra { color: green; }',
+  );
+  const entryPoints: EntryPoint[] = [
+    { in: basePath, out: 'index' },
+    { in: path.join(value.dir, 'entry.ts'), out: APP_ENTRY_POINT },
+    { in: extraPath, out: 'extra' },
+  ];
+  const assets = await buildAssets(undefined, entryPoints, value.config, {
+    runtime: 'node',
+  });
+  const css = decodeAsset(assets, '/index.css');
+  const order = ['.probe-base', '.probe-app', '.probe-extra'].map((m) =>
+    css.indexOf(m)
+  );
+  assertTrue(
+    order.every((idx) => idx >= 0),
+    'All three markers must be present in CSS',
+  );
+  assertTrue(
+    order[0] < order[1] && order[1] < order[2],
+    'Cascade order must be base, app, extra',
+  );
+  assertCssProbe(assets, '.probe-base', 'base.css');
+  assertCssProbe(assets, '.probe-app', 'app.css');
+  assertCssProbe(assets, '.probe-extra', 'extra.css');
+}
+
+async function cssSourcemapMinifiedTest(ctx: TestSuite): Promise<void> {
+  // Production builds minify CSS by default; the composed map must still
+  // resolve rules in the minified concatenation.
+  const value = await fixture(ctx, 'css-minified', "import './component.css';");
+  value.config.cssPath = await addFile(
+    value,
+    'base.css',
+    '.probe-base { color: blue; }',
+  );
+  await addFile(value, 'component.css', '.probe-component { color: red; }');
+  value.config.minify = true;
+  const assets = await buildFixture(value);
+  assertCssProbe(assets, '.probe-base', 'base.css');
+  assertCssProbe(assets, '.probe-component', 'component.css');
+}
+
+function cssSourcemapComposerUnitTest(_ctx: TestSuite): void {
+  // Pure-function coverage of the composition math: section offsets must equal
+  // each part's start line in the '\n'-joined output, including trailing-
+  // newline and unmapped-chunk edge cases.
+  const fakeMap = (src: string): string =>
+    JSON.stringify({ version: 3, sources: [src], names: [], mappings: '' });
+  const parts = ['a\nb', 'c', 'd\n']; // joined: 'a\nb\nc\nd\n'
+  const map = JSON.parse(
+    composeCssSourcemap(parts, [
+      fakeMap('a.css'),
+      fakeMap('c.css'),
+      fakeMap('d.css'),
+    ])!,
+  );
+  assertEquals(map.version, 3);
+  assertEquals(map.file, 'index.css');
+  assertEquals(map.sections.length, 3);
+  assertEquals(map.sections[0].offset, { line: 0, column: 0 });
+  assertEquals(map.sections[1].offset, { line: 2, column: 0 });
+  assertEquals(map.sections[2].offset, { line: 3, column: 0 });
+  // Chunks without a map are skipped; the rest keep their true offsets.
+  const partial = JSON.parse(
+    composeCssSourcemap(parts, [
+      fakeMap('a.css'),
+      undefined,
+      fakeMap('d.css'),
+    ])!,
+  );
+  assertEquals(partial.sections.length, 2);
+  assertEquals(partial.sections[1].offset, { line: 3, column: 0 });
+  // No maps at all → no composed map.
+  assertEquals(
+    composeCssSourcemap(parts, [undefined, undefined, undefined]),
+    undefined,
+  );
 }
 
 async function cssUrlAssetTest(ctx: TestSuite): Promise<void> {
@@ -258,11 +464,14 @@ async function cssMapRewriteTest(ctx: TestSuite): Promise<void> {
     mapJson.sources?.some((s: string) => s.includes('style.css')),
     'Sourcemap must reference style.css',
   );
+  // Probe: the single-chunk flat map must resolve like the multi-chunk one.
+  assertCssProbe(assets, '.mapped', 'style.css');
 }
 
 async function noCssTest(ctx: TestSuite): Promise<void> {
   const assets = await buildFixture(await fixture(ctx, 'no-css'));
   assertEquals(assets['/index.css'], undefined);
+  assertEquals(assets['/index.css.map'], undefined);
 }
 
 async function missingHtmlTest(ctx: TestSuite): Promise<void> {
@@ -442,8 +651,23 @@ export default function setupCliBuildAssetsTests() {
   );
   TEST(
     kSuite,
-    'CSS order is deterministic and multi-chunk maps are omitted',
-    serverTest(cssOrderingAndMapsTest),
+    'CSS order is deterministic and multi-chunk CSS emits a correct combined sourcemap',
+    serverTest(cssSourcemapMultiChunkTest),
+  );
+  TEST(
+    kSuite,
+    'three CSS chunks resolve through one composed sourcemap',
+    serverTest(cssSourcemapThreeChunkTest),
+  );
+  TEST(
+    kSuite,
+    'composed sourcemap stays correct for minified CSS',
+    serverTest(cssSourcemapMinifiedTest),
+  );
+  TEST(
+    kSuite,
+    'CSS sourcemap composer math (offsets, unmapped chunks)',
+    serverTest(cssSourcemapComposerUnitTest),
   );
   TEST(
     kSuite,
