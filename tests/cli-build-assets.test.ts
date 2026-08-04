@@ -152,7 +152,13 @@ function cssLoader(
   contents: () => Promise<string>,
   watchFiles?: string[],
 ): Plugin {
-  const escapedPath = cssPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // esbuild matches onLoad filters against the fully-resolved path, which uses
+  // native separators (backslashes on Windows). Match both separator forms so
+  // the plugin fires on every platform.
+  // e.g. "/a/b.css" → "[/\\]a[/\\]b\\.css" (matches both / and \ separators)
+  const escapedPath = cssPath
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\//g, '[/\\\\]');
   return {
     name: 'test-css-loader',
     setup(build) {
