@@ -271,5 +271,5 @@ Relative `url()` references in bundled CSS (images, fonts) are emitted under `/a
 :::
 
 :::info CSS sourcemaps
-A combined CSS sourcemap (`/index.css.map`) is emitted only when there is a single CSS chunk. With multiple chunks the map is omitted — composing sourcemaps across concatenated files is not supported by esbuild.
+A combined CSS sourcemap (`/index.css.map`) is emitted when CSS chunks include source maps. A single CSS chunk keeps its own (flat) map with the URL rewritten to `index.css.map`. When multiple chunks are concatenated, the map is an indexed source map (Source Map v3 `sections`): each chunk's map is embedded verbatim and positioned at its start line in the concatenation, so rules from every chunk resolve to their authored sources.
 :::
