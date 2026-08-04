@@ -1,6 +1,7 @@
 // Note: We use ../base/path.ts instead of @std/path to avoid JSR dependencies
 // that would break when this module is transitively bundled into SEA binaries.
 import { APP_ENTRY_POINT } from './base/app-entry-point.ts';
+import { isWindows } from './base/common.ts';
 import * as path from './base/path.ts';
 // IMPORTANT: These MUST remain `import type` — runtime imports would break
 // Node.js SEA binaries since esbuild/deno-loader are Deno-specific packages.
@@ -73,13 +74,28 @@ function assertValidPlugins(plugins: Plugin[], owner: string): void {
   }
 }
 
+/**
+ * On Windows, the Deno resolver (@luca/esbuild-deno-loader) resolves specifiers
+ * via URL parsing, where a drive-letter path like `C:/Users/...` is parsed with
+ * `C:` as a URL scheme — dropping the drive letter and breaking resolution.
+ * esbuild hands entry `in` strings verbatim to onResolve, so converting entries
+ * to file:// URLs bypasses the mangling. Node's native resolver and POSIX paths
+ * are unaffected.
+ */
+function denoEntryPoints(spec: ClientBundleSpec): EntryPoint[] {
+  if (spec.runtime !== 'deno' || !isWindows()) {
+    return spec.entryPoints;
+  }
+  return spec.entryPoints.map((e) => ({ ...e, in: path.toFileUrl(e.in) }));
+}
+
 /** Single source of truth for client (browser) esbuild options. */
 export async function clientBuildOptions(
   spec: ClientBundleSpec,
 ): Promise<BuildOptions> {
   const plugins = await clientPlugins(spec.runtime, spec.userPlugins ?? []);
   return {
-    entryPoints: spec.entryPoints,
+    entryPoints: denoEntryPoints(spec),
     plugins,
     bundle: true,
     write: false,

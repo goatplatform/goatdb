@@ -186,6 +186,27 @@ export function toAbsolutePath(p: string): string {
 }
 
 /**
+ * Converts an absolute path to a file:// URL.
+ * Handles both POSIX paths (`/Users/...`) and Windows drive-letter paths
+ * (`C:/Users/...`), which need their leading slash restored.
+ *
+ * @param p The absolute path to convert
+ * @returns The file URL string
+ */
+export function toFileUrl(p: string): string {
+  p = normalizeSlashes(p);
+  if (!p.startsWith('/')) {
+    p = '/' + p;
+  }
+  // Encode each component so filename characters cannot become URL syntax.
+  const urlPath = p.split('/').map(encodeURIComponent).join('/').replaceAll(
+    '%3A',
+    ':',
+  );
+  return 'file://' + urlPath;
+}
+
+/**
  * Converts a file:// URL to a filesystem path.
  * Only works in Deno and Node.js environments.
  *

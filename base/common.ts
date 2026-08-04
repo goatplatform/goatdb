@@ -260,6 +260,26 @@ export function isNode(): boolean {
 }
 
 /**
+ * Determines if the code is running on Windows.
+ *
+ * Lightweight variant for SEA-bundled modules; `base/os.ts` has a heavier
+ * version backed by the runtime adapter system (`getRuntime().getOS()`).
+ *
+ * The client build pipeline (esbuild + @luca/esbuild-deno-loader) treats
+ * Windows drive-letter paths differently from POSIX paths; callers use this to
+ * apply platform-specific path normalization (see build.ts).
+ *
+ * @returns True if running on Windows, false otherwise.
+ */
+export function isWindows(): boolean {
+  // deno-lint-ignore no-explicit-any
+  const platform = (globalThis as any).process?.platform ??
+    // deno-lint-ignore no-explicit-any
+    (globalThis as any).Deno?.build?.os;
+  return typeof platform === 'string' && platform.startsWith('win');
+}
+
+/**
  * Returns the appropriate crypto object for the current environment
  * (browser or Node.js).
  */
