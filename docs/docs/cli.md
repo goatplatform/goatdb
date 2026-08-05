@@ -250,7 +250,7 @@ await startDebugServer({
 });
 ```
 
-GoatDB's runtime adapter stubs and Deno resolver run first. Your plugins run after resolution but before the Deno loader, so custom `onLoad` callbacks can process resolved local files such as CSS. GoatDB's Deno loader remains the fallback for files your plugins do not handle.
+In Deno builds, GoatDB registers runtime adapter stubs first, then your plugins, its browser asset fallback, and finally its Deno resolver/loader. Your `onResolve` callbacks receive original specifiers, while your `onLoad` callbacks can process resolved local files such as CSS before the fallbacks handle them.
 
 :::tip Dev-server rebuilds
 The debug server watches only `watchDir` (the current directory by default). esbuild's `watchFiles`/`watchDirs` do not add directories to GoatDB's watcher, so keep plugin auxiliary inputs under `watchDir` or configure a common parent.

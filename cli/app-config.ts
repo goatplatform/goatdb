@@ -71,10 +71,12 @@ export type AppConfig = {
    */
   minify?: boolean;
   /**
-   * Optional custom esbuild plugins. GoatDB's adapter stubs and Deno resolver
-   * run first; plugins run before the Deno loader so they can load resolved
-   * local files such as CSS. Applied by both compile() and startDebugServer()
-   * rebuilds. The debug server watches only `watchDir`; esbuild `watchFiles`
+   * Optional custom esbuild plugins. In Deno builds, plugins register after
+   * GoatDB's adapter stubs and before its browser asset fallback and Deno
+   * resolver/loader. Your `onResolve` handlers receive original specifiers,
+   * while `onLoad` handlers can process resolved local files such as CSS before
+   * those fallbacks. Applied by both compile() and startDebugServer() rebuilds.
+   * The debug server watches only `watchDir`; esbuild `watchFiles`
    * and `watchDirs` do not expand that directory. Keep auxiliary inputs under
    * `watchDir` (or configure a common parent) so their changes rebuild.
    */
