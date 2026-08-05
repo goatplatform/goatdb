@@ -1,5 +1,4 @@
 {
-  "workspace": ["./docs"],
   "compilerOptions": {
     "lib": ["dom", "dom.iterable", "dom.asynciterable", "deno.ns"]
   },
@@ -24,6 +23,7 @@
     "singleQuote": true,
     "exclude": [
       "benchmarks/browser/assets/",
+      "docs/docs/",
       "system-assets/bloom_filter.js",
       "external/"
     ]
@@ -45,10 +45,12 @@
     "bench": "deno run -A benchmarks/run.ts",
     "bench:json": "deno run -A benchmarks/run.ts --output-json --output-dir=benchmarks/results",
     "bench:update-docs": "deno run -A benchmarks/update-docs.ts --input-dir=benchmarks/results",
-    "docs:api": "deno run -A docs/docs-api-build.ts",
-    "docs:clean": "rm -rf docs/node_modules docs/.docusaurus docs/build docs/package-lock.json docs/api-docs",
-    "docs:serve": "deno run -A docs/docs-api-build.ts && deno run -A docs/docs-build.ts serve",
-    "docs:build": "deno run -A docs/docs-api-build.ts && deno run -A docs/docs-build.ts build"
+    "docs:install": "npm ci --prefix docs",
+    "docs:validate": "npm --prefix docs run validate",
+    "docs:api": "deno run -A --config docs/deno.json docs/docs-api-build.ts",
+    "docs:clean": "rm -rf docs/node_modules docs/.docusaurus docs/build docs/api-docs build/docs build/docs.zip",
+    "docs:serve": "deno task docs:validate && deno run -A --config docs/deno.json docs/docs-api-build.ts && deno run -A --config docs/deno.json docs/docs-build.ts serve",
+    "docs:build": "deno task docs:validate && deno run -A --config docs/deno.json docs/docs-api-build.ts && deno run -A --config docs/deno.json docs/docs-build.ts build"
   },
   "imports": {
     "@goatdb/orderstamp": "jsr:@goatdb/orderstamp@^1.1.1",

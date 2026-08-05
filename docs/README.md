@@ -1,55 +1,60 @@
 # GoatDB Documentation
 
-This documentation site is built using [Docusaurus](https://docusaurus.io/), a
-modern static website generator.
+This site uses [Docusaurus](https://docusaurus.io/) for written documentation
+and TypeDoc for the generated API reference.
 
 ## Prerequisites
 
-- Deno (no Node.js or npm required!)
+- Deno 2.x
+- Node.js 24.x with npm
 
 ## Installation
 
-First time setup - install dependencies using Deno:
+Install the locked documentation dependencies from the repository root:
 
 ```bash
-cd docs
-deno install
+deno task docs:install
 ```
 
-This will download and cache all npm dependencies specified in package.json
-using Deno's npm compatibility layer.
+This runs `npm ci` against the tracked `docs/package-lock.json`.
 
 ## Development
 
-To run the documentation site locally, use the Deno build script from the
-project root:
+Generate the API reference and start the local development server:
 
 ```bash
-deno run -A docs-build.ts serve
+deno task docs:serve
 ```
 
-This will start a local development server with hot reload at
-http://localhost:3000.
+The site is available at <http://localhost:3000> with hot reload.
 
 ## Build
 
-To build the static documentation site:
+Build the complete static site:
 
 ```bash
-deno run -A docs-build.ts build
+deno task docs:build
 ```
 
-This generates static content into the `build/docs` directory.
+The build produces `build/docs` and `build/docs.zip`.
 
-## Architecture
+Type-check the Docusaurus site separately with:
 
-GoatDB uses Deno throughout the entire project, including for documentation. The
-`docs-build.ts` script leverages Deno's npm compatibility to run Docusaurus
-directly without requiring Node.js:
+```bash
+npm --prefix docs run typecheck
+```
 
-- Uses `deno run -A npm:@docusaurus/core` to execute Docusaurus commands
-- Dependencies are managed through `package.json` but executed via Deno
-- No `node_modules` directory or npm installation required
+Remove generated output and installed dependencies with:
 
-This approach maintains consistency with GoatDB's Deno-first philosophy while
-leveraging the excellent documentation features of Docusaurus.
+```bash
+deno task docs:clean
+```
+
+The clean task preserves both dependency lockfiles.
+
+## Dependency ownership
+
+npm owns the documentation dependency tree in `docs/node_modules` and installs
+it deterministically from `docs/package-lock.json`. Deno orchestrates API
+reference generation and the Docusaurus npm scripts using `docs/deno.json`; that
+config keeps the Deno-only JSR dependencies pinned in `docs/deno.lock`.

@@ -6,12 +6,15 @@
     "docusaurus": "docusaurus",
     "start": "docusaurus start",
     "build": "docusaurus build",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "validate": "node validate-docs.mjs"
   },
   "dependencies": {
-    "@docusaurus/core": "3.8.1",
-    "@docusaurus/plugin-google-gtag": "3.8.1",
-    "@docusaurus/preset-classic": "3.8.1",
+    "@docusaurus/core": "3.10.2",
+    "@docusaurus/faster": "3.10.2",
+    "@docusaurus/plugin-content-docs": "3.10.2",
+    "@docusaurus/plugin-google-gtag": "3.10.2",
+    "@docusaurus/preset-classic": "3.10.2",
     "@mdx-js/react": "^3.0.0",
     "pixelarticons": "2.2.0",
     "clsx": "^2.0.0",
@@ -22,10 +25,13 @@
     "remark-math": "^6.0.0"
   },
   "devDependencies": {
-    "@docusaurus/module-type-aliases": "3.8.1",
-    "@docusaurus/tsconfig": "3.8.1",
-    "@docusaurus/types": "3.8.1",
-    "typescript": "~5.6.2"
+    "@docusaurus/module-type-aliases": "3.10.2",
+    "@docusaurus/tsconfig": "3.10.2",
+    "@docusaurus/types": "3.10.2",
+    "typedoc": "^0.28.8",
+    "typedoc-plugin-markdown": "^4.10.0",
+    "typescript": "~5.6.2",
+    "webpack-dev-server": "^5.2.6"
   },
   "browserslist": {
     "production": [
@@ -40,6 +46,6 @@
     ]
   },
   "engines": {
-    "node": ">=18.0"
+    "node": ">=20.11"
   }
 }

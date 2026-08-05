@@ -25,9 +25,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
       - name: Install docs dependencies
-        run: npm install
-        working-directory: docs
+        run: npm ci --prefix docs
+      - name: Typecheck docs
+        run: npm --prefix docs run typecheck
       - name: Build docs
         run: deno task docs:build
       - uses: actions/configure-pages@v5

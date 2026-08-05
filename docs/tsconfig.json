@@ -1,8 +1,14 @@
 {
-  // This file is not used in compilation. It is here just for a nice editor experience.
+  // Used by `npm run typecheck` (tsc) and for editor tooling. The excluded
+  // .ts files are Deno scripts whose jsr: specifiers tsc cannot resolve.
   "extends": "@docusaurus/tsconfig",
   "compilerOptions": {
     "baseUrl": "."
   },
-  "exclude": [".docusaurus", "build"]
+  "exclude": [
+    ".docusaurus",
+    "build",
+    "docs-api-build.ts",
+    "docs-build.ts"
+  ]
 }

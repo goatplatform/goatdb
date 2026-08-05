@@ -36,6 +36,33 @@ jobs:
         env:
           CI: true
 
+  docs-build:
+    name: Docs Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Install docs dependencies
+        run: npm ci --prefix docs
+
+      - name: Typecheck docs
+        run: npm --prefix docs run typecheck
+
+      - name: Build docs
+        run: deno task docs:build
+
   build-npm:
     name: npm Build
     runs-on: ubuntu-latest

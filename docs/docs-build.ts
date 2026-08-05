@@ -1,70 +1,64 @@
-import { cli } from '../base/development.ts';
-import { zip } from 'jsr:@deno-library/compress';
+import { zip } from '@deno-library/compress';
+import { dirname, fromFileUrl, join } from '@std/path';
 
-export async function buildDocs(): Promise<void> {
-  await cli('rm', '-rf', 'build/docs');
-  await cli('mkdir', '-p', 'build/docs');
+const DOCS_DIR = dirname(fromFileUrl(import.meta.url));
+const ROOT_DIR = dirname(DOCS_DIR);
+const DOCUSAURUS_BUILD_DIR = join(DOCS_DIR, 'build');
+const BUILD_DIR = join(ROOT_DIR, 'build', 'docs');
+const BUILD_ARCHIVE = join(ROOT_DIR, 'build', 'docs.zip');
+const NPM_COMMAND = Deno.build.os === 'windows' ? 'npm.cmd' : 'npm';
 
-  // Build Docusaurus via npx (Deno's npm: specifier has ESM compat issues)
-  const buildProcess = new Deno.Command('npx', {
-    args: [
-      'docusaurus',
-      'build',
-      '--out-dir',
-      '../build/docs',
-    ],
-    cwd: 'docs', // Run from docs directory where docusaurus.config.ts is located
+async function runNpmScript(script: string, ...args: string[]): Promise<void> {
+  const child = new Deno.Command(NPM_COMMAND, {
+    args: ['run', script, '--', ...args],
+    cwd: DOCS_DIR,
     stdout: 'inherit',
     stderr: 'inherit',
-  });
-
-  const { code } = await buildProcess.output();
-  if (code !== 0) {
-    throw new Error(`Docusaurus build failed with code ${code}`);
+  }).spawn();
+  const status = await child.status;
+  if (!status.success) {
+    throw new Error(`npm run ${script} failed with code ${status.code}`);
   }
+}
 
-  // Compress the contents of build/docs, not the folder itself
-  await zip.compress('build/docs', 'build/docs.zip', { excludeSrc: true });
-  console.log('Docs built successfully under build/docs');
+async function removePath(path: string): Promise<void> {
+  try {
+    await Deno.remove(path, { recursive: true });
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotFound)) throw error;
+  }
+}
+
+async function prepareBuild(): Promise<void> {
+  await Promise.all([
+    removePath(DOCUSAURUS_BUILD_DIR),
+    removePath(BUILD_DIR),
+    removePath(BUILD_ARCHIVE),
+  ]);
+  await Deno.mkdir(dirname(BUILD_DIR), { recursive: true });
+}
+
+export async function buildDocs(): Promise<void> {
+  await prepareBuild();
+  await runNpmScript('build');
+  await Deno.rename(DOCUSAURUS_BUILD_DIR, BUILD_DIR);
+  await zip.compress(BUILD_DIR, BUILD_ARCHIVE, { excludeSrc: true });
+  console.log(
+    `Docs build completed successfully: ${BUILD_DIR} and ${BUILD_ARCHIVE}`,
+  );
 }
 
 async function serveDocs(): Promise<void> {
-  console.log('🚀 Starting Docusaurus development server...');
-
-  // Start the dev server process
-  const serveProcess = new Deno.Command('npx', {
-    args: [
-      'docusaurus',
-      'start',
-    ],
-    cwd: 'docs', // Run from docs directory where docusaurus.config.ts is located
-    stdout: 'inherit',
-    stderr: 'inherit',
-  });
-
-  // Spawn and don't wait - dev servers should run indefinitely
-  const child = serveProcess.spawn();
-
-  console.log('📡 Server starting at http://localhost:3000');
-  console.log('Press Ctrl+C to stop the server');
-
-  // Wait for the process to exit (only happens when user stops it)
-  const status = await child.status;
-
-  if (status.code !== 0) {
-    throw new Error(`Docusaurus serve failed with code ${status.code}`);
-  }
+  await runNpmScript('start');
 }
 
 if (import.meta.main) {
-  const cmd = Deno.args[0];
-  if (!cmd || (cmd !== 'build' && cmd !== 'serve')) {
-    console.error('Usage: deno run -A docs-build.ts <build|serve>');
-    Deno.exit(1);
-  }
-  if (cmd === 'build') {
+  const command = Deno.args[0];
+  if (command === 'build') {
     await buildDocs();
-  } else if (cmd === 'serve') {
+  } else if (command === 'serve') {
     await serveDocs();
+  } else {
+    throw new Error('Usage: docs-build.ts <build|serve>');
   }
 }

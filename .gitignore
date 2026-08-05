@@ -21,7 +21,7 @@ docs/api.json
 .claude/worktrees/
 
 # Node.js SEA development artifacts
-package-lock.json
+/package-lock.json
 
 # npm build artifacts
 dist/

@@ -1,21 +1,18 @@
 {
-  "name": "@goatdb/docs",
-  "version": "0.1.0",
-  "exports": {
-    "./docs-api-build": "./docs-api-build.ts",
-    "./docs-build": "./docs-build.ts"
-  },
   "compilerOptions": {
     "lib": ["dom", "dom.iterable", "dom.asynciterable", "deno.ns"]
   },
   "imports": {
-    "typedoc": "npm:typedoc@^0.28.8",
-    "typedoc-plugin-markdown": "npm:typedoc-plugin-markdown@^4.10.0"
+    "@deno-library/compress": "jsr:@deno-library/compress@0.5.6",
+    "@std/path": "jsr:@std/path@1.1.1"
   },
-  "tasks": {
-    "api": "deno run -A docs-api-build.ts",
-    "build": "deno run -A docs-build.ts build",
-    "serve": "deno run -A docs-build.ts serve"
+  "nodeModulesDir": "manual",
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 80,
+    "indentWidth": 2,
+    "singleQuote": true,
+    "exclude": ["static/"]
   },
   "exclude": ["node_modules/", ".docusaurus/", "build/", "docs/"]
 }
