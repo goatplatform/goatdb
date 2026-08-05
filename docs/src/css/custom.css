@@ -7,77 +7,309 @@
 /* Import KaTeX CSS for math rendering */
 @import url('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css');
 
-/* You can override the default Infima variables here. */
+/* Pixel display font (self-hosted, SIL OFL 1.1 - see docs/static/fonts/LICENSE-departure-mono.txt) */
+@font-face {
+  font-family: 'Departure Mono';
+  src: url('/fonts/DepartureMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Text + code fonts (self-hosted, SIL OFL 1.1 - see docs/static/fonts/LICENSE-ibm-plex.txt).
+ * Static latin subsets: 400/500/600/700 upright + 400 italic per family. */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('/fonts/IBMPlexSans-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('/fonts/IBMPlexSans-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('/fonts/IBMPlexSans-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('/fonts/IBMPlexSans-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('/fonts/IBMPlexSans-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/IBMPlexMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/IBMPlexMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/IBMPlexMono-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/IBMPlexMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/IBMPlexMono-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* ---------------------------------------------------------------------------
+ * Blocky design tokens.
+ * Primitives: brand-anchored OKLCH scales (WCAG-validated pairs).
+ * Light mode = purple primary, dark mode = green primary. Brand anchors fixed.
+ * ------------------------------------------------------------------------- */
 :root {
+  /* Primary (purple, H288) */
+  --p50: #f4f4ff;
+  --p100: #e6e5ff;
+  --p200: #d1ceff;
+  --p300: #b4abff;
+  --p400: #9886ff;
+  --p500: #7c4dff; /* brand anchor */
+  --p600: #6935e4;
+  --p700: #541ebe;
+  --p800: #411099;
+  --p900: #2e0a71;
+  --p950: #230959;
+
+  /* Accent (green, H126) - dark-mode brand */
+  --a50: #e8ffc8;
+  --a100: #d5f6a2;
+  --a200: #bde57a;
+  --a300: #9cca3b;
+  --a400: #c6f578; /* brand anchor */
+  --a500: #698f00;
+  --a600: #537200;
+  --a700: #415a00;
+  --a800: #314500;
+  --a900: #223100;
+  --a950: #1a2700;
+
+  /* Neutral (H288, low chroma) */
+  --n50: #f5f4fa;
+  --n100: #e7e7ed;
+  --n200: #d4d3db;
+  --n300: #b7b6bf;
+  --n400: #9b9aa4;
+  --n500: #7f7f89;
+  --n600: #65656e;
+  --n700: #4f4f57;
+  --n800: #3d3c43;
+  --n900: #2b2b30;
+  --n950: #212125;
+
+  /* Error (H25) */
+  --e50: #fff2f0;
+  --e100: #ffdfdc;
+  --e200: #ffc3bd;
+  --e300: #ff958d;
+  --e400: #e7736d;
+  --e500: #ca5551;
+  --e600: #a93c39;
+  --e700: #8a2828;
+  --e800: #6d1b1b;
+  --e900: #501212;
+  --e950: #3f0e0d;
+
+  /* Warning (H70) */
+  --w50: #fff3e6;
+  --w100: #ffe3c3;
+  --w200: #f9cb97;
+  --w300: #e2ac6b;
+  --w400: #c98e43;
+  --w500: #ad721c;
+  --w600: #8e5900;
+  --w700: #704500;
+  --w800: #573400;
+  --w900: #3f2500;
+  --w950: #321c00;
+
+  /* Success (H155) */
+  --s50: #deffe8;
+  --s100: #c2f7d3;
+  --s200: #a3e7ba;
+  --s300: #78cd97;
+  --s400: #51b278;
+  --s500: #2c965d;
+  --s600: #017a44;
+  --s700: #006035;
+  --s800: #004a27;
+  --s900: #00351b;
+  --s950: #002a14;
+
+  /* Final type system: three tiers, three vars, ZERO component-level font
+   * names — components reference tier vars only; inheriting --ifm-font-family-base
+   * (= sans) is the correct default for anything read.
+   * --font-pixel = brand chrome ONLY (hero/section + docs h1-h5 headings,
+   *   buttons, navbar, eyebrows/labels, docs nav chrome): 16px buttons;
+   *   11px multiples (11/22/33/44) elsewhere, weight 400 only (>= 500
+   *   faux-bolds the single-weight font), uppercase labels, AA off. Never
+   *   paragraphs.
+   * --font-sans = everything read: prose, docs body + h3-h6 (600/700), card
+   *   bodies, UI text outside the pixel tier. 400 body /
+   *   500 UI emphasis / 600-700 headings. rem-based (NOT on the 11px grid),
+   *   normal antialiasing, true italic shipped.
+   * --font-mono = code and data: code blocks, inline code, benchmark table
+   *   cells, SVG diagram labels, identifiers/paths in prose. */
+  --font-pixel: 'Departure Mono', monospace;
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Semantic tokens (light) */
+  --bg-page: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-muted: var(--n50);
+  --text: var(--n900);
+  --text-muted: var(--n600);
+  --border: var(--n500);
+  --primary: var(--p500);
+  --on-primary: #ffffff;
+  --shadow-hard: var(--n500);
+}
+
+[data-theme='dark'] {
+  /* Semantic tokens (dark) */
+  --bg-page: var(--n950);
+  --bg-surface: var(--n900);
+  --bg-muted: var(--n900);
+  --text: var(--n100);
+  --text-muted: var(--n200);
+  --border: var(--n300);
+  --primary: var(--a400);
+  --on-primary: var(--a950);
+  --shadow-hard: var(--n300);
+}
+
+/* Infima bindings */
+:root {
+  --ifm-font-family-base: var(--font-sans); /* one var: homepage + all docs pages */
+  --ifm-font-family-monospace: var(--font-mono); /* code blocks, inline code, SVG diagrams */
   --ifm-global-radius: 0;
   --ifm-button-border-radius: 0;
   --ifm-code-border-radius: 0;
-  --ifm-color-primary: #7c4dff;
-  --topology-highlight-bg: rgba(124, 77, 255, 0.10);
+  --ifm-color-primary: var(--p500);
+  --ifm-color-primary-dark: var(--p600);
+  --ifm-color-primary-darker: var(--p700);
+  --ifm-color-primary-darkest: var(--p800);
+  --ifm-color-primary-light: var(--p400);
+  --ifm-color-primary-lighter: var(--p300);
+  --ifm-color-primary-lightest: var(--p200);
+  --ifm-background-color: var(--bg-page);
+  --ifm-background-surface-color: var(--bg-surface);
+  --topology-highlight-bg: var(--bg-muted);
   --topology-highlight-shadow: rgba(124, 77, 255, 0.20);
-  --ifm-color-primary-dark: #651fff;
-  --ifm-color-primary-darker: #6200ea;
-  --ifm-color-primary-darkest: #4a00b4;
-  --ifm-color-primary-light: #9775ff;
-  --ifm-color-primary-lighter: #a891ff;
-  --ifm-color-primary-lightest: #c2b0ff;
   --ifm-code-font-size: 95%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+
+  /* Neutral emphasis scale */
+  --ifm-color-emphasis-100: var(--n50);
+  --ifm-color-emphasis-200: var(--n200);
+  --ifm-color-emphasis-300: var(--n300);
+  --ifm-color-emphasis-400: var(--n400);
+  --ifm-color-emphasis-500: var(--n500);
+  --ifm-color-emphasis-600: var(--n600);
+  --ifm-color-emphasis-700: var(--n700);
+  --ifm-color-emphasis-800: var(--n800);
+  --ifm-color-emphasis-900: var(--n900);
+  --ifm-color-emphasis-1000: var(--n950);
 }
 
-/* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
-  --ifm-color-primary: #c6f578;
+  --ifm-color-primary: var(--a400);
+  --ifm-color-primary-dark: var(--a300);
+  --ifm-color-primary-darker: var(--a500);
+  --ifm-color-primary-darkest: var(--a600);
+  --ifm-color-primary-light: var(--a200);
+  --ifm-color-primary-lighter: var(--a100);
+  --ifm-color-primary-lightest: var(--a50);
   --topology-highlight-bg: rgba(198, 245, 120, 0.10);
   --topology-highlight-shadow: rgba(198, 245, 120, 0.20);
-  --ifm-color-primary-dark: #b4e85c;
-  --ifm-color-primary-darker: #a2db40;
-  --ifm-color-primary-darkest: #8bc832;
-  --ifm-color-primary-light: #d2f894;
-  --ifm-color-primary-lighter: #defbb0;
-  --ifm-color-primary-lightest: #eafdcc;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+
+  /* Neutral emphasis scale (inverted) */
+  --ifm-color-emphasis-100: var(--n900);
+  --ifm-color-emphasis-200: var(--n800);
+  --ifm-color-emphasis-300: var(--n700);
+  --ifm-color-emphasis-400: var(--n600);
+  --ifm-color-emphasis-500: var(--n500);
+  --ifm-color-emphasis-600: var(--n400);
+  --ifm-color-emphasis-700: var(--n200);
+  --ifm-color-emphasis-800: var(--n100);
+  --ifm-color-emphasis-900: var(--n50);
+  --ifm-color-emphasis-1000: #ffffff;
 }
 
-/* Override admonition colors to use purple theme */
+/* Admonitions: light = purple family, dark = green family */
 :root {
-  /* Tip admonition (replacing green) */
-  --ifm-color-success: #7c4dff;
-  --ifm-color-success-dark: #651fff;
-  --ifm-color-success-darker: #6200ea;
-  --ifm-color-success-darkest: #4a00b4;
-  --ifm-color-success-light: #9775ff;
-  --ifm-color-success-lighter: #a891ff;
-  --ifm-color-success-lightest: #c2b0ff;
+  --ifm-color-success: var(--p500);
+  --ifm-color-success-dark: var(--p600);
+  --ifm-color-success-darker: var(--p700);
+  --ifm-color-success-darkest: var(--p800);
+  --ifm-color-success-light: var(--p400);
+  --ifm-color-success-lighter: var(--p300);
+  --ifm-color-success-lightest: var(--p200);
 
-  /* Info admonition */
-  --ifm-color-info: #5e35b1;
-  --ifm-color-info-dark: #512da8;
-  --ifm-color-info-darker: #4527a0;
-  --ifm-color-info-darkest: #311b92;
-  --ifm-color-info-light: #7e57c2;
-  --ifm-color-info-lighter: #9575cd;
-  --ifm-color-info-lightest: #b39ddb;
+  --ifm-color-info: var(--p700);
+  --ifm-color-info-dark: var(--p800);
+  --ifm-color-info-darker: var(--p900);
+  --ifm-color-info-darkest: var(--p950);
+  --ifm-color-info-light: var(--p600);
+  --ifm-color-info-lighter: var(--p500);
+  --ifm-color-info-lightest: var(--p400);
 }
 
 [data-theme='dark'] {
-  /* Tip admonition (matching logo green) in dark mode */
-  --ifm-color-success: #c6f578;
-  --ifm-color-success-dark: #b4e85c;
-  --ifm-color-success-darker: #a2db40;
-  --ifm-color-success-darkest: #8bc832;
-  --ifm-color-success-light: #d2f894;
-  --ifm-color-success-lighter: #defbb0;
-  --ifm-color-success-lightest: #eafdcc;
+  --ifm-color-success: var(--a400);
+  --ifm-color-success-dark: var(--a300);
+  --ifm-color-success-darker: var(--a500);
+  --ifm-color-success-darkest: var(--a600);
+  --ifm-color-success-light: var(--a200);
+  --ifm-color-success-lighter: var(--a100);
+  --ifm-color-success-lightest: var(--a50);
 
-  /* Info admonition in dark mode - complementary teal */
-  --ifm-color-info: #26c6da;
-  --ifm-color-info-dark: #00acc1;
-  --ifm-color-info-darker: #0097a7;
-  --ifm-color-info-darkest: #00838f;
-  --ifm-color-info-light: #4dd0e1;
-  --ifm-color-info-lighter: #80deea;
-  --ifm-color-info-lightest: #b2ebf2;
+  --ifm-color-info: var(--a300);
+  --ifm-color-info-dark: var(--a500);
+  --ifm-color-info-darker: var(--a600);
+  --ifm-color-info-darkest: var(--a700);
+  --ifm-color-info-light: var(--a400);
+  --ifm-color-info-lighter: var(--a100);
+  --ifm-color-info-lightest: var(--a50);
 }
 
 /* Override admonition backgrounds */
@@ -99,17 +331,177 @@
   --ifm-alert-border-color: var(--ifm-color-success);
 }
 
-/* Homepage improvements */
+/* Pixel rendering law: 1-bit bitmap font — antialiasing smears stems into gray
+ * mush at fractional x-positions (Chromium subpixel text positioning). AA off =
+ * glyphs snap to the pixel grid. Firefox has no equivalent; keep x-origins
+ * integer via layout (hence integer .button padding below). */
+.button,
+.navbar__link {
+  -webkit-font-smoothing: none;
+  font-synthesis: none;
+}
 
-/* Better button styles */
+/* Blocky buttons: 2px border + hard offset shadow, no soft hover lift.
+ * Press = instant 4px step into the shadow (pixel press).
+ * Labels: 16px uppercase 400 (400 avoids faux-bold smear).
+ * Readability takes priority over the 11px grid for every button. */
 .button {
-  font-weight: 600;
-  transition: all 0.2s ease;
+  border-width: 2px;
+  box-shadow: 4px 4px 0 var(--shadow-hard);
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  font-weight: 400;
+  padding: 8px
+    32px; /* integers: Infima rem defaults land text at fractional x */
+  text-transform: uppercase;
+  transition: none;
 }
 
 .button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 4px 4px 0 var(--shadow-hard);
+  transform: none;
+}
+
+.button:active {
+  box-shadow: none;
+  transform: translate(4px, 4px);
+}
+
+/* Docs chrome joins the pixel tier: headings = full homepage display ladder
+ * (44/33/22) + label tier (11px uppercase) for h4/h5 kickers; h6 and ALL prose
+ * stay sans -- pixel is never paragraphs. Navigation = label tier (11px
+ * uppercase 400). Weight pinned: Infima sets 500-700 on these, which
+ * faux-bolds the single-weight font. AA off per pixel law. Sizes in px (11px
+ * grid): Infima rem defaults land bitmap glyphs at fractional x. */
+article h1,
+article h2,
+article h3,
+article h4,
+article h5 {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  -webkit-font-smoothing: none;
+  font-synthesis: none;
+}
+
+article h1 {
+  font-size: 44px;
+}
+
+/* h2 = section tier: blocky 2px rule mirrors homepage section separation */
+article h2 {
+  margin-top: 2.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--border);
+  font-size: 33px;
+}
+
+article h3 {
+  font-size: 22px;
+}
+
+article h4,
+article h5 {
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+/* Article chrome joins the label tier (11px uppercase 400, AA off): table
+ * headers + admonition headings (hashed CSS-module class, matched by substring
+ * like iconExternalLink below). */
+article th,
+[class*='admonitionHeading'] {
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  -webkit-font-smoothing: none;
+  font-synthesis: none;
+}
+
+.menu__link,
+.table-of-contents__link,
+.breadcrumbs__link,
+.pagination-nav__link,
+.footer__link-item,
+.footer__title,
+.footer__copyright {
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  -webkit-font-smoothing: none;
+  font-synthesis: none;
+}
+
+/* Footer skin: replaces the stock dark slab with the site's own emphasis-100
+ * band so the footer continues the homepage's alternating-background law in
+ * both themes (openSource above it is surface). The 4px primary top stroke is
+ * the page's closing highlight - user directed it to live on the footer, not
+ * on openSource above. */
+.footer {
+  --ifm-footer-background-color: var(--ifm-color-emphasis-100);
+  border-top: 4px solid var(--ifm-color-primary);
+}
+
+.footer__title {
+  color: var(--ifm-color-emphasis-900);
+}
+
+.footer__link-item {
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* custom.css is unlayered so it beats ALL @layer docusaurus.infima rules
+ * regardless of specificity - the hover color must be redeclared here or the
+ * base rule above would suppress Infima's primary hover. */
+.footer__link-item:hover {
+  color: var(--ifm-color-primary);
+}
+
+.footer__copyright {
+  color: var(--ifm-color-emphasis-600);
+}
+
+/* Docs contents hierarchy: label-tier size is flat, so levels differentiate
+ * by color (homepage label color law: primary = active, emphasis-900 =
+ * structure) + a blocky 2px active marker; padding compensated to avoid shift. */
+.menu__link--sublist {
+  color: var(--ifm-color-emphasis-900);
+}
+
+.menu__link--active,
+.table-of-contents__link--active {
+  color: var(--ifm-color-primary);
+}
+
+.menu__link--active {
+  border-left: 2px solid var(--ifm-color-primary);
+  padding-left: calc(var(--ifm-menu-link-padding-horizontal) - 2px);
+}
+
+/* Hide Docusaurus smooth external-link glyphs in the navbar (icon law) */
+[class*='iconExternalLink'] {
+  display: none;
+}
+
+/* Navbar separator: neutral 2px structural rule instead of Infima's soft
+ * shadow (blocky law: no soft shadows). Deliberately neutral - the primary
+ * stroke belongs to the footer alone (user correction: colored header stroke
+ * is too much; ONE primary highlight per page edge). */
+.navbar {
+  border-bottom: 2px solid var(--ifm-color-emphasis-300);
+  box-shadow: none;
+}
+
+/* Navbar links are brand chrome next to the pixel wordmark: label tier
+ * (11px uppercase, same as eyebrows). Sans links here break the pixel system.
+ * Weight pinned: Infima sets 500, which faux-bolds the single-weight font. */
+.navbar__link {
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
 }
 
 /* Code block improvements */
@@ -120,15 +512,4 @@ pre {
 /* Copy button styling */
 .theme-code-block:hover .copyButton_Tacv {
   opacity: 1;
-}
-
-/* Responsive text sizing */
-@media screen and (max-width: 996px) {
-  h1 {
-    font-size: 2rem;
-  }
-
-  h2 {
-    font-size: 1.5rem;
-  }
 }

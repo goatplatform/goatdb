@@ -1,0 +1,45 @@
+/* Pixel-art SVG laws (see design system): blocky (crispEdges, 2px strokes),
+ * token colors only, no region/caption container rects, no emoji. */
+/* Colored tile => hard offset shadow (drop-shadow = box-shadow's SVG
+ * twin). */
+.box {
+  fill: var(--ifm-background-surface-color);
+  stroke: var(--ifm-color-primary);
+  stroke-width: 2;
+  shape-rendering: crispEdges;
+  filter: drop-shadow(4px 4px 0 var(--ifm-color-primary));
+}
+
+/* Headings/labels only: 1-bit bitmap font, AA off, weight pinned 400. */
+.caption {
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  font-weight: 400;
+  -webkit-font-smoothing: none;
+  font-synthesis: none;
+  text-transform: uppercase;
+  fill: var(--ifm-color-primary);
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  fill: var(--ifm-color-emphasis-800);
+}
+
+.body {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  fill: var(--ifm-color-emphasis-800);
+}
+
+.arrow {
+  fill: none;
+  stroke: var(--ifm-color-primary);
+  stroke-width: 2;
+  shape-rendering: crispEdges;
+}
+
+.arrowHead {
+  fill: var(--ifm-color-primary);
+}

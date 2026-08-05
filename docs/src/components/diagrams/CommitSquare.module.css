@@ -1,0 +1,75 @@
+/* Commit square: the signed-commit tile shared by every diagram that shows
+ * commits. Blocky laws: 2px strokes, zero radius, semantic tokens only.
+ * Primary marks what holds data; the lock badge is the signed-provenance
+ * stamp. Colored tile => hard offset shadow in the stroke color (uniform
+ * law across all diagrams). */
+
+/* Content stays centered while the lock sits just outside the top-right
+ * corner as a signed-provenance stamp. */
+.commit,
+.commitFilled {
+  position: relative;
+  overflow: visible;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--ifm-background-surface-color);
+  border: 2px solid var(--ifm-color-primary);
+  box-shadow: 4px 4px 0 var(--ifm-color-primary);
+}
+
+.commitContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+/* Filled primary = the element the system produces (e.g. a merge result).
+ * Glyph, version and badge all flip to --on-primary to stay readable.
+ * Filled tiles override the primary shadow with the neutral --shadow-hard
+ * (mirrors the homepage CTA) so fill and shadow never share a color. */
+.commitFilled {
+  background: var(--ifm-color-primary);
+  color: var(--on-primary);
+  box-shadow: 4px 4px 0 var(--shadow-hard);
+}
+
+.commitVersion {
+  max-width: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--ifm-color-emphasis-900);
+}
+
+.commitFilled .commitVersion {
+  color: var(--on-primary);
+}
+
+/* Signed-commit badge: place the full 12px stamp outside the tile, touching
+ * its top-right corner without covering the tile contents. */
+.signBadge {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  color: var(--ifm-color-emphasis-600);
+}
+
+/* The badge sits on the page background outside filled commits, so it keeps
+ * the neutral signed-provenance color rather than the tile's on-primary ink. */
+.commitFilled .signBadge {
+  color: var(--ifm-color-emphasis-600);
+}

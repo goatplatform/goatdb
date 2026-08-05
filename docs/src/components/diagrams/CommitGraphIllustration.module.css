@@ -1,0 +1,76 @@
+/* Pixel-art SVG laws: 16px square commit nodes, 2px primary orthogonal
+ * edges, crispEdges everywhere. Zone captions in pixel type (uppercase,
+ * AA off); data tags in mono. Merge node = filled primary square. No rx,
+ * no circles, no dashes, no grouping container rects. */
+
+/* Mobile: min-width beats max-width per CSS rules (regardless of
+ * specificity), so the rail stays legible and scrolls horizontally inside
+ * Diagram's overflow container instead of shrinking to unreadable text. */
+.rail {
+  min-width: 600px;
+}
+
+.heading,
+.captionLabel {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  -webkit-font-smoothing: none;
+  font-synthesis: none;
+  text-transform: uppercase;
+}
+
+.heading {
+  font-size: 11px;
+  fill: var(--ifm-color-emphasis-900);
+}
+
+.captionLabel {
+  font-size: 11px;
+  fill: var(--ifm-color-primary);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  fill: var(--ifm-color-emphasis-700);
+}
+
+.nodeLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--ifm-color-emphasis-700);
+}
+
+/* Colored tile => hard offset shadow (drop-shadow = box-shadow's SVG
+ * twin: 0 blur keeps the offset hard, same 4px geometry + token). */
+.node {
+  fill: var(--ifm-background-surface-color);
+  stroke: var(--ifm-color-primary);
+  stroke-width: 2;
+  shape-rendering: crispEdges;
+  filter: drop-shadow(4px 4px 0 var(--ifm-color-primary));
+}
+
+/* Filled tile: neutral shadow (mirrors CommitSquare .commitFilled and the
+ * homepage CTA) so fill and shadow never share a color. */
+.nodeMerge {
+  fill: var(--ifm-color-primary);
+  stroke: var(--ifm-color-primary);
+  stroke-width: 2;
+  shape-rendering: crispEdges;
+  filter: drop-shadow(4px 4px 0 var(--shadow-hard));
+}
+
+.edge {
+  stroke: var(--ifm-color-primary);
+  stroke-width: 2;
+  fill: none;
+  marker-end: url(#cgi-arrow);
+  shape-rendering: crispEdges;
+}
+
+/* Branch identity glyphs (pixelarticons paths inlined, 24px grid scaled
+ * to 14px): neutral emphasis per icon-semantics guidance. */
+.branchIcon {
+  fill: var(--ifm-color-emphasis-700);
+}

@@ -23,3 +23,24 @@
   height: auto;
   display: block;
 }
+
+.diagramContentWide {
+  display: block;
+  width: 100%;
+}
+
+.diagramContentWide:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 2px;
+}
+
+.diagramContentWide svg {
+  width: max(100%, 960px);
+  max-width: none;
+}
+
+.scrollHint {
+  margin-top: 0.4rem;
+  color: var(--ifm-color-emphasis-600);
+  font-size: 0.75rem;
+}

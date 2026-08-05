@@ -152,10 +152,9 @@ function computeVariantDivergentOps(
 }
 
 /**
- * Wrap a value in a CSS class span if it's meaningfully faster/slower.
- * Color is only applied when the win is robust: the loser's lower bound
- * (mean × (1 − cv)) is still threshold× above the winner's upper bound
- * (mean × (1 + cv)), so variance alone cannot flip the result.
+ * Mark the CV-robust winner with a filled-primary hero chip; losers and
+ * uncertain ties render plain. Only noteworthy data gets chroma — the
+ * traffic-light green/amber semantics was removed from the design system.
  */
 function comparisonCell(
   myMs: number,
@@ -176,15 +175,15 @@ function comparisonCell(
   const fastUpper = min * (1 + (allCVs[minIdx] ?? 0));
   const slowLower = max * (1 - Math.min(allCVs[maxIdx] ?? 0, 1));
   if (slowLower <= fastUpper) {
-    // Variance makes winner uncertain — show neutral tie treatment
+    // Variance makes winner uncertain — plain value, high CV still noted
     const cvNote = myCV !== undefined && myCV > HIGH_CV_THRESHOLD
       ? ` <span className="bench-cv">\u00b1${Math.round(myCV * 100)}%</span>`
       : '';
-    return `<span className="bench-tie">${val}${cvNote}</span>`;
+    return `${val}${cvNote}`;
   }
 
-  if (myMs === min) return `<span className="bench-excels">${val}</span>`;
-  return `<span className="bench-tradeoff">${val}</span>`;
+  if (myMs === min) return `<span className="bench-winner">${val}</span>`;
+  return val;
 }
 
 /**

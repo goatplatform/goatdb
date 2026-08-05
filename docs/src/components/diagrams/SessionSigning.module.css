@@ -1,0 +1,97 @@
+/* Sessions act 2: sign with the private key, validate with the public key.
+ * Blocky laws: 2px strokes, zero radius, semantic tokens only. Primary
+ * marks what holds data (commit tiles via the shared CommitSquare, link
+ * arrows, the public key fragment). Same 5-column rhythm as the merge
+ * diagrams: tight centered composition, fixed equal gaps. */
+
+.figure {
+  max-width: 720px;
+  margin: 2rem auto;
+}
+
+/* 5 columns: signer | arrow | commits | arrow | validator. */
+.grid {
+  display: grid;
+  grid-template-columns: auto auto auto auto auto;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem 3rem;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.cellRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* The lock badge sticks 14px out of each tile's top-right; the row gap
+ * keeps badges clear of the next tile. */
+.commitRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5rem;
+  /* Room above the row for the protruding sign badges. */
+  padding-top: 14px;
+}
+
+.linkArrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ifm-color-primary);
+}
+
+.mono,
+.monoKey {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.mono {
+  color: var(--ifm-color-emphasis-900);
+}
+
+.monoKey {
+  color: var(--ifm-color-primary);
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: var(--ifm-color-emphasis-700);
+  text-align: center;
+}
+
+.figureCaption {
+  margin-top: 1.25rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+@media screen and (max-width: 768px) {
+  /* Single centered column: signer -> arrow -> commits -> arrow ->
+   * validator; arrows rotate vertical (merge-diagram pattern). */
+  .grid {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 0.75rem;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  .linkArrow svg {
+    transform: rotate(90deg);
+  }
+}

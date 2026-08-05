@@ -1,471 +1,808 @@
 .heroBanner {
-  padding: 2rem 0 3rem;
-  text-align: center;
+  padding: 4rem 0;
   background: var(--ifm-background-surface-color);
-  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.heroLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 2.5rem;
+  align-items: center;
+}
+
+.heroContent {
+  max-width: 630px;
+}
+
+.heroActions > div {
+  justify-content: flex-start;
+}
+
+.eyebrow,
+.stackLabel,
+.speedFactor > span,
+.textLink {
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: uppercase;
+}
+
+.eyebrow,
+.stackLabel,
+.heroTitle,
+.sectionIntro h2,
+.possibilityCard h3,
+.traditionalStack h3,
+.goatSystem h3,
+.platformLayer strong,
+.compressionArrow span,
+.responsibilityPanel h3,
+.responsibilityPrimary h3,
+.iconList strong,
+.fitPanel h3,
+.limitsPanel h3,
+.openSource h2,
+.speedFactor > span,
+.textLink {
+  -webkit-font-smoothing: none;
+  font-synthesis: none;
+}
+
+.eyebrow {
+  margin: 0 0 0.75rem;
+  color: var(--ifm-color-primary-dark);
+  line-height: 1.3;
 }
 
 .heroTitle {
-  margin: 0 0 1rem 0;
-  line-height: 0;
-  font-size: 0;
+  margin: 0 0 1rem;
+  font-family: var(--font-pixel);
+  font-size: 44px;
+  font-weight: 400;
+  line-height: 1.2;
 }
 
-.heroLogo,
-.heroLogoDark {
-  max-width: 420px;
-  width: 100%;
-  height: auto;
-}
-
-.heroLogoDark {
-  display: none;
-}
-
-[data-theme='dark'] .heroLogo {
-  display: none;
-}
-
-[data-theme='dark'] .heroLogoDark {
-  display: inline;
-}
-
-.heroSubtitle {
-  font-size: 1.4rem;
-  font-weight: 600;
-  color: var(--ifm-color-emphasis-800);
-  margin: 0 auto 0.5rem;
-  max-width: 600px;
-  line-height: 1.4;
-}
-
-.heroSpecs {
-  font-size: 1rem;
-  color: var(--ifm-color-emphasis-600);
-  margin: 0 auto 2rem;
-  max-width: 600px;
-  line-height: 1.6;
-}
-
-@media screen and (max-width: 996px) {
-  .heroBanner {
-    padding: 1.5rem;
-  }
-
-  .heroLogo,
-  .heroLogoDark {
-    max-width: 340px;
-  }
-
-  .heroSubtitle {
-    font-size: 1.2rem;
-  }
-}
-
-.buttons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  margin-top: 1.5rem;
-}
-
-/* The Split Section */
-.theSplit {
-  padding: 3.5rem 0;
-  background-color: var(--ifm-color-emphasis-100);
-  border-bottom: 1px solid var(--ifm-color-emphasis-200);
-  text-align: center;
-}
-
-.theSplit h2 {
-  font-size: 1.75rem;
-  margin-bottom: 2rem;
-  max-width: 700px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.splitCards {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.5rem;
-  max-width: 800px;
-  margin: 0 auto 2rem;
-  text-align: left;
-}
-
-.splitCard {
-  background: var(--ifm-background-surface-color);
-  border: 1px solid var(--ifm-color-emphasis-200);
-  border-radius: 0;
-  padding: 1.5rem;
-}
-
-.splitCardTitle {
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--ifm-color-emphasis-800);
-  margin: 0 0 0.25rem;
-}
-
-.splitCardSubtitle {
-  font-size: 0.8rem;
-  color: var(--ifm-color-emphasis-500);
-  margin: 0 0 0.75rem;
-  font-family: monospace;
-}
-
-.splitCard p:last-child {
+.heroSummary {
   margin: 0;
-  font-size: 0.95rem;
   color: var(--ifm-color-emphasis-700);
+  font-size: 1.06rem;
   line-height: 1.65;
 }
 
-.bridgeText {
-  max-width: 680px;
-  margin: 0 auto;
-  font-size: 1.05rem;
-  color: var(--ifm-color-emphasis-700);
-  line-height: 1.75;
-  font-style: italic;
-}
-
-/* Third Category Section */
-.thirdCategory {
-  padding: 3.5rem 0;
-  background: var(--ifm-background-surface-color);
-  border-bottom: 1px solid var(--ifm-color-emphasis-200);
-}
-
-.thirdCategoryContent {
+/* Row gap doubles as the stem channel: stops connect down to the mesh bar. */
+.heroJourney {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3rem;
+  gap: 1.25rem 0;
+}
+
+/* The GoatDB logo lockup bar: the state layer/mesh every surface stems into. */
+.journeyMesh {
+  display: flex;
   align-items: center;
-  max-width: 900px;
-  margin: 0 auto;
+  justify-content: center;
+  padding: 0.55rem;
+  background: var(--ifm-background-surface-color);
+  border: 2px solid var(--ifm-color-primary);
+  box-shadow: 4px 4px 0 var(--ifm-color-primary);
 }
 
-.thirdCategoryText h2 {
-  font-size: 1.75rem;
-  margin-bottom: 1rem;
+.journeyMeshLogo {
+  display: block;
+  width: 8.5rem;
+  height: auto;
 }
 
-.thirdCategoryText p {
-  font-size: 1rem;
-  color: var(--ifm-color-emphasis-700);
-  line-height: 1.7;
-  margin-bottom: 0.75rem;
+.journeyMeshLogoDark {
+  display: none;
 }
 
-.thirdCategoryText p:last-child {
-  margin-bottom: 0;
+:global([data-theme='dark']) .journeyMeshLogo {
+  display: none;
 }
 
-/* Topology Panels */
-.topologyPanels {
+:global([data-theme='dark']) .journeyMeshLogoDark {
+  display: block;
+}
+
+.journeyFlow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.journeyStop {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  max-width: 360px;
-  margin: 0 auto;
-}
-
-.topologyPanel {
-  border: 1px solid var(--ifm-color-emphasis-300);
-  border-radius: 0;
-  padding: 0.75rem 1rem 0.6rem;
-  background: var(--ifm-color-emphasis-100);
-  box-shadow: 0 0 0 1px var(--ifm-color-emphasis-200);
-}
-
-[data-theme='dark'] .topologyPanel {
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.9rem 0.6rem;
   background: var(--ifm-background-surface-color);
+  border: 2px solid var(--border);
+  text-align: center;
 }
 
-.topologyPanelHighlight {
-  border-color: var(--ifm-color-primary);
-  background: var(--topology-highlight-bg);
-  box-shadow: 0 0 0 1px var(--topology-highlight-shadow);
+/* Stem: the visual link from each surface down to the GoatDB state layer. */
+.journeyStop::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 2px;
+  height: 1.25rem;
+  background: var(--ifm-color-primary);
+  transform: translateX(-50%);
 }
 
-[data-theme='dark'] .topologyPanelHighlight {
-  background: var(--topology-highlight-bg);
-  border-color: var(--ifm-color-primary-light);
-  box-shadow: 0 0 0 1px var(--topology-highlight-shadow);
-}
-
-.topologyHeader {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.4rem;
-}
-
-.topologyTitle {
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ifm-color-emphasis-800);
-}
-
-.topologyTitlePrimary {
+.journeyStop > svg {
   color: var(--ifm-color-primary);
 }
 
-.topologySubtitle {
-  font-size: 0.72rem;
-  color: var(--ifm-color-emphasis-700);
-  font-family: monospace;
-}
-
-.topologyScene svg {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.topologyLabel {
-  display: block;
-  font-size: 0.75rem;
-  color: var(--ifm-color-emphasis-700);
-  font-style: italic;
-  margin-top: 0.3rem;
-}
-
-/* Topology SVG shared element styles */
-.svgDevice {
-  fill: none;
-  stroke: var(--ifm-color-primary);
-  stroke-width: 2;
-}
-.svgDeviceDim {
-  fill: none;
-  stroke: var(--ifm-color-primary-light);
-  stroke-width: 2;
-  opacity: 0.55;
-}
-.svgDeviceDimmer {
-  fill: none;
-  stroke: var(--ifm-color-primary-lightest);
-  stroke-width: 2;
-  opacity: 0.45;
-}
-.svgServer {
-  fill: var(--ifm-color-primary);
-  fill-opacity: 0.15;
-  stroke: var(--ifm-color-primary);
-  stroke-width: 2;
-}
-.svgServerDim {
-  fill: var(--ifm-color-primary-lightest);
-  fill-opacity: 0.25;
-  stroke: var(--ifm-color-primary-light);
-  stroke-width: 2;
-}
-.svgRack {
-  fill: var(--ifm-color-primary);
-  fill-opacity: 0.5;
-  stroke: none;
-}
-.svgRackDim {
-  fill: var(--ifm-color-primary-light);
-  fill-opacity: 0.5;
-  stroke: none;
-}
-.svgDb {
-  fill: var(--ifm-color-primary);
-  fill-opacity: 0.2;
-  stroke: var(--ifm-color-primary);
-  stroke-width: 1.5;
-}
-.svgDbDim {
-  fill: var(--ifm-color-primary-light);
-  fill-opacity: 0.3;
-  stroke: var(--ifm-color-primary-light);
-  stroke-width: 1.5;
-  opacity: 0.8;
-}
-.svgDbDimmer {
-  fill: none;
-  stroke: var(--ifm-color-primary-lightest);
-  stroke-width: 1.5;
-  opacity: 0.45;
-}
-.svgArrow {
-  stroke: var(--ifm-color-primary-light);
-  stroke-width: 2;
-  fill: none;
-  opacity: 0.75;
-}
-.svgSync {
-  stroke: var(--ifm-color-primary);
-  stroke-width: 2;
-  stroke-dasharray: 4 2;
-  fill: none;
-  opacity: 0.8;
-}
-.svgSyncDirect {
-  stroke: var(--ifm-color-primary);
-  stroke-width: 2.5;
-  fill: none;
-  opacity: 1;
-}
-.svgBlock {
-  fill: var(--ifm-color-emphasis-400);
-  fill-opacity: 0.25;
-  stroke: var(--ifm-color-emphasis-500);
-  stroke-width: 1.5;
-}
-
-/* Browser Native Section */
-.browserNative {
-  padding: 3.5rem 0;
-  background-color: var(--ifm-color-emphasis-100);
-  border-bottom: 1px solid var(--ifm-color-emphasis-200);
-}
-
-.browserNativeContent {
+/* Identical chip in every stop: same item id, only the status advances. */
+.journeyChip {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3rem;
+  gap: 0.25rem;
+  justify-items: center;
+  width: 100%;
+  margin-top: auto;
+  padding: 0.4rem 0.3rem;
+  background: var(--ifm-color-emphasis-100);
+  border: 2px solid var(--border);
+}
+
+.journeyChip code {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--ifm-color-emphasis-800);
+  font-size: 0.66rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* Body font (not the pixel font) keeps status words crisp at small sizes. */
+.journeyStatus {
+  display: flex;
   align-items: center;
-  max-width: 900px;
-  margin: 0 auto;
+  gap: 0.3rem;
+  color: var(--ifm-color-emphasis-800);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.3;
 }
 
-.browserNativeText h2 {
-  font-size: 1.75rem;
-  margin-bottom: 1rem;
+.section {
+  padding: 5.25rem 0;
+  background: var(--ifm-background-surface-color);
 }
 
-.browserNativeText p {
-  font-size: 1rem;
+.sectionIntro {
+  max-width: 850px;
+  margin-bottom: 2.25rem;
+}
+
+.sectionIntro h2,
+.openSource h2 {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-pixel);
+  font-size: 33px;
+  font-weight: 400;
+  line-height: 1.28;
+}
+
+.sectionIntro > p:last-child,
+.openSource > div > p:last-of-type {
+  margin: 0;
   color: var(--ifm-color-emphasis-700);
-  line-height: 1.7;
+  font-size: 1.04rem;
+  line-height: 1.65;
+}
+
+.possibilities,
+.fitEvidence {
+  background: var(--ifm-color-emphasis-100);
+}
+
+/* Balance the intro wrap so no orphan word drops onto the last line. */
+.possibilities .sectionIntro > p:last-child {
+  text-wrap: balance;
+}
+
+/* The inline mark defines "one shared state" at the point of claim. */
+.sharedStateMark {
+  display: inline-block;
+  height: 1.1em;
+  width: auto;
+  margin-left: 0.1em;
+  vertical-align: -0.18em;
+}
+
+.sharedStateMarkDark {
+  display: none;
+}
+
+:global([data-theme='dark']) .sharedStateMark {
+  display: none;
+}
+
+:global([data-theme='dark']) .sharedStateMarkDark {
+  display: inline-block;
+}
+
+.possibilityGrid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.possibilityGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.possibilityCard,
+.responsibilityPanel,
+.responsibilityPrimary,
+.fitPanel,
+.limitsPanel {
+  min-width: 0;
+  padding: 1.5rem;
+  background: var(--ifm-background-surface-color);
+  border: 2px solid var(--border);
+}
+
+.possibilityCard > svg {
+  margin-bottom: 0.7rem;
+  color: var(--ifm-color-primary);
+}
+
+.possibilityCard h3,
+.responsibilityPanel h3,
+.responsibilityPrimary h3,
+.fitPanel h3,
+.limitsPanel h3 {
+  margin: 0 0 0.65rem;
+  font-family: var(--font-pixel);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.possibilityCard p {
+  margin: 0;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.architecture {
+  scroll-margin-top: 4rem;
+}
+
+.architecture .sectionIntro,
+.fitEvidence .sectionIntro {
+  margin-inline: auto;
+  text-align: center;
+}
+
+.compressionFigure {
+  max-width: 1120px;
+  margin: 0 auto 2rem;
+  padding: 1.5rem;
+  background: var(--ifm-color-emphasis-100);
+  border: 2px solid var(--border);
+}
+
+.compressionGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) 5rem minmax(280px, 0.75fr);
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.traditionalStack,
+.goatSystem {
+  min-width: 0;
+  padding: 1.4rem;
+  background: var(--ifm-background-surface-color);
+  border: 2px solid var(--border);
+}
+
+.stackLabel {
+  margin: 0 0 0.65rem;
+  color: var(--ifm-color-primary);
+  line-height: 1.3;
+}
+
+.traditionalStack h3,
+.goatSystem h3 {
+  margin: 0 0 1rem;
+  font-family: var(--font-pixel);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.platformLayerGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.platformLayer,
+.iconList li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.platformLayer {
+  padding: 0.7rem;
+  background: var(--ifm-color-emphasis-100);
+  border: 2px solid var(--border);
+}
+
+.platformLayer svg {
+  color: var(--ifm-color-emphasis-700);
+}
+
+.platformLayer span,
+.iconList span {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.platformLayer strong,
+.iconList strong {
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  /* User-approved faux bold: restores the label weight lost in the grid fix.
+   * Overrides font-synthesis:none from the group rule above. */
+  font-synthesis: weight;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.platformLayer small,
+.iconList small {
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.compressionArrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--ifm-color-primary);
+  text-align: center;
+}
+
+.compressionArrow span {
+  margin-top: 0.35rem;
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.goatSystem {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-color: var(--ifm-color-primary);
+  box-shadow: 6px 6px 0 var(--ifm-color-primary);
+}
+
+.goatSystemLogo,
+.goatSystemLogoDark {
+  width: 48px;
+  height: 48px;
   margin-bottom: 0.75rem;
 }
 
-.browserNativeText p:last-child {
-  margin-bottom: 0;
+.goatSystemLogoDark,
+[data-theme='dark'] .goatSystemLogo {
+  display: none;
 }
 
-.browserNative .topologyPanel {
-  background: var(--ifm-background-surface-color);
+[data-theme='dark'] .goatSystemLogoDark {
+  display: inline;
 }
 
-@media screen and (max-width: 768px) {
-  .browserNativeContent {
-    grid-template-columns: 1fr;
-    gap: 2rem;
-  }
+.goatSystem > p:not(.stackLabel) {
+  margin: 0 0 1rem;
+  color: var(--ifm-color-emphasis-800);
+  font-size: 0.9rem;
+  line-height: 1.55;
 }
 
-/* Honest Tradeoff Section */
-.honestTradeoff {
-  padding: 3rem 0;
-  background-color: var(--ifm-color-emphasis-100);
-  border-top: 1px solid var(--ifm-color-emphasis-200);
-}
-
-.honestTradeoffContent {
-  text-align: center;
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-.honestTradeoff h2 {
-  font-size: 1.75rem;
-  margin-bottom: 1rem;
-}
-
-.honestTradeoffContent p {
-  font-size: 1rem;
+.goatSystem > small {
+  padding-top: 0.85rem;
+  border-top: 2px solid var(--border);
   color: var(--ifm-color-emphasis-700);
-  line-height: 1.6;
-  margin-bottom: 1rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
 }
 
-/* Open Source Section */
-.openSource {
-  padding: 4rem 0;
-  background: var(--ifm-background-surface-color);
-  border-top: 1px solid var(--ifm-color-emphasis-200);
-}
-
-.openSourceContent {
-  text-align: center;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.openSource h2 {
-  font-size: 2rem;
-  margin-bottom: 1rem;
-}
-
-.openSourceDescription {
-  font-size: 1.1rem;
+.compressionFigure figcaption {
   color: var(--ifm-color-emphasis-700);
-  margin-bottom: 2rem;
-  line-height: 1.6;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  text-align: center;
 }
 
-.openSourceButtons {
+.compressionFigure figcaption {
+  margin-top: 1.25rem;
+}
+
+.responsibilityGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+  max-width: 1120px;
+  margin: 0 auto 1.75rem;
+}
+
+.responsibilityPrimary {
+  border-color: var(--ifm-color-primary);
+}
+
+.iconList {
+  display: grid;
+  gap: 0.8rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.iconList svg {
+  color: var(--ifm-color-primary);
+}
+
+.textLink {
   display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 1rem;
-  margin-bottom: 2rem;
+  gap: 0.4rem;
+  width: fit-content;
+  margin: 0 auto;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.textLink svg {
+  flex: 0 0 auto;
+}
+
+.textLink:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 3px;
+}
+
+.heroActions .heroSecondary {
+  justify-content: flex-start;
+  margin: 1rem 0 0;
+}
+
+.fitEvidence .sectionIntro {
+  max-width: 900px;
+}
+
+.fitGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 1.5rem;
+  max-width: 1060px;
+  margin: 0 auto 1.25rem;
+}
+
+.fitPanel,
+.limitsPanel {
+  padding: 1.35rem 1.5rem;
+}
+
+.squareList {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.squareList li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.6rem;
+  color: var(--ifm-color-emphasis-800);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.squareList li::before {
+  width: 8px;
+  height: 8px;
+  margin-top: 0.35rem;
+  background: var(--ifm-color-primary);
+  content: '';
+}
+
+.limitsPanel > p {
+  margin: 0;
+  padding-top: 1rem;
+  border-top: 2px solid var(--border);
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.speedProof {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 1060px;
+  margin: 0 auto 1.75rem;
+}
+
+.speedRow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.75rem;
+}
+
+/* The section's one highlight: primary border + hard shadow on the factor. */
+.speedFactor {
+  flex: 0 0 auto;
+  min-width: 16rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--ifm-background-surface-color);
+  border: 2px solid var(--ifm-color-primary);
+  box-shadow: 4px 4px 0 var(--ifm-color-primary);
+}
+
+.speedFactor strong {
+  display: block;
+  color: var(--ifm-color-primary);
+  font-size: 2.6rem;
+  line-height: 1.1;
+}
+
+.speedFactor > span {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--ifm-color-primary);
+  line-height: 1.3;
+}
+
+.speedFactor small {
+  display: block;
+  margin-top: 0.5rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.speedStats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3.5rem;
   flex-wrap: wrap;
 }
 
-.openSourceStats {
-  display: flex;
+.speedStat strong {
+  display: block;
+  color: var(--ifm-color-primary);
+  font-size: 1.45rem;
+  line-height: 1.2;
+}
+
+.speedStat span {
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.speedProof .textLink {
   justify-content: center;
-  align-items: center;
-  gap: 1rem;
+}
+
+.openSource {
+  padding: 5rem 0;
+  background: var(--ifm-background-color);
+  text-align: center;
+}
+
+.openSource h2 {
+  max-width: 850px;
+  margin-inline: auto;
+}
+
+.openSource > div > p:last-of-type {
+  max-width: 700px;
+  margin-inline: auto;
+}
+
+.initCommand {
+  max-width: 620px;
+  margin: 1.5rem auto 0;
+  text-align: left;
+}
+
+.initCommand :global(.theme-code-block) {
   margin: 0;
+  border: 2px solid var(--border);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--ifm-color-primary);
 }
 
-.openSourceStats img {
-  height: 28px;
+.initCommand :global(pre) {
+  padding-block: 0.9rem;
 }
 
-/* Responsive adjustments */
+@media screen and (max-width: 996px) {
+  .heroLayout {
+    grid-template-columns: 1fr;
+    max-width: 760px;
+    margin: 0 auto;
+    gap: 2.5rem;
+  }
+
+  .heroContent {
+    max-width: 680px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .heroActions > div,
+  .heroActions .heroSecondary {
+    justify-content: center;
+  }
+
+  .heroActions .heroSecondary {
+    margin-inline: auto;
+  }
+
+  .possibilityGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .compressionGrid {
+    grid-template-columns: 1fr;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  .compressionArrow {
+    min-height: 3.5rem;
+  }
+
+  .compressionArrow svg {
+    transform: rotate(90deg);
+  }
+}
+
 @media screen and (max-width: 768px) {
-  .buttons {
-    flex-direction: column;
-    width: 100%;
-    padding: 0 1rem;
+  .heroBanner {
+    padding: 2.5rem 0 3rem;
   }
 
-  .buttons .button {
-    width: 100%;
-    max-width: 280px;
-  }
-
-  .splitCards {
-    grid-template-columns: 1fr;
-  }
-
-  .thirdCategoryContent {
-    grid-template-columns: 1fr;
+  .heroLayout {
     gap: 2rem;
   }
 
-  .topologyPanels {
-    max-width: 100%;
+  .heroTitle {
+    font-size: 33px;
   }
 
-  .openSourceButtons {
-    flex-direction: column;
-    align-items: center;
+  /* Rail layout: a vertical spine links the stacked stops into the mesh bar. */
+  .heroJourney {
+    grid-template-columns: 2px 1fr;
+    grid-template-rows: auto auto;
+    gap: 1rem;
   }
 
-  .openSourceButtons .button {
-    width: 200px;
+  .heroJourney::before {
+    content: '';
+    grid-column: 1;
+    grid-row: 1;
+    background: var(--ifm-color-primary);
+  }
+
+  .journeyFlow {
+    grid-column: 2;
+    grid-row: 1;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .journeyStop::after {
+    top: 50%;
+    right: 100%;
+    left: auto;
+    width: calc(1rem + 2px);
+    height: 2px;
+    transform: translateY(-50%);
+  }
+
+  .journeyMesh {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .heroSummary {
+    font-size: 1rem;
+  }
+
+  .section {
+    padding: 4rem 0;
+  }
+
+  .sectionIntro h2,
+  .openSource h2 {
+    font-size: 22px;
+  }
+
+  .responsibilityGrid,
+  .fitGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .speedRow {
+    align-items: stretch;
+    max-width: 540px;
+    margin: 0 auto;
+  }
+
+  .speedProof .textLink {
+    justify-content: center;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .heroTitle {
+    font-size: 22px;
+  }
+
+  .heroArtifact {
+    padding: 1rem;
+  }
+
+  .possibilityGrid,
+  .platformLayerGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .possibilityCard,
+  .responsibilityPanel,
+  .responsibilityPrimary,
+  .fitPanel,
+  .limitsPanel,
+  .traditionalStack,
+  .goatSystem {
+    padding: 1.15rem;
+  }
+
+  .compressionFigure {
+    padding: 1rem;
+  }
+
+  .speedStats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .initCommand :global(code) {
+    font-size: 0.78rem;
   }
 }

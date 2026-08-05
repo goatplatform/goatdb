@@ -1,0 +1,144 @@
+.figure {
+  margin: 2rem 0;
+}
+
+.title {
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+/* Bare two-panel layout: caption + content | pixel arrow | caption + content.
+ * No wrapper chrome around the pair -- the panels carry the blocky styling. */
+.panels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.connector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.25rem;
+  color: var(--ifm-color-primary);
+}
+
+/* Blocky law: zero radius, 2px borders, hard offset shadow on the hero. */
+.panel,
+.panelHero {
+  padding: 1.25rem;
+  background: var(--ifm-background-surface-color);
+}
+
+.panel {
+  border: 2px solid var(--border);
+}
+
+/* Hero treatment mirrors StackCollapse .unified: primary stroke + hard offset
+ * shadow in the stroke color. */
+.panelHero {
+  border: 2px solid var(--ifm-color-primary);
+  box-shadow: 4px 4px 0 var(--ifm-color-primary);
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--border);
+}
+
+/* Pixel rendering law (see custom.css): 1-bit bitmap font, AA off so glyphs
+ * snap to the pixel grid. Weight pinned at 400 (single-weight font). */
+.panelCaption,
+.badge {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  font-size: 11px;
+  line-height: 1.3;
+  text-transform: uppercase;
+  -webkit-font-smoothing: none;
+  font-synthesis: none;
+}
+
+.panelCaption {
+  margin: 0;
+  color: var(--ifm-color-primary);
+}
+
+/* Badges = filled squares (blocky law). Complexity maps to the neutral
+ * emphasis scale; primary reserved for the GoatDB-side 'low'. */
+.badge {
+  flex: 0 0 auto;
+  padding: 4px 6px;
+}
+
+.badgeHigh {
+  background: var(--ifm-color-emphasis-900);
+  color: var(--ifm-background-color);
+}
+
+.badgeMedium {
+  background: var(--ifm-color-emphasis-700);
+  color: var(--ifm-background-color);
+}
+
+.badgeLow {
+  background: var(--ifm-color-primary);
+  color: var(--on-primary);
+}
+
+.items {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.items li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: start;
+  color: var(--ifm-color-emphasis-800);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+/* Square CSS bullets (blocky icon diet, mirrors StackCollapse .benefits). */
+.items li::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  margin-top: 0.35rem;
+  background: var(--ifm-color-primary);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media screen and (max-width: 768px) {
+  .panels {
+    grid-template-columns: 1fr;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  .connector svg {
+    transform: rotate(90deg);
+  }
+}

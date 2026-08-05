@@ -1,0 +1,106 @@
+/* Base & Branches: three-way merge from the LCA base. Blocky laws: 2px
+ * strokes, zero radius, semantic tokens only (auto-flip in dark). Primary
+ * marks what holds data (link arrows, merge fill); the commit tile itself
+ * is the shared CommitSquare component. */
+
+.figure {
+  max-width: 720px;
+  margin: 2rem auto;
+}
+
+/* 5 columns: base | link | leaves (2 rows) | link | merge. Tight centered
+ * composition: fixed equal gaps (3rem) between every column pair so the
+ * connector rhythm reads like the commit-graph rail -- NOT stretched
+ * edge-to-edge (tiny arrows float in voids) and NOT 1fr-centered blobs. */
+.grid {
+  display: grid;
+  grid-template-columns: auto auto auto auto auto;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem 3rem;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.leaves {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.leaf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* Identity icon (who) sits beside the commit (what), both small. */
+.leafRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* One arrow per leaf row; rows mirror .leaves so edges align structurally. */
+.linkCol {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--ifm-color-primary);
+}
+
+.linkArrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: var(--ifm-color-emphasis-700);
+  text-align: center;
+}
+
+.figureCaption {
+  margin-top: 1.25rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+@media screen and (max-width: 768px) {
+  /* Single centered column: base -> arrow -> v4a -> v4b -> arrow -> merge.
+   * The link columns keep one (rotated) arrow each; the second is dropped
+   * because the two leaf rows collapse into one stack. */
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  .linkCol {
+    grid-template-rows: none;
+    justify-items: center;
+  }
+
+  .linkArrow:last-child {
+    display: none;
+  }
+
+  .linkArrow svg {
+    transform: rotate(90deg);
+  }
+}

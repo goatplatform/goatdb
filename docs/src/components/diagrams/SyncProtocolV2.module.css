@@ -1,0 +1,246 @@
+/* The Server Shrinks: centralized scale-up vs GoatDB P2P + anchor server.
+ * Blocky laws: 2px --border strokes, no radius/fills beyond tokens, primary
+ * marks only what carries data or connects (peer squares, fan arrows, link
+ * slots, connector). */
+
+.figure {
+  max-width: 720px;
+  margin: 2rem auto;
+}
+
+.lanes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* margin-top: 0 beats Infima's '.markdown li + li' rule (specificity
+ * 0,2,0 > 0,1,2) so both lanes stay pixel-aligned at the top. */
+.lanes > .laneCell {
+  display: flex;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.lanes > .connector {
+  margin-top: 0;
+}
+
+.connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0 0.25rem;
+  color: var(--ifm-color-primary);
+}
+
+/* Bare column: layout only. Inner boxes carry the blocky styling; a
+ * container around them would be redundant box-in-box. */
+.lane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+/* Pixel rendering law (see custom.css): 1-bit bitmap font, AA off so glyphs
+ * snap to the pixel grid. Weight pinned at 400 (single-weight font). */
+.laneCaption,
+.connectorLabel {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  -webkit-font-smoothing: none;
+  font-synthesis: none;
+  text-transform: uppercase;
+}
+
+.laneCaption {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.25rem;
+  color: var(--ifm-color-primary);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.connectorLabel {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.serverBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--ifm-background-surface-color);
+  border: 2px solid var(--border);
+}
+
+/* Centralized: three stacked strips = one machine scaled up (tall box).
+ * Outlined strips, no fill; icons neutral emphasis. */
+.stackStrips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.hStrip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  border: 2px solid var(--border);
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* GoatDB server identity: the anchor is ONE PARTICIPANT in the mesh, not
+ * a hub -- so it wears the same tile as the clients (primary square + hard
+ * offset shadow, device icon + own replica) to make the symmetry literal. */
+.serverNode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  width: 64px;
+  aspect-ratio: 1;
+  background: var(--ifm-background-surface-color);
+  border: 2px solid var(--ifm-color-primary);
+  box-shadow: 4px 4px 0 var(--ifm-color-primary);
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* ...while its properties (authn/authz/uptime badges + tag) hang below in
+ * one small row -- subordinate to the node, never level with it. */
+.roleRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  color: var(--ifm-color-emphasis-700);
+}
+
+.boxTag,
+.laneNote {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* Scale + crash note: two plain mono lines, identical structure on both
+ * lanes (left: peak-provisioned / outage; right: commodity / rebuilt). */
+.laneNote {
+  text-align: center;
+}
+
+/* GoatDB lane: a single server link into the peer mesh. Replaces the
+ * three-arrow fan (the server is one participant, not a hub) and de-clutters
+ * the lane. */
+.singleLink {
+  display: flex;
+  justify-content: center;
+  color: var(--ifm-color-primary);
+}
+
+/* 5-slot grid: device | link slot | device | link slot | device. Same grid
+ * both lanes; only GoatDB fills the slots (peers sync directly). */
+.deviceRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  /* Fan arrows + link slots inherit primary (connectors law). */
+  color: var(--ifm-color-primary);
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.linkSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  /* Empty slot on the left lane still reserves its footprint. */
+  min-height: 14px;
+}
+
+/* Neutral empty square = terminal that holds nothing. */
+.clientSquare {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--ifm-background-surface-color);
+  border: 2px solid var(--border);
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* Primary stroke = holds data (device + full local replica inside).
+ * Hard offset shadow in the stroke color: only colored tiles get one. */
+.peerSquare {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--ifm-background-surface-color);
+  border: 2px solid var(--ifm-color-primary);
+  box-shadow: 4px 4px 0 var(--ifm-color-primary);
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* Footer pinned to the column bottom so both lanes align. */
+.laneFooter {
+  margin: auto 0 0;
+  padding-top: 0.5rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.figureCaption {
+  margin-top: 1.25rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+@media screen and (max-width: 768px) {
+  .lanes {
+    grid-template-columns: 1fr;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  .connector svg {
+    transform: rotate(90deg);
+  }
+}

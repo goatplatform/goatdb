@@ -1,0 +1,117 @@
+/* Sessions act 1: the identity roster. Blocky laws: 2px strokes, zero
+ * radius, semantic tokens only; primary marks the public key fragment --
+ * the data that IS the identity. */
+
+.figure {
+  max-width: 560px;
+  margin: 2rem auto;
+}
+
+.context {
+  margin: 0 0 0.75rem;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* Two session forms: same geometry, mirror symmetry -- both are the same
+ * keypair mechanism, differing only in what they bind. */
+.roster {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* margin-top: 0 beats Infima's '.markdown li + li' rule so the roster and
+ * mechanics rows stay evenly spaced. */
+.roster > li,
+.mechanics > li {
+  margin-top: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  background: var(--ifm-background-surface-color);
+  border: 2px solid var(--border);
+}
+
+.identityRow {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* Pixel rendering law (see custom.css): 1-bit bitmap font, AA off so glyphs
+ * snap to the pixel grid. Weight pinned at 400 (single-weight font). */
+.cardLabel {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  -webkit-font-smoothing: none;
+  font-synthesis: none;
+  text-transform: uppercase;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--ifm-color-primary);
+}
+
+.mono,
+.monoKey {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.mono {
+  color: var(--ifm-color-emphasis-900);
+}
+
+.monoKey {
+  color: var(--ifm-color-primary);
+}
+
+/* fit-content + auto margins: the strip centers as one block against the
+ * centered context line and figcaption, while rows keep a shared left
+ * edge so the icons stay vertically aligned. */
+.mechanics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: fit-content;
+  margin: 0.75rem auto 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mechRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--ifm-color-emphasis-700);
+}
+
+.mechRow svg {
+  flex-shrink: 0;
+}
+
+.figureCaption {
+  margin-top: 1.25rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+@media screen and (max-width: 480px) {
+  /* Labels barely fit at 390px; tighter padding keeps the mirror pair
+   * side by side instead of overflowing. */
+  .card {
+    padding: 0.5rem;
+  }
+}

@@ -1,0 +1,38 @@
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.9rem;
+  margin-top: 1.75rem;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  gap: 0.45rem;
+  /* 24px icon + 16px padding + 4px border; wrapping may grow it. */
+  min-height: 44px;
+  line-height: 24px;
+}
+
+.button svg {
+  flex: 0 0 auto;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 3px;
+}
+
+@media screen and (max-width: 480px) {
+  .buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .button {
+    width: min(100%, 380px);
+  }
+}

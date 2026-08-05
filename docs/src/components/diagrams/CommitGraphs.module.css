@@ -1,0 +1,79 @@
+/* CommitGraphs: the log re-threaded by key -- one commit-graph spine per
+ * item inside a repository frame. Blocky laws: 2px strokes, zero radius,
+ * semantic tokens only (auto-flip in dark). Primary marks data (spine
+ * edges, commit tiles, key chips); the frame is the muted --border
+ * boundary. Commit tile = shared CommitSquare component. */
+
+.figure {
+  max-width: 720px;
+  margin: 2rem auto;
+}
+
+/* Hero boundary: the repository holding all per-item graphs. */
+.frame {
+  position: relative;
+  width: fit-content;
+  margin-inline: auto;
+  border: 2px solid var(--border);
+  padding: 1.5rem 2rem;
+}
+
+/* Repo tab straddling the frame's top edge (legend style). Paths are
+ * case-sensitive data: mono, not the uppercase-only pixel font. */
+.frameLabel {
+  position: absolute;
+  top: -0.6rem;
+  left: 1rem;
+  padding: 0 0.4rem;
+  background: var(--ifm-background-color);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ifm-color-emphasis-900);
+}
+
+/* Three independent graphs side by side, tops aligned; unequal lengths
+ * show independent, parallel evolution. */
+.graphs {
+  display: flex;
+  align-items: flex-start;
+  gap: 2.5rem;
+}
+
+.graph {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.key {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ifm-color-primary);
+  margin-bottom: 1rem;
+}
+
+.edge {
+  width: 2px;
+  height: 12px;
+  background: var(--ifm-color-primary);
+}
+
+.figureCaption {
+  margin-top: 1.25rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+@media screen and (max-width: 480px) {
+  .frame {
+    padding: 1.25rem 1.25rem;
+  }
+
+  .graphs {
+    gap: 1.5rem;
+  }
+}

@@ -1,0 +1,109 @@
+.figure {
+  max-width: 720px;
+  margin: 2rem auto;
+}
+
+/* Bare list (no-nested-containers law): rows carry their own hairline rules,
+ * a wrapping box would be redundant chrome. */
+.layers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Full-width register line: identity | description | data. Spreading all
+ * three zones edge to edge keeps the figure balanced (no dead right zone). */
+.row {
+  display: grid;
+  grid-template-columns: minmax(230px, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-top: 2px solid var(--border);
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+/* Neutral icon color (user law: icons neutral, only badges get primary). */
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* Pixel rendering law (see custom.css): 1-bit bitmap font, AA off so glyphs
+ * snap to the pixel grid. Weight pinned at 400 (single-weight font).
+ * Headings/badges only -- never body text. */
+.heading,
+.badge {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  font-size: 11px;
+  -webkit-font-smoothing: none;
+  font-synthesis: none;
+}
+
+.heading {
+  margin: 0;
+  color: var(--ifm-color-emphasis-900);
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+/* Ordering badge: OPT for the optional layer, 1-5 for stack depth. Primary
+ * fill because the sequence is the diagram's point (mirrors StackCollapse). */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  background: var(--ifm-color-primary);
+  color: var(--on-primary);
+  line-height: 1;
+}
+
+.desc {
+  color: var(--ifm-color-emphasis-800);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Register entry pinned to the right edge of the row. */
+.data {
+  color: var(--ifm-color-emphasis-700);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.figureCaption {
+  margin-top: 1.25rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+/* Mobile: center the stacked row content -- left-aligned short lines next
+ * to full-width hairlines read as left-leaning (mirrors StackCollapse's
+ * centered frames and the centered figure caption). */
+@media screen and (max-width: 768px) {
+  .row {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 0.25rem;
+    padding: 0.75rem 0;
+  }
+
+  .data {
+    text-align: center;
+  }
+}

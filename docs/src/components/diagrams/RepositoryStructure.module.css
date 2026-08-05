@@ -1,0 +1,90 @@
+/* RepositoryStructure: one .goat file = one continuous commit spine inside
+ * a file frame. Blocky laws: 2px strokes, zero radius, semantic tokens only
+ * (auto-flip in dark). Primary marks data (spine edges, commit tiles, key
+ * chips); the frame is the muted --border boundary. Commit tile = shared
+ * CommitSquare component. */
+
+.figure {
+  max-width: 720px;
+  margin: 2rem auto;
+}
+
+/* Hero boundary: the file itself. fit-content + auto margins center it
+ * against the figcaption. */
+.frame {
+  position: relative;
+  width: fit-content;
+  margin-inline: auto;
+  border: 2px solid var(--border);
+  padding: 1.25rem 1.5rem;
+}
+
+/* File tab straddling the frame's top edge (legend style). Pixel rendering
+ * law (see custom.css): 1-bit bitmap font, AA off, weight pinned at 400. */
+.frameLabel {
+  position: absolute;
+  top: -0.55rem;
+  left: 1rem;
+  padding: 0 0.4rem;
+  background: var(--ifm-background-color);
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  -webkit-font-smoothing: none;
+  font-synthesis: none;
+  text-transform: uppercase;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--ifm-color-emphasis-900);
+}
+
+.spine {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.spine > li {
+  margin-top: 0;
+}
+
+/* The atomic-log glyph: a 2px primary segment connecting every commit to
+ * the previous one, centered under the 36px tile (18px - 1px). */
+.edge {
+  display: block;
+  width: 2px;
+  height: 12px;
+  margin-left: 17px;
+  background: var(--ifm-color-primary);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.key {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ifm-color-primary);
+}
+
+/* Open end: the spine continues past the newest commit into a bare arrow --
+ * the log only ever grows at the end. Icon centered under the tile
+ * (18px - 9px). */
+.openEnd {
+  color: var(--ifm-color-primary);
+}
+
+.openEnd > svg {
+  display: block;
+  margin-left: 9px;
+}
+
+.figureCaption {
+  margin-top: 1.25rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: center;
+}

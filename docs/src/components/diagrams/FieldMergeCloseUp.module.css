@@ -1,0 +1,184 @@
+/* Field Merge Close-Up v2 "Strategy Matrix": a 4-row ledger teaching the
+ * field-level merge strategies (last change wins / union / key merge /
+ * merged) -- the graph-level story lives in MergeBaseBranches.
+ * Blocky laws: 2px --border strokes, zero radius, no shadows; primary marks
+ * only the merged column (the hero outcome); icons stay neutral. */
+
+.figure {
+  max-width: 720px;
+  margin: 2rem auto;
+}
+
+/* Header and rows share one column template so captions align over data.
+ * The arrow column is fixed 32px so every arrow sits at the same x. */
+.header,
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.6fr) 32px minmax(0, 1.5fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.header {
+  padding-bottom: 0.5rem;
+}
+
+/* Row separators are the only chrome (no cards -- no nested containers
+ * law). Every row's top border also underlines the header. */
+.row {
+  padding: 0.65rem 0;
+  border-top: 2px solid var(--border);
+}
+
+/* Pixel rendering law (see custom.css): 1-bit bitmap font, AA off so glyphs
+ * snap to the pixel grid. Weight pinned at 400 (single-weight font).
+ * Pixel font = headings/labels only. */
+.caption,
+.strategyBadge {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  -webkit-font-smoothing: none;
+  font-synthesis: none;
+  font-size: 11px;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.caption {
+  color: var(--ifm-color-primary);
+}
+
+/* Field cell: square bullet (the property marker, mirrors v1 field rows) +
+ * mono "name · type". Neutral -- it is an input, not the outcome. */
+.fieldCell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: var(--ifm-color-emphasis-700);
+}
+
+.fieldCell::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  background: var(--ifm-color-primary);
+}
+
+/* The two concurrent signed edits, human above agent. Icons neutral (only
+ * badges get primary). Author word labels -- icons alone don't read as
+ * identities. */
+.editsCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.editLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: var(--ifm-color-emphasis-700);
+}
+
+.editAuthor {
+  color: var(--ifm-color-emphasis-600);
+}
+
+.editOp {
+  color: var(--ifm-color-emphasis-800);
+}
+
+/* The losing edit (last change wins): struck + dimmed so the resolution is
+ * visible on the input side. */
+.editOpStruck {
+  color: var(--ifm-color-emphasis-500);
+  text-decoration: line-through;
+}
+
+.arrowCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ifm-color-primary);
+}
+
+/* Merged cell = the hero: fixed 2-line stack (value + survivors, then the
+ * strategy badge) mirroring the 2-line edits cell. Value in primary, badge
+ * filled primary (the merge result the system produces). */
+.mergedCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.mergedLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.mergedValue {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: var(--ifm-color-primary);
+}
+
+/* Provenance icons trailing the value: who survived the merge (winner only
+ * for LCW, both for union/key merge/merged). Neutral -- primary belongs to
+ * the data. */
+.survivors {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--ifm-color-emphasis-700);
+}
+
+.strategyBadge {
+  flex: 0 0 auto;
+  padding: 4px 6px;
+  background: var(--ifm-color-primary);
+  color: var(--on-primary);
+}
+
+.figureCaption {
+  margin-top: 1.25rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+@media screen and (max-width: 768px) {
+  .figure {
+    max-width: 420px;
+  }
+
+  /* Columns collapse, so the column captions would lie -- hide them. */
+  .header {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: 1fr;
+    justify-items: start;
+    gap: 0.5rem;
+    padding: 0.85rem 0;
+  }
+
+  .arrowCell svg {
+    transform: rotate(90deg);
+  }
+}

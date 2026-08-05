@@ -1,406 +1,153 @@
 import React from 'react';
 import Diagram from '../Diagram';
+import styles from './CommitGraphIllustration.module.css';
 
+// Timeline Rail: one item's history on a single horizontal baseline --
+// linear single-writer chain (v1-v3), then a concurrent branch (v4a/v4b)
+// that converges into an automatic merge (v5) and continues (v6).
+// All edges are orthogonal right-angle paths (diagonals banned). Identity
+// icons sit on the branch nodes, replacing the old swatch legend. Merge
+// node = filled primary square (primary = the GoatDB element).
 export default function CommitGraphIllustration() {
   return (
     <Diagram>
       <svg
         width='720'
-        height='480'
-        viewBox='0 0 720 480'
+        height='264'
+        viewBox='0 0 720 264'
         xmlns='http://www.w3.org/2000/svg'
+        className={styles.rail}
       >
         <defs>
-          <style>
-            {`
-            .repo-box { 
-              fill: var(--ifm-color-emphasis-100); 
-              stroke: var(--ifm-color-primary); 
-              stroke-width: 2.5; 
-            }
-            [data-theme='dark'] .repo-box { 
-              fill: var(--ifm-background-surface-color); 
-              stroke: var(--ifm-color-primary-light);
-            }
-            .item-box { 
-              fill: var(--ifm-background-color); 
-              stroke: var(--ifm-color-emphasis-400); 
-              stroke-width: 1.5; 
-            }
-            [data-theme='dark'] .item-box { 
-              fill: var(--ifm-color-emphasis-100); 
-              stroke: var(--ifm-color-emphasis-500);
-            }
-            .commit-node {
-              fill: var(--ifm-color-primary-lighter);
-              stroke: var(--ifm-color-primary-dark);
-              stroke-width: 2;
-            }
-            [data-theme='dark'] .commit-node {
-              fill: var(--ifm-color-primary-darkest);
-              stroke: var(--ifm-color-primary);
-            }
-            .commit-edge {
-              stroke: var(--ifm-color-primary);
-              stroke-width: 1.5;
-              fill: none;
-              marker-end: url(#arrowhead2);
-            }
-            .merge-node {
-              fill: var(--ifm-color-warning-lighter);
-              stroke: var(--ifm-color-warning-dark);
-              stroke-width: 2;
-            }
-            [data-theme='dark'] .merge-node {
-              fill: var(--ifm-color-warning-darkest);
-              stroke: var(--ifm-color-warning);
-            }
-            .text-heading { 
-              font-size: 15px; 
-              font-weight: 600; 
-              fill: var(--ifm-font-color-base); 
-            }
-            .text-body { 
-              font-size: 13px; 
-              fill: var(--ifm-font-color-base); 
-              opacity: 0.9;
-            }
-            .text-label { 
-              font-size: 11px; 
-              fill: var(--ifm-font-color-base); 
-              opacity: 0.8;
-            }
-            .text-icon-small { font-size: 18px; }
-            .bg-section { 
-              fill: var(--ifm-color-emphasis-100); 
-              stroke: var(--ifm-color-emphasis-300); 
-              stroke-width: 1.5; 
-              stroke-dasharray: 6 3; 
-            }
-            [data-theme='dark'] .bg-section { 
-              fill: var(--ifm-background-surface-color); 
-              opacity: 0.5;
-            }
-            .caption-box {
-              fill: var(--ifm-color-emphasis-100);
-              stroke: var(--ifm-color-emphasis-300);
-              stroke-width: 1;
-            }
-            [data-theme='dark'] .caption-box {
-              fill: var(--ifm-background-surface-color);
-              stroke: var(--ifm-color-emphasis-400);
-            }
-            .user-label {
-              fill: var(--ifm-color-primary-lighter);
-              stroke: none;
-              opacity: 0.8;
-            }
-            [data-theme='dark'] .user-label {
-              fill: var(--ifm-color-primary-darkest);
-              opacity: 0.6;
-            }
-            .user-b {
-              fill: var(--ifm-color-success-lighter);
-            }
-            [data-theme='dark'] .user-b {
-              fill: var(--ifm-color-success-darkest);
-            }
-          `}
-          </style>
           <marker
-            id='arrowhead2'
+            id='cgi-arrow'
             markerWidth='8'
             markerHeight='6'
             refX='7'
             refY='3'
             orient='auto'
           >
-            <polygon points='0 0, 8 3, 0 6' fill='var(--ifm-color-primary)' />
+            <polygon
+              points='0 0, 8 3, 0 6'
+              fill='var(--ifm-color-primary)'
+            />
           </marker>
         </defs>
 
-        <g transform='translate(0, 0)'>
-          <rect width='720' height='480' rx='8' ry='8' className='bg-section' />
+        <text x='30' y='28' className={styles.heading}>
+          Commit Graph Evolution
+        </text>
+        <text x='30' y='46' className={styles.mono}>
+          /data/docs/team-roadmap
+        </text>
 
-          {/* Repository Container */}
-          <g transform='translate(30, 30)'>
-            <rect
-              x='0'
-              y='0'
-              width='660'
-              height='350'
-              rx='4'
-              ry='4'
-              className='repo-box'
-            />
-            <text x='20' y='30' className='text-icon-small'>📂</text>
-            <text x='45' y='30' className='text-heading'>
-              Commit Graph Evolution
-            </text>
+        {/* Zone captions above the rail */}
+        <text
+          x='170'
+          y='96'
+          textAnchor='middle'
+          className={styles.captionLabel}
+        >
+          Single Writer
+        </text>
+        <text
+          x='518'
+          y='96'
+          textAnchor='middle'
+          className={styles.captionLabel}
+        >
+          Concurrent Writers
+        </text>
 
-            {/* Single item showing the evolution */}
-            <g transform='translate(20, 52)'>
-              <rect
-                x='0'
-                y='0'
-                width='620'
-                height='274'
-                rx='2'
-                ry='2'
-                className='item-box'
-              />
-              <text x='15' y='25' className='text-body'>
-                /data/docs/team-roadmap
-              </text>
+        {/* Balance law: EVERY horizontal edge segment is exactly 64px with
+            a 2px gap at each node, and the split/converge paths are mirror
+            images around the branch column (x=402). */}
+        <path d='M96 164 H160' className={styles.edge} />
+        <path d='M180 164 H244' className={styles.edge} />
 
-              {/* Phase 1: Linear commits by User A */}
-              <g transform='translate(40, 30)'>
-                <text x='0' y='20' className='text-body' fontWeight='600'>
-                  Phase 1: Single User
-                </text>
-                <text x='480' y='0' className='text-label'>
-                  10:00 - 10:30 AM
-                </text>
+        {/* Right-angle split from v3 up/down to the two branch rows.
+            Trunk segment is drawn twice (same stroke, full overlap). */}
+        <path d='M264 164 H328 V110 H392' className={styles.edge} />
+        <path d='M264 164 H328 V218 H392' className={styles.edge} />
 
-                <rect
-                  x='-10'
-                  y='50'
-                  width='50'
-                  height='20'
-                  className='user-label'
-                  rx='10'
-                />
-                <text x='16' y='64' className='text-label' textAnchor='middle'>
-                  User A
-                </text>
+        {/* Right-angle convergence from both branches into the merge node */}
+        <path d='M412 110 H476 V164 H540' className={styles.edge} />
+        <path d='M412 218 H476 V164 H540' className={styles.edge} />
 
-                {/* Commit chain */}
-                <g transform='translate(0, 60)'>
-                  <text
-                    x='160'
-                    y='-15'
-                    className='text-body'
-                    textAnchor='middle'
-                  >
-                    Create doc → Add Q1 goals → Update timeline
-                  </text>
+        {/* Baseline continues after the merge */}
+        <path d='M560 164 H624' className={styles.edge} />
 
-                  <circle cx='60' cy='0' r='8' className='commit-node' />
-                  <text
-                    x='60'
-                    y='20'
-                    className='text-label'
-                    textAnchor='middle'
-                  >
-                    v1
-                  </text>
+        {/* Baseline nodes */}
+        <rect x='78' y='156' width='16' height='16' className={styles.node} />
+        <text x='86' y='186' textAnchor='middle' className={styles.nodeLabel}>
+          v1
+        </text>
 
-                  <line
-                    x1='68'
-                    y1='0'
-                    x2='152'
-                    y2='0'
-                    className='commit-edge'
-                  />
+        <rect x='162' y='156' width='16' height='16' className={styles.node} />
+        <text x='170' y='186' textAnchor='middle' className={styles.nodeLabel}>
+          v2
+        </text>
 
-                  <circle cx='160' cy='0' r='8' className='commit-node' />
-                  <text
-                    x='160'
-                    y='20'
-                    className='text-label'
-                    textAnchor='middle'
-                  >
-                    v2
-                  </text>
+        <rect x='246' y='156' width='16' height='16' className={styles.node} />
+        <text x='254' y='186' textAnchor='middle' className={styles.nodeLabel}>
+          v3
+        </text>
+        <text x='254' y='198' textAnchor='middle' className={styles.nodeLabel}>
+          base
+        </text>
 
-                  <line
-                    x1='168'
-                    y1='0'
-                    x2='252'
-                    y2='0'
-                    className='commit-edge'
-                  />
-
-                  <circle cx='260' cy='0' r='8' className='commit-node' />
-                  <text
-                    x='260'
-                    y='20'
-                    className='text-label'
-                    textAnchor='middle'
-                  >
-                    v3
-                  </text>
-                </g>
-              </g>
-
-              {/* Phase 2: Branching occurs */}
-              <g transform='translate(40, 150)'>
-                <text x='0' y='-4' className='text-body' fontWeight='600'>
-                  Phase 2: Concurrent Editing
-                </text>
-                <text x='480' y='0' className='text-label'>
-                  10:45 - 11:15 AM
-                </text>
-
-                {/* User labels */}
-                <rect
-                  x='90'
-                  y='15'
-                  width='50'
-                  height='20'
-                  className='user-label'
-                  rx='10'
-                />
-                <text x='116' y='28' className='text-label' textAnchor='middle'>
-                  User A
-                </text>
-
-                <rect
-                  x='90'
-                  y='85'
-                  width='50'
-                  height='20'
-                  className='user-label user-b'
-                  rx='10'
-                />
-                <text x='116' y='98' className='text-label' textAnchor='middle'>
-                  User B
-                </text>
-
-                {/* Branching commit graph */}
-                <g transform='translate(0, 60)'>
-                  {/* Base commit */}
-                  <circle cx='60' cy='0' r='8' className='commit-node' />
-                  <text
-                    x='60'
-                    y='20'
-                    className='text-label'
-                    textAnchor='middle'
-                  >
-                    v3
-                  </text>
-
-                  {/* Branch to User A */}
-                  <line
-                    x1='68'
-                    y1='-4'
-                    x2='192'
-                    y2='-40'
-                    className='commit-edge'
-                  />
-                  <circle cx='200' cy='-40' r='8' className='commit-node' />
-                  <text
-                    x='200'
-                    y='-55'
-                    className='text-label'
-                    textAnchor='middle'
-                  >
-                    v4a
-                  </text>
-                  <text x='235' y='-37' className='text-label'>
-                    Add Q2 goals
-                  </text>
-
-                  {/* Branch to User B */}
-                  <line
-                    x1='68'
-                    y1='4'
-                    x2='192'
-                    y2='40'
-                    className='commit-edge'
-                  />
-                  <circle cx='200' cy='40' r='8' className='commit-node' />
-                  <text
-                    x='200'
-                    y='60'
-                    className='text-label'
-                    textAnchor='middle'
-                  >
-                    v4b
-                  </text>
-                  <text x='235' y='43' className='text-label'>
-                    Update budget
-                  </text>
-
-                  {/* Merge */}
-                  <line
-                    x1='208'
-                    y1='-40'
-                    x2='332'
-                    y2='0'
-                    className='commit-edge'
-                  />
-                  <line
-                    x1='208'
-                    y1='40'
-                    x2='332'
-                    y2='0'
-                    className='commit-edge'
-                  />
-
-                  <text x='300' y='-15' className='text-body'>
-                    Automatic merge
-                  </text>
-
-                  <circle cx='340' cy='0' r='8' className='merge-node' />
-                  <text
-                    x='340'
-                    y='20'
-                    className='text-label'
-                    textAnchor='middle'
-                  >
-                    v5
-                  </text>
-
-                  {/* Continue after merge */}
-                  <line
-                    x1='348'
-                    y1='0'
-                    x2='432'
-                    y2='0'
-                    className='commit-edge'
-                  />
-                  <circle cx='440' cy='0' r='8' className='commit-node' />
-                  <text
-                    x='440'
-                    y='20'
-                    className='text-label'
-                    textAnchor='middle'
-                  >
-                    v6
-                  </text>
-                  <text x='460' y='4' className='text-label'>Fix typos</text>
-                </g>
-              </g>
-            </g>
-          </g>
-
-          {/* Caption */}
-          <g transform='translate(30, 400)'>
-            <rect
-              x='0'
-              y='0'
-              width='660'
-              height='60'
-              rx='4'
-              ry='4'
-              className='caption-box'
-            />
-            <text x='20' y='25' className='text-icon-small'>🔄</text>
-            <text x='45' y='25' className='text-body'>
-              <tspan fontWeight='600' fill='var(--ifm-color-primary-darker)'>
-                Real-time Collaboration:
-              </tspan>
-              <tspan dx='5'>
-                When users edit concurrently, GoatDB creates branches and merges
-              </tspan>
-            </text>
-            <text x='45' y='45' className='text-body'>
-              automatically • Each commit is cryptographically signed •
-              Conflicts resolved at field level
-            </text>
-          </g>
+        {/* Upper branch: human writer (UserSharp glyph) edits `title` */}
+        <g
+          transform='translate(395,82) scale(0.5833)'
+          className={styles.branchIcon}
+        >
+          <path d='M7 2h10v2H7zm0 8h10v2H7zm8-6h2v6h-2zM7 4h2v6H7zM4 14h2v8H4zm14 0h2v8h-2zM6 14h12v2H6z' />
         </g>
+        <rect x='394' y='102' width='16' height='16' className={styles.node} />
+        <text x='402' y='132' textAnchor='middle' className={styles.nodeLabel}>
+          v4a
+        </text>
+        <text x='402' y='144' textAnchor='middle' className={styles.nodeLabel}>
+          title
+        </text>
+
+        {/* Lower branch: agent writer (AiUserCircle glyph) edits `status` */}
+        <g
+          transform='translate(395,190) scale(0.5833)'
+          className={styles.branchIcon}
+        >
+          <path d='M6 2h8v2H6zm0 18h12v2H6zM4 4h2v2H4zM2 6h2v12H2zm20 4h-2v8h2zM4 18h2v2H4zm16 0h-2v2h2zM10 6h4v2h-4zM8 8h2v4H8zm2 4h4v2h-4zm4-4h2v4h-2zm-8 8h12v2H6zM18 2h2v2h-2zm-2 2h2v2h-2zm2 2h2v2h-2zm2-2h2v2h-2z' />
+        </g>
+        <rect x='394' y='210' width='16' height='16' className={styles.node} />
+        <text x='402' y='240' textAnchor='middle' className={styles.nodeLabel}>
+          v4b
+        </text>
+        <text x='402' y='252' textAnchor='middle' className={styles.nodeLabel}>
+          status
+        </text>
+
+        {/* Automatic merge: filled primary square */}
+        <rect
+          x='542'
+          y='156'
+          width='16'
+          height='16'
+          className={styles.nodeMerge}
+        />
+        <text x='550' y='186' textAnchor='middle' className={styles.nodeLabel}>
+          v5
+        </text>
+        <text x='550' y='198' textAnchor='middle' className={styles.nodeLabel}>
+          merge
+        </text>
+
+        <rect x='626' y='156' width='16' height='16' className={styles.node} />
+        <text x='634' y='186' textAnchor='middle' className={styles.nodeLabel}>
+          v6
+        </text>
+        <text x='634' y='198' textAnchor='middle' className={styles.nodeLabel}>
+          fix typos
+        </text>
       </svg>
     </Diagram>
   );
