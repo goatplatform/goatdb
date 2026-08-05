@@ -627,7 +627,7 @@ function FitEvidence() {
       <div className='container'>
         <SectionIntro
           eyebrow='Measured speed'
-          title='One loader. Then nothing ever loads.'
+          title='One loader. Then nothing ever loads'
           text="Apps where nothing ever spins are usually out of reach—they take an architecture most teams can't afford to build. GoatDB makes it the default: each repository loads once, the way a desktop app opens a document, and from then on every read, write, and screen update runs at memory speed—the same in the browser as on the server. No per-interaction spinners, no optimistic-state machinery, no cache tier to maintain."
         />
         <SpeedProof />
