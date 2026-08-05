@@ -5,14 +5,15 @@ sidebar_position: 5
 slug: /authorization
 ---
 
-
 # Authorization
 
 Authorization rules in GoatDB provide a flexible way to control access to your
 data. They work in conjunction with GoatDB's
 [session-based authentication system](/docs/sessions) to define who can read and
-write to specific [repositories](/docs/repositories) or items within repositories.
-For details about how sessions and authentication work, see
+write to specific [repositories](/docs/repositories) or items within
+repositories. Because rules run on the session, they are also how you scope what
+an agent session may write — which paths it can touch, and which operations it
+can perform. For details about how sessions and authentication work, see
 [Sessions and Users](/docs/sessions) and [Concepts](/docs/concepts).
 
 import AuthorizationFlow from '@site/src/components/diagrams/AuthorizationFlow';
@@ -23,9 +24,11 @@ import AuthorizationFlow from '@site/src/components/diagrams/AuthorizationFlow';
 
 Authorization rules are registered with the
 [DataRegistry](/docs/concepts#the-data-registry) and are evaluated whenever a
-[read or write operation](/docs/read-write-data) is attempted. Each rule consists of:
+[read or write operation](/docs/read-write-data) is attempted. Each rule
+consists of:
 
-1. A path pattern (string or RegExp) that matches [repositories](/docs/repositories)
+1. A path pattern (string or RegExp) that matches
+   [repositories](/docs/repositories)
 2. A rule function that determines if the operation is allowed
 
 Authorization rules are executed very frequently—on every read and write
@@ -39,8 +42,8 @@ operation. However, since GoatDB operates as an
 
 ## Granularity
 
-Authorization rules apply at the individual [item](/docs/concepts#item) level and
-affect:
+Authorization rules apply at the individual [item](/docs/concepts#item) level
+and affect:
 
 - The item's current state
 - Its entire [commit history](/docs/commit-graph)
@@ -52,8 +55,8 @@ This means:
 - Access to an item includes access to its full [history](/docs/commit-graph)
 - Rules cannot selectively allow access to specific versions
 - Historical data inherits the same access controls as current data
-- The entire [commit graph](/docs/commit-graph) for an item is subject to the same
-  rules
+- The entire [commit graph](/docs/commit-graph) for an item is subject to the
+  same rules
 
 ## Basic Concepts
 
@@ -71,18 +74,19 @@ The rule function receives an `AuthRuleInfo` object containing:
 - `db`: The GoatDB instance
 - `repoPath`: Path to the [repository](/docs/repositories) being accessed
 - `itemKey`: Key of the [item](/docs/concepts#item) being accessed
-- `session`: Current [user session](/docs/sessions) (contains public key and owner)
+- `session`: Current [user session](/docs/sessions) (contains public key and
+  owner)
 - `op`: Type of operation (`read` or `write`)
 
 ## Creating Authorization Rules
 
 Authorization rules are created by registering a path pattern and a rule
-function with the [DataRegistry](/docs/concepts#the-data-registry). The rule function
-receives an `AuthRuleInfo` object containing the database instance, repository
-path, item key, session, and operation type. Here's an example:
+function with the [DataRegistry](/docs/concepts#the-data-registry). The rule
+function receives an `AuthRuleInfo` object containing the database instance,
+repository path, item key, session, and operation type. Here's an example:
 
 ```typescript
-import { DataRegistry } from '@goatdb/goatdb';
+import { DataRegistry, itemPathGetPart } from '@goatdb/goatdb';
 
 // This rule allows users to access only their own repository at /user/<user-id>
 DataRegistry.default.registerAuthRule(
@@ -124,6 +128,9 @@ GoatDB includes several built-in rules:
    ```
 
 2. **Use Specific Paths**
+
+   `registerAuthRule` treats a string `path` as an **exact repository path** (matched via `Repository.normalizePath(rulePath) === repoId`). To match a pattern of paths, use a **RegExp** instead.
+
    ```typescript
    // Specific path protection example
    // This rule protects a specific private API endpoint
@@ -137,7 +144,7 @@ GoatDB includes several built-in rules:
    ```typescript
    // Public read access with write restrictions
    DataRegistry.default.registerAuthRule(
-     '/public/*',
+     /^\/public\//,
      ({ op }) => op === 'read',
    );
    ```
@@ -147,7 +154,7 @@ GoatDB includes several built-in rules:
    // Admin-only access rule
    // Note: Sessions only contain the user ID, so we need to look up the user's roles
    DataRegistry.default.registerAuthRule(
-     '/admin/*',
+     /^\/admin\//,
      ({ db, session }) => {
        // Deny anonymous access
        if (!session.owner) {
@@ -170,7 +177,7 @@ For more on role-based access and user management, see
 // Public read, private write pattern
 // This is a common pattern for public content that only authenticated sessions can modify
 DataRegistry.default.registerAuthRule(
-  '/public/*',
+  /^\/public\//,
   ({ session, op }) => {
     // Allow anyone to read
     if (op === 'read') {
@@ -182,8 +189,9 @@ DataRegistry.default.registerAuthRule(
 );
 ```
 
-This pattern is often used for collaborative apps—see the [Tutorial](/docs/tutorial)
-and [React Hooks](/docs/react) for real-world examples.
+This pattern is often used for collaborative apps—see the
+[Tutorial](/docs/tutorial) and [React Hooks](/docs/react) for real-world
+examples.
 
 ### 2. Role-Based Access
 
@@ -191,7 +199,7 @@ and [React Hooks](/docs/react) for real-world examples.
 // Role-based access control
 // This pattern restricts write access to sessions with specific roles
 DataRegistry.default.registerAuthRule(
-  '/editor/*',
+  /^\/editor\//,
   ({ db, session, op }) => {
     // Allow anyone to read
     if (op === 'read') {
@@ -208,8 +216,8 @@ DataRegistry.default.registerAuthRule(
 );
 ```
 
-For more on roles and user profiles, see [Sessions and Users](/docs/sessions) and
-[Schema](/docs/schema).
+For more on roles and user profiles, see [Sessions and Users](/docs/sessions)
+and [Schema](/docs/schema).
 
 ### 3. Owner-Only Access
 
@@ -217,7 +225,7 @@ For more on roles and user profiles, see [Sessions and Users](/docs/sessions) an
 // Owner-only access pattern
 // This ensures sessions can only access their own data
 DataRegistry.default.registerAuthRule(
-  '/user/*',
+  /^\/user\//,
   ({ session, repoPath }) => {
     // Only the session owner can access
     const repoId = itemPathGetPart(repoPath, 'repo');
@@ -233,17 +241,16 @@ For more on repository structure and item ownership, see
 
 While authorization rules provide fine-grained control over data access, there
 are scenarios where bypassing these rules is necessary for performance or
-architectural reasons. GoatDB's [trusted mode](/docs/sessions#trusted-mode) allows
-you to disable authorization rule evaluation entirely. For performance
-implications, see [Benchmarks](/docs/benchmarks#operational-modes).
+architectural reasons. GoatDB's [trusted mode](/docs/sessions#trusted-mode)
+allows you to disable authorization rule evaluation entirely. For performance
+implications, see [Benchmarks](/docs/benchmarks#configuration-variants).
 
 :::note
 
 Trusted mode is particularly useful when:
 
 - Building high-performance microservices that handle their own access control
-- Running in a controlled environment where network-level security is
-  sufficient
+- Running in a controlled environment where network-level security is sufficient
 - Using GoatDB as a caching layer with separate authorization mechanisms
 
 :::

@@ -5,26 +5,54 @@ sidebar_position: 4
 slug: /sessions
 ---
 
-import KeyGeneration from '@site/src/components/diagrams/KeyGeneration';
-import SigningVerification from '@site/src/components/diagrams/SigningVerification';
-import DistributedSecurity from '@site/src/components/diagrams/DistributedSecurity';
+import SessionIdentity from '@site/src/components/diagrams/SessionIdentity';
+import SessionSigning from '@site/src/components/diagrams/SessionSigning';
+import SessionAudit from '@site/src/components/diagrams/SessionAudit';
 
 # Sessions and Users
 
+When work is delegated to AI agents, the first audit question is: who did what —
+a human, or an agent? GoatDB's answer is signed provenance: in secure mode
+(default), every commit is signed by the session that produced it, so the
+[commit graph](/docs/commit-graph) doubles as an audit trail for delegated work.
+Mapping a session to a specific human, agent, or tool is the application's
+responsibility (see [Session vs Actor](#key-distinction-session-vs-actor)).
+
 [GoatDB](/) implements a robust session-based authentication system that
-provides secure and flexible [user management](/docs/authorization). This document
-explains how sessions work, their security implications, and how they integrate
-with [user management](/docs/authorization).
+provides secure and flexible [user management](/docs/authorization). This
+document explains how sessions work, their security implications, and how they
+integrate with [user management](/docs/authorization).
+
+## Key Distinction: Session vs Actor
+
+Session signatures prove that a commit originated from the holder of a **session
+key**, not from a verified real-world identity. The application is responsible
+for mapping sessions to actors such as humans, agents, services, or tools.
+
+This is a deliberate design choice. It means:
+
+- A single human may use multiple sessions across devices.
+- An agent may have its own sessions independent of any human.
+- A service may share a session across multiple invocations.
+- Session ownership (`session.owner`) is an application-level field, not a
+  cryptographically verified identity claim.
+
+### Trusted Mode Exception
+
+In [trusted mode](#trusted-mode), cryptographic signing and session verification
+are bypassed entirely. This is suitable for trusted environments where security
+is handled at a different layer — but it means signed provenance guarantees are
+lost.
 
 ## Understanding Session-Based Authentication
 
 At its core, GoatDB's authentication system revolves around sessions - secure
-connections to the database that are represented by **Ed25519 public/private
-key pairs**. The private key is generated and stored exclusively on the peer's
+connections to the database that are represented by **Ed25519 public/private key
+pairs**. The private key is generated and stored exclusively on the peer's
 machine, never leaving its local storage. Only the corresponding public key is
 shared with the GoatDB network.
 
-<KeyGeneration />
+<SessionIdentity />
 
 Sessions come in two forms: identified sessions, which are tied to specific user
 IDs and peers, and anonymous sessions, which are only associated with specific
@@ -40,32 +68,29 @@ this forced logout is achieved by updating the session's expiration field. Note
 that only root users (typically servers) have the authority to modify sessions,
 ensuring that session management remains under administrative control.
 
-Every operation in [GoatDB](/) is cryptographically signed using the session's
-private key on the peer's machine. This signature serves two critical security
-functions: it verifies the integrity of the operation's content (ensuring it
-hasn't been tampered with) and proves the identity of the operation's creator.
-This dual verification system creates a robust foundation for both data
-integrity and accountability.
+In secure mode (the default), every commit is cryptographically signed with
+the session's private key on the peer. The signature verifies the commit's
+integrity and proves that it originated from the holder of the signing session
+key. It does not establish the creator's real-world identity; the application
+maps actors to sessions. In [trusted mode](#trusted-mode), signing,
+verification, authorization, and provenance are disabled.
 
-<SigningVerification />
+<SessionSigning />
 
 ## Distributed Security Architecture
 
-The public/private key design enables a powerful distributed security model.
-Every operation in [GoatDB](/) is cryptographically signed, allowing all peers
-in the network to verify its authenticity. This creates a tamper-proof
-[commit graph](/docs/commit-graph) where each change can be traced back to its
-authorized source, with invalid or unauthorized changes being automatically
-rejected by the network.
+In secure mode (the default), every commit is signed so peers can verify its
+integrity and signing session. Reads are local and not signed. Invalid or unauthorized changes are rejected
+during verification before entering the [commit graph](/docs/commit-graph).
+Trusted mode disables these guarantees.
 
-<DistributedSecurity />
+<SessionAudit />
 
-A key feature of this architecture is the client-as-replica design. Clients
-maintain their own copy of the [commit graph](/docs/commit-graph) and verify all
-operations independently. This enables clients to act as replicas of the
-database state, providing resilience against peer failures. If a peer crashes,
-any client can safely restore the peer's state by replaying the verified commit
-graph and ensuring all operations were properly signed.
+Clients maintain a full local commit graph for each repository they open and, in
+secure mode, verify operations independently. A replica can restore only the
+repositories and history it retains. Recovery therefore requires an available
+authorized replica with the relevant commit history; an arbitrary client cannot
+restore an arbitrary peer. Trusted mode provides no provenance checks.
 
 This distributed verification system ensures data integrity even in challenging
 scenarios like network partitions, peer failures, or malicious actors. Clients
@@ -78,8 +103,8 @@ For applications where security is handled at a different layer or in trusted
 environments (such as microservices running in the cloud without direct client
 interaction), [GoatDB](/) offers a trusted mode that bypasses cryptographic
 verification and security controls. This mode can significantly
-[improve performance](/docs/benchmarks#operational-modes) by skipping commit signing and
-verification.
+[improve performance](/docs/benchmarks#configuration-variants) by skipping
+commit signing and verification.
 
 :::note
 
@@ -108,10 +133,9 @@ const db = new GoatDB({
 
 Note that trusted mode disables several security features:
 
-- Cryptographic signing of commits
-- Skips authorization rules
-- Protection against unauthorized modifications
-- Distributed security guarantees
+- Cryptographic **signing** and **verification** of commits
+- **Authorization** rules and protection against unauthorized modifications
+- **Provenance** tracking and distributed security guarantees
 
 Use trusted mode with caution and only in environments where the security
 tradeoffs are acceptable.

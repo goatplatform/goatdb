@@ -5,75 +5,136 @@ sidebar_position: 12
 slug: /faq
 ---
 
-
 # GoatDB FAQ
 
 ## What is GoatDB?
 
-GoatDB is a distributed database designed for edge-native applications. Inspired
-by distributed version control systems, GoatDB focuses on maximizing client-side
-processing, reducing server dependency, and supporting real-time synchronization
-across peers.
+GoatDB is an embedded, distributed document database that provides verifiable
+local-first state continuity for human-agent systems. It combines deterministic
+structural merge, authorization, bounded recovery through retained replicas, and
+Ed25519 signed provenance in secure mode (default). The current network topology
+is server-coordinated HTTP; shoulder tap is in progress, while WebSocket and
+WebRTC are planned.
+
+## Is GoatDB agent memory?
+
+No. Agent memory services remember _for_ an agent: they store and retrieve an
+agent's recollections behind a cloud API, separate from your application's
+state. GoatDB is the opposite category: a realtime state layer that shares live
+state _between_ humans, agents, and tools. Every participant — human or agent —
+works against a full local replica through the same API, and
+[structural merge](/docs/conflict-resolution) converges concurrent edits. If you
+need an agent to remember things, pair a memory service with your app; if you
+need an agent to collaborate on your app's state, that's GoatDB.
+
+## How do agents learn about state changes?
+
+Through reactive subscriptions — push, not polling. A GoatDB
+[query](/docs/query) updates its results automatically when the underlying data
+changes, and `onResultsChanged` notifies subscribers in-process. An agent
+subscribes to the state it cares about and reacts when a human (or another
+agent) writes, instead of issuing repeated request/response calls the way
+MCP-style tool interfaces work.
+
+Changes from other devices arrive through [sync](/docs/sync): over the current
+HTTP carrier with a polling trigger (700–1000ms typical application-perceived
+remote latency), they appear in the local replica and fire the same
+subscriptions. An active shoulder tap is in progress to replace polling as the
+trigger.
+
+## How do I audit what an agent did?
+
+In secure mode (default), every commit in the append-only
+[commit graph](/docs/commit-graph) carries an Ed25519 session signature. The
+graph is the audit trail: you can verify exactly which session key produced
+every change, and replay commit sequences to inspect how state evolved.
+
+One honest limit: a signature proves which _session_ signed a commit, not
+whether the actor behind it was a human, an agent, or a tool. Mapping session
+keys to actors is the application's responsibility. See
+[Sessions](/docs/sessions) for details.
 
 ## Won't This Architecture Overload the Client?
 
-No. Modern cloud-first applications already perform similar operations under the
-guise of temporary caching. Any data rendered on the client's screen has already
-been downloaded to the client, aligning with GoatDB's approach. Modern client
-devices are significantly more powerful than the fraction of a server's
-resources allocated to serve them, enabling them to handle such workloads
-efficiently.
+Generally no for typical application-scale repositories. Modern client devices are significantly more powerful than the fraction of a server's resources allocated to serve them. However, loading very large repositories into memory can strain client resources; design your data model to keep individual repositories small. See [benchmarks](/docs/benchmarks) for performance characteristics.
 
 ## Won't it expose sensitive data to clients?
 
-No. GoatDB establishes a private network, unlike public approaches such as
-Bitcoin or IPFS. Clients only access data explicitly granted by developers,
-adhering to the same principles as cloud-first applications.
+Not when properly configured. GoatDB establishes a private network, unlike public approaches such as Bitcoin or IPFS. Clients only access repositories they have been authorized to sync, and [authorization rules](/docs/authorization) control which sessions can read or write. However, secure deployment requires correctly configuring these rules; misconfigured authorization can expose data. In [trusted mode](/docs/sessions#trusted-mode), all authorization checks are disabled.
 
 ## What workload is GoatDB optimized for?
 
 GoatDB is optimized for read-heavy workloads, where reads significantly
-outnumber writes. For the occasional writes, GoatDB supports concurrent
-operations with distributed, lockless [concurrency control](/docs/architecture). It
-is ideal for use cases that naturally segment into logical data repositories.
+outnumber writes — including human-agent collaboration, where humans and AI
+agents share live state and both read far more often than they write. For the
+occasional writes, GoatDB supports concurrent operations with distributed,
+lockless [concurrency control](/docs/architecture). It is ideal for use cases
+that naturally segment into logical data repositories.
 
 ## Can you delete data from GoatDB?
 
 Yes. Although the underlying structure is an
-[append-only commit graph](/docs/commit-graph), GoatDB employs garbage collection.
-Data deletion involves marking items as deleted, with garbage collection
-handling eventual removal. Note that the garbage collection feature is still a
-work in progress and will be fully implemented in upcoming releases.
+[append-only commit graph](/docs/commit-graph), GoatDB employs garbage
+collection. Data deletion involves marking items as deleted, with garbage
+collection handling eventual removal. Note that the garbage collection feature
+is still a work in progress and will be fully implemented in upcoming releases.
 
 ## How does synchronization work in GoatDB?
 
-GoatDB employs a soft [real-time synchronization](/docs/sync) mechanism that captures
-in-memory states of peers up to three times per second. These states are
-packaged into signed commits and appended to an append-only commit graph.
-Synchronization uses a probabilistic protocol with Bloom Filters to minimize
-data comparison overhead, ensuring efficient and consistent propagation of
-updates across peers.
+GoatDB packages changes into commits appended to an append-only graph. In secure
+mode (default), those commits carry Ed25519 session signatures. The
+[sync protocol](/docs/sync) uses Bloom filters to discover and reconcile missing
+commits.
+
+The durable reconciliation mechanism is carrier-independent. GoatDB currently
+uses HTTP with 200ms scheduler checks plus per-repository adaptive 300–1500ms
+polling cycles. Active shoulder tap is in progress. WebSocket and WebRTC
+carriers are planned, and direct peer-to-peer sync requires WebRTC.
 
 ## What sync latency should I expect?
 
-Typical synchronization latency is **700-1000ms** between peers in real-world deployments. This represents application-perceived latency (when data becomes available via API) rather than pure network transmission time.
+Typical remote synchronization latency is **700–1000ms** in current deployments.
+This is application-perceived latency—when data becomes available through the
+API—not pure network transmission time.
 
-GoatDB prioritizes data consistency and offline-first capabilities over minimal latency. The architecture uses polling-based synchronization with adaptive timing that balances performance with reliability. For applications requiring sub-100ms sync times, evaluate whether GoatDB's consistency guarantees align with your performance requirements.
+GoatDB prioritizes consistency and offline-first operation over minimal latency.
+No lower-latency result is claimed for shoulder tap, WebSocket, or WebRTC until
+it is implemented and measured.
+
+## What is the session key? Does it identify the actor?
+
+In **secure mode** (default), every GoatDB commit is signed with an Ed25519
+session key. The signature proves **which session key produced the commit**; it
+does not identify whether the actor is a human, agent, or tool. That mapping is
+the application's responsibility.
+
+In **trusted mode**, signing, verification, authorization, and provenance are
+disabled. The application does not supply signing keys; it opts out of
+secure-mode guarantees.
+
+See [Sessions](/docs/sessions) for details.
 
 ## Can GoatDB operate offline?
 
-Yes. GoatDB supports offline mode by design. When the server is unavailable,
-peers continue functioning autonomously. Updates made offline are synchronized
-with the server once connectivity is restored. Future updates will also
-introduce WebRTC-based peer-to-peer synchronization for added resilience.
+Yes. Every client holds a full local replica of each repository it has opened or been authorized to sync, not of the entire database. When the server is unavailable, peers can continue working with those repositories. Offline updates synchronize through the server after connectivity returns.
+
+Direct peer-to-peer synchronization through WebRTC is planned but not yet
+available. WebSocket is also planned. The current topology remains
+server-coordinated.
 
 ## How does GoatDB handle data conflicts?
 
-Conflict resolution is automated and optimized for real-time operations.
-Detailed strategies for resolving conflicts are outlined in the
-[Conflict Resolution documentation](/docs/conflict-resolution). By leveraging
-distributed version control principles, GoatDB ensures that conflicts are
-resolved efficiently and transparently.
+GoatDB provides **deterministic structural merge**: Git-style three-way merge at
+the field level of document schemas. Concurrent edits converge to a consistent
+structural result, and edits to different fields can both survive.
+
+Structural convergence does not guarantee semantic or business correctness, nor
+generic conflict markers. Field strategies may select one value, preserve
+multiple values, merge a structure, or use last-writer-wins behavior.
+Applications must enforce their own domain rules.
+
+Detailed strategies for structural merge are outlined in the
+[Conflict Resolution documentation](/docs/conflict-resolution).
 
 ## How does GoatDB simplify development?
 
@@ -84,7 +145,7 @@ deploying GoatDB as a single executable is simpler compared to managing multiple
 microservices. A single executable consolidates the application stack, reducing
 inter-service communication issues and deployment overhead. For React
 applications, GoatDB offers a state management package that integrates with
-React hooks, supporting real-time updates and efficient UI state handling.
+React hooks, supporting immediate local updates and remote updates after sync.
 
 ## What is the deployment process for GoatDB?
 
@@ -97,20 +158,19 @@ operations for developers and reducing the need for manual interventions.
 
 ## How does GoatDB ensure data reliability?
 
-- **Active Replication:** Each client peer maintains a local copy of the data,
-  serving as an active replica. In case of server data loss, these replicas can
-  restore the server state.
-- **Backup and Restore:** The distributed design inherently supports backup and
-  redundancy. Peers store partial replicas, facilitating recovery. Backing up
-  the data is as simple as zipping the live directory of data, making it
-  straightforward to preserve and restore states.
+- **Active Replication:** Each peer has a full local replica of every repository
+  it opens. After server data loss, an available authorized replica retaining
+  relevant history can replay that repository's commit graph.
+- **Backup and Restore:** Peers store the repositories they open rather than the
+  entire database. Backing up the data is as simple as zipping the live data
+  directory.
+
+Recovery depends on at least one authorized replica being available with the
+relevant commit history, subject to garbage-collection and retention policies.
 
 ## Does GoatDB support schema migrations?
 
-Yes. GoatDB employs version control principles for schema management. Changes
-are applied to a separate branch, ensuring backward compatibility. Rolling
-updates are supported without disrupting workflows, and problematic changes can
-be reverted seamlessly.
+Yes. GoatDB employs version control principles for schema management. Sequential upgrade functions transform data automatically when accessed. Rolling updates are supported without disrupting workflows.
 
 ## Can GoatDB integrate with data warehouses?
 
@@ -120,23 +180,22 @@ analytical workflows.
 
 ## What debugging tools does GoatDB provide?
 
-GoatDB includes a "History Playback" feature that allows developers to replay
-specific commit sequences. This functionality simplifies debugging by enabling
-precise analysis of data changes over time.
+GoatDB stores a full commit history per item, enabling inspection of how state evolved over time. Standard tooling can inspect commit graphs and verify session signatures. Additional debugging features are planned.
 
 ## How does GoatDB ensure compliance and auditability?
 
-The append-only signed [commit graph](/docs/commit-graph) acts as a built-in audit
-log. This log provides full traceability for data modifications, ensuring
-transparency and compliance with regulatory requirements. Additionally, it
-allows reversion to the last valid state if needed.
+In secure mode (default), commits in the append-only
+[commit graph](/docs/commit-graph) carry Ed25519 session signatures, providing a
+built-in audit log. This proves session-key provenance rather than actor
+identity. See [Sessions](/docs/sessions) for the trusted-mode exception.
 
 ## What is the performance impact of GoatDB on client devices?
 
 GoatDB is optimized for lightweight operations on client devices. The
 append-only storage model and delta-compressed synchronization reduce
-computational overhead while maintaining real-time responsiveness. For detailed
-performance metrics and benchmarks, see our [benchmarks page](/docs/benchmarks).
+computational overhead while maintaining responsive local interactions. For
+detailed performance metrics and benchmarks, see our
+[benchmarks page](/docs/benchmarks).
 
 ## How does distributed local querying differ from centralized queries?
 
@@ -161,16 +220,17 @@ tolerance.
 ## Does GoatDB support Node.js?
 
 Yes. Node.js is a fully supported, first-class runtime alongside Deno. GoatDB
-provides a complete Node.js adapter including HTTP server (`node:http`/`node:https`),
-file I/O, crypto, workers, and Single Executable Application (SEA) compilation.
-Node.js 24+ is required. See the [installation guide](/docs/install) for setup
-instructions and the [examples](https://github.com/goatplatform/goatdb/tree/main/examples)
-for working Node.js projects.
+provides a complete Node.js adapter including HTTP server
+(`node:http`/`node:https`), file I/O, crypto, workers, and Single Executable
+Application (SEA) compilation. Node.js 24+ is required. See the
+[installation guide](/docs/install) for setup instructions and the
+[examples](https://github.com/goatplatform/goatdb/tree/main/examples) for
+working Node.js projects.
 
 ## What licensing options does GoatDB offer?
 
-GoatDB is released under the MIT License, a permissive open-source license
-that provides:
+GoatDB is released under the MIT License, a permissive open-source license that
+provides:
 
 - Freedom to use the software for any purpose
 - Freedom to modify and distribute the software

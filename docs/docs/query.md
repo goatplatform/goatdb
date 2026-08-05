@@ -15,14 +15,14 @@ import IncrementalUpdates from '@site/src/components/diagrams/IncrementalUpdates
 :::tip
 
 If you're building a [React](/docs/react) UI, we recommend using the
-[React Hooks](/docs/react) instead of working with [queries](/docs/query) directly. The
-[hooks](/docs/react) provide a more ergonomic interface for [React](/docs/react)
-components and handle all the complexity of data [synchronization](/docs/sync) and
-updates.
+[React Hooks](/docs/react) instead of working with [queries](/docs/query)
+directly. The [hooks](/docs/react) provide a more ergonomic interface for
+[React](/docs/react) components and handle all the complexity of data
+[synchronization](/docs/sync) and updates.
 
 :::
 
-GoatDB's query system provides real-time, efficient access to your data with
+GoatDB's query system provides reactive, efficient access to your data with
 automatic updates as the underlying data changes. Queries can be chained
 together, sorted, and used as lightweight ad-hoc indexes for fast lookups.
 
@@ -46,6 +46,12 @@ await adminUsers.loadingFinished();
 // Get the results
 const results = adminUsers.results();
 ```
+
+:::note
+
+These examples assume a ready database. In non-React flows, register schemas before use, await `db.readyPromise()`, and close with `await db.flushAll(); await db.close()` in a try/finally block. See [Reading and Writing Data](/docs/read-write-data) for a complete lifecycle example.
+
+:::
 
 :::tip
 
@@ -245,11 +251,13 @@ In this example, each query in the chain:
 - Updates independently when the underlying data changes
 - Can be reused independently for other purposes
 
-## Real-Time Updates
+## Reactive Updates
 
 Queries automatically update their results when the underlying data changes.
 This makes them perfect for building reactive UIs and backend services that need
-to respond to data changes in real-time:
+to respond to data changes — and for agents subscribing to shared state. An
+agent can keep a query open and get updates pushed to it as humans or other
+agents write, instead of polling:
 
 ```typescript
 // Create a query
@@ -266,20 +274,22 @@ activeUsers.onResultsChanged(() => {
 
 ## Technical Details
 
-GoatDB's query system is designed for responsiveness and efficiency while being easy to use without explicit indexing. The [architecture](/docs/architecture)
-prioritizes developer experience without sacrificing [performance](/docs/benchmarks):
+GoatDB's query system is designed for responsiveness and efficiency while being
+easy to use without explicit indexing. The [architecture](/docs/architecture)
+prioritizes developer experience without sacrificing
+[performance](/docs/benchmarks):
 
 - **No Manual Indexing**: Unlike traditional databases, GoatDB doesn't require
-  developers to define and maintain explicit indexes
+  developers to define and maintain explicit indexes. Cold queries scan source data linearly; live queries keep results warm through incremental updates.
 - **Lazy Evaluation**: Queries only compute what's needed when it's needed
 - **Transparent Caching**: Results are cached transparently without developer
   intervention
 
 <LocalCopy />
 
-Each peer maintains a complete local copy of the database, enabling offline
-operation and low-latency access. The local copy is [synchronized](/docs/sync) with
-the network when online, ensuring consistency across all peers.
+Each GoatDB instance maintains a full local replica of every repository it
+opens, enabling offline operation and low-latency local access. The local copy
+is [synchronized](/docs/sync) with the server when online.
 
 <CommitStorage />
 
@@ -291,8 +301,8 @@ across the network.
 <QueryCache />
 
 When persisting query results, we store both the results and the age of the
-latest commit processed by the query. This allows us to efficiently track
-which commits have already been processed.
+latest commit processed by the query. This allows us to efficiently track which
+commits have already been processed.
 
 <IncrementalUpdates />
 

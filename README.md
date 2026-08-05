@@ -8,7 +8,7 @@
 
 ---
 
-# GoatDB: Embedded, Distributed, Document Database
+# GoatDB: The Realtime State Layer for Human-Agent Collaboration
 
 <p align="center">
 📚 <a href="https://goatdb.dev">Documentation</a> • ⚡ <a href="https://goatdb.dev/docs/benchmarks/">Benchmarks</a> • 💬 <a href="https://github.com/goatplatform/goatdb/discussions">Discussions</a> • 👋 <a href="https://discord.gg/SAt3cbUqxr">Discord</a>
@@ -21,20 +21,33 @@
 <a href="https://www.npmjs.com/package/@goatdb/goatdb"><img src="https://img.shields.io/npm/v/@goatdb/goatdb" alt="npm" /></a>
 </p>
 
-[GoatDB](https://goatdb.dev/) is an embedded, distributed document database that
-prioritizes speed and developer experience. Build real-time collaborative apps
-that work offline.
+[GoatDB](https://goatdb.dev/) is the realtime state layer for human-agent
+collaboration: humans, AI agents, tools, and devices share the same live,
+durable state. Under the hood it is an embedded, distributed document database
+providing verifiable state continuity — TypeScript-first, with React hooks
+included.
 
 Inspired by distributed version control systems, GoatDB brings Git-like features
-to databases: cryptographically signed commits, three-way merges, and automatic
-conflict resolution. TypeScript-first with React hooks included.
+to databases: cryptographically signed commits and deterministic structural
+merges. In secure mode (default), every write produces a signed commit in a
+durable commit graph—the authoritative source of repository state.
 
 **What makes GoatDB different?**
 
-- **Works offline:** Changes sync automatically when reconnected
-- **Instant UI updates:** Local changes are instant, no loading states
-- **Smart conflict resolution:** Git-style three-way merge for live data
-- **Self-healing:** Clients can restore crashed servers from the commit graph
+- **Works offline:** Full local replicas of each opened repository; changes sync
+  automatically when reconnected
+- **Reactive local reads:** Queries run in memory, update incrementally as data
+  changes
+- **Structural merge:** Git-style three-way merge at the field level for
+  concurrent edits
+- **Signed provenance:** In secure mode (default), every commit is signed with
+  Ed25519; verify which session wrote what — GoatDB proves the session key, not
+  actor identity
+- **Bounded recovery:** An available authorized replica retaining relevant
+  history can restore a crashed server
+
+See the [Architecture](https://goatdb.dev/docs/architecture) page for the full
+architecture and current network topology.
 
 GoatDB is under active development. Star ⭐️ our project if you like the
 approach!
@@ -87,7 +100,7 @@ item.set('done', true);
 
 ## React Integration
 
-GoatDB includes React hooks for real-time, offline-capable UIs. See the
+GoatDB includes React hooks for reactive, offline-capable UIs. See the
 [React documentation](https://goatdb.dev/docs/react/).
 
 See the <a href="https://goatdb.dev/docs/tutorial/">tutorial</a> for more

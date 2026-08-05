@@ -39,8 +39,8 @@ This design takes advantage of modern SSD characteristics:
 
 The storage format can be selected via the `storageFormat` config option:
 
-- **`'goat'` (default)**: Compact binary with 4-byte length prefix per record
-  — best for production; fast I/O
+- **`'goat'` (default)**: Compact binary with 4-byte length prefix per record —
+  best for production; fast I/O
 - **`'jsonl'`**: [JSON Lines](https://jsonlines.org/) — one JSON object per
   line; human-readable, useful for debugging
 
@@ -65,8 +65,8 @@ Each commit in the repository log contains:
 - **Timestamp**: When the commit was created
 - **Metadata**: Additional information like organization ID and build version
 - **Session**: The ID of the session that created the commit
-- **Signature**: Cryptographic signature of the commit, generated using the
-  session's private key
+- **Signature**: In secure mode (default), a cryptographic signature generated
+  using the session's private key
 
 The signature is particularly important as it provides cryptographic proof that:
 
@@ -74,18 +74,18 @@ The signature is particularly important as it provides cryptographic proof that:
 2. The commit data hasn't been tampered with
 3. The commit is part of a verifiable chain of changes
 
-This security model ensures that all operations in GoatDB are cryptographically
-signed, creating a tamper-proof commit graph where each change can be traced
-back to its authorized source.
+In secure mode (default), operations are cryptographically signed, creating a
+verifiable commit graph where each change can be traced to its signing session.
+Actor identity remains application-owned.
 
 :::note
 
 For performance-critical applications or trusted environments (like backend
-services), GoatDB offers a trusted mode that bypasses cryptographic
-verification. This mode can significantly [improve performance](/docs/benchmarks)
-by skipping commit signing and verification. However, it should only be used
-in controlled, trusted environments where [security](/docs/sessions) is handled at
-a different layer.
+services), GoatDB offers a trusted mode that disables signing, verification,
+authorization, and provenance. This mode can significantly
+[improve performance](/docs/benchmarks), but it should only be used in
+controlled environments where [security](/docs/sessions) is handled at a
+different layer.
 
 :::
 
@@ -142,40 +142,36 @@ use and avoids delays during user interactions.
 
 :::note
 
-When preloading a repository, you usually don't need to `await` the
-result—just call `db.open()` and continue. It's safe to call `open()` multiple
-times for the same repository; only the first call will actually start
-loading. If the repository isn't fully loaded by the time you access its data,
-GoatDB will automatically wait for loading to finish. This approach ensures
-your application remains responsive and avoids unnecessary delays for users.
+When preloading a repository, you usually don't need to `await` the result—just
+call `db.open()` and continue. It's safe to call `open()` multiple times for the
+same repository; only the first call will actually start loading. If the
+repository isn't fully loaded by the time you access its data, GoatDB will
+automatically wait for loading to finish. This approach ensures your application
+remains responsive and avoids unnecessary delays for users.
 
 :::
 
 ### Closing a Repository
 
 Repositories remain open in memory for the duration of your application's
-session unless you explicitly close them. To manually close a repository and
-release its resources, use the `db.close()` method:
+session unless you explicitly close them. To manually close a single repository
+and release its resources, use the `db.closeRepo()` method:
 
 ```typescript
 // Close a repository and flush any pending writes to disk
-await db.close('/chats/chatId');
+await db.closeRepo('/chats/chatId');
 ```
 
 When you close a repository, GoatDB will first commit any in-memory changes for
 items in that repository, then flush all pending writes to disk. This ensures
 that all local edits are saved and durable before the repository is fully
-released from memory. This is currently a manual operation. In future versions
-of GoatDB, there will be an option to automatically close repositories when they
-are no longer in use.
+released from memory.
 
 :::note
 
-In most cases, you don't need to `await` the result of `db.close()`. It's
-common to simply call `db.close()` and let GoatDB handle the process in the
-background. The system will ensure all changes are safely written to disk, so
-you can keep your application responsive without waiting for the close
-operation to finish.
+`db.close()` (no arguments) closes the **entire database**, releasing all
+repositories, sync schedulers, queries, and file handles. Use `db.closeRepo(path)`
+to close a single repository without affecting others.
 
 :::
 
@@ -186,22 +182,22 @@ GoatDB provides strong durability through:
 1. **Atomic Commits**: Each commit is written atomically - if a crash occurs
    mid-write, the half-written commit is simply trimmed from the log
 2. **Parallel Writes**: Changes are written simultaneously to both local storage
-   and replicated to other peers
+   and replicated to the server
 3. **Automatic Recovery**: After a crash, the system automatically recovers
-   missing commits through the [synchronization protocol](/docs/sync), ensuring all
-   peers converge to the same state. The P2P design enables both clients and
-   servers to act as active replicas, providing redundancy and resilience
+   missing commits through the [synchronization protocol](/docs/sync). Recovery
+   depends on the availability of authorized replicas and configured retention
+   policies.
 
 :::note
 
 Traditional database durability often focuses on server-side guarantees -
 ensuring data survives server crashes. But in GoatDB, we recognize that client
-durability is fundamentally different. Modern SSDs in laptops and phones
-rarely fail, and when they do, it's typically due to physical damage rather
-than data corruption. More importantly, user expectations differ between
-client and server operations - if your phone dies mid-click, you wouldn't
-expect that click's effect to be saved, but when a server acknowledges an API
-call, you rightfully expect that operation to be durable.
+durability is fundamentally different. Modern SSDs in laptops and phones rarely
+fail, and when they do, it's typically due to physical damage rather than data
+corruption. More importantly, user expectations differ between client and server
+operations - if your phone dies mid-click, you wouldn't expect that click's
+effect to be saved, but when a server acknowledges an API call, you rightfully
+expect that operation to be durable.
 
 :::
 
@@ -217,11 +213,11 @@ const repo = db.repository('/users/john');
 // Low-level repository methods
 // Get the current value and commit for a specific key
 // Returns [value, commit] tuple or undefined if key doesn't exist
-const [value, commit] = repo.valueForKey('/users/john');
+const [value, commit] = repo.valueForKey('john');
 
 // Set a new value for a key with an optional parent commit
-// Returns a Promise that resolves to the new commit or undefined if no change
-await repo.setValueForKey('/users/john', newItem, parentCommit);
+// Returns a Commit or undefined if no change
+await repo.setValueForKey('john', newItem, parentCommit);
 
 // Get all keys in the repository
 // Returns an iterable of all keys
@@ -233,11 +229,11 @@ const paths = repo.paths();
 
 // Get the commit graph for a specific key
 // Returns an array of CommitGraph objects showing the commit history
-const graph = repo.graphForKey('/users/john/foo');
+const graph = repo.graphForKey('foo');
 
 // Get a Cytoscape-compatible JSON representation of the commit network for a key
 // This can be used to visualize the commit history in Cytoscape (https://cytoscape.org/)
-const network = repo.debugNetworkForKey('/users/john/foo');
+const network = repo.debugNetworkForKey('foo');
 ```
 
 These low-level APIs are primarily useful for:

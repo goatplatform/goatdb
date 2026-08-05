@@ -59,4 +59,4 @@ task.set('done', true);
 - **Memory-first**: Fast operations with persistent storage
 - **Security mode**: Uses default security settings. For backend-only
   applications in secure environments, see
-  [trusted mode documentation](https://goatdb.dev/sessions#trusted-mode)
+  [trusted mode documentation](https://goatdb.dev/docs/sessions#trusted-mode)

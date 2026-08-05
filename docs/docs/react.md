@@ -5,13 +5,14 @@ sidebar_position: 4
 slug: /react
 ---
 
-
 # GoatDB React Hooks
 
 The hooks are built on top of GoatDB's core functionality, providing a more
 ergonomic interface for React components. They handle all the complexity of data
-[synchronization](/docs/sync) and updates, making it easy to build reactive UIs that
-work seamlessly both online and offline. For a full example, see the
+[synchronization](/docs/sync) and updates, making it easy to build reactive UIs
+that work seamlessly both online and offline. These hooks are the human side of
+human-agent collaboration: the UI re-renders reactively as agents (or other
+humans) write to the same items. For a full example, see the
 [Tutorial](/docs/tutorial).
 
 ## Hooks Overview
@@ -19,15 +20,17 @@ work seamlessly both online and offline. For a full example, see the
 ### `useDB()`
 
 Initializes and returns the default GoatDB instance, handling storage and server
-[synchronization](/docs/sync) automatically. The hook also bootstraps the database by
-setting up the storage backend and creating an initial connection to the server.
-This ensures that the application is ready to interact with the database without
-requiring additional setup steps. For more on storage and repositories, see
-[Repositories](/docs/repositories) and [Architecture](/docs/architecture).
+[synchronization](/docs/sync) automatically. The hook also bootstraps the
+database by setting up the storage backend and creating an initial connection to
+the server. This ensures that the application is ready to interact with the
+database without requiring additional setup steps. For more on storage and
+repositories, see [Repositories](/docs/repositories) and
+[Architecture](/docs/architecture).
 
 - **Behavior:**
   - Uses the native file system for storage (OPFS in browsers)
-  - Synchronizes with the server in the background ([Synchronization](/docs/sync))
+  - Synchronizes with the server in the background
+    ([Synchronization](/docs/sync))
   - Triggers re-renders when the current user changes
     ([Sessions and Users](/docs/sessions))
 
@@ -57,7 +60,7 @@ required. For more on sessions, see [Sessions and Users](/docs/sessions).
 
 - **Returns:**
   - `"loading"`: Database is initializing
-  - `"ready"`: Database is fully loaded and synchronized
+  - `"ready"`: Database is initialized (local data loaded, session ready)
   - `"error"`: An error occurred during initialization
 
 **Example:**
@@ -78,10 +81,10 @@ function App() {
 
 :::tip
 
-During the initial session setup, the client may require a network connection
-in order to download the initial copy of the history. Once this setup is
-complete, full offline functionality is supported. See
-[Synchronization](/docs/sync) and [Repositories](/docs/repositories) for more details.
+During the initial session setup, the client may require a network connection in
+order to download the initial copy of the history. Once this setup is complete,
+full offline functionality is supported. See [Synchronization](/docs/sync) and
+[Repositories](/docs/repositories) for more details.
 
 :::
 
@@ -91,22 +94,24 @@ Creates a new query or retrieves an existing one. On first access, GoatDB
 automatically loads the source repository either from the local disk or by
 fetching it from the server. The hook triggers UI re-rendering whenever the
 query results are updated, regardless of whether the changes originate from
-local or remote edits. For advanced query usage, see [Querying Data](/docs/query).
+local or remote edits. For advanced query usage, see
+[Querying Data](/docs/query).
 
 When a query is first opened, it performs a linear scan of its source using a
 coroutine without blocking the main thread. During and after this initial scan,
 the query caches its results to disk, allowing subsequent runs to resume
 execution from the cached state. For more on the data model, see
-[Concepts](/docs/concepts) and [Reading and Writing Data](/docs/read-write-data).
+[Concepts](/docs/concepts) and
+[Reading and Writing Data](/docs/read-write-data).
 
 **Config Options:**
 
 - **`schema`** _(required)_: Specifies the [schema](/docs/schema) for the query
   results
-- **`source`** _(required)_: Path to a [repository](/docs/repositories) or another
-  query instance
+- **`source`** _(required)_: Path to a [repository](/docs/repositories) or
+  another query instance
 - **`predicate`** _(optional)_: Function to filter results
-- **`sortDescriptor`** _(optional)_: Function to sort results
+- **`sortBy`** _(optional)_: Field name or comparator function `({ left, right, ctx })` to sort results
 - **`ctx`** _(optional)_: Optional context for predicates and sort descriptors
 - **`limit`** _(optional)_: Limits the number of results
 - **`showIntermittentResults`** _(optional)_: If `true`, updates UI during
@@ -118,12 +123,13 @@ GoatDB re-evaluates the entire query whenever any of its configuration values
 change, including:
 
 - The predicate function
-- The sort descriptor function
+- The sort function
 - The context object
 - The source repository
 - The schema
 
 :::
+
 > GoatDB internally calls `.toString()` on the passed functions to determine if
 > they have changed. While you don't need to explicitly use `useCallback` or
 > other memoization techniques, it's crucial that your predicate and sort
@@ -144,8 +150,8 @@ function TaskList() {
   const tasksQuery = useQuery({
     schema: taskSchema,
     source: '/data/tasks',
-    sortDescriptor: (a, b) => a.get('text').localeCompare(b.get('text')),
-    predicate: (item) => !item.get('done'),
+    sortBy: ({ left, right }) => left.get('text').localeCompare(right.get('text')),
+    predicate: ({ item }) => !item.get('done'),
     showIntermittentResults: true,
   });
 
@@ -165,11 +171,12 @@ Monitors changes to a specific item, triggering a re-render whenever the item's
 state changes. It returns a mutable `ManagedItem` instance that allows direct
 modifications. Any changes to the item are automatically queued for background
 commits and synchronized with the server. For more on items and managed items,
-see [Reading and Writing Data](/docs/read-write-data) and [Concepts](/docs/concepts).
+see [Reading and Writing Data](/docs/read-write-data) and
+[Concepts](/docs/concepts).
 
 **Signatures:**
 
-```typescript
+```typescript validate=off
 useItem<S extends Schema>(...pathComps: string[]): ManagedItem<S> | undefined
 useItem<S extends Schema>(path: string | undefined, opts: UseItemOpts): ManagedItem<S> | undefined
 useItem<S extends Schema>(item: ManagedItem<S> | undefined, opts: UseItemOpts): ManagedItem<S> | undefined
@@ -249,13 +256,14 @@ The `useItem` hook will automatically trigger a re-render when:
 
 ### Data Synchronization
 
-1. **Background Writes:** All writes are processed asynchronously. The system
-   batches changes and writes them to both local storage and remote servers in
-   parallel. See [Synchronization](/docs/sync).
+1. **Background Writes:** The system batches changes, persists them to local
+   storage, and synchronizes them with remote replicas through the server in the
+   background. See [Synchronization](/docs/sync).
 
-2. **Offline Support:** GoatDB maintains a local copy of the database and
-   synchronizes changes when the connection is restored. See
-   [Architecture](/docs/architecture) and [Repositories](/docs/repositories).
+2. **Offline Support:** GoatDB maintains a full local replica of every
+   repository it opens and synchronizes changes when the connection is restored.
+   See [Architecture](/docs/architecture) and
+   [Repositories](/docs/repositories).
 
 ## Technical Details
 

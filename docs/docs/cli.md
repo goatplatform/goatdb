@@ -131,7 +131,7 @@ await compile({
 });
 ```
 
-:::info Cross-compilation
+:::info[Cross-compilation]
 **Deno only** supports cross-compilation. Running `compile` on a Mac with `os: 'linux'` produces a Linux binary.
 
 **Node.js** builds are always native — run `compile` on the target OS.

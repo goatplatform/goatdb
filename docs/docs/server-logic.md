@@ -41,7 +41,7 @@ When the server receives an HTTP request, it processes it through this pipeline:
 
 If no endpoint matches, `shouldProcess()` is skipped and `didProcess()` runs on the default 404 response.
 
-:::info Default endpoints
+:::info[Default endpoints]
 
 GoatDB registers built-in endpoints for health checks, authentication, sync, CORS, and static assets **before** any user-registered endpoints. Since the first matching `filter()` wins, your endpoints cannot shadow these defaults. To take full control, pass `disableDefaultEndpoints: true` in [ServerOptions](/api/GoatDB/Server/interfaces/ServerOptions).
 
@@ -111,7 +111,7 @@ class WebhookEndpoint implements Endpoint<typeof kUserSchema> {
 }
 ```
 
-:::tip Error handling
+:::tip[Error handling]
 
 Return explicit `Response` objects for controlled HTTP errors (e.g., `new Response('Forbidden', { status: 403 })`). Unhandled exceptions produce a generic `500 Internal Server Error`.
 

@@ -7,11 +7,21 @@ slug: /schema
 
 # GoatDB Schemas
 
-Schemas in GoatDB solve three critical problems for distributed applications: **data validation**, **automatic conflict resolution**, and **seamless migrations**. Unlike traditional databases where schemas live in the database, GoatDB schemas are TypeScript objects compiled into your application, giving you type safety and zero-latency validation.
+Schemas in GoatDB solve three critical problems for distributed applications:
+**data validation**, **deterministic structural merge**, and **seamless
+migrations**. Unlike traditional databases where schemas live in the database,
+GoatDB schemas are TypeScript objects compiled into your application, giving you
+type safety and synchronous local validation.
+
+Schemas are the shared contract between human and agent writers: both write
+through the same schema, and the field-level merge strategies defined here are
+what let a human and an agent edit the same item concurrently and still converge
+deterministically.
 
 ## Quick Start
 
-Import the [DataRegistry](/api/GoatDB/classes/DataRegistry) and define your schema:
+Import the [DataRegistry](/api/GoatDB/classes/DataRegistry) and define your
+schema:
 
 ```typescript
 import { DataRegistry } from '@goatdb/goatdb';
@@ -31,7 +41,7 @@ const kSchemaTask = {
     },
     tags: {
       type: 'set',
-      default: () => new Set<string>(),  // Empty typed set
+      default: () => new Set<string>(), // Empty typed set
     },
   },
 } as const;
@@ -46,15 +56,23 @@ const task = db.create('/data/tasks/task-123', kSchemaTask, {
 });
 
 // TypeScript knows the field types automatically
-task.set('completed', true);  // ✅ Type-safe
+task.set('completed', true); // ✅ Type-safe
 task.set('completed', 'yes'); // ❌ TypeScript error
 ```
 
+:::note
+
+In non-React flows, await `db.readyPromise()` before operations and close with `await db.flushAll(); await db.close()` in a try/finally block. See [Reading and Writing Data](/docs/read-write-data) for a complete lifecycle example.
+
+:::
+
 ## Core Concepts
 
-### Schemas Are Conflict Resolution Strategies
+### Schemas Define Structural Merge Strategies
 
-When two users edit the same [document](/docs/concepts#item) simultaneously, GoatDB automatically resolves conflicts based on your schema's [field types](/api/GoatDB/type-aliases/FieldDef):
+When two users edit the same [document](/docs/concepts#item) concurrently,
+GoatDB structurally merges their changes based on the schema's
+[field types](/api/GoatDB/type-aliases/FieldDef):
 
 ```typescript
 // User A adds a tag while User B adds a different tag
@@ -67,7 +85,8 @@ userB.get('tags').add('meeting');
 
 ### Schemas Enable Safe Migrations
 
-When you need to change your data structure, schemas provide a clear upgrade path:
+When you need to change your data structure, schemas provide a clear upgrade
+path:
 
 ```typescript
 // Version 2: Add due dates and rename fields
@@ -94,7 +113,9 @@ const kSchemaTaskV2 = {
 
 ### Schemas Are Compile-Time Contracts
 
-Schemas exist only in your application code—they're not stored in the database. This means:
+Schemas exist only in your application code—they're not stored in the database.
+This means:
+
 - Zero network overhead for schema information
 - Full TypeScript integration and IntelliSense
 - Compile-time validation of field access
@@ -102,7 +123,8 @@ Schemas exist only in your application code—they're not stored in the database
 
 ## The Data Registry
 
-The DataRegistry manages schema versions and coordinates upgrades across your application:
+The DataRegistry manages schema versions and coordinates upgrades across your
+application:
 
 ```typescript
 // Access the default registry
@@ -128,12 +150,13 @@ Registration serves three purposes:
 
 ### Basic Structure
 
-Each [schema](/api/GoatDB/type-aliases/Schema) requires a namespace, version, and [field definitions](/api/GoatDB/type-aliases/SchemaFieldsDef):
+Each [schema](/api/GoatDB/type-aliases/Schema) requires a namespace, version,
+and [field definitions](/api/GoatDB/type-aliases/SchemaFieldsDef):
 
 ```typescript
 export const kSchemaMessage = {
-  ns: 'message',      // Namespace - groups related items
-  version: 1,         // Version number - must be consecutive
+  ns: 'message', // Namespace - groups related items
+  version: 1, // Version number - must be consecutive
   fields: {
     sender: {
       type: 'string',
@@ -156,9 +179,10 @@ type MessageType = typeof kSchemaMessage;
 
 ### Field Configuration
 
-Each [field definition](/api/GoatDB/type-aliases/FieldDef) accepts these options:
+Each [field definition](/api/GoatDB/type-aliases/FieldDef) accepts these
+options:
 
-```typescript
+```typescript validate=off
 {
   type: 'string' | 'number' | 'boolean' | 'date' | 'set' | 'map' | 'richtext',
   required?: boolean,           // Validation fails if missing
@@ -181,7 +205,7 @@ const kSchemaProject = {
     },
     members: {
       type: 'set',
-      default: () => new Set<string>(),  // Set<string> of user IDs
+      default: () => new Set<string>(), // Set<string> of user IDs
     },
     metadata: {
       type: 'map',
@@ -204,24 +228,29 @@ const kSchemaProject = {
 
 ## Conflict Resolution Deep Dive
 
-Understanding how different [field types](/api/GoatDB/type-aliases/SchemaDataType) resolve conflicts is crucial for designing robust schemas.
+Understanding how different
+[field types](/api/GoatDB/type-aliases/SchemaDataType) resolve conflicts is
+crucial for designing robust schemas.
 
 ### Primitive Types (string, number, boolean, date)
 
-**Strategy**: Any Write Wins (last write takes precedence)
+**Strategy**: Last Change Wins — during merge, the last Insert operation in the changes array overwrites the current value. The changes array is constructed deterministically from commit ordering.
 
 ```typescript
 // Initial state
 item.set('title', 'Original Title');
 
 // Concurrent edits
-userA.set('title', 'Title A');  // timestamp: 100ms
-userB.set('title', 'Title B');  // timestamp: 150ms
+userA.set('title', 'Title A');
+userB.set('title', 'Title B');
 
-// Result: 'Title B' (latest timestamp wins)
+// After merge: one value wins based on commit ordering during merge
+// Both values survive in the commit graph; the merged result reflects
+// the last Insert applied during the deterministic merge process
 ```
 
-**Use when**: Fields that represent single values where [conflicts](/docs/conflict-resolution) are rare or latest value is preferred.
+**Use when**: Fields that represent single values where
+[conflicts](/docs/conflict-resolution) are rare or latest value is preferred.
 
 ### Sets
 
@@ -235,7 +264,7 @@ const kSchemaWithTags = {
   fields: {
     tags: {
       type: 'set',
-      default: () => new Set<string>(),  // Can hold any CoreValue
+      default: () => new Set<string>(), // Can hold any CoreValue
     },
   },
 } as const;
@@ -244,8 +273,8 @@ const kSchemaWithTags = {
 item.set('tags', new Set(['work']));
 
 // Concurrent changes
-userA.get('tags').add('urgent');     // Adds 'urgent' string
-userB.get('tags').delete('work');    // Tries to delete 'work'
+userA.get('tags').add('urgent'); // Adds 'urgent' string
+userB.get('tags').delete('work'); // Tries to delete 'work'
 userB.get('tags').add({ type: 'priority', value: 'high' }); // Adds object
 
 // Result: Set(['work', 'urgent', { type: 'priority', value: 'high' }])
@@ -253,7 +282,8 @@ userB.get('tags').add({ type: 'priority', value: 'high' }); // Adds object
 // - Deletions only work on elements from the base version
 ```
 
-**Use when**: Collections where additions are more important than deletions (tags, permissions, feature flags).
+**Use when**: Collections where additions are more important than deletions
+(tags, permissions, feature flags).
 
 ### Maps
 
@@ -267,7 +297,7 @@ const kSchemaWithMetadata = {
   fields: {
     metadata: {
       type: 'map',
-      default: () => new Map<string, CoreValue>(),  // Values can be any CoreValue
+      default: () => new Map<string, CoreValue>(), // Values can be any CoreValue
     },
   },
 } as const;
@@ -276,9 +306,9 @@ const kSchemaWithMetadata = {
 item.set('metadata', new Map([['priority', 'low']]));
 
 // Concurrent changes
-userA.get('metadata').set('priority', 'high');  // Edit existing string
+userA.get('metadata').set('priority', 'high'); // Edit existing string
 userA.get('metadata').set('assignee', { name: 'alice', id: 123 }); // Add object
-userB.get('metadata').delete('priority');       // Try to delete
+userB.get('metadata').delete('priority'); // Try to delete
 userB.get('metadata').set('tags', new Set(['urgent', 'review'])); // Add Set
 
 // Result: Map([
@@ -288,14 +318,18 @@ userB.get('metadata').set('tags', new Set(['urgent', 'review'])); // Add Set
 // ])
 ```
 
-**Use when**: Key-value data where updates are more important than removals (settings, attributes, properties).
+**Use when**: Key-value data where updates are more important than removals
+(settings, attributes, properties).
 
 ### Rich Text
 
 **Strategy**: Tree-based document structure with intelligent conflict resolution
 
 ```typescript
-import { initRichText, plaintextToTree } from '@goatdb/goatdb/cfds/richtext/tree';
+import {
+  initRichText,
+  plaintextToTree,
+} from '@goatdb/goatdb/cfds/richtext/tree';
 
 // Schema with typed default
 const kSchemaWithRichText = {
@@ -304,7 +338,7 @@ const kSchemaWithRichText = {
   fields: {
     content: {
       type: 'richtext',
-      default: () => initRichText(),  // Empty RichText document
+      default: () => initRichText(), // Empty RichText document
     },
   },
 } as const;
@@ -329,19 +363,19 @@ const userAContent = {
     children: [
       {
         tagName: 'p',
-        children: [{ text: 'Hello beautiful world' }],  // Added "beautiful"
+        children: [{ text: 'Hello beautiful world' }], // Added "beautiful"
       },
     ],
   },
 };
 userA_doc.set('content', userAContent);
 
-// User B changes the structure 
+// User B changes the structure
 const userBContent = {
   root: {
     children: [
       {
-        tagName: 'h1',  // Changed paragraph to heading
+        tagName: 'h1', // Changed paragraph to heading
         children: [{ text: 'Hello world' }],
       },
     ],
@@ -354,15 +388,16 @@ const mergedResult = {
   root: {
     children: [
       {
-        tagName: 'h1',  // User B's structural change
-        children: [{ text: 'Hello beautiful world' }],  // User A's text change
+        tagName: 'h1', // User B's structural change
+        children: [{ text: 'Hello beautiful world' }], // User A's text change
       },
     ],
   },
 };
 ```
 
-**Use when**: Collaborative document editing where preserving all contributions and document structure is important.
+**Use when**: Collaborative document editing where preserving all contributions
+and document structure is important.
 
 ## Schema Versioning & Migrations
 
@@ -384,10 +419,10 @@ const kSchemaTaskV2 = {
   ns: 'task',
   version: 2,
   fields: {
-    title: { type: 'string', required: true },    // Renamed from 'text'
+    title: { type: 'string', required: true }, // Renamed from 'text'
     completed: { type: 'boolean', default: () => false }, // Renamed from 'done'
-    priority: { 
-      type: 'string', 
+    priority: {
+      type: 'string',
       default: () => 'medium',
       validate: (p) => ['low', 'medium', 'high'].includes(p),
     },
@@ -405,22 +440,24 @@ const kSchemaTaskV2 = {
 
 ### Upgrade Function Rules
 
-1. **Sequential Only**: Upgrade functions migrate from the immediately previous version
-2. **Automatic Chaining**: GoatDB applies multiple upgrades automatically (V1→V2→V3)
+1. **Sequential Only**: Upgrade functions migrate from the immediately previous
+   version
+2. **Automatic Chaining**: GoatDB applies multiple upgrades automatically
+   (V1→V2→V3)
 3. **Data Transformation**: Modify the data object to match the new schema
 
-```typescript
+```typescript validate=object-member
 // Multi-step upgrade example
 upgrade: (data, schema) => {
   // Complex data transformation
   const oldFormat = data.get('complexField');
   const newFormat = transformComplexData(oldFormat);
-  
+
   data.set('newComplexField', newFormat);
   data.delete('complexField');
-  
+
   return data;
-}
+},
 ```
 
 ### Registration Best Practices
@@ -428,7 +465,7 @@ upgrade: (data, schema) => {
 ```typescript
 // Group related schemas together
 export function registerProjectSchemas(
-  registry: DataRegistry = DataRegistry.default
+  registry: DataRegistry = DataRegistry.default,
 ): void {
   // Register in version order (optional but recommended)
   registry.registerSchema(kSchemaProjectV1);
@@ -445,7 +482,7 @@ registerProjectSchemas();
 
 ### String
 
-```typescript
+```typescript validate=off
 {
   type: 'string',
   required?: boolean,
@@ -454,12 +491,12 @@ registerProjectSchemas();
 }
 ```
 
-**Conflict Resolution**: Any Write Wins  
+**Conflict Resolution**: Last Change Wins (deterministic merge)
 **Use Cases**: Names, descriptions, IDs, text content
 
 ### Number
 
-```typescript
+```typescript validate=off
 {
   type: 'number',
   required?: boolean,
@@ -468,12 +505,12 @@ registerProjectSchemas();
 }
 ```
 
-**Conflict Resolution**: Any Write Wins  
+**Conflict Resolution**: Last Change Wins (deterministic merge)
 **Use Cases**: Configuration values, thresholds, limits, quantities
 
 ### Boolean
 
-```typescript
+```typescript validate=off
 {
   type: 'boolean',
   required?: boolean,
@@ -482,12 +519,12 @@ registerProjectSchemas();
 }
 ```
 
-**Conflict Resolution**: Any Write Wins  
+**Conflict Resolution**: Last Change Wins (deterministic merge)
 **Use Cases**: Flags, toggles, binary states
 
 ### Date
 
-```typescript
+```typescript validate=off
 {
   type: 'date',
   required?: boolean,
@@ -496,12 +533,12 @@ registerProjectSchemas();
 }
 ```
 
-**Conflict Resolution**: Any Write Wins  
+**Conflict Resolution**: Last Change Wins (deterministic merge)
 **Use Cases**: Timestamps, deadlines, creation dates
 
 ### Set
 
-```typescript
+```typescript validate=off
 {
   type: 'set',
   required?: boolean,
@@ -510,12 +547,14 @@ registerProjectSchemas();
 }
 ```
 
-**Conflict Resolution**: Union-based (additions win)  
-**Use Cases**: Tags, permissions, categories, flags  
-**CoreValue Types**: Primitives (string, number, boolean, Date), Arrays, Objects, nested Sets/Maps, and custom classes
+**Conflict Resolution**: Union-based (additions win)\
+**Use Cases**: Tags, permissions, categories, flags\
+**CoreValue Types**: Primitives (string, number, boolean, Date), Arrays,
+Objects, nested Sets/Maps, and custom classes
 
 **Best Practice**: Always provide a typed default to avoid undefined values:
-```typescript
+
+```typescript validate=off
 // Simple string set
 tags: {
   type: 'set',
@@ -537,7 +576,7 @@ mixedData: {
 
 ### Map
 
-```typescript
+```typescript validate=off
 {
   type: 'map',
   required?: boolean,
@@ -546,12 +585,14 @@ mixedData: {
 }
 ```
 
-**Conflict Resolution**: Key-level merging (additions/edits win)  
-**Use Cases**: Settings, metadata, attributes, properties  
-**CoreValue Types**: Values can be any CoreValue - primitives, Arrays, Objects, nested Sets/Maps, custom classes
+**Conflict Resolution**: Key-level merging (additions/edits win)\
+**Use Cases**: Settings, metadata, attributes, properties\
+**CoreValue Types**: Values can be any CoreValue - primitives, Arrays, Objects,
+nested Sets/Maps, custom classes
 
 **Best Practice**: Always provide a typed default to avoid undefined values:
-```typescript
+
+```typescript validate=off
 // Simple string-to-string map
 metadata: {
   type: 'map',
@@ -573,7 +614,7 @@ configuration: {
 
 ### Rich Text
 
-```typescript
+```typescript validate=off
 {
   type: 'richtext',
   required?: boolean,
@@ -591,31 +632,31 @@ const document = {
     children: [
       {
         tagName: 'h1',
-        children: [{ text: 'Project Overview' }]
+        children: [{ text: 'Project Overview' }],
       },
       {
         tagName: 'p',
         children: [
           { text: 'This project includes ' },
-          { 
+          {
             tagName: 'span',
             text: 'critical features',
             bold: true,
-            italic: true
+            italic: true,
           },
-          { text: ' for collaboration.' }
-        ]
+          { text: ' for collaboration.' },
+        ],
       },
       {
         tagName: 'ul',
         children: [
           {
             tagName: 'li',
-            children: [{ text: 'Real-time editing' }]
-          }
-        ]
-      }
-    ]
+            children: [{ text: 'Real-time editing' }],
+          },
+        ],
+      },
+    ],
   },
   pointers: new Set([
     {
@@ -623,25 +664,31 @@ const document = {
       type: 'focus',
       node: textNodeRef,
       offset: 5,
-      dir: 0
-    }
-  ])
-}
+      dir: 0,
+    },
+  ]),
+};
 ```
 
 **Supported Elements**:
+
 - **Block Elements**: `p` (paragraph), `h1`-`h6` (headings)
 - **Lists**: `ul` (unordered), `ol` (ordered), `li` (list items)
 - **Tables**: `table`, `tr` (rows), `td` (cells)
-- **Text Formatting**: `span` nodes with `bold`, `italic`, `underline`, `strike` properties
+- **Text Formatting**: `span` nodes with `bold`, `italic`, `underline`, `strike`
+  properties
 - **Links**: `a` nodes with `href` attributes
 - **References**: `ref` nodes for internal links and external references
 - **Media**: `img` nodes with `src`, `object` nodes for embedded content
 
-**Working with RichText**: Uses standard GoatDB [item API](/api/GoatDB/classes/ManagedItem):
+**Working with RichText**: Uses standard GoatDB
+[item API](/api/GoatDB/classes/ManagedItem):
 
 ```typescript
-import { initRichText, plaintextToTree } from '@goatdb/goatdb/cfds/richtext/tree';
+import {
+  initRichText,
+  plaintextToTree,
+} from '@goatdb/goatdb/cfds/richtext/tree';
 
 // Get current content
 const currentContent = doc.get('content');
@@ -667,6 +714,7 @@ const richTextFromPlain = { root: plaintextToTree('Simple text content') };
 doc.set('content', richTextFromPlain);
 ```
 
-**Conflict Resolution**: Tree-based intelligent merging  
-**Use Cases**: Documents, comments, collaborative content  
-**API**: Uses standard [item.set()](/api/GoatDB/classes/ManagedItem#set) and [item.get()](/api/GoatDB/classes/ManagedItem#get) - no special RichText methods
+**Conflict Resolution**: Tree-based intelligent merging\
+**Use Cases**: Documents, comments, collaborative content\
+**API**: Uses standard [item.set()](/api/GoatDB/classes/ManagedItem#set) and
+[item.get()](/api/GoatDB/classes/ManagedItem#get) - no special RichText methods

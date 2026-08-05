@@ -8,7 +8,7 @@ import rehypeKatex from 'rehype-katex';
 
 const config: Config = {
   title: 'GoatDB',
-  tagline: 'Databases split into fast or shared. AI agents need both.',
+  tagline: 'Verifiable local-first state continuity for human-agent systems.',
   favicon: 'img/favicon.png',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future

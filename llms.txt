@@ -1,36 +1,45 @@
-GoatDB: An Embedded, Distributed, Document Database
+GoatDB: The Realtime State Layer for Human-Agent Collaboration
 
-GoatDB is an embedded, distributed, document database that prioritizes speed and developer experience. It excels at real-time collaboration and embedded caching applications.
+GoatDB is the realtime state layer for human-agent collaboration: humans, AI agents, tools, and devices share the same live, durable state. Under the hood it is an embedded, distributed document database providing verifiable local-first state continuity, prioritizing speed, developer experience, and signed provenance.
 
-Instead of following traditional database design patterns, GoatDB leverages concepts refined over decades by distributed version control systems. These are enhanced with novel algorithms (bloom filter-based synchronization and ephemeral CRDTs) for efficient synchronization and automatic real-time conflict resolution.
+Instead of following traditional database design patterns, GoatDB leverages concepts refined over decades by distributed version control systems. In secure mode (default), every write produces a cryptographically signed commit appended to a durable commit graph. Concurrent changes merge deterministically through Git-style three-way merge at the field level. The commit graph is the authoritative source of repository state — not the network, server, or any single peer.
 
-Currently optimized for TypeScript environments, GoatDB functions as a first-class citizen in both browsers and servers. It utilizes a document model with schemas, providing causal eventual consistency to simplify development while offering built-in optional cryptographic signing for the underlying commit graph.
+Currently optimized for TypeScript environments, GoatDB functions as a first-class citizen in both browsers and servers. It utilizes a document model with schemas, providing causal eventual consistency to simplify development while offering built-in Ed25519 session signing (default secure mode) for the underlying commit graph.
 
 Core Features:
+- Durable Commit Graph: Append-only source of truth for repository state; cryptographically signed in secure mode (default)
 - Repository-Centric Design: Independent units of data synchronization and access control
 - Memory-First Architecture: Explicit control with predictable performance
-- Local Query Processing: Real-time query engine with distributed consistency
-- Simple Storage Model: Single file per repository for atomic operations
-- Efficient Synchronization: Stateless, delta-compressed data exchange
-- Time-Based Garbage Collection: Session-based commit history management
+- Local Query Processing: Reactive query engine with distributed consistency
+- Deterministic Structural Merge: Git-style three-way merge at the field level
+- Signed Provenance: Ed25519 session signatures on every commit (default secure mode)
+- Server Recovery: Any authorized client replica holding the relevant history can restore a crashed server
+- Offline-First: Full local replicas of each opened repository; work continues without network connectivity
+
+Current Network Architecture:
+- Carrier: HTTP (current); WebSocket and WebRTC planned
+- Trigger: Polling with 200ms scheduler checks plus per-repository adaptive 300–1500ms cycles
+- Typical latency: 700–1000ms application-perceived
+- Topology: Server-coordinated (current); direct P2P via WebRTC planned
+- Sync protocol: Transport-independent, delta-compressed, Bloom-filter-based reconciliation
 
 Documentation Pages:
-- Architecture: https://goatdb.dev/architecture
-- Authorization Rules: https://goatdb.dev/authorization-rules
-- Benchmarks: https://goatdb.dev/benchmarks
-- Commit Graph: https://goatdb.dev/commit-graph
-- Concepts: https://goatdb.dev/concepts
-- Conflict Resolution: https://goatdb.dev/conflict-resolution
-- FAQ: https://goatdb.dev/faq
-- Installation: https://goatdb.dev/install
-- Query: https://goatdb.dev/query
-- Reading and Writing Data: https://goatdb.dev/reading-and-writing-data
-- React Integration: https://goatdb.dev/react
-- Repositories: https://goatdb.dev/repositories
-- Schema: https://goatdb.dev/schema
-- Sessions: https://goatdb.dev/sessions
-- Synchronization: https://goatdb.dev/sync
-- Tutorial: https://goatdb.dev/tutorial
+- Architecture: https://goatdb.dev/docs/architecture
+- Authorization Rules: https://goatdb.dev/docs/authorization
+- Benchmarks: https://goatdb.dev/docs/benchmarks
+- Commit Graph: https://goatdb.dev/docs/commit-graph
+- Concepts: https://goatdb.dev/docs/concepts
+- Conflict Resolution: https://goatdb.dev/docs/conflict-resolution
+- FAQ: https://goatdb.dev/docs/faq
+- Installation: https://goatdb.dev/docs/install
+- Query: https://goatdb.dev/docs/query
+- Reading and Writing Data: https://goatdb.dev/docs/read-write-data
+- React Integration: https://goatdb.dev/docs/react
+- Repositories: https://goatdb.dev/docs/repositories
+- Schema: https://goatdb.dev/docs/schema
+- Sessions: https://goatdb.dev/docs/sessions
+- Synchronization: https://goatdb.dev/docs/sync
+- Tutorial: https://goatdb.dev/docs/tutorial
 
 Example Projects:
 - Todo: https://github.com/goatplatform/todo

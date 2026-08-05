@@ -5,7 +5,8 @@ sidebar_position: 11
 slug: /commit-graph
 ---
 
-import CommitGraphIllustration from '@site/src/components/diagrams/CommitGraphIllustration';
+import CommitGraphIllustration from
+'@site/src/components/diagrams/CommitGraphIllustration';
 
 # Commit Graph
 
@@ -24,30 +25,34 @@ presence of offline editing.
 
 Simply put, all data creation and editing operations in GoatDB append new
 commits to the replicated commit graph. The commit graph is then synchronized in
-the background, in real-time, with other peers in the network.
+the background with the server.
 
-Each commit in the graph is [signed with the private key](/docs/sessions) of the peer
-that created it. This enables the network to verify the graph and ensures that:
+In secure mode (default), each commit in the graph is [signed](/docs/sessions)
+with the session's private key. This enables verification that commits were
+created by authorized sessions and that each commit edited only what was
+allowed, effectively enforcing permissions retroactively. A commit that appears
+to perform unauthorized modifications is simply ignored. Trusted mode disables
+signing, verification, authorization, and provenance.
 
-1. All commits were created by known, trusted peers.
-2. Each commit edited only what was allowed, effectively enforcing permissions
-   retroactively. A commit that appears to perform unauthorized modifications is
-   simply ignored by the network.
+Because the graph is append-only and every commit is signed, it doubles as an
+audit trail for delegated work — you can always verify which session wrote what,
+including actions taken by agents.
 
 The length of the commit graph—that is, how much history is retained—determines
-the maximum supported offline period. For example, if configured to retain two
-weeks of history, clients can go offline for up to two weeks and still rejoin
-the network and merge their offline edits.
+the maximum supported offline period, subject to the availability of authorized
+replicas and configured retention policies. For example, if configured to retain
+two weeks of history, clients can go offline for up to two weeks and still
+rejoin and merge their offline edits.
 
 <CommitGraphIllustration />
 
 ## Creation Process
 
-When creating a new commit, a peer follows the procedure below:
+When creating a new commit, a GoatDB instance follows the procedure below:
 
 1. Capture the state of the data in a commit format.
 2. Apply [delta compression](#delta-compression).
-3. Sign the result with the peer's private key.
+3. Sign the result with the session's private key.
 4. Write the new commit to the replicated graph.
 
 ## Ancestor Pointers
@@ -55,8 +60,8 @@ When creating a new commit, a peer follows the procedure below:
 In addition to its direct parents, each commit stores references to K ancestors
 further up the commit history. These ancestor pointers serve two purposes:
 
-1. **Bridging sync gaps.** The [bloom-filter sync protocol](/docs/sync)
-   may temporarily miss consecutive commits, creating gaps in the local graph.
+1. **Bridging sync gaps.** The [bloom-filter sync protocol](/docs/sync) may
+   temporarily miss consecutive commits, creating gaps in the local graph.
    Ancestor pointers let the system see past these gaps. A commit that appears
    in another commit's ancestor list is recognized as part of the graph and is
    not treated as a leaf — even if its direct parent link is missing locally.
@@ -68,8 +73,8 @@ further up the commit history. These ancestor pointers serve two purposes:
 
 The probability of missing K consecutive commits during sync is approximately
 FPR^K, where FPR is the bloom filter's false-positive rate. With GoatDB's
-minimum FPR cap of 0.001, gaps larger than three commits are extremely
-unlikely. See the [synchronization page](/docs/sync) for the full analysis.
+minimum FPR cap of 0.001, gaps larger than three commits are extremely unlikely.
+See the [synchronization page](/docs/sync) for the full analysis.
 
 ## Delta Compression
 
@@ -106,8 +111,4 @@ shared by other delta-compressed commits, it is a good candidate for caching.
 
 Another potential issue with delta compression is the loss of the base version.
 If the base version is lost or corrupted, the entire chain of dependent commits
-becomes unreadable. To mitigate this risk, GoatDB periodically (approximately
-every 20 commits) enforces the creation of a full snapshot commit, even if delta
-compression would otherwise be more efficient. This increases the system's
-reliability by avoiding long chains of delta-compressed commits, at the cost of
-minimal performance overhead.
+becomes unreadable. To mitigate this risk, GoatDB probabilistically creates a full snapshot commit with approximately 1 in 20 probability per commit, even if delta compression would otherwise be more efficient. This increases the system's reliability by avoiding long chains of delta-compressed commits, at the cost of minimal performance overhead.

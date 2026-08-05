@@ -5,12 +5,13 @@ sidebar_position: 10
 slug: /sync
 ---
 
-
 # Synchronization Protocol
 
-At the heart of GoatDB lies a [distributed commit graph](/docs/commit-graph). This
-graph must be synchronized across all peers in the network to converge into a
-single version of truth.
+At the heart of GoatDB lies a [distributed commit graph](/docs/commit-graph).
+This graph must be synchronized across all peers in the network to converge into
+a single version of truth. This convergence is what keeps humans and agents
+working from the same live state, even when they write concurrently or spend
+time offline.
 
 ## Background
 
@@ -18,7 +19,7 @@ single version of truth.
 addresses this problem by traversing the commit graph over multiple
 request-response cycles, sending any missing commits until a common ancestor is
 identified. However, this process often involves several round trips, making it
-unsuitable for real-time collaboration.
+unsuitable for realtime collaboration.
 
 Martin Kleppmann and his team
 [published](https://martin.kleppmann.com/2020/12/02/bloom-filter-hash-graph-sync.html)
@@ -72,9 +73,9 @@ misses. For instance:
   3. Iteration 3 misses 6.25 × 0.25 = ~1.56 entries.
   4. …
 
-This iterative process guarantees convergence.
+This iterative process converges probabilistically.
 
-To bound the process, GoatDB uses the following relationship:
+GoatDB uses the following heuristic to estimate required cycle count:
 
 $$\text{cycles} = 2 \cdot \log_{\text{fpr}}(\max(M, N))$$
 
@@ -128,39 +129,69 @@ changes from one or both parts of the graph. To prevent this, every commit
 stores a reference to K ancestors further up the graph. Since the Bloom Filter
 may randomly miss some commits, the probability of missing `K` consecutive
 commits is approximately `FPR^K`. By capping the Bloom Filter's false positive
-rate at a minimum of `0.001`, we ensure that a gap larger than three commits is
-extremely unlikely—occurring roughly once every 32 years (assuming one sync
-iteration per second).
+rate at a minimum of `0.001`, a gap larger than three commits is extremely unlikely—for example, with one sync iteration per second, `FPR^4 = 10^{-12}` yields roughly one occurrence per 32 years under those assumptions.
 
 ### Merge Deferral on Incomplete Graphs
 
 When a gap does occur despite ancestor pointers, the system responds
-defensively. The [merge-base (LCA) algorithm](/docs/conflict-resolution#merge-base-selection)
-expands its search through ancestor links as well as parent links, ranking
-every common-ancestor candidate by depth (closeness to the two leaves). It
-always prefers the closest candidate.
+defensively. The
+[merge-base (LCA) algorithm](/docs/conflict-resolution#merge-base-selection)
+expands its search through ancestor links as well as parent links, ranking every
+common-ancestor candidate by depth (closeness to the two leaves). It always
+prefers the closest candidate.
 
-If the closest candidate exists in the intersection of both ancestry sets but
-is not yet available locally, the merge is **deferred**: the leaf is left
-unmerged and retried on the next merge attempt after sync delivers the missing
-commit. This prevents the system from falling back to a farther ancestor, which
-would produce a wider diff and potentially revert intermediate changes.
+If the closest candidate exists in the intersection of both ancestry sets but is
+not yet available locally, the merge is **deferred**: the leaf is left unmerged
+and retried on the next merge attempt after sync delivers the missing commit.
+This prevents the system from falling back to a farther ancestor, which would
+produce a wider diff and potentially revert intermediate changes.
 
 This design also provides resilience against bad actors. If a peer injects a
 branch but withholds K+1 consecutive ancestor commits, the LCA search finds no
-usable candidate — the branch is deferred indefinitely. The system never
-reverts good data to accommodate an incomplete branch. Legitimate users whose
-commits are temporarily missing due to bloom-filter false positives will have
-their gaps bridged by ancestor pointers within one or two sync iterations.
+usable candidate — the branch is deferred indefinitely. The system never reverts
+good data to accommodate an incomplete branch. Legitimate users whose commits
+are temporarily missing due to bloom-filter false positives will have their gaps
+bridged by ancestor pointers within one or two sync iterations.
+
+## Trigger, Carrier, and Topology
+
+The sync protocol is **transport-independent**. Three orthogonal concerns shape
+real-world performance:
+
+### Trigger — What Starts Sync
+
+- **Current (shipping):** Polling. Scheduler checks run every **200ms**, while
+  each repository follows adaptive **300–1500ms** sync cycles.
+- **In progress (not yet shipped):** Active shoulder tap — an ephemeral
+  notification that tells a peer to begin syncing. It does not replace
+  commit-graph reconciliation as the source of truth.
+
+### Carrier — How Sync Messages Travel
+
+- **Current (shipping):** HTTP. Each sync cycle involves multiple HTTP
+  round-trips for Bloom filter exchange.
+- **Planned (roadmap):** WebSocket and WebRTC carriers.
+
+### Topology — How Peers Connect
+
+- **Current (shipping):** Server-coordinated. Peers sync through relay servers.
+- **Planned (roadmap):** True direct peer-to-peer sync via WebRTC, once
+  implemented and proven.
 
 ## Real-World Performance
 
-GoatDB's synchronization prioritizes consistency over speed. In typical deployments, expect **700-1000ms application-perceived latency** between peers.
+GoatDB's synchronization prioritizes consistency over speed. In typical
+deployments with the current HTTP carrier and polling trigger, expect
+**700-1000ms application-perceived latency** between peers.
 
 This latency reflects several architectural components:
 
-- **Sync scheduling:** 200ms polling intervals with 300-1500ms adaptive cycles
+- **Sync scheduling:** 200ms scheduler checks plus per-repository adaptive
+  300–1500ms cycles
 - **Protocol overhead:** Multiple HTTP round-trips for Bloom filter convergence
 - **Processing time:** Commit validation, serialization, and storage operations
 
-For applications requiring sub-100ms synchronization, consider the planned Server-Sent Events optimization or evaluate whether GoatDB's consistency guarantees align with your performance requirements.
+Do not assume that switching triggers or carriers will improve latency until
+measurements confirm it. No latency improvement is claimed for the shoulder tap
+until measured; overall latency also depends on round-trip costs and processing
+time.

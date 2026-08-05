@@ -71,7 +71,7 @@ GoatDB uses `/type/repo/item` paths:
 GoatDB defaults to secure mode with user authentication. For backend-only
 applications in secure environments, you can use `trusted: true` for better
 performance.
-[Learn more about trusted mode](https://goatdb.dev/sessions#trusted-mode).
+[Learn more about trusted mode](https://goatdb.dev/docs/sessions#trusted-mode).
 
 ## Requirements
 

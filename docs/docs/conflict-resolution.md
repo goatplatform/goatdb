@@ -5,16 +5,46 @@ sidebar_position: 9
 slug: /conflict-resolution
 ---
 
+import FieldMergeCloseUp from
+'@site/src/components/diagrams/FieldMergeCloseUp';
+import MergeBaseBranches from
+'@site/src/components/diagrams/MergeBaseBranches';
 
 # Conflict Resolution
+
+Concurrent writes are the norm in human-agent collaboration: a human edits a
+task's title in the UI while an agent updates its status in the same item, at
+the same time. GoatDB resolves these concurrent writes with a deterministic
+field-level merge — all replicas converge to the same value — and because in
+secure mode (the default) every commit
+carries signed provenance, each side
+of the merge stays attributed to the session that wrote it.
+
+The merge operates at the data-structure level, combining concurrent edits
+field by field: primitives, sets, maps, rich text, and ordered collections
+each resolve concurrent writes by their own deterministic strategy, as the
+figure below shows.
+
+<FieldMergeCloseUp />
+
+:::note
+
+Structural merging does **not** resolve semantic or business-logic conflicts.
+The `stock · number` row above shows the limit: if two peers independently
+decrement the same inventory counter, the merged result keeps one written value
+instead of accumulating both decrements — structural merging provides neither
+additive-counter semantics nor a non-negative result. Enforcing such invariants,
+or deciding whether an agent's edit is acceptable, is an application-level
+policy decision that may require human review.
+
+:::
+
+## Merge Base Selection
 
 Whenever a peer in the network detects more than one differing value at the
 leaves of the [commit graph](/docs/commit-graph), it performs a
 [three-way merge](https://en.wikipedia.org/wiki/Merge_(version_control)#Three-way_merge)
-to resolve the conflict. Internally, a conflict-free patch function is used
-temporarily during the merge process.
-
-## Merge Base Selection
+to resolve the conflict.
 
 A three-way merge needs a **base version** — the point where the two divergent
 branches last shared the same state. GoatDB finds this base by computing the
@@ -22,21 +52,23 @@ Lowest Common Ancestor (LCA) of the two leaf commits in the
 [commit graph](/docs/commit-graph).
 
 The LCA algorithm walks the graph from both leaves simultaneously, expanding
-through both parent links and [ancestor pointers](/docs/commit-graph#ancestor-pointers).
-It tracks the depth (number of hops) from each leaf to every reachable commit
-and builds an intersection of commits reachable from both sides. Among
-candidates in the intersection, the one with the lowest combined depth from
-both leaves is selected — this is the closest common ancestor.
+through both parent links and
+[ancestor pointers](/docs/commit-graph#ancestor-pointers). It tracks the depth
+(number of hops) from each leaf to every reachable commit and builds an
+intersection of commits reachable from both sides. Among candidates in the
+intersection, the one with the lowest combined depth from both leaves is
+selected — this is the closest common ancestor.
 
 When the closest candidate exists in the intersection but has not yet been
 synced to the local peer, the merge is **deferred** rather than falling back to
-a farther ancestor. A farther base would produce a wider diff and risk
-reverting intermediate changes. The deferred leaf stays in the graph and is
-retried on the next merge attempt, after the [sync protocol](/docs/sync)
-delivers the missing commit. See the
-[sync page](/docs/sync#merge-deferral-on-incomplete-graphs) for how ancestor
-pointers and bloom-filter false-positive rates interact to keep deferrals rare
-in practice.
+a farther ancestor. A farther base would produce a wider diff and risk reverting
+intermediate changes. The deferred leaf stays in the graph and is retried on the
+next merge attempt, after the [sync protocol](/docs/sync) delivers the missing
+commit. See the [sync page](/docs/sync#merge-deferral-on-incomplete-graphs) for
+how ancestor pointers and bloom-filter false-positive rates interact to keep
+deferrals rare in practice.
+
+<MergeBaseBranches />
 
 ## CRDTs
 
@@ -165,7 +197,7 @@ global order. The resolution strategies are as follows:
 Timestamp-based resolution is not fair and may lead to starvation in some cases,
 where changes from parties with slower clocks are consistently ignored. It is
 especially suited for environments where clocks are tightly synchronized, such
-as within a data center, and less appropriate for real-time collaboration
+as within a data center, and less appropriate for realtime collaboration
 sessions between different clients.
 
 This approach ensures efficient conflict resolution tailored to the requirements
