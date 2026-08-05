@@ -211,6 +211,13 @@ export default function setupPathTests(): void {
     assertEquals(toFileUrl('C:\\Users\\foo'), 'file:///C:/Users/foo');
   });
 
+  TEST('Path', 'toFileUrl preserves UNC authorities', () => {
+    const filePath = '\\\\fileserver\\shared folder\\entry.ts';
+    const url = 'file://fileserver/shared%20folder/entry.ts';
+    assertEquals(toFileUrl(filePath), url);
+    assertEquals(fromFileUrl(url), '//fileserver/shared folder/entry.ts');
+  });
+
   TEST('Path', 'toFileUrl encodes URL syntax in path components', () => {
     const filePath = 'C:/goat#44?/100%/entry.ts';
     const url = 'file:///C:/goat%2344%3F/100%25/entry.ts';
