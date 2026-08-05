@@ -257,8 +257,8 @@ function HomepageHeader() {
           <p className={styles.heroSummary}>{heroSummary}</p>
           <div className={styles.heroActions}>
             <CtaButtons ctas={heroCtas} ariaLabel='Build with GoatDB' />
-            <TextLink className={styles.heroSecondary} to='#architecture'>
-              See the shared-state system
+            <TextLink className={styles.heroSecondary} to='/docs/architecture'>
+              GoatDB Architecture
             </TextLink>
           </div>
         </div>
