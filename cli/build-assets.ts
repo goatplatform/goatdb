@@ -30,6 +30,11 @@ export interface BuildAssetsOptions {
    */
   runtime?: 'deno' | 'node';
   /**
+   * Path to the project's deno.json, forwarded to the Deno esbuild plugin so
+   * the app's import map resolves deps regardless of the process CWD.
+   */
+  denoConfigPath?: string;
+  /**
    * When true, keeps the esbuild background process alive after building.
    * Caller is responsible for calling stopBackgroundCompiler().
    */
@@ -74,6 +79,7 @@ async function buildDirectly(
     runtime: options?.runtime ?? 'deno',
     minify: appConfig.minify,
     userPlugins: appConfig.esbuildPlugins,
+    denoConfigPath: options?.denoConfigPath,
   });
   try {
     return clientBuildOutputFromResult(await esbuild.build(buildOptions));

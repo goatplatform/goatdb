@@ -1,38 +1,18 @@
 // Note: We use ../base/path.ts instead of @std/path to avoid JSR dependencies
 // that would break when this module is transitively bundled into SEA binaries.
 import { APP_ENTRY_POINT } from './base/app-entry-point.ts';
+import {
+  getDenoPlugin,
+  getEsbuild,
+  stopBackgroundCompiler,
+} from './base/build-dependencies.ts';
 import { isWindows } from './base/common.ts';
 import * as path from './base/path.ts';
 // IMPORTANT: These MUST remain `import type` — runtime imports would break
-// Node.js SEA binaries since esbuild/deno-loader are Deno-specific packages.
+// Node.js SEA binaries since esbuild/deno-plugin are Deno-specific packages.
 import type { BuildOptions, Loader, Plugin } from 'esbuild';
-import type { denoPlugins } from '@luca/esbuild-deno-loader';
 
-// Lazy-loaded modules to avoid bundling build-time dependencies into runtime code.
-// These packages (esbuild, @luca/esbuild-deno-loader) are Deno/JSR-specific and
-// cannot be resolved by Node.js at runtime.
-// We assign specifiers to variables so bundlers (esbuild) won't statically
-// resolve and inline these imports, which would break SEA binaries.
-// deno-lint-ignore no-explicit-any
-let esbuildModule: any;
-// deno-lint-ignore no-explicit-any
-let denoPluginsModule: any;
-
-export async function getEsbuild(): Promise<typeof import('esbuild')> {
-  if (!esbuildModule) {
-    const specifier = 'esbuild';
-    esbuildModule = await import(specifier);
-  }
-  return esbuildModule as typeof import('esbuild');
-}
-
-export async function getDenoPlugins(): Promise<typeof denoPlugins> {
-  if (!denoPluginsModule) {
-    const specifier = '@luca/esbuild-deno-loader';
-    denoPluginsModule = await import(specifier);
-  }
-  return denoPluginsModule.denoPlugins as typeof denoPlugins;
-}
+export { getDenoPlugin, getEsbuild, stopBackgroundCompiler };
 
 export type EntryPoint = { in: string; out: string };
 
@@ -45,6 +25,12 @@ export interface ClientBundleSpec {
   runtime: 'deno' | 'node';
   minify?: boolean;
   userPlugins?: Plugin[];
+  /**
+   * Path to the project's deno.json. Passed to @deno/esbuild-plugin so app
+   * dependencies (import map) resolve regardless of the process CWD, whose
+   * config the plugin would otherwise auto-discover.
+   */
+  denoConfigPath?: string;
 }
 
 /** Per entry-point outputs, keyed by the entry's out name. */
@@ -75,25 +61,44 @@ function assertValidPlugins(plugins: Plugin[], owner: string): void {
 }
 
 /**
- * On Windows, the Deno resolver (@luca/esbuild-deno-loader) resolves specifiers
- * via URL parsing, where a drive-letter path like `C:/Users/...` is parsed with
- * `C:` as a URL scheme — dropping the drive letter and breaking resolution.
- * esbuild hands entry `in` strings verbatim to onResolve, so converting entries
- * to file:// URLs bypasses the mangling. Node's native resolver and POSIX paths
- * are unaffected.
+ * Canonicalizes a build entry path before it crosses into the bundling layer.
+ * On Windows, the Deno WASM resolver (@deno/esbuild-plugin) parses drive-letter
+ * paths (C:/foo) with `C:` as a URL scheme — dropping the drive letter and
+ * breaking resolution. UNC paths must also use file:// form so the host/share
+ * boundary stays intact. POSIX absolute, relative, and existing file:// paths
+ * pass through unchanged.
+ */
+export function normalizeBuildEntryPath(entryPath: string): string {
+  if (/^[A-Za-z]:[/\\]/.test(entryPath) || /^[/\\]{2}[^/\\]/.test(entryPath)) {
+    return path.toFileUrl(entryPath);
+  }
+  return entryPath;
+}
+
+/**
+ * Converts Deno-target entry points to file:// URLs on Windows so the WASM
+ * resolver doesn't mangle drive-letter paths. Node's native resolver and
+ * POSIX paths are unaffected.
  */
 function denoEntryPoints(spec: ClientBundleSpec): EntryPoint[] {
   if (spec.runtime !== 'deno' || !isWindows()) {
     return spec.entryPoints;
   }
-  return spec.entryPoints.map((e) => ({ ...e, in: path.toFileUrl(e.in) }));
+  return spec.entryPoints.map((e) => ({
+    ...e,
+    in: normalizeBuildEntryPath(e.in),
+  }));
 }
 
 /** Single source of truth for client (browser) esbuild options. */
 export async function clientBuildOptions(
   spec: ClientBundleSpec,
 ): Promise<BuildOptions> {
-  const plugins = await clientPlugins(spec.runtime, spec.userPlugins ?? []);
+  const plugins = await clientPlugins(
+    spec.runtime,
+    spec.userPlugins ?? [],
+    spec.denoConfigPath,
+  );
   return {
     entryPoints: denoEntryPoints(spec),
     plugins,
@@ -124,20 +129,27 @@ export async function clientBuildOptions(
 async function clientPlugins(
   runtime: 'deno' | 'node',
   userPlugins: Plugin[],
+  denoConfigPath?: string,
 ): Promise<Plugin[]> {
   assertValidPlugins(userPlugins, 'AppConfig.esbuildPlugins');
   const adapterPlugin = adapterStubPlugin(['deno', 'node']);
   if (runtime === 'node') {
     return [adapterPlugin, nodeStubPlugin(), ...userPlugins];
   }
-  const builtins = (await getDenoPlugins())() as unknown as Plugin[];
-  assertDenoPluginOrder(builtins);
+  // @deno/esbuild-plugin is a single resolver+loader plugin (WASM). It must be
+  // registered LAST: esbuild runs handlers in registration order, so user
+  // plugins and browserAssetPlugin win the onLoad chain for CSS/assets, and
+  // user onResolve handlers see raw specifiers (with resolveDir) rather than
+  // pre-resolved paths (the @luca resolver/loader split no longer exists).
+  // configPath: the plugin's config discovery is CWD-based, so the project's
+  // deno.json must be passed explicitly or app deps fail to resolve.
   return [
     adapterPlugin,
-    builtins[0],
     ...userPlugins,
     browserAssetPlugin(),
-    ...builtins.slice(1),
+    (await getDenoPlugin())({
+      configPath: denoConfigPath,
+    }) as unknown as Plugin,
   ];
 }
 
@@ -186,18 +198,6 @@ function browserAssetPlugin(): Plugin {
 
 async function readBuildFile(filePath: string): Promise<Uint8Array> {
   return await (await import('node:fs/promises')).readFile(filePath);
-}
-
-function assertDenoPluginOrder(plugins: Plugin[]): void {
-  assertValidPlugins(plugins, '@luca/esbuild-deno-loader');
-  if (
-    plugins[0]?.name !== 'deno-resolver' ||
-    plugins[1]?.name !== 'deno-loader'
-  ) {
-    throw new Error(
-      'Unsupported @luca/esbuild-deno-loader plugin order: expected deno-resolver then deno-loader.',
-    );
-  }
 }
 
 // Node.js builds: stub node:* imports that appear in library code behind
@@ -304,14 +304,6 @@ export function adapterStubPlugin(
       }
     },
   };
-}
-
-export async function stopBackgroundCompiler(): Promise<void> {
-  if (esbuildModule) {
-    await esbuildModule.stop();
-    esbuildModule = undefined;
-    denoPluginsModule = undefined;
-  }
 }
 
 export interface ReBuildContext {

@@ -139,13 +139,32 @@ function getCwd(): string {
 export function debugClientBundleSpec(
   options: AppConfig,
   runtime: 'deno' | 'node',
+  denoConfigPath?: string,
 ): ClientBundleSpec {
   return {
     entryPoints: appEntryPoints(options),
     runtime,
     minify: options.minify,
     userPlugins: options.esbuildPlugins,
+    denoConfigPath,
   };
+}
+
+export async function debugConfigPaths(
+  options: Pick<AppConfig, 'denoJson' | 'packageJson'>,
+  cwd: string,
+): Promise<{ buildInfoConfigPath: string; denoConfigPath?: string }> {
+  const localDenoConfigPath = path.join(cwd, 'deno.json');
+  const denoConfigPath = options.denoJson ||
+    (await pathExists(localDenoConfigPath) ? localDenoConfigPath : undefined);
+  const buildInfoConfigPath = options.denoJson || options.packageJson ||
+    denoConfigPath || path.join(cwd, 'package.json');
+  if (!await pathExists(buildInfoConfigPath)) {
+    throw new Error(
+      `No config file found. Expected deno.json or package.json in "${cwd}".`,
+    );
+  }
+  return { buildInfoConfigPath, denoConfigPath };
 }
 
 /**
@@ -164,20 +183,11 @@ export async function startDebugServer<US extends Schema>(
   getGoatConfig().debug = true; // Turn on debug mode globally
 
   const cwd = getCwd();
-  let configPath = options.denoJson || options.packageJson;
-  if (!configPath) {
-    const denoJsonPath = path.join(cwd, 'deno.json');
-    const packageJsonPath = path.join(cwd, 'package.json');
-    configPath = await pathExists(denoJsonPath)
-      ? denoJsonPath
-      : packageJsonPath;
-  }
-  if (!await pathExists(configPath)) {
-    throw new Error(
-      `No config file found. Expected deno.json or package.json in "${cwd}".`,
-    );
-  }
-  const buildInfo = await generateBuildInfo(configPath);
+  const { buildInfoConfigPath, denoConfigPath } = await debugConfigPaths(
+    options,
+    cwd,
+  );
+  const buildInfo = await generateBuildInfo(buildInfoConfigPath);
   buildInfo.debugBuild = true;
 
   const server = new Server({
@@ -191,6 +201,7 @@ export async function startDebugServer<US extends Schema>(
   const buildSpec = debugClientBundleSpec(
     options,
     isNode() ? 'node' : 'deno',
+    isNode() ? undefined : denoConfigPath,
   );
   const entryPoints = buildSpec.entryPoints;
 

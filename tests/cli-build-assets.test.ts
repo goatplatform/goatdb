@@ -5,12 +5,16 @@ import * as path from '../base/path.ts';
 import {
   createBuildContext,
   type EntryPoint,
+  normalizeBuildEntryPath,
   stopBackgroundCompiler,
 } from '../build.ts';
 import { appEntryPoints, buildAssets } from '../cli/build-assets.ts';
 import { composeCssSourcemap } from '../cli/css-sourcemap.ts';
 import type { AppConfig } from '../cli/app-config.ts';
-import { debugClientBundleSpec } from '../cli/debug-server.ts';
+import {
+  debugClientBundleSpec,
+  debugConfigPaths,
+} from '../cli/debug-server.ts';
 import type { StaticAssets } from '../system-assets/system-assets.ts';
 import type { Plugin } from 'esbuild';
 import { AnyMap, originalPositionFor } from '@jridgewell/trace-mapping';
@@ -63,7 +67,7 @@ async function buildFixture(
       undefined,
       appEntryPoints(value.config),
       value.config,
-      { runtime },
+      { runtime, denoConfigPath: value.config.denoJson },
     );
   } finally {
     await stopBackgroundCompiler();
@@ -495,6 +499,83 @@ async function missingHtmlTest(ctx: TestSuite): Promise<void> {
   );
 }
 
+function buildEntryPathNormalizationTest(_ctx: TestSuite): void {
+  assertEquals(
+    normalizeBuildEntryPath('C:\\Users\\goatdb\\entry.ts'),
+    'file:///C:/Users/goatdb/entry.ts',
+  );
+  assertEquals(
+    normalizeBuildEntryPath('\\\\fileserver\\share\\entry.ts'),
+    'file://fileserver/share/entry.ts',
+  );
+  assertEquals(normalizeBuildEntryPath('/tmp/entry.ts'), '/tmp/entry.ts');
+  assertEquals(normalizeBuildEntryPath('entry.ts'), 'entry.ts');
+}
+
+async function denoConfigBuildTest(ctx: TestSuite): Promise<void> {
+  const value = await fixture(ctx, 'deno-config');
+  value.config.jsPath = await addFile(
+    value,
+    'entry.tsx',
+    [
+      "import { message } from '@fixture/value';",
+      'globalThis.__fixtureValue = <section>{message}</section>;',
+    ].join('\n'),
+  );
+  const importsDir = path.join(value.dir, 'imports');
+  await Deno.mkdir(importsDir, { recursive: true });
+  await writeTextFile(
+    path.join(importsDir, 'value.ts'),
+    "export const message = 'import-map-value';",
+  );
+  await writeTextFile(
+    path.join(importsDir, 'jsx-runtime.ts'),
+    "export function jsx() { return 'configured-jsx-runtime'; }",
+  );
+  const denoJsonPath = await addFile(
+    value,
+    'deno.json',
+    JSON.stringify({
+      imports: {
+        '@fixture/value': './imports/value.ts',
+        'fixture-jsx/jsx-runtime': './imports/jsx-runtime.ts',
+      },
+      compilerOptions: {
+        jsx: 'react-jsx',
+        jsxImportSource: 'fixture-jsx',
+      },
+    }),
+  );
+  value.config.denoJson = denoJsonPath;
+  const directAssets = await buildFixture(value, 'deno');
+  const directJs = decodeAsset(directAssets, '/app.js');
+  assertTrue(directJs.includes('import-map-value'));
+  assertTrue(directJs.includes('configured-jsx-runtime'));
+
+  const spec = debugClientBundleSpec(value.config, 'deno', denoJsonPath);
+  const buildCtx = await createBuildContext(spec);
+  try {
+    const debugJs = decodeAsset(
+      await buildAssets(buildCtx, spec.entryPoints, value.config),
+      '/app.js',
+    );
+    assertTrue(debugJs.includes('import-map-value'));
+    assertTrue(debugJs.includes('configured-jsx-runtime'));
+  } finally {
+    buildCtx.close();
+    await stopBackgroundCompiler();
+  }
+}
+
+async function packageOnlyDebugConfigTest(ctx: TestSuite): Promise<void> {
+  const dir = await ctx.tempDir('package-only-debug-config');
+  const packageJson = path.join(dir, 'package.json');
+  await writeTextFile(packageJson, '{"name":"package-only"}');
+  const paths = await debugConfigPaths({ packageJson }, dir);
+  assertEquals(paths.buildInfoConfigPath, packageJson);
+  assertEquals(paths.denoConfigPath, undefined);
+}
+
 async function denoRealFilesTest(ctx: TestSuite): Promise<void> {
   const value = await fixture(ctx, 'deno-real-files', "import './style.css';");
   await addFile(
@@ -687,6 +768,21 @@ export default function setupCliBuildAssetsTests() {
   );
   TEST(kSuite, 'entry without CSS omits index.css', serverTest(noCssTest));
   TEST(kSuite, 'missing htmlPath fails visibly', serverTest(missingHtmlTest));
+  TEST(
+    kSuite,
+    'normalizes Windows and UNC build entry paths',
+    serverTest(buildEntryPathNormalizationTest),
+  );
+  TEST(
+    kSuite,
+    'Deno build uses a foreign-CWD config import map and JSX compiler options',
+    denoTest(denoConfigBuildTest),
+  );
+  TEST(
+    kSuite,
+    'package-only debug config is not passed to the Deno plugin',
+    serverTest(packageOnlyDebugConfigTest),
+  );
   TEST(
     kSuite,
     'Deno build loads real CSS and asset files',

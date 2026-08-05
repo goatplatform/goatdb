@@ -265,7 +265,7 @@ export function isNode(): boolean {
  * Lightweight variant for SEA-bundled modules; `base/os.ts` has a heavier
  * version backed by the runtime adapter system (`getRuntime().getOS()`).
  *
- * The client build pipeline (esbuild + @luca/esbuild-deno-loader) treats
+ * The client build pipeline (esbuild + @deno/esbuild-plugin) treats
  * Windows drive-letter paths differently from POSIX paths; callers use this to
  * apply platform-specific path normalization (see build.ts).
  *
