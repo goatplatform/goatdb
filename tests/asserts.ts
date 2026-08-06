@@ -133,6 +133,64 @@ export function assertThrows(
 }
 
 /**
+ * Asserts that a function throws an error that is an instance of the
+ * expected error class when called.
+ * @param fn - The function expected to throw
+ * @param errorCtor - The expected error constructor (e.g. TypeError)
+ * @param message - Optional error message to display if assertion fails
+ * @throws {AssertionError} If the function does not throw, or throws a
+ *   non-instance of the expected error class
+ */
+export function assertThrowsInstanceOf(
+  fn: () => unknown | Promise<unknown>,
+  errorCtor: new (...args: unknown[]) => unknown,
+  message?: string,
+): void | Promise<void> {
+  const logStreams = getGlobalLoggerStreams();
+  setGlobalLoggerStreams([]);
+  let threw = false;
+  let caughtError: unknown;
+  try {
+    const result = fn();
+    if (result instanceof Promise) {
+      return result.then(
+        () => {
+          throw new AssertionError(
+            message || 'Expected function to throw, but it did not',
+          );
+        },
+        (e) => {
+          threw = true;
+          caughtError = e;
+          if (!(caughtError instanceof errorCtor)) {
+            throw new AssertionError(
+              message ||
+                `Expected error to be instance of ${errorCtor.name}, got ${caughtError?.constructor?.name ?? typeof caughtError}`,
+            );
+          }
+        },
+      );
+    }
+  } catch (e) {
+    threw = true;
+    caughtError = e;
+  } finally {
+    setGlobalLoggerStreams(logStreams);
+  }
+  if (!threw) {
+    throw new AssertionError(
+      message || 'Expected function to throw, but it did not',
+    );
+  }
+  if (!(caughtError instanceof errorCtor)) {
+    throw new AssertionError(
+      message ||
+        `Expected error to be instance of ${errorCtor.name}, got ${caughtError?.constructor?.name ?? typeof caughtError}`,
+    );
+  }
+}
+
+/**
  * Asserts that a number is less than another number.
  * @param actual - The actual number to check
  * @param expected - The number that actual should be less than

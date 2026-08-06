@@ -12,7 +12,7 @@ import {
   toAbsolutePath,
   toFileUrl,
 } from '../base/path.ts';
-import { assertThrows } from './asserts.ts';
+import { assertThrows, assertThrowsInstanceOf } from './asserts.ts';
 
 export default function setupPathTests(): void {
   // normalize tests
@@ -223,5 +223,12 @@ export default function setupPathTests(): void {
     const url = 'file:///C:/goat%2344%3F/100%25/entry.ts';
     assertEquals(toFileUrl(filePath), url);
     assertEquals(fromFileUrl(url), filePath);
+  });
+
+  TEST('Path', 'toFileUrl rejects relative paths', () => {
+    assertThrowsInstanceOf(() => toFileUrl('foo/bar'), TypeError);
+    assertThrowsInstanceOf(() => toFileUrl('./foo'), TypeError);
+    assertThrowsInstanceOf(() => toFileUrl('../foo'), TypeError);
+    assertThrowsInstanceOf(() => toFileUrl(''), TypeError);
   });
 }

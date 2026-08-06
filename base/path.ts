@@ -195,6 +195,9 @@ export function toAbsolutePath(p: string): string {
  */
 export function toFileUrl(p: string): string {
   p = normalizeSlashes(p);
+  if (!p.startsWith('/') && !/^[A-Za-z]:/.test(p)) {
+    throw new TypeError(`toFileUrl requires an absolute path, got: "${p}"`);
+  }
   if (p.startsWith('//')) {
     const [host, ...segments] = p.slice(2).split('/');
     return `file://${host}/${fileUrlPath(segments)}`;
