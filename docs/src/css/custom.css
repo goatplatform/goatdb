@@ -341,30 +341,18 @@
   font-synthesis: none;
 }
 
-/* Blocky buttons: 2px border + hard offset shadow, no soft hover lift.
- * Press = instant 4px step into the shadow (pixel press).
- * Labels: 16px uppercase 400 (400 avoids faux-bold smear).
- * Readability takes priority over the 11px grid for every button. */
+/* Blocky buttons: 2px border + pixel label typography (16px uppercase 400;
+ * 400 avoids faux-bold smear). Press mechanics (hard shadow, hover lift,
+ * press, 80ms ease) come from the global .pressable system, composed in
+ * CtaButtons.module.css. Readability takes priority over the 11px grid. */
 .button {
   border-width: 2px;
-  box-shadow: 4px 4px 0 var(--shadow-hard);
   font-family: var(--font-pixel);
   font-size: 16px;
   font-weight: 400;
   padding: 8px
     32px; /* integers: Infima rem defaults land text at fractional x */
   text-transform: uppercase;
-  transition: none;
-}
-
-.button:hover {
-  box-shadow: 4px 4px 0 var(--shadow-hard);
-  transform: none;
-}
-
-.button:active {
-  box-shadow: none;
-  transform: translate(4px, 4px);
 }
 
 /* Docs chrome joins the pixel tier: headings = full homepage display ladder
@@ -509,7 +497,37 @@ pre {
   position: relative;
 }
 
-/* Copy button styling */
-.theme-code-block:hover .copyButton_Tacv {
+/* Shared hard-shadow press for every clickable card/button (pixel system).
+ * Consumers set --press-offset (shadow size) and optionally
+ * --press-shadow-color (defaults to primary; filled buttons keep their
+ * neutral --shadow-hard). Hover lifts 2px and grows the shadow, press steps
+ * fully into it. 80ms ease: an instant jump reads as a glitch. :active must
+ * stay after :hover so press wins. Link resets (color/text-decoration) are
+ * NOT here: they belong to link-card classes, and on filled buttons they
+ * would fight Infima's color classes. Global home: CSS Modules consumers
+ * use `composes: pressable from global;`. */
+.pressable {
+  cursor: pointer;
+  box-shadow: var(--press-offset) var(--press-offset) 0
+    var(--press-shadow-color, var(--ifm-color-primary));
+  transition: box-shadow 80ms ease-out, transform 80ms ease-out;
+}
+
+.pressable:hover {
+  box-shadow: calc(var(--press-offset) + 2px) calc(var(--press-offset) + 2px) 0
+    var(--press-shadow-color, var(--ifm-color-primary));
+  transform: translate(-2px, -2px);
+}
+
+.pressable:active {
+  box-shadow: none;
+  transform: translate(var(--press-offset), var(--press-offset));
+}
+
+.pressable:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 3px;
+}
+
   opacity: 1;
 }

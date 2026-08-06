@@ -395,7 +395,10 @@ function CompressionArrow() {
 
 function GoatSystem() {
   return (
-    <div className={styles.goatSystem}>
+    <Link
+      className={styles.goatSystem}
+      to='/docs/cli#build--development-apis'
+    >
       <p className={styles.stackLabel}>The GoatDB path</p>
       <img
         src='/img/goatdb_mark_dark.svg'
@@ -420,7 +423,7 @@ function GoatSystem() {
         The application/server plane is packaged together. Browser clients and
         external model or tool services remain separate.
       </small>
-    </div>
+    </Link>
   );
 }
 
@@ -441,15 +444,16 @@ function StackCompression() {
 }
 
 function ResponsibilityPanel(
-  { title, items, primary = false }: {
+  { title, items, variant = 'default' }: {
     title: string;
     items: readonly IconItem[];
-    primary?: boolean;
+    variant?: 'default' | 'primary';
   },
 ) {
-  const className = primary
-    ? styles.responsibilityPrimary
-    : styles.responsibilityPanel;
+  const className = [
+    styles.responsibilityCard,
+    variant === 'primary' && styles.responsibilityCardPrimary,
+  ].filter(Boolean).join(' ');
   return (
     <article className={className}>
       <h3>{title}</h3>
@@ -476,7 +480,7 @@ function ResponsibilitySplit() {
       <ResponsibilityPanel
         title='GoatDB owns the shared-state mechanics'
         items={goatResponsibilities}
-        primary
+        variant='primary'
       />
     </div>
   );
@@ -597,11 +601,11 @@ function SpeedStat({ value, label }: { value: string; label: string }) {
 // point-read factor is the claim everything else supports.
 function SpeedFactor() {
   return (
-    <div className={styles.speedFactor}>
+    <Link className={styles.speedFactor} to='/docs/benchmarks#browser'>
       <strong>300×</strong>
       <span>faster reads than SQLite in the browser</span>
       <small>7× on the server. Measured, same machine, reproducible.</small>
-    </div>
+    </Link>
   );
 }
 

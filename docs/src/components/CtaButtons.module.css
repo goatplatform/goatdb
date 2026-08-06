@@ -7,6 +7,11 @@
 }
 
 .button {
+  composes: pressable from global;
+  --press-offset: 4px; /* same shadow size as before */
+  /* Filled buttons keep their neutral hard shadow; cards default to a
+   * primary-colored shadow. */
+  --press-shadow-color: var(--shadow-hard);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -21,9 +26,22 @@
   flex: 0 0 auto;
 }
 
-.button:focus-visible {
-  outline: 2px solid var(--ifm-color-primary);
-  outline-offset: 3px;
+/* Colors are state-constant: only shadow/transform signal interaction.
+ * Infima re-pins --ifm-button-background-color AND --ifm-button-border-color
+ * on :hover/:active, and sets the outline text color directly via
+ * .button.button--secondary; re-assert the rest values at higher
+ * specificity. */
+.button:global(.button--primary):hover,
+.button:global(.button--primary):active {
+  --ifm-button-background-color: var(--ifm-color-primary);
+  --ifm-button-border-color: var(--ifm-color-primary);
+}
+
+.button:global(.button--outline):hover,
+.button:global(.button--outline):active {
+  --ifm-button-background-color: transparent;
+  --ifm-button-border-color: var(--ifm-color-secondary);
+  color: var(--ifm-font-color-base);
 }
 
 @media screen and (max-width: 480px) {
