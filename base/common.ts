@@ -262,12 +262,9 @@ export function isNode(): boolean {
 /**
  * Determines if the code is running on Windows.
  *
- * Lightweight variant for SEA-bundled modules; `base/os.ts` has a heavier
- * version backed by the runtime adapter system (`getRuntime().getOS()`).
- *
- * The client build pipeline (esbuild + @deno/esbuild-plugin) treats
- * Windows drive-letter paths differently from POSIX paths; callers use this to
- * apply platform-specific path normalization (see build.ts).
+ * Avoids the runtime-adapter graph (`base/os.ts` → `getRuntime().getOS()`)
+ * so callers in the build pipeline (`build.ts`) don't pull in the full
+ * adapter system just for a platform check. Use `base/os.ts` elsewhere.
  *
  * @returns True if running on Windows, false otherwise.
  */
