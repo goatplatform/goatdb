@@ -230,8 +230,8 @@ export function fromFileUrl(url: string | URL): string {
   let path = decodeURIComponent(urlObj.pathname);
   if (urlObj.host) {
     path = `//${urlObj.host}${path}`;
-    // Windows: file:///C:/path -> C:/path
   } else if (/^\/[A-Za-z]:/.test(path)) {
+    // Windows: file:///C:/path -> C:/path
     path = path.slice(1);
   }
   return path;
