@@ -186,11 +186,38 @@ export function toAbsolutePath(p: string): string {
 }
 
 /**
+ * Converts an absolute path to a file:// URL.
+ * Handles POSIX paths, Windows drive-letter paths, and UNC paths
+ * (`//host/share/...`), preserving the UNC host as the file URL authority.
+ *
+ * @param p The absolute path to convert
+ * @returns The file URL string
+ */
+export function toFileUrl(p: string): string {
+  p = normalizeSlashes(p);
+  if (!p.startsWith('/') && !/^[A-Za-z]:/.test(p)) {
+    throw new TypeError(`toFileUrl requires an absolute path, got: "${p}"`);
+  }
+  if (p.startsWith('//')) {
+    const [host, ...segments] = p.slice(2).split('/');
+    return `file://${host}/${fileUrlPath(segments)}`;
+  }
+  if (!p.startsWith('/')) {
+    p = '/' + p;
+  }
+  return 'file://' + fileUrlPath(p.split('/'));
+}
+
+function fileUrlPath(segments: string[]): string {
+  return segments.map(encodeURIComponent).join('/').replaceAll('%3A', ':');
+}
+
+/**
  * Converts a file:// URL to a filesystem path.
  * Only works in Deno and Node.js environments.
  *
  * @param url The file URL to convert
- * @returns The filesystem path
+ * @returns The filesystem path; UNC URLs return `//host/share/...`.
  */
 export function fromFileUrl(url: string | URL): string {
   if (!isDeno() && !isNode()) {
@@ -201,8 +228,10 @@ export function fromFileUrl(url: string | URL): string {
     throw new TypeError('Must be a file URL');
   }
   let path = decodeURIComponent(urlObj.pathname);
-  // Windows: file:///C:/path -> C:/path
-  if (/^\/[A-Za-z]:/.test(path)) {
+  if (urlObj.host) {
+    path = `//${urlObj.host}${path}`;
+  } else if (/^\/[A-Za-z]:/.test(path)) {
+    // Windows: file:///C:/path -> C:/path
     path = path.slice(1);
   }
   return path;

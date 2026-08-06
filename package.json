@@ -27,7 +27,8 @@
     "@goatdb/orderstamp": "npm:@jsr/goatdb__orderstamp@^1.1.1",
     "@std/data-structures": "npm:@jsr/std__data-structures@^1.0.8",
     "@std/encoding": "npm:@jsr/std__encoding@^1.0.10",
-    "@std/path": "npm:@jsr/std__path@^1.0.9"
+    "@std/path": "npm:@jsr/std__path@^1.0.9",
+    "esbuild": "^0.25.4"
   },
   "optionalDependencies": {
     "postject": "1.0.0-alpha.6"
@@ -45,6 +46,7 @@
     }
   },
   "devDependencies": {
+    "@deno/esbuild-plugin": "npm:@jsr/deno__esbuild-plugin@^1.2.1",
     "@types/node": "^24.0.0",
     "@types/nodemailer": "^6.4.17",
     "@types/react": "^19.0.0",

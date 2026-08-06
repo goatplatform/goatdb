@@ -260,6 +260,23 @@ export function isNode(): boolean {
 }
 
 /**
+ * Determines if the code is running on Windows.
+ *
+ * Avoids the runtime-adapter graph (`base/os.ts` → `getRuntime().getOS()`)
+ * so callers in the build pipeline (`build.ts`) don't pull in the full
+ * adapter system just for a platform check. Use `base/os.ts` elsewhere.
+ *
+ * @returns True if running on Windows, false otherwise.
+ */
+export function isWindows(): boolean {
+  // deno-lint-ignore no-explicit-any
+  const platform = (globalThis as any).process?.platform ??
+    // deno-lint-ignore no-explicit-any
+    (globalThis as any).Deno?.build?.os;
+  return typeof platform === 'string' && platform.startsWith('win');
+}
+
+/**
  * Returns the appropriate crypto object for the current environment
  * (browser or Node.js).
  */

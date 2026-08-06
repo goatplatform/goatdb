@@ -10,8 +10,9 @@ import {
   normalize,
   resolve,
   toAbsolutePath,
+  toFileUrl,
 } from '../base/path.ts';
-import { assertThrows } from './asserts.ts';
+import { assertThrows, assertThrowsInstanceOf } from './asserts.ts';
 
 export default function setupPathTests(): void {
   // normalize tests
@@ -190,5 +191,44 @@ export default function setupPathTests(): void {
   TEST('Path', 'fromFileUrl throws for non-file protocols', () => {
     assertThrows(() => fromFileUrl('https://example.com/path'));
     assertThrows(() => fromFileUrl('http://localhost/path'));
+  });
+
+  // toFileUrl tests
+  TEST('Path', 'toFileUrl converts POSIX paths', () => {
+    assertEquals(toFileUrl('/Users/foo/bar'), 'file:///Users/foo/bar');
+    assertEquals(toFileUrl('/'), 'file:///');
+  });
+
+  TEST('Path', 'toFileUrl converts Windows drive-letter paths', () => {
+    assertEquals(toFileUrl('C:/Users/foo'), 'file:///C:/Users/foo');
+    assertEquals(
+      toFileUrl('d:/path/to/file.txt'),
+      'file:///d:/path/to/file.txt',
+    );
+  });
+
+  TEST('Path', 'toFileUrl normalizes backslashes', () => {
+    assertEquals(toFileUrl('C:\\Users\\foo'), 'file:///C:/Users/foo');
+  });
+
+  TEST('Path', 'toFileUrl preserves UNC authorities', () => {
+    const filePath = '\\\\fileserver\\shared folder\\entry.ts';
+    const url = 'file://fileserver/shared%20folder/entry.ts';
+    assertEquals(toFileUrl(filePath), url);
+    assertEquals(fromFileUrl(url), '//fileserver/shared folder/entry.ts');
+  });
+
+  TEST('Path', 'toFileUrl encodes URL syntax in path components', () => {
+    const filePath = 'C:/goat#44?/100%/entry.ts';
+    const url = 'file:///C:/goat%2344%3F/100%25/entry.ts';
+    assertEquals(toFileUrl(filePath), url);
+    assertEquals(fromFileUrl(url), filePath);
+  });
+
+  TEST('Path', 'toFileUrl rejects relative paths', () => {
+    assertThrowsInstanceOf(() => toFileUrl('foo/bar'), TypeError);
+    assertThrowsInstanceOf(() => toFileUrl('./foo'), TypeError);
+    assertThrowsInstanceOf(() => toFileUrl('../foo'), TypeError);
+    assertThrowsInstanceOf(() => toFileUrl(''), TypeError);
   });
 }

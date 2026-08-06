@@ -1,3 +1,4 @@
+import { APP_ENTRY_POINT } from '../../base/app-entry-point.ts';
 import type { Endpoint, ServerServices } from './server.ts';
 import { getRequestPath } from './utils.ts';
 import { kStaticAssetsSystem } from '../../system-assets/system-assets.ts';
@@ -7,7 +8,7 @@ import type { GoatRequest } from './http-compat.ts';
 import type { Schema } from '../../cfds/base/schema.ts';
 import type { ServeHandlerInfo } from './http-compat.ts';
 
-export const APP_ENTRY_POINT = 'web-app';
+export { APP_ENTRY_POINT };
 
 const STATIC_ASSETS_CACHE_DURATION_SEC = 86400;
 

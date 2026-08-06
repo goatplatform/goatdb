@@ -24,3 +24,7 @@ export {
 } from './cli/compile.ts';
 
 export type { AppConfig } from './cli/app-config.ts';
+
+// Convenience alias for AppConfig.esbuildPlugins. Type-only: safe for Node.js
+// SEA binaries; esbuild remains lazy-loaded at runtime.
+export type { Plugin as EsbuildPlugin } from 'esbuild';

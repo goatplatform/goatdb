@@ -5,8 +5,11 @@ import {
   stopBackgroundCompiler,
 } from '../build.ts';
 import type { AppConfig } from './app-config.ts';
-import { APP_ENTRY_POINT } from '../net/server/static-assets.ts';
-import { buildAssets, type BuildAssetsOptions } from './build-assets.ts';
+import {
+  appEntryPoints,
+  buildAssets,
+  type BuildAssetsOptions,
+} from './build-assets.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
 import { staticAssetsToJS } from '../system-assets/system-assets.ts';
 import { getRuntime } from '../base/runtime/index.ts';
@@ -190,23 +193,8 @@ async function bundleClientAssets(
 ): Promise<{ assetsJson: string; buildInfoJson: string }> {
   console.log('Bundling client code...');
   const bundlingStart = performance.now();
-  const entryPoints = [
-    { in: path.resolve(options.jsPath), out: APP_ENTRY_POINT },
-  ];
+  const entryPoints = appEntryPoints(options);
   const minify = options.minify !== false;
-  const buildAssetsOpts: BuildAssetsOptions = {
-    runtime: runtime ?? 'deno',
-    keepEsbuildAlive,
-  };
-  const assets = staticAssetsToJS(
-    await buildAssets(
-      undefined,
-      entryPoints,
-      { ...options, minify },
-      buildAssetsOpts,
-    ),
-  );
-
   const configPath = runtime === 'node'
     ? (options.packageJson || path.join(getRuntime().getCWD(), 'package.json'))
     : (options.denoJson || path.join(getRuntime().getCWD(), 'deno.json'));
@@ -218,6 +206,23 @@ async function bundleClientAssets(
         } or run from a directory containing one.`,
     );
   }
+  const buildAssetsOpts: BuildAssetsOptions = {
+    runtime: runtime ?? 'deno',
+    keepEsbuildAlive,
+    // Pass the app config to the Deno esbuild plugin: its config discovery is
+    // CWD-based, so without configPath the app's import map (npm:/jsr: deps)
+    // is missed when building from a different working directory.
+    denoConfigPath: runtime === 'deno' ? configPath : undefined,
+  };
+  const assets = staticAssetsToJS(
+    await buildAssets(
+      undefined,
+      entryPoints,
+      { ...options, minify },
+      buildAssetsOpts,
+    ),
+  );
+
   const buildInfo = await generateBuildInfo(configPath);
 
   console.log(
@@ -535,8 +540,8 @@ export async function bundleServerForSEA(
     external: [
       'node:*',
       'esbuild', // Defense-in-depth: also hidden via eval() import
-      '@luca/esbuild-deno-loader', // Deno-specific build plugin
-      '@jsr/luca__esbuild-deno-loader', // JSR-imported version
+      '@deno/esbuild-plugin', // Deno-specific build plugin
+      '@jsr/deno__esbuild-plugin', // JSR-imported version
     ],
     logLevel: 'warning',
   });

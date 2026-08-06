@@ -1,7 +1,8 @@
 import * as path from '@std/path';
 import * as esbuild from 'esbuild';
-import { denoPlugins } from '@luca/esbuild-deno-loader';
+import { denoPlugin } from '@deno/esbuild-plugin';
 import { getRepositoryPath } from '../base/git-root.ts';
+import { normalizeBuildEntryPath } from '../build.ts';
 import { type StaticAssets, staticAssetsToJS } from './system-assets.ts';
 
 export async function buildSysAssets(): Promise<void> {
@@ -10,11 +11,15 @@ export async function buildSysAssets(): Promise<void> {
   const result = await esbuild.build({
     entryPoints: [
       {
-        in: path.join(repoPath, 'base', 'json-log', 'json-log-worker-entry.ts'),
+        in: normalizeBuildEntryPath(
+          path.join(repoPath, 'base', 'json-log', 'json-log-worker-entry.ts'),
+        ),
         out: 'json-log-worker',
       },
     ],
-    plugins: [...denoPlugins()],
+    // noTranspile: let esbuild transpile so the final bundle map is composed
+    // from file-relative sources instead of the loader's repo-relative maps.
+    plugins: [denoPlugin({ noTranspile: true })],
     bundle: true,
     write: false,
     sourcemap: 'external',

@@ -28,6 +28,7 @@ import {
 } from '../cli/compile.ts';
 import { stopBackgroundCompiler } from '../build.ts';
 import { goatEntryPoints } from '../cli/link.ts';
+import type { Plugin } from 'esbuild';
 import { getRuntime } from '../base/runtime/index.ts';
 import { cli } from '../base/development.ts';
 
@@ -231,6 +232,16 @@ export default function setupCliCompileTests() {
         ? path.join(testDir, 'server/server-sea.ts')
         : path.join(testDir, 'server/server.ts');
 
+      let pluginBuilds = 0;
+      const buildPlugin: Plugin = {
+        name: 'compile-e2e-plugin',
+        setup(build) {
+          build.onEnd((result) => {
+            assertEquals(result.errors.length, 0, 'Plugin build must succeed');
+            pluginBuilds++;
+          });
+        },
+      };
       await compile({
         buildDir: path.join(testDir, 'build'),
         serverEntry,
@@ -238,11 +249,14 @@ export default function setupCliCompileTests() {
         htmlPath: path.join(testDir, 'client/index.html'),
         cssPath: path.join(testDir, 'client/index.css'),
         outputName: 'test-app',
+        esbuildPlugins: [buildPlugin],
         // Use deno.json or package.json based on runtime
         ...(runtime.id === 'deno'
           ? { denoJson: path.join(testDir, 'deno.json') }
           : { packageJson: path.join(testDir, 'package.json') }),
       });
+
+      assertEquals(pluginBuilds, 1, 'Compile must invoke configured plugin');
 
       // 4. Verify binary exists
       const osName = runtime.getOS();
