@@ -10,8 +10,7 @@ export function lazyModule<T>(specifier: string): LazyModule<T> {
   return {
     async get(): Promise<T> {
       if (!module) {
-        const dynamicSpecifier = specifier;
-        module = await import(dynamicSpecifier) as T;
+        module = await import(specifier) as T;
       }
       return module;
     },
