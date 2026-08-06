@@ -6,7 +6,7 @@ import {
   UserSharp,
 } from 'pixelarticons/react';
 
-import { HomepageIcon, type HomepageIconComponent } from '../HomepageIcon';
+import { PixelIcon, type PixelIconComponent } from '../PixelIcon';
 import styles from './SessionIdentity.module.css';
 
 // One identity form on the network roster. Equal geometry across forms
@@ -14,7 +14,7 @@ import styles from './SessionIdentity.module.css';
 // marks the data that IS the identity.
 function IdentityCard(
   { icon, label, user }: {
-    icon: HomepageIconComponent;
+    icon: PixelIconComponent;
     label: string;
     user: string;
   },
@@ -22,7 +22,7 @@ function IdentityCard(
   return (
     <li className={styles.card}>
       <span className={styles.identityRow}>
-        <HomepageIcon icon={icon} size={18} />
+        <PixelIcon icon={icon} size={18} />
         <span className={styles.cardLabel}>{label}</span>
       </span>
       <span className={styles.mono}>user: {user}</span>
@@ -35,13 +35,13 @@ function IdentityCard(
 // identity, so they live on the roster -- not on the audit trail.
 function Mechanic(
   { icon, children }: {
-    icon: HomepageIconComponent;
+    icon: PixelIconComponent;
     children: React.ReactNode;
   },
 ) {
   return (
     <li className={styles.mechRow}>
-      <HomepageIcon icon={icon} size={16} />
+      <PixelIcon icon={icon} size={16} />
       <span>{children}</span>
     </li>
   );

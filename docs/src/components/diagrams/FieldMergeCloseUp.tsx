@@ -4,12 +4,12 @@ import {
   UserSharp,
 } from 'pixelarticons/react';
 
-import { HomepageIcon, type HomepageIconComponent } from '../HomepageIcon';
+import { PixelIcon, type PixelIconComponent } from '../PixelIcon';
 import styles from './FieldMergeCloseUp.module.css';
 
 type Author = 'human' | 'agent';
 
-const AUTHOR_ICON: Record<Author, HomepageIconComponent> = {
+const AUTHOR_ICON: Record<Author, PixelIconComponent> = {
   human: UserSharp,
   agent: AiUserCircle,
 };
@@ -23,7 +23,7 @@ function EditLine(
 ) {
   return (
     <span className={styles.editLine}>
-      <HomepageIcon icon={AUTHOR_ICON[author]} size={14} />
+      <PixelIcon icon={AUTHOR_ICON[author]} size={14} />
       <span className={styles.editAuthor}>{author}</span>
       <span className={struck ? styles.editOpStruck : styles.editOp}>
         {op}
@@ -38,7 +38,7 @@ function Survivors({ of }: { of: Author | 'both' }) {
   const authors: Author[] = of === 'both' ? ['human', 'agent'] : [of];
   return (
     <span className={styles.survivors}>
-      {authors.map((a) => <HomepageIcon key={a} icon={AUTHOR_ICON[a]} size={14} />)}
+      {authors.map((a) => <PixelIcon key={a} icon={AUTHOR_ICON[a]} size={14} />)}
     </span>
   );
 }
@@ -69,7 +69,7 @@ function StrategyRow(
         <EditLine author='agent' op={agentOp} struck={struck === 'agent'} />
       </span>
       <span className={styles.arrowCell} aria-hidden='true'>
-        <HomepageIcon icon={ArrowRight} size={18} />
+        <PixelIcon icon={ArrowRight} size={18} />
       </span>
       <span className={styles.mergedCell}>
         <span className={styles.mergedLine}>

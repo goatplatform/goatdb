@@ -12,10 +12,10 @@ import {
   TabletSharp,
 } from 'pixelarticons/react';
 
-import { HomepageIcon, type HomepageIconComponent } from '../HomepageIcon';
+import { PixelIcon, type PixelIconComponent } from '../PixelIcon';
 import styles from './SyncProtocolV2.module.css';
 
-type Icon = HomepageIconComponent;
+type Icon = PixelIconComponent;
 
 // Same device fleet on both lanes: the architecture changes, the hardware
 // people carry doesn't. Symmetry carries "same devices, different role".
@@ -34,7 +34,7 @@ function BeefyServer() {
       <div className={styles.stackStrips}>
         {[0, 1, 2].map((i) => (
           <div className={styles.hStrip} key={i}>
-            <HomepageIcon icon={ServerSharp} size={18} />
+            <PixelIcon icon={ServerSharp} size={18} />
           </div>
         ))}
       </div>
@@ -53,13 +53,13 @@ function AnchorServer() {
   return (
     <div className={styles.serverBox}>
       <div className={styles.serverNode}>
-        <HomepageIcon icon={ServerSharp} size={20} />
-        <HomepageIcon icon={Database} size={14} />
+        <PixelIcon icon={ServerSharp} size={20} />
+        <PixelIcon icon={Database} size={14} />
       </div>
       <div className={styles.roleRow}>
-        <HomepageIcon icon={LockSharp} size={14} />
-        <HomepageIcon icon={ShieldSharp} size={14} />
-        <HomepageIcon icon={CirclePower} size={14} />
+        <PixelIcon icon={LockSharp} size={14} />
+        <PixelIcon icon={ShieldSharp} size={14} />
+        <PixelIcon icon={CirclePower} size={14} />
         <span className={styles.boxTag}>trust + uptime only</span>
       </div>
     </div>
@@ -77,10 +77,10 @@ function DeviceCell({ icon, peer, fan }: {
 }) {
   return (
     <div className={styles.cell}>
-      {fan && <HomepageIcon icon={ArrowDown} size={16} />}
+      {fan && <PixelIcon icon={ArrowDown} size={16} />}
       <div className={peer ? styles.peerSquare : styles.clientSquare}>
-        <HomepageIcon icon={icon} size={20} />
-        {peer && <HomepageIcon icon={Database} size={14} />}
+        <PixelIcon icon={icon} size={20} />
+        {peer && <PixelIcon icon={Database} size={14} />}
       </div>
     </div>
   );
@@ -93,11 +93,11 @@ function DeviceRow({ peer, fan }: { peer?: boolean; fan?: boolean }) {
     <div className={styles.deviceRow}>
       <DeviceCell icon={devices[0]} peer={peer} fan={fan} />
       <span className={styles.linkSlot}>
-        {peer && <HomepageIcon icon={ArrowsHorizontal} size={14} />}
+        {peer && <PixelIcon icon={ArrowsHorizontal} size={14} />}
       </span>
       <DeviceCell icon={devices[1]} peer={peer} fan={fan} />
       <span className={styles.linkSlot}>
-        {peer && <HomepageIcon icon={ArrowsHorizontal} size={14} />}
+        {peer && <PixelIcon icon={ArrowsHorizontal} size={14} />}
       </span>
       <DeviceCell icon={devices[2]} peer={peer} fan={fan} />
     </div>
@@ -132,7 +132,7 @@ function LaneGoat() {
       </span>
       {/* One link into the mesh: the server is one participant, not a hub. */}
       <span className={styles.singleLink}>
-        <HomepageIcon icon={ArrowDown} size={16} />
+        <PixelIcon icon={ArrowDown} size={16} />
       </span>
       <DeviceRow peer />
       <p className={styles.laneFooter}>peers carry the data and the work</p>
@@ -150,7 +150,7 @@ function LaneConnector() {
         <br />
         the server shrinks
       </p>
-      <HomepageIcon icon={ArrowRight} />
+      <PixelIcon icon={ArrowRight} />
     </li>
   );
 }

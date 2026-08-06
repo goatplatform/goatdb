@@ -8,13 +8,13 @@ import {
 } from 'pixelarticons/react';
 
 import {
-  HomepageIcon,
-  type HomepageIconComponent,
-} from '../HomepageIcon';
+  PixelIcon,
+  type PixelIconComponent,
+} from '../PixelIcon';
 import styles from './CoreArchitectureV2.module.css';
 
 type Layer = {
-  icon: HomepageIconComponent;
+  icon: PixelIconComponent;
   heading: string;
   body: string;
   data: string;
@@ -70,7 +70,7 @@ function LayerRow({ layer, index }: { layer: Layer; index: number }) {
   return (
     <li className={styles.row}>
       <div className={styles.identity}>
-        <HomepageIcon icon={layer.icon} size={20} />
+        <PixelIcon icon={layer.icon} size={20} />
         <LayerBadge index={index} />
         <h3 className={styles.heading}>{layer.heading}</h3>
       </div>

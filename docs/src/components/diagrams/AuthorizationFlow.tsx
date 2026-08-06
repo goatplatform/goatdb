@@ -6,14 +6,14 @@ import {
   UserSharp,
 } from 'pixelarticons/react';
 
-import { HomepageIcon, type HomepageIconComponent } from '../HomepageIcon';
+import { PixelIcon, type PixelIconComponent } from '../PixelIcon';
 import styles from './AuthorizationFlow.module.css';
 
 // Identity rail of one swimlane: WHO acts here. Identity icons always carry
 // a word label (design law); the mono note names the actor's concrete data.
 function LaneIdentity(
   { icon, label, note }: {
-    icon: HomepageIconComponent;
+    icon: PixelIconComponent;
     label: string;
     note: string;
   },
@@ -21,7 +21,7 @@ function LaneIdentity(
   return (
     <div className={styles.identity}>
       <span className={styles.identityRow}>
-        <HomepageIcon icon={icon} size={18} />
+        <PixelIcon icon={icon} size={18} />
         <span className={styles.laneLabel}>{label}</span>
       </span>
       <span className={styles.identityNote}>{note}</span>
@@ -35,7 +35,7 @@ function Connector({ note }: { note: string }) {
   return (
     <li className={styles.connector}>
       <span aria-hidden='true'>
-        <HomepageIcon icon={ArrowDown} size={18} />
+        <PixelIcon icon={ArrowDown} size={18} />
       </span>
       <span className={styles.connectorNote}>{note}</span>
     </li>
@@ -54,7 +54,7 @@ function VerdictBox(
   return (
     <div className={allowed ? styles.allowBox : styles.denyBox}>
       <span className={styles.verdictRow}>
-        <HomepageIcon icon={allowed ? Check : Close} size={16} />
+        <PixelIcon icon={allowed ? Check : Close} size={16} />
         <span className={styles.verdictLabel}>{label}</span>
       </span>
       <span className={styles.verdictNote}>{note}</span>

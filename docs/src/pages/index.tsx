@@ -24,12 +24,12 @@ import { type ReactNode } from 'react';
 
 import { type CtaButtonData, CtaButtons } from '../components/CtaButtons';
 import {
-  HomepageIcon,
-  type HomepageIconComponent,
-} from '../components/HomepageIcon';
+  PixelIcon,
+  type PixelIconComponent,
+} from '../components/PixelIcon';
 import styles from './index.module.css';
 
-type Icon = HomepageIconComponent;
+type Icon = PixelIconComponent;
 type IconItem = { icon: Icon; title: string; text: string };
 type JourneyStopData = {
   icon: Icon;
@@ -243,7 +243,7 @@ function TextLink(
   return (
     <Link className={`${styles.textLink} ${className}`} to={to}>
       {children}
-      <HomepageIcon icon={ArrowRight} />
+      <PixelIcon icon={ArrowRight} />
     </Link>
   );
 }
@@ -283,7 +283,7 @@ function SectionIntro(
 function IconCard({ item, className }: { item: IconItem; className: string }) {
   return (
     <article className={className}>
-      <HomepageIcon icon={item.icon} />
+      <PixelIcon icon={item.icon} />
       <h3>{item.title}</h3>
       <p>{item.text}</p>
     </article>
@@ -357,7 +357,7 @@ function IconListItem(
 ) {
   return (
     <li className={className}>
-      <HomepageIcon icon={item.icon} />
+      <PixelIcon icon={item.icon} />
       <span>
         <strong>{item.title}</strong>
         <small>{item.text}</small>
@@ -387,7 +387,7 @@ function TraditionalStack() {
 function CompressionArrow() {
   return (
     <div className={styles.compressionArrow} aria-hidden='true'>
-      <HomepageIcon icon={ArrowRight} size={32} />
+      <PixelIcon icon={ArrowRight} size={32} />
       <span>compress</span>
     </div>
   );
@@ -504,11 +504,11 @@ function ArchitectureCompression() {
 function JourneyStop({ icon, statusIcon, status }: JourneyStopData) {
   return (
     <div className={styles.journeyStop}>
-      <HomepageIcon icon={icon} size={28} />
+      <PixelIcon icon={icon} size={28} />
       <span className={styles.journeyChip}>
         <code>{journeyItemId}</code>
         <span className={styles.journeyStatus}>
-          <HomepageIcon icon={statusIcon} size={12} />
+          <PixelIcon icon={statusIcon} size={12} />
           {status}
         </span>
       </span>

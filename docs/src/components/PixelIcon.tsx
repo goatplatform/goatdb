@@ -1,10 +1,10 @@
 import type { ComponentType, SVGProps } from 'react';
 
-export type HomepageIconComponent = ComponentType<SVGProps<SVGSVGElement>>;
+export type PixelIconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
-export function HomepageIcon(
+export function PixelIcon(
   { icon: IconComponent, size = 24, className }: {
-    icon: HomepageIconComponent;
+    icon: PixelIconComponent;
     size?: number;
     className?: string;
   },

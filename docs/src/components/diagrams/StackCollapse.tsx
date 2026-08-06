@@ -8,12 +8,12 @@ import {
 import { Fragment } from 'react';
 
 import {
-  HomepageIcon,
-  type HomepageIconComponent,
-} from '../HomepageIcon';
+  PixelIcon,
+  type PixelIconComponent,
+} from '../PixelIcon';
 import styles from './StackCollapse.module.css';
 
-type Icon = HomepageIconComponent;
+type Icon = PixelIconComponent;
 
 const systems = [
   { icon: WindowFrame, label: 'Client Application' },
@@ -37,7 +37,7 @@ function SystemBox(
 ) {
   return (
     <div className={styles.systemBox}>
-      <HomepageIcon icon={icon} />
+      <PixelIcon icon={icon} />
       <span className={styles.boxLabel}>{label}</span>
       <span className={styles.badge}>{badge}</span>
     </div>
@@ -47,7 +47,7 @@ function SystemBox(
 function ProtocolLink({ label }: { label: string }) {
   return (
     <div className={styles.protocol}>
-      <HomepageIcon icon={ArrowDown} size={16} />
+      <PixelIcon icon={ArrowDown} size={16} />
       <span>{label}</span>
     </div>
   );
@@ -77,7 +77,7 @@ function EmbeddedStack() {
       {systems.map((system, index) => (
         <Fragment key={system.label}>
           {index > 0 && <span className={styles.plus}>+</span>}
-          <HomepageIcon icon={system.icon} />
+          <PixelIcon icon={system.icon} />
         </Fragment>
       ))}
     </div>
@@ -104,7 +104,7 @@ function FrameUnified() {
 function FrameConnector() {
   return (
     <li className={styles.connector} aria-hidden='true'>
-      <HomepageIcon icon={ArrowRight} />
+      <PixelIcon icon={ArrowRight} />
     </li>
   );
 }

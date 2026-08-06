@@ -12,12 +12,12 @@ import {
 } from 'pixelarticons/react';
 
 import {
-  HomepageIcon,
-  type HomepageIconComponent,
-} from '../HomepageIcon';
+  PixelIcon,
+  type PixelIconComponent,
+} from '../PixelIcon';
 import styles from './RepositoryModel.module.css';
 
-type Icon = HomepageIconComponent;
+type Icon = PixelIconComponent;
 
 // Repo identities make sharding-by-concern literal: each repository owns a
 // domain, not an arbitrary key range.
@@ -35,7 +35,7 @@ function FrameCaption({ icon: IconComponent, children }: {
   return (
     <p className={styles.frameCaption}>
       <span className={styles.captionIcon}>
-        <HomepageIcon icon={IconComponent} size={14} />
+        <PixelIcon icon={IconComponent} size={14} />
       </span>
       {children}
     </p>
@@ -47,7 +47,7 @@ function FrameCaption({ icon: IconComponent, children }: {
 function AppBox() {
   return (
     <div className={styles.appBox}>
-      <HomepageIcon icon={WindowFrameSharp} />
+      <PixelIcon icon={WindowFrameSharp} />
       <span className={styles.boxLabel}>Application</span>
     </div>
   );
@@ -56,7 +56,7 @@ function AppBox() {
 function DownLink({ label }: { label: string }) {
   return (
     <div className={styles.downLink}>
-      <HomepageIcon icon={ArrowDown} size={16} />
+      <PixelIcon icon={ArrowDown} size={16} />
       <span>{label}</span>
     </div>
   );
@@ -71,7 +71,7 @@ function ClusterBox() {
       <div className={styles.strips}>
         {[0, 1, 2].map((i) => (
           <div className={styles.strip} key={i}>
-            <HomepageIcon icon={Database} size={18} />
+            <PixelIcon icon={Database} size={18} />
           </div>
         ))}
       </div>
@@ -85,9 +85,9 @@ function ClusterBox() {
 function RepoCell({ name, icon: IconComponent }: { name: string; icon: Icon }) {
   return (
     <div className={styles.repoCell}>
-      <HomepageIcon icon={ArrowDown} size={16} />
+      <PixelIcon icon={ArrowDown} size={16} />
       <div className={styles.repoSquare}>
-        <HomepageIcon icon={IconComponent} size={20} />
+        <PixelIcon icon={IconComponent} size={20} />
       </div>
       <span className={styles.repoTab}>{name}</span>
     </div>
@@ -136,7 +136,7 @@ function FrameConnector() {
         <br />
         into the app
       </p>
-      <HomepageIcon icon={ArrowRight} />
+      <PixelIcon icon={ArrowRight} />
     </li>
   );
 }

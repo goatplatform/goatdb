@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowRight } from 'pixelarticons/react';
 
-import { HomepageIcon } from '../HomepageIcon';
+import { PixelIcon } from '../PixelIcon';
 import styles from './ComparisonSplitSimple.module.css';
 
 type Complexity = 'low' | 'medium' | 'high';
@@ -60,7 +60,7 @@ export default function ComparisonSplitSimple(
       <div className={styles.panels}>
         <Panel {...traditional} />
         <div className={styles.connector} aria-hidden='true'>
-          <HomepageIcon icon={ArrowRight} />
+          <PixelIcon icon={ArrowRight} />
         </div>
         <Panel {...goatdb} hero />
       </div>

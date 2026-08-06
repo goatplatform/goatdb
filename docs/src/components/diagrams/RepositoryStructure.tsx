@@ -1,6 +1,6 @@
 import { ArrowDown } from 'pixelarticons/react';
 
-import { HomepageIcon } from '../HomepageIcon';
+import { PixelIcon } from '../PixelIcon';
 import CommitSquare from './CommitSquare';
 import styles from './RepositoryStructure.module.css';
 
@@ -59,7 +59,7 @@ export default function RepositoryStructure() {
           <Entry version='c8' itemKey='quotes' filled />
           <li className={styles.openEnd} aria-hidden='true'>
             <span className={styles.edge} />
-            <HomepageIcon icon={ArrowDown} size={18} />
+            <PixelIcon icon={ArrowDown} size={18} />
           </li>
         </ol>
       </div>

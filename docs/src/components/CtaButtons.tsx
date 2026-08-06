@@ -1,12 +1,12 @@
 import Link from '@docusaurus/Link';
 
-import { HomepageIcon, type HomepageIconComponent } from './HomepageIcon';
+import { PixelIcon, type PixelIconComponent } from './PixelIcon';
 import styles from './CtaButtons.module.css';
 
 export type CtaVariant = 'primary' | 'secondary';
 
 export type CtaButtonData = {
-  icon: HomepageIconComponent;
+  icon: PixelIconComponent;
   label: string;
   to: string;
   variant: CtaVariant;
@@ -26,7 +26,7 @@ export function CtaButton(
       to={to}
     >
       {label}
-      <HomepageIcon icon={icon} />
+      <PixelIcon icon={icon} />
     </Link>
   );
 }

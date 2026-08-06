@@ -1,16 +1,16 @@
 import { ArrowDown, Check, MonitorSharp } from 'pixelarticons/react';
 
-import { HomepageIcon, type HomepageIconComponent } from '../HomepageIcon';
+import { PixelIcon, type PixelIconComponent } from '../PixelIcon';
 import styles from './SessionAudit.module.css';
 
 // Header row of one card: WHO acts here. Identity icons always carry a
 // word label (design law).
 function CardHead(
-  { icon, label }: { icon: HomepageIconComponent; label: string },
+  { icon, label }: { icon: PixelIconComponent; label: string },
 ) {
   return (
     <span className={styles.cardHead}>
-      <HomepageIcon icon={icon} size={16} />
+      <PixelIcon icon={icon} size={16} />
       <span className={styles.headLabel}>{label}</span>
     </span>
   );
@@ -24,15 +24,15 @@ function PeerAudit({ label }: { label: string }) {
     <div className={styles.peerCard}>
       <CardHead icon={MonitorSharp} label={label} />
       <span className={styles.checkRow}>
-        <HomepageIcon icon={Check} size={14} />
+        <PixelIcon icon={Check} size={14} />
         <span className={styles.mono}>integrity</span>
       </span>
       <span className={styles.checkRow}>
-        <HomepageIcon icon={Check} size={14} />
+        <PixelIcon icon={Check} size={14} />
         <span className={styles.mono}>session 8f3a…</span>
       </span>
       <span className={styles.checkRow}>
-        <HomepageIcon icon={Check} size={14} />
+        <PixelIcon icon={Check} size={14} />
         <span className={styles.mono}>authorized</span>
       </span>
       <span className={styles.cardNote}>commit enters the graph</span>
@@ -64,7 +64,7 @@ export default function SessionAudit() {
         </li>
         <li className={styles.connector}>
           <span aria-hidden='true'>
-            <HomepageIcon icon={ArrowDown} size={18} />
+            <PixelIcon icon={ArrowDown} size={18} />
           </span>
           <span className={styles.connectorNote}>
             signed history replicates to all peers

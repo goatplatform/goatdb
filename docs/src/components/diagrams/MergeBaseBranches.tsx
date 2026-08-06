@@ -5,7 +5,7 @@ import {
   UserSharp,
 } from 'pixelarticons/react';
 
-import { HomepageIcon, type HomepageIconComponent } from '../HomepageIcon';
+import { PixelIcon, type PixelIconComponent } from '../PixelIcon';
 import CommitSquare from './CommitSquare';
 import styles from './MergeBaseBranches.module.css';
 
@@ -15,7 +15,7 @@ import styles from './MergeBaseBranches.module.css';
 // different fields of the same item.
 function Leaf(
   { icon, version, note }: {
-    icon: HomepageIconComponent;
+    icon: PixelIconComponent;
     version: string;
     note: string;
   },
@@ -23,7 +23,7 @@ function Leaf(
   return (
     <div className={styles.leaf}>
       <div className={styles.leafRow}>
-        <HomepageIcon icon={icon} size={18} />
+        <PixelIcon icon={icon} size={18} />
         <CommitSquare version={version} />
       </div>
       <span className={styles.tag}>{note}</span>
@@ -38,10 +38,10 @@ function LinkCol() {
   return (
     <div className={styles.linkCol} aria-hidden='true'>
       <span className={styles.linkArrow}>
-        <HomepageIcon icon={ArrowRight} size={18} />
+        <PixelIcon icon={ArrowRight} size={18} />
       </span>
       <span className={styles.linkArrow}>
-        <HomepageIcon icon={ArrowRight} size={18} />
+        <PixelIcon icon={ArrowRight} size={18} />
       </span>
     </div>
   );

@@ -5,7 +5,7 @@ import {
   UserSharp,
 } from 'pixelarticons/react';
 
-import { HomepageIcon, type HomepageIconComponent } from '../HomepageIcon';
+import { PixelIcon, type PixelIconComponent } from '../PixelIcon';
 import CommitSquare from './CommitSquare';
 import styles from './SessionSigning.module.css';
 
@@ -13,14 +13,14 @@ import styles from './SessionSigning.module.css';
 // word label (design law).
 function CellRow(
   { icon, text, primary }: {
-    icon: HomepageIconComponent;
+    icon: PixelIconComponent;
     text: string;
     primary?: boolean;
   },
 ) {
   return (
     <span className={styles.cellRow}>
-      <HomepageIcon icon={icon} size={18} />
+      <PixelIcon icon={icon} size={18} />
       <span className={primary ? styles.monoKey : styles.mono}>{text}</span>
     </span>
   );
@@ -31,7 +31,7 @@ function CellRow(
 function LinkArrow() {
   return (
     <span className={styles.linkArrow} aria-hidden='true'>
-      <HomepageIcon icon={ArrowRight} size={18} />
+      <PixelIcon icon={ArrowRight} size={18} />
     </span>
   );
 }
