@@ -1,0 +1,8 @@
+/* The whole tile presses like every other pixel card; the global .pressable
+ * system (custom.css) owns shadow/hover/press, we only set the scale.
+ * Border and surface come from the div.theme-code-block rule in custom.css. */
+.codeBlock {
+  composes: pressable from global;
+  --press-offset: 4px;
+  margin-bottom: var(--ifm-leading);
+}

@@ -1,0 +1,23 @@
+/* Bare pixel icon affordance (same language as the homepage init command):
+ * no button chrome, just the icon with a small 2px press step. 80ms ease:
+ * an instant jump reads as a glitch. */
+.copyButton {
+  transition: transform 80ms ease-out;
+}
+
+.copyButton:active {
+  transform: translate(2px, 2px);
+}
+
+/* The default buttonGroup rule boxes every button (border, background,
+ * hover-only opacity) at class+element specificity; re-assert the bare
+ * style from the theme-code-block scope instead of !important. */
+:global(.theme-code-block) .copyButton {
+  opacity: 1;
+  border: none;
+  background: none;
+}
+
+.copyButton svg {
+  color: var(--ifm-color-primary);
+}

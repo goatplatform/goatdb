@@ -199,8 +199,17 @@ const config: Config = {
       copyright: `Copyright © ${new Date().getFullYear()} GoatDB · MIT License`,
     },
     prism: {
-      theme: prismThemes.github,
-      darkTheme: prismThemes.dracula,
+      // prism-react-renderer paints the theme background as an inline style,
+      // which beats all CSS. Code blocks are pixel cards (surface + hard
+      // shadow, see custom.css), so the Prism slab must be transparent.
+      theme: {
+        ...prismThemes.github,
+        plain: { ...prismThemes.github.plain, backgroundColor: 'transparent' },
+      },
+      darkTheme: {
+        ...prismThemes.dracula,
+        plain: { ...prismThemes.dracula.plain, backgroundColor: 'transparent' },
+      },
       additionalLanguages: ['typescript', 'javascript'],
     },
   } satisfies Preset.ThemeConfig,

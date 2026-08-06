@@ -529,5 +529,29 @@ pre {
   outline-offset: 3px;
 }
 
+/* Code blocks are pixel cards (same language as the homepage init command):
+ * bordered surface tile; never the default gray Prism slab with a soft
+ * shadow. Shadow/hover/press come from the swizzled Container composing the
+ * global .pressable system. div prefix beats the theme's own
+ * .codeBlockContainer at equal-or-better specificity. */
+div.theme-code-block {
+  border: 2px solid var(--border);
+  background: var(--ifm-background-surface-color);
+}
+
+/* The theme sets --ifm-pre-background to the Prism slab color on the pre;
+ * override the variable so the card's surface shows through. */
+.theme-code-block pre {
+  --ifm-pre-background: transparent;
+}
+
+/* Code block buttons are permanently visible (no hover-only affordances).
+ * The copy button owns its styling in its swizzled component; this strips
+ * Docusaurus's boxed chrome off the word-wrap button to match. Hashed class
+ * names keep their module prefix, so the attribute selector is stable. */
+.theme-code-block [class*='wordWrapButton'] {
   opacity: 1;
+  border: none;
+  background: none;
+  color: var(--ifm-color-primary);
 }

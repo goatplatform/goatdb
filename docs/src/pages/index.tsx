@@ -6,6 +6,7 @@ import {
   Check,
   Circle,
   ComputerSharp as Computer,
+  CopySharp as Copy,
   Database,
   ExternalLinkSharp as ExternalLink,
   FolderSharp as Folder,
@@ -18,9 +19,8 @@ import {
   UserSharp as User,
   WindowFrameSharp as WindowFrame,
 } from 'pixelarticons/react';
-import CodeBlock from '@theme/CodeBlock';
 import Layout from '@theme/Layout';
-import { type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 
 import { type CtaButtonData, CtaButtons } from '../components/CtaButtons';
 import {
@@ -644,11 +644,28 @@ function FitEvidence() {
   );
 }
 
+/* The card itself is the copy target: one press area, the icon is the
+ * affordance and flips to a check as feedback. Plain <code>, not CodeBlock:
+ * a single plain-token shell line needs no Prism, and dropping CodeBlock
+ * removes Docusaurus's hover-only copy button entirely. */
 function InitCommand() {
+  const [copied, setCopied] = useState(false);
+  const copyInit = async () => {
+    await navigator.clipboard.writeText(initCommand);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
   return (
-    <div className={styles.initCommand}>
-      <CodeBlock language='shell'>{initCommand}</CodeBlock>
-    </div>
+    <button
+      type='button'
+      className={styles.initCommand}
+      onClick={copyInit}
+      aria-label='Copy init command'
+      title='Copy init command'
+    >
+      <code>{initCommand}</code>
+      <PixelIcon icon={copied ? Check : Copy} />
+    </button>
   );
 }
 

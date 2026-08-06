@@ -665,21 +665,36 @@
   margin-inline: auto;
 }
 
+/* Whole card is the copy target: one press area, icon = affordance. */
 .initCommand {
+  composes: pressableCard;
+  --press-offset: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
   max-width: 620px;
   margin: 1.5rem auto 0;
+  padding: 0.9rem 1.25rem;
+  background: var(--ifm-background-surface-color);
+  border: 2px solid var(--border);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.9rem;
   text-align: left;
 }
 
-.initCommand :global(.theme-code-block) {
-  margin: 0;
-  border: 2px solid var(--border);
-  border-radius: 0;
-  box-shadow: 4px 4px 0 var(--ifm-color-primary);
+/* The tile itself is already the code affordance; strip Infima's
+ * inline-code chrome (gray background + hairline border) off the code. */
+.initCommand code {
+  background: none;
+  border: none;
+  padding: 0;
 }
 
-.initCommand :global(pre) {
-  padding-block: 0.9rem;
+.initCommand svg {
+  flex: 0 0 auto;
+  color: var(--ifm-color-primary);
 }
 
 @media screen and (max-width: 996px) {
@@ -834,7 +849,7 @@
     width: 100%;
   }
 
-  .initCommand :global(code) {
+  .initCommand {
     font-size: 0.78rem;
   }
 }
