@@ -38,6 +38,8 @@ type JourneyStopData = {
 };
 
 const initCommand = 'npx -y @goatdb/goatdb init';
+const githubUrl = 'https://github.com/goatplatform/goatdb';
+const licenseUrl = `${githubUrl}/blob/main/LICENSE`;
 const heroTitle = 'Build live tools people and agents run together';
 const heroSummary =
   'GoatDB gives browsers and agent runtimes local, reactive state that synchronizes through one coordinating server—so you can build the workflow instead of assembling its shared-state platform.';
@@ -91,7 +93,7 @@ const closeCtas = [
   {
     icon: ExternalLink,
     label: 'View on GitHub',
-    to: 'https://github.com/goatplatform/goatdb',
+    to: githubUrl,
     variant: 'secondary',
   },
 ] satisfies readonly CtaButtonData[];
@@ -192,34 +194,34 @@ const goatResponsibilities: IconItem[] = [
   },
 ];
 
-const idealFits: IconItem[] = [
+const sharedWorkCapabilities: IconItem[] = [
   {
     icon: Folder,
-    title: 'Bounded working sets',
-    text: 'Operational data that divides cleanly into repositories.',
+    title: 'Focused repositories',
+    text: 'Organize each workflow into a fast, predictable local working set.',
   },
   {
     icon: User,
-    title: 'Repeated collaboration',
-    text: 'People and agents revisiting and changing shared state.',
+    title: 'Continuous collaboration',
+    text: 'People and agents revisit and update the same live state.',
   },
   {
     icon: Reload,
-    title: 'Offline-capable work',
-    text: 'Useful local interaction before remote convergence.',
+    title: 'Local-first work',
+    text: 'Keep working locally while synchronization catches up.',
   },
   {
     icon: Pencil,
-    title: 'Attributable changes',
-    text: 'Secure-mode histories tied to signing sessions.',
+    title: 'Verifiable history',
+    text: 'Secure-mode changes are tied to cryptographic signing sessions.',
   },
 ];
 
-const limits = [
-  'Each opened repository is a full local replica loaded into memory, so keep repository boundaries bounded.',
-  'Cold predicates scan the working set; GoatDB is not SQL or an analytics engine.',
-  'Remote convergence is polling-based—typically 700–1000ms—not cursor-grade transport.',
-  'Secure writes pay per-commit signing cost; measure bulk-ingest workloads.',
+const instantReadChoices = [
+  'Every opened repository is a memory-resident local replica, making reads instant and independent of network latency. Bounded repositories keep that performance predictable.',
+  'A predicate scans the working set when first opened, then stays live as data changes—ideal for interactive views, monitoring, collaborative apps, and agents.',
+  'Remote updates currently converge in around 700–1000ms. Faster synchronization is actively in development.',
+  'Every secure commit is cryptographically signed, giving collaborative apps and agents verifiable writes by default.',
 ];
 
 const speedStats = [
@@ -420,8 +422,8 @@ function GoatSystem() {
         history, persistence, and bounded replica-assisted recovery.
       </p>
       <small>
-        The application/server plane is packaged together. Browser clients and
-        external model or tool services remain separate.
+        The application, server, and browser client are bundled and served
+        together for simple deployments, rollbacks, and updates.
       </small>
     </Link>
   );
@@ -435,10 +437,6 @@ function StackCompression() {
         <CompressionArrow />
         <GoatSystem />
       </div>
-      <figcaption>
-        This is architectural positioning, not a claim that GoatDB replaces
-        product decisions, agent infrastructure, or every data system.
-      </figcaption>
     </figure>
   );
 }
@@ -566,23 +564,23 @@ function BulletList({ items }: { items: readonly string[] }) {
   );
 }
 
-function FitPanel() {
+function SharedWorkPanel() {
   return (
     <article className={styles.fitPanel}>
-      <h3>A strong fit when</h3>
-      <IconList items={idealFits} />
+      <h3>Made for shared work</h3>
+      <IconList items={sharedWorkCapabilities} />
     </article>
   );
 }
 
-function LimitsPanel() {
+function InstantReadChoices() {
   return (
     <article className={styles.limitsPanel}>
-      <h3>Design around the boundaries</h3>
-      <BulletList items={limits} />
+      <h3>Built for instant, live apps</h3>
+      <BulletList items={instantReadChoices} />
       <p>
-        Pair GoatDB with PostgreSQL or an analytics store for relational
-        queries, warehousing, and unbounded datasets.
+        One focused data layer for building small, reactive, collaborative apps
+        quickly—without assembling a database stack.
       </p>
     </article>
   );
@@ -636,8 +634,8 @@ function FitEvidence() {
         />
         <SpeedProof />
         <div className={styles.fitGrid}>
-          <FitPanel />
-          <LimitsPanel />
+          <SharedWorkPanel />
+          <InstantReadChoices />
         </div>
       </div>
     </section>
@@ -673,7 +671,10 @@ function OpenSource() {
   return (
     <section className={styles.openSource}>
       <div className='container'>
-        <p className={styles.eyebrow}>Open source · MIT licensed</p>
+        <p className={styles.eyebrow}>
+          <Link to={githubUrl}>Open source</Link> ·{' '}
+          <Link to={licenseUrl}>MIT licensed</Link>
+        </p>
         <h2>Start with shared state, then shape the app around your work</h2>
         <p>
           Initialize a project, connect the people and agents your workflow

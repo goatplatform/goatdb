@@ -542,6 +542,17 @@
   padding: 1.35rem 1.5rem;
 }
 
+.fitPanel {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Stretch the list so the card's unused height becomes item spacing. */
+.fitPanel .iconList {
+  flex: 1;
+  align-content: space-between;
+}
+
 .squareList {
   display: grid;
   gap: 0.7rem;
