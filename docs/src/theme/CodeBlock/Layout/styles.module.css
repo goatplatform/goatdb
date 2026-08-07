@@ -1,0 +1,44 @@
+/* Swizzled from Docusaurus 3.10.2 @theme/CodeBlock/Layout. The title row is
+ * a flex bar: the title truncates (ellipsis) so long titles never overlap
+ * the copy button, which sits right-aligned with the button's icon baseline
+ * reset (upstream buttonGroup line-height reset does not apply here). */
+
+.codeBlockContent {
+  position: relative;
+  /* rtl:ignore */
+  direction: ltr;
+  border-radius: inherit;
+}
+
+.codeBlockTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ifm-pre-padding);
+  border-bottom: 1px solid var(--ifm-color-emphasis-300);
+  font-size: var(--ifm-code-font-size);
+  font-weight: 500;
+  padding: 0.75rem var(--ifm-pre-padding);
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+
+/* Title text truncates instead of wrapping under / overlapping the button. */
+.codeBlockTitleText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Standalone (non-buttonGroup) copy button: keep its natural size so the
+ * row never shifts, and kill the inline svg's baseline whitespace. */
+.titleCopyButton {
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.codeBlockTitle + .codeBlockContent .codeBlock {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
