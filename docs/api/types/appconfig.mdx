@@ -11,5 +11,8 @@ A configuration of a Single Page Application built on top GoatDB.
 
 **Type:** <code>AppConfig = &#123; appName?: string; assetsFilter?: (path: string) =&gt; boolean; assetsPath?: string; buildDir: string; cssPath?: string; denoJson?: string; esbuildPlugins?: Plugin[]; htmlPath?: string; jsPath: string; minify?: boolean &#125;</code>
 
-`esbuildPlugins` applies custom esbuild plugins to both `compile()` and every `startDebugServer()` rebuild. Plugins can process resolved local files such as CSS.
-
+`esbuildPlugins` applies custom esbuild plugins to
+[compile()](</api/GoatDB/Server/Build/functions/compile>) and every
+[startDebugServer()](</api/GoatDB/Server/Build/functions/startDebugServer>)
+rebuild. For CSS ordering, generated styles, and asset handling, see
+[Customize Client Styling](/docs/styling).

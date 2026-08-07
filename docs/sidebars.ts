@@ -15,6 +15,7 @@ const sidebars: SidebarsConfig = {
 
     // PRACTICAL GUIDES (How-to documentation)
     'reading-and-writing-data',
+    'styling',
     'query',
     'react',
     'repositories',
