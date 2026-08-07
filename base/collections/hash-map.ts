@@ -65,6 +65,7 @@ export class HashSet<V> implements Iterable<V> {
   private readonly _hashFunc: HashFunction<V>;
   private readonly _equalFunc: EqualFunction<V>;
   private readonly _cloneFunc: CloneFunction<V>;
+  private _size = 0;
 
   /**
    * Initializes a new HashSet instance.
@@ -90,7 +91,7 @@ export class HashSet<V> implements Iterable<V> {
   }
 
   get size(): number {
-    return this._map.size;
+    return this._size;
   }
 
   add(v: V): boolean {
@@ -102,6 +103,7 @@ export class HashSet<V> implements Iterable<V> {
     if (values === undefined) {
       values = [this._cloneFunc(v)];
       map.set(key, values);
+      ++this._size;
       return true;
     }
 
@@ -115,6 +117,7 @@ export class HashSet<V> implements Iterable<V> {
 
     // If we got this far, v doesn't exist in the current list of values
     values.push(this._cloneFunc(v));
+    ++this._size;
     return true;
   }
 
@@ -138,6 +141,7 @@ export class HashSet<V> implements Iterable<V> {
         } else {
           values.splice(i, 1);
         }
+        --this._size;
         return true;
       }
     }
@@ -148,6 +152,7 @@ export class HashSet<V> implements Iterable<V> {
 
   clear(): void {
     this._map.clear();
+    this._size = 0;
   }
 
   get(v: V): V | undefined {
