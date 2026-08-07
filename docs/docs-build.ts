@@ -38,9 +38,25 @@ async function prepareBuild(): Promise<void> {
   await Deno.mkdir(dirname(BUILD_DIR), { recursive: true });
 }
 
+async function validateApiAnchorOffset(): Promise<void> {
+  const html = await Deno.readTextFile(
+    join(DOCUSAURUS_BUILD_DIR, 'api/GoatDB/type-aliases/AppConfig/index.html'),
+  );
+  // Smoke test: validates that TypeDoc-generated anchors have Docusaurus' sticky navbar offset class
+  // (anchorTargetStickyNavbar_* is a CSS modules hash from @docusaurus/theme-common's
+  // useAnchorTargetClassName hook). This ensures property anchors clear the sticky navbar.
+  if (
+    !/<a\b(?=[^>]*\bid=property-csspath\b)(?=[^>]*\bclass=anchorTargetStickyNavbar_[^\s>]+)[^>]*>/
+      .test(html)
+  ) {
+    throw new Error('API property anchors must clear the sticky navbar');
+  }
+}
+
 export async function buildDocs(): Promise<void> {
   await prepareBuild();
   await runNpmScript('build');
+  await validateApiAnchorOffset();
   await Deno.rename(DOCUSAURUS_BUILD_DIR, BUILD_DIR);
   await zip.compress(BUILD_DIR, BUILD_ARCHIVE, { excludeSrc: true });
   console.log(

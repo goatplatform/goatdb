@@ -16,7 +16,9 @@ try {
 const docsDir = join(import.meta.dirname, 'docs');
 const rootDir = join(import.meta.dirname, '..');
 const llmsPath = join(rootDir, 'llms.txt');
-const docsUrlPattern = /https:\/\/goatdb\.dev\/docs\/\S+/g;
+// Markdown links terminate before `)` and `#`; keeping them out makes route checks match
+// the URL rather than link punctuation.
+const docsUrlPattern = /https:\/\/goatdb\.dev\/docs\/[^\s)#]+/g;
 const validationPattern = /(?:^|\s)validate=([^\s]*)(?=\s|$)/;
 const validationModes = new Set(['module', 'object-member', 'off']);
 const validatedLanguages = new Set(['ts', 'tsx', 'typescript']);
