@@ -468,6 +468,18 @@ article th,
   padding-left: calc(var(--ifm-menu-link-padding-horizontal) - 2px);
 }
 
+/* Docs layout separators: Docusaurus leaves both rails at 1px, which breaks
+ * the site's 2px structural-stroke law. Keep the neutral TOC border token. */
+@media screen and (min-width: 997px) {
+  [class*='docSidebarContainer'] {
+    border-right: 2px solid var(--ifm-toc-border-color);
+  }
+
+  .table-of-contents__left-border {
+    border-left: 2px solid var(--ifm-toc-border-color);
+  }
+}
+
 /* Hide Docusaurus smooth external-link glyphs in the navbar (icon law) */
 [class*='iconExternalLink'] {
   display: none;
