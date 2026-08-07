@@ -56,6 +56,7 @@ import setupSecurityBoundaries from './security-boundaries.test.ts';
 import setupLiveQuery from './live-query.test.ts';
 import setupWriteFailure from './write-failure.test.ts';
 import setupQueryId from './query-id.test.ts';
+import setupHashMap from './hash-map.test.ts';
 
 /**
  * Registers all test suites with the default TestsRunner.
@@ -81,6 +82,7 @@ export async function registerAllTests(): Promise<void> {
   setupShardFormat(); // Shard file format read/write primitives
   setupAncestorLeafDetection(); // Ancestor edges and leaf detection via AdjacencyList
   setupQueryId(); // generateQueryId cache-key determinism and uniqueness
+  setupHashMap(); // HashSet and HashMap collision-safe cardinality
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
   setupBinaryEncoding(); // Binary commit format encoding roundtrip
