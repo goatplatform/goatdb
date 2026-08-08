@@ -222,8 +222,11 @@
   line-height: 1.28;
 }
 
+/* The summary paragraph is the only classless <p> in openSource: eyebrow and
+ * colophon carry classes. :not([class]) keeps this rule off the colophon,
+ * which took over last-of-type when added below the CTAs. */
 .sectionIntro > p:last-child,
-.openSource > div > p:last-of-type {
+.openSource > div > p:not([class]) {
   margin: 0;
   color: var(--ifm-color-emphasis-700);
   font-size: 1.04rem;
@@ -704,7 +707,7 @@
   margin-inline: auto;
 }
 
-.openSource > div > p:last-of-type {
+.openSource > div > p:not([class]) {
   max-width: 700px;
   margin-inline: auto;
 }
