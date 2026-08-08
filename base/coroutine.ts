@@ -41,6 +41,7 @@ export class Coroutine<T = unknown> {
   readonly name: string | undefined;
   private readonly _generator: Generator<T, T>;
   private _doneHandler: (v: T | undefined) => void;
+  private readonly _rejectHandler: (e: unknown) => void;
   private _timeSpentMs: number;
   private _completed: boolean;
   private _cancelled = false;
@@ -53,7 +54,9 @@ export class Coroutine<T = unknown> {
    * @param id   The id of this routine, as assigned by the scheduler.
    *
    * @param g    The underlying generator.
-   *             Values yielded or returned are ignored.
+   *              Yielded values become the coroutine's intermediate `value`.
+   *              The returned value resolves the accompanying promise.
+   *              If the generator throws, the promise rejects with the error.
    *
    * @param name An optional name for identifying this coroutine in logs.
    *
@@ -66,10 +69,12 @@ export class Coroutine<T = unknown> {
     name?: string,
   ): [Coroutine<T>, CancellablePromise<T>] {
     let resolve: (v: T | undefined) => void;
-    const promise = new Promise<T>((res) => {
+    let reject: (e: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
       resolve = res as (v: T | undefined) => void;
+      reject = rej;
     });
-    const coroutine = new Coroutine<T>(id, g, resolve!, name);
+    const coroutine = new Coroutine<T>(id, g, resolve!, reject!, name);
     (promise as CancellablePromise<T>).cancel = () => coroutine.cancel();
     (promise as CancellablePromise<T>).cancelImmediately = () =>
       coroutine.cancelImmediately();
@@ -90,23 +95,26 @@ export class Coroutine<T = unknown> {
    *
    * @param id          The id of this routine, as assigned by the scheduler.
    *
-   * @param generator   The underlying generator.
-   *                    Values yielded or returned are ignored.
+   * @param generator     The underlying generator.
    *
-   * @param doneHandler An optional handler that'll be called once this
-   *                    coroutine transitions to a done status. This handler is
-   *                    called at most once.
+   * @param doneHandler   Called once when this coroutine transitions to done.
+   *                      Called at most once.
    *
-   * @param name        An optional name for identifying this coroutine in logs.
+   * @param rejectHandler Called once if the generator throws during `run()`.
+   *                      Called at most once.
+   *
+   * @param name          An optional name for identifying this coroutine in logs.
    */
   constructor(
     readonly id: number,
     generator: Generator<T, T>,
     doneHandler: (v: T | undefined) => void,
+    rejectHandler: (e: unknown) => void,
     name?: string,
   ) {
     this._generator = generator;
     this._doneHandler = doneHandler;
+    this._rejectHandler = rejectHandler;
     this._timeSpentMs = 0;
     this._completed = false;
     this.name = name;
@@ -186,19 +194,29 @@ export class Coroutine<T = unknown> {
    * you're building an alternative scheduler.
    *
    * Each call to this method runs the underlying generator until its next call
-   * to `yield` or `return`.
+   * to `yield` or `return`. If the generator throws, the error is caught, the
+   * coroutine is marked completed, and the promise is rejected via
+   * rejectHandler — allowing callers (e.g. CoroutineQueue) to observe the
+   * failure and continue processing.
    */
   run(): void {
-    if (this._completed) {
-      return;
-    }
+    if (this._completed) return;
     gActiveCoroutine = this as Coroutine<unknown>;
-    const res = this._generator.next();
-    gActiveCoroutine = undefined;
-    this._value = res.value;
-    if (res.done === true) {
+    try {
+      const res = this._generator.next();
+      this._value = res.value;
+      if (res.done === true) {
+        this._completed = true;
+        this._doneHandler(this.value);
+      }
+    } catch (e) {
+      // Generator threw - reject promise so callers observe failure.
       this._completed = true;
-      this._doneHandler(this.value);
+      this._cancelled = true;
+      this._rejectHandler(e);
+      return;
+    } finally {
+      gActiveCoroutine = undefined;
     }
   }
 
@@ -511,6 +529,11 @@ export class CoroutineQueue implements Scheduler {
   readonly priority: SchedulerPriority;
   private readonly _queue: Coroutine[];
   private _id: number;
+  // Tracks worker liveness, not queue depth - worker yields between run()s
+  // so depth==0 still alive; length===1 would spawn an overlapping worker.
+  private _workerScheduled: boolean;
+  // O(1) dequeue via head index; periodically compacted to bound memory.
+  private _head = 0;
 
   /**
    * Initialize a new serial execution queue.
@@ -529,13 +552,15 @@ export class CoroutineQueue implements Scheduler {
     this.priority = priority;
     this._queue = [];
     this._id = 0;
+    this._workerScheduled = false;
+    this._head = 0;
   }
 
   /**
    * Returns the number of coroutines currently scheduled in this queue.
    */
   get size(): number {
-    return this._queue.length;
+    return this._queue.length - this._head;
   }
 
   /**
@@ -557,22 +582,43 @@ export class CoroutineQueue implements Scheduler {
   ): CancellablePromise<T> {
     const [coroutine, promise] = Coroutine.pack<T>(++this._id, g, name);
     this._queue.push(coroutine as Coroutine<unknown>);
-    if (this._queue.length === 1) {
+    // _workerScheduled decouples liveness from queue depth (see field comment).
+    if (!this._workerScheduled) {
+      this._workerScheduled = true;
       this.scheduler.schedule(this._workCoroutine(), this.priority);
     }
     return promise;
   }
 
+  // Amortized O(1) dequeue; compact when waste >50%.
+  private _maybeCompact(): void {
+    if (this._head > 64 && this._head > this._queue.length / 2) {
+      this._queue.splice(0, this._head);
+      this._head = 0;
+    }
+  }
+
   private *_workCoroutine(): Generator<void> {
-    for (
-      let coroutine = this._queue.pop();
-      coroutine !== undefined;
-      coroutine = this._queue.pop()
-    ) {
-      while (!coroutine.completed) {
-        coroutine.run();
-        yield;
+    try {
+      for (;;) {
+        const c = this._queue[this._head];
+        if (c === undefined) {
+          // Drain: reset storage to release completed coroutines.
+          this._queue.length = 0;
+          this._head = 0;
+          return;
+        }
+        this._head++;
+        this._maybeCompact();
+        // run() rejects on throw and marks completed, so no try/catch needed
+        // here; while condition exits and next queued item runs.
+        while (!c.completed) {
+          c.run();
+          yield;
+        }
       }
+    } finally {
+      this._workerScheduled = false;
     }
   }
 }
