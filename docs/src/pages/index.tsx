@@ -35,6 +35,7 @@ type JourneyStopData = {
   icon: Icon;
   statusIcon: Icon;
   status: string;
+  surface: string;
 };
 
 const initCommand = 'npx -y @goatdb/goatdb init';
@@ -61,16 +62,19 @@ const journeyStops = [
     icon: Computer,
     statusIcon: Circle,
     status: 'you flagged',
+    surface: 'browser',
   },
   {
     icon: Server,
     statusIcon: Reload,
     status: 'agent drafting',
+    surface: 'agent runtime',
   },
   {
     icon: Smartphone,
     statusIcon: Check,
     status: 'you confirmed',
+    surface: 'phone',
   },
 ] satisfies readonly JourneyStopData[];
 
@@ -503,16 +507,17 @@ function ArchitectureCompression() {
   );
 }
 
-function JourneyStop({ icon, statusIcon, status }: JourneyStopData) {
+function JourneyStop({ icon, statusIcon, status, surface }: JourneyStopData) {
   return (
     <div className={styles.journeyStop}>
       <PixelIcon icon={icon} size={28} />
+      <span className={styles.journeySurface}>{surface}</span>
       <span className={styles.journeyChip}>
-        <code>{journeyItemId}</code>
         <span className={styles.journeyStatus}>
           <PixelIcon icon={statusIcon} size={12} />
           {status}
         </span>
+        <code>{journeyItemId}</code>
       </span>
     </div>
   );
