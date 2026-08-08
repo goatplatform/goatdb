@@ -212,7 +212,6 @@ export class Coroutine<T = unknown> {
     } catch (e) {
       // Generator threw - reject promise so callers observe failure.
       this._completed = true;
-      this._cancelled = true;
       this._rejectHandler(e);
       return;
     } finally {
