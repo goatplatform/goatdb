@@ -687,6 +687,11 @@ function OpenSource() {
         </p>
         <InitCommand />
         <CtaButtons ctas={closeCtas} ariaLabel='Build with GoatDB' />
+        {/* The site's only footer content: footer was removed (all its links
+         * duplicated the navbar), copyright survives here as the page closer. */}
+        <p className={styles.openSourceColophon}>
+          Copyright © {new Date().getFullYear()} GoatDB · MIT License
+        </p>
       </div>
     </section>
   );

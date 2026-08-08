@@ -674,10 +674,29 @@
   justify-content: center;
 }
 
+/* The 4px primary top stroke is the page's closing highlight - user directed
+ * it to live on this closing section, not on a footer (footer removed: every
+ * link duplicated the navbar). */
 .openSource {
   padding: 5rem 0;
   background: var(--ifm-background-color);
+  border-top: 4px solid var(--ifm-color-primary);
   text-align: center;
+}
+
+/* Copyright colophon: the site's only surviving footer content, in the pixel
+ * label tier (11px uppercase 400, AA off) matching docs chrome. margin-top =
+ * the section's 5rem bottom padding so the line is vertically centered in
+ * the space between the CTAs and the page edge (user direction). */
+.openSourceColophon {
+  margin: 5rem 0 0;
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  -webkit-font-smoothing: none;
+  font-synthesis: none;
+  color: var(--ifm-color-emphasis-600);
 }
 
 .openSource h2 {
