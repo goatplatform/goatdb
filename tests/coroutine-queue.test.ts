@@ -1,11 +1,7 @@
 import { CoroutineQueue, CoroutineScheduler } from '../base/coroutine.ts';
 import { assertEquals } from './asserts.ts';
+import { record } from './coroutine-test-helpers.ts';
 import { TEST } from './mod.ts';
-
-// deno-lint-ignore require-yield
-function* record(order: string[], label: string): Generator<void, void> {
-  order.push(label);
-}
 
 export default function setupCoroutineQueueTests(): void {
   TEST(
@@ -132,7 +128,9 @@ export default function setupCoroutineQueueTests(): void {
     async () => {
       const queue = new CoroutineQueue(new CoroutineScheduler());
       const order: string[] = [];
-      const count = 50;
+      // Minimum item count to trigger _maybeCompact (requires _head > 64).
+      const kMinItemsToTriggerCompaction = 66;
+      const count = kMinItemsToTriggerCompaction;
       const promises: Promise<void>[] = [];
 
       for (let i = 0; i < count; i++) {
