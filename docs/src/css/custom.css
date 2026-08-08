@@ -410,45 +410,13 @@ article th,
 .menu__link,
 .table-of-contents__link,
 .breadcrumbs__link,
-.pagination-nav__link,
-.footer__link-item,
-.footer__title,
-.footer__copyright {
+.pagination-nav__link {
   font-family: var(--font-pixel);
   font-size: 11px;
   font-weight: 400;
   text-transform: uppercase;
   -webkit-font-smoothing: none;
   font-synthesis: none;
-}
-
-/* Footer skin: replaces the stock dark slab with the site's own emphasis-100
- * band so the footer continues the homepage's alternating-background law in
- * both themes (openSource above it is surface). The 4px primary top stroke is
- * the page's closing highlight - user directed it to live on the footer, not
- * on openSource above. */
-.footer {
-  --ifm-footer-background-color: var(--ifm-color-emphasis-100);
-  border-top: 4px solid var(--ifm-color-primary);
-}
-
-.footer__title {
-  color: var(--ifm-color-emphasis-900);
-}
-
-.footer__link-item {
-  color: var(--ifm-color-emphasis-700);
-}
-
-/* custom.css is unlayered so it beats ALL @layer docusaurus.infima rules
- * regardless of specificity - the hover color must be redeclared here or the
- * base rule above would suppress Infima's primary hover. */
-.footer__link-item:hover {
-  color: var(--ifm-color-primary);
-}
-
-.footer__copyright {
-  color: var(--ifm-color-emphasis-600);
 }
 
 /* Docs contents hierarchy: label-tier size is flat, so levels differentiate

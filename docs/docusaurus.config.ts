@@ -142,62 +142,6 @@ const config: Config = {
         },
       ],
     },
-    footer: {
-      links: [
-        {
-          title: 'Documentation',
-          items: [
-            {
-              label: 'Getting Started',
-              to: '/docs/tutorial',
-            },
-            {
-              label: 'Architecture',
-              to: '/docs/architecture',
-            },
-            {
-              label: 'API Reference',
-              to: '/api',
-            },
-          ],
-        },
-        {
-          title: 'Community',
-          items: [
-            {
-              label: 'Discord',
-              href: 'https://discord.gg/SAt3cbUqxr',
-            },
-            {
-              label: 'Reddit',
-              href: 'https://www.reddit.com/r/zbdb/s/jx1jAbEqtj',
-            },
-            {
-              label: 'GitHub Discussions',
-              href: 'https://github.com/goatplatform/goatdb/discussions',
-            },
-          ],
-        },
-        {
-          title: 'Resources',
-          items: [
-            {
-              label: 'GitHub',
-              href: 'https://github.com/goatplatform/goatdb',
-            },
-            {
-              label: 'Benchmarks',
-              to: '/docs/benchmarks',
-            },
-            {
-              label: 'FAQ',
-              to: '/docs/faq',
-            },
-          ],
-        },
-      ],
-      copyright: `Copyright © ${new Date().getFullYear()} GoatDB · MIT License`,
-    },
     prism: {
       // prism-react-renderer paints the theme background as an inline style,
       // which beats all CSS. Code blocks are pixel cards (surface + hard
