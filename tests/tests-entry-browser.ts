@@ -30,6 +30,7 @@ import setupBinaryEncoding from './binary-encoding.test.ts';
 import setupJsonLogFormats from './json-log-formats.test.ts';
 import setupCommit from './commit.test.ts';
 import setupSession from './session.test.ts';
+import setupCoroutineQueueTests from './coroutine-queue.test.ts';
 import setupTrusted from './db-trusted.test.ts';
 import setupGoatRequest from './goat-request.test.ts';
 import setupStaticAssetsEndpoint from './static-assets-endpoint.test.ts';
@@ -75,6 +76,7 @@ async function main(): Promise<void> {
   setupHealthCheckEndpoint(); // Simple HTTP endpoint check
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
+  setupCoroutineQueueTests(); // Coroutine FIFO execution contract
   setupBinaryEncoding(); // Binary commit format encoding roundtrip
   setupJsonLogFormats(); // GOAT binary/JSONL storage format roundtrip and edge cases
   setupCommit(); // Core commit/versioning logic

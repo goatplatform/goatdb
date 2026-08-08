@@ -31,6 +31,7 @@ import setupCliInitTests from './cli-init.test.ts';
 import setupCliCompileTests from './cli-compile.test.ts';
 import setupPathTests from './path.test.ts';
 import setupRuntimeTests from './runtime.test.ts';
+import setupCoroutineQueueTests from './coroutine-queue.test.ts';
 import setupProgressTests from './progress.test.ts';
 import setupMergeAdjList from './merge-adjlist.test.ts';
 import setupMergeBloom from './merge-bloom.test.ts';
@@ -82,6 +83,7 @@ export async function registerAllTests(): Promise<void> {
   setupQueryId(); // generateQueryId cache-key determinism and uniqueness
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
+  setupCoroutineQueueTests(); // Coroutine FIFO execution contract
   setupBinaryEncoding(); // Binary commit format encoding roundtrip
   setupCommit(); // Core commit/versioning logic
   setupSession(); // Authentication and session management
