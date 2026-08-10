@@ -1,6 +1,6 @@
 import { CoroutineQueue, CoroutineScheduler } from '../base/coroutine.ts';
 import { assertEquals } from './asserts.ts';
-import { record } from './coroutine-test-helpers.ts';
+import { fail, record } from './coroutine-test-helpers.ts';
 import { TEST } from './mod.ts';
 
 export default function setupCoroutineQueueTests(): void {
@@ -151,19 +151,19 @@ export default function setupCoroutineQueueTests(): void {
       const queue = new CoroutineQueue(new CoroutineScheduler());
       const order: string[] = [];
 
-      // deno-lint-ignore require-yield
-      function* bad(): Generator<void, void> {
-        throw new Error('boom');
-      }
+      const error = new Error('boom');
 
       const pA = queue.schedule(record(order, 'A'));
-      const pB = queue.schedule(bad());
+      const pB = queue.schedule(fail(error));
       const pC = queue.schedule(record(order, 'C'));
 
       const results = await Promise.allSettled([pA, pB, pC]);
 
       assertEquals(results[0].status, 'fulfilled');
       assertEquals(results[1].status, 'rejected');
+      if (results[1].status === 'rejected') {
+        assertEquals(results[1].reason, error);
+      }
       assertEquals(results[2].status, 'fulfilled');
       // Rejected task does not contribute to order; queue proceeds.
       assertEquals(order, ['A', 'C']);
