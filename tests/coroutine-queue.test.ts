@@ -228,7 +228,8 @@ export default function setupCoroutineQueueTests(): void {
     'CoroutineQueue',
     'maintains FIFO and reuse after a large batch',
     async () => {
-      const queue = new CoroutineQueue(new CoroutineScheduler());
+      const scheduler = new StepScheduler();
+      const queue = new CoroutineQueue(scheduler);
       const order: string[] = [];
       const promises: Promise<void>[] = [];
 
@@ -237,6 +238,7 @@ export default function setupCoroutineQueueTests(): void {
       for (let i = 0; i < count; i++) {
         promises.push(queue.schedule(record(order, `T${i}`)));
       }
+      for (let i = 0; i <= count; i++) scheduler.runNext();
 
       await Promise.all(promises);
 
@@ -247,7 +249,10 @@ export default function setupCoroutineQueueTests(): void {
       assertEquals(order, expected);
       assertEquals(queue.size, 0);
       const probe: string[] = [];
-      await queue.schedule(record(probe, 'after'));
+      const probePromise = queue.schedule(record(probe, 'after'));
+      scheduler.runNext();
+      await probePromise;
+      scheduler.runNext();
       assertEquals(probe, ['after']);
     },
   );
