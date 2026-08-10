@@ -1,7 +1,28 @@
-import { CoroutineQueue, CoroutineScheduler } from '../base/coroutine.ts';
+import {
+  type CancellablePromise,
+  Coroutine,
+  CoroutineQueue,
+  CoroutineScheduler,
+  type Scheduler,
+} from '../base/coroutine.ts';
 import { assertEquals } from './asserts.ts';
 import { fail, record } from './coroutine-test-helpers.ts';
 import { TEST } from './mod.ts';
+
+class StepScheduler implements Scheduler {
+  private _coroutine: Coroutine<unknown> | undefined;
+
+  schedule<T>(g: Generator<T, T>): CancellablePromise<T> {
+    const [coroutine, promise] = Coroutine.pack(0, g);
+    this._coroutine = coroutine as Coroutine<unknown>;
+    return promise;
+  }
+
+  runNext(): void {
+    if (!this._coroutine) throw new Error('No coroutine scheduled');
+    this._coroutine.run();
+  }
+}
 
 export default function setupCoroutineQueueTests(): void {
   TEST(
@@ -227,6 +248,44 @@ export default function setupCoroutineQueueTests(): void {
       assertEquals(queue.size, 0);
       const probe: string[] = [];
       await queue.schedule(record(probe, 'after'));
+      assertEquals(probe, ['after']);
+    },
+  );
+
+  TEST(
+    'CoroutineQueue',
+    'respects cooperative cancellation via cancel()',
+    async () => {
+      const scheduler = new StepScheduler();
+      const queue = new CoroutineQueue(scheduler);
+      const order: string[] = [];
+
+      function* cancellable(): Generator<void, void> {
+        order.push('started');
+        yield;
+        const current = Coroutine.current();
+        if (current && !current.shouldRun) {
+          order.push('cancelled-cooperatively');
+          return;
+        }
+        order.push('should-not-reach');
+      }
+
+      const p = queue.schedule(cancellable());
+      // WHY: Drive exactly one worker step so cancellation occurs at its yield.
+      scheduler.runNext();
+      p.cancel();
+      scheduler.runNext();
+      await p;
+      scheduler.runNext();
+
+      assertEquals(order, ['started', 'cancelled-cooperatively']);
+      assertEquals(queue.size, 0);
+      const probe: string[] = [];
+      const probePromise = queue.schedule(record(probe, 'after'));
+      scheduler.runNext();
+      await probePromise;
+      scheduler.runNext();
       assertEquals(probe, ['after']);
     },
   );
