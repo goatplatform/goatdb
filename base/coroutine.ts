@@ -23,6 +23,10 @@ const kSingleFrameMs = 1000 / 60;
 // 1/3 of a frame every event loop cycle
 const kSchedulerCycleTimeMs = kSingleFrameMs / 3;
 
+// WHY: Batches queue compaction to preserve amortized O(1) dequeue -
+// defers splice until head waste exceeds threshold, bounding waste to <=50%.
+const kQueueCompactionThreshold = 64;
+
 /**
  * Coroutines wrapped as promises support cancellation out of the box
  */
@@ -591,7 +595,10 @@ export class CoroutineQueue implements Scheduler {
 
   // Amortized O(1) dequeue; compact when waste >50%.
   private _maybeCompact(): void {
-    if (this._head > 64 && this._head > this._queue.length / 2) {
+    if (
+      this._head > kQueueCompactionThreshold &&
+      this._head > this._queue.length / 2
+    ) {
       this._queue.splice(0, this._head);
       this._head = 0;
     }
