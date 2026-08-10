@@ -124,28 +124,6 @@ export default function setupCoroutineQueueTests(): void {
 
   TEST(
     'CoroutineQueue',
-    'maintains FIFO with large batches',
-    async () => {
-      const queue = new CoroutineQueue(new CoroutineScheduler());
-      const order: string[] = [];
-      // Minimum item count to trigger _maybeCompact (requires _head > 64).
-      const kMinItemsToTriggerCompaction = 66;
-      const count = kMinItemsToTriggerCompaction;
-      const promises: Promise<void>[] = [];
-
-      for (let i = 0; i < count; i++) {
-        promises.push(queue.schedule(record(order, `T${i}`)));
-      }
-
-      await Promise.all(promises);
-
-      const expected = Array.from({ length: count }, (_, i) => `T${i}`);
-      assertEquals(order, expected);
-    },
-  );
-
-  TEST(
-    'CoroutineQueue',
     'continues FIFO after a throwing task',
     async () => {
       const queue = new CoroutineQueue(new CoroutineScheduler());
@@ -222,6 +200,34 @@ export default function setupCoroutineQueueTests(): void {
       assertEquals(r1, 42);
       assertEquals(r2, 'hi');
       assertEquals(queue.size, 0);
+    },
+  );
+
+  TEST(
+    'CoroutineQueue',
+    'maintains FIFO and reuse after a large batch',
+    async () => {
+      const queue = new CoroutineQueue(new CoroutineScheduler());
+      const order: string[] = [];
+      const promises: Promise<void>[] = [];
+
+      // A large batch protects FIFO and drain/reuse behavior under sustained work.
+      const count = 100;
+      for (let i = 0; i < count; i++) {
+        promises.push(queue.schedule(record(order, `T${i}`)));
+      }
+
+      await Promise.all(promises);
+
+      const expected = Array.from(
+        { length: count },
+        (_, i) => `T${i}`,
+      );
+      assertEquals(order, expected);
+      assertEquals(queue.size, 0);
+      const probe: string[] = [];
+      await queue.schedule(record(probe, 'after'));
+      assertEquals(probe, ['after']);
     },
   );
 }
