@@ -294,4 +294,147 @@ export default function setupCoroutineQueueTests(): void {
       assertEquals(probe, ['after']);
     },
   );
+
+  TEST(
+    'CoroutineQueue',
+    'maintains at-most-one-active invariant under concurrent load',
+    async () => {
+      const queue = new CoroutineQueue(new CoroutineScheduler());
+      let activeCount = 0;
+      let maxActive = 0;
+      const count = 50;
+
+      function* guardedTask(_id: number): Generator<void, void> {
+        activeCount++;
+        maxActive = Math.max(maxActive, activeCount);
+        yield; // Allow interleaving point
+        activeCount--;
+      }
+
+      const promises: Promise<void>[] = [];
+      for (let i = 0; i < count; i++) {
+        promises.push(queue.schedule(guardedTask(i)));
+      }
+
+      await Promise.all(promises);
+
+      assertEquals(maxActive, 1, 'Multiple tasks active simultaneously');
+      assertEquals(activeCount, 0, 'All tasks should have completed');
+      assertEquals(queue.size, 0);
+    },
+  );
+
+  TEST(
+    'CoroutineQueue',
+    'executes each task exactly once under load',
+    async () => {
+      const queue = new CoroutineQueue(new CoroutineScheduler());
+      const executed = new Set<number>();
+      const count = 100;
+
+      function* task(id: number): Generator<void, void> {
+        assertEquals(executed.has(id), false, `Task ${id} executed twice`);
+        executed.add(id);
+        yield;
+      }
+
+      const promises: Promise<void>[] = [];
+      for (let i = 0; i < count; i++) {
+        promises.push(queue.schedule(task(i)));
+      }
+
+      await Promise.all(promises);
+
+      assertEquals(executed.size, count, 'Not all tasks executed');
+      assertEquals(queue.size, 0);
+    },
+  );
+
+  TEST(
+    'CoroutineQueue',
+    'skips the running head task cancelled via cancelImmediately',
+    async () => {
+      const scheduler = new StepScheduler();
+      const queue = new CoroutineQueue(scheduler);
+      const order: string[] = [];
+
+      function* task(name: string): Generator<void, void> {
+        order.push(`${name}:start`);
+        yield;
+        order.push(`${name}:end`);
+      }
+
+      const pA = queue.schedule(task('A'));
+      const pB = queue.schedule(task('B'));
+      const pC = queue.schedule(task('C'));
+
+      // Step 1: Work coroutine runs A (A yields)
+      scheduler.runNext();
+      assertEquals(order, ['A:start'], 'A should have started');
+
+      // Cancel A immediately (marks A as completed)
+      pA.cancelImmediately();
+
+      // Step 2: Work coroutine sees A.completed, moves to B (B yields)
+      scheduler.runNext();
+      assertEquals(order, ['A:start', 'B:start'], 'A:end should not appear');
+
+      // Step 3: B completes
+      scheduler.runNext();
+      assertEquals(order, ['A:start', 'B:start', 'B:end']);
+
+      // Step 4: Move to C (C yields)
+      scheduler.runNext();
+      assertEquals(order, ['A:start', 'B:start', 'B:end', 'C:start']);
+
+      // Step 5: C completes
+      scheduler.runNext();
+      assertEquals(order, ['A:start', 'B:start', 'B:end', 'C:start', 'C:end']);
+
+      // Step 6: Queue empty, work coroutine returns
+      scheduler.runNext();
+
+      await Promise.all([pA, pB, pC]);
+      assertEquals(queue.size, 0);
+    },
+  );
+
+  TEST(
+    'CoroutineQueue',
+    'preserves FIFO under stress with mixed outcomes',
+    async () => {
+      const queue = new CoroutineQueue(new CoroutineScheduler());
+      const order: number[] = [];
+      const count = 100;
+
+      function* task(id: number): Generator<void, void> {
+        order.push(id);
+        yield;
+      }
+
+      const promises: Promise<void>[] = [];
+      for (let i = 0; i < count; i++) {
+        if (i % 10 === 5) {
+          promises.push(queue.schedule(fail(new Error(`Task ${i} failed`))));
+        } else {
+          promises.push(queue.schedule(task(i)));
+        }
+      }
+
+      const results = await Promise.allSettled(promises);
+
+      // Verify order: tasks executed in FIFO order (excluding failures)
+      const expected: number[] = [];
+      for (let i = 0; i < count; i++) {
+        if (i % 10 !== 5) {
+          expected.push(i);
+        }
+      }
+      assertEquals(order, expected, 'FIFO order violated');
+
+      // Verify all promises settled
+      assertEquals(results.length, count);
+      assertEquals(queue.size, 0);
+    },
+  );
 }
