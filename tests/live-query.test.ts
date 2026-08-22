@@ -11,8 +11,26 @@ const kSchema = {
   },
 } as const;
 
+const kDateSchema = {
+  ns: 'live-query-date-test',
+  version: 1,
+  fields: {
+    date: { type: 'date', required: true },
+  },
+} as const;
+
+const kBoolSchema = {
+  ns: 'live-query-bool-test',
+  version: 1,
+  fields: {
+    flag: { type: 'boolean', required: true },
+  },
+} as const;
+
 const kRegistry = new DataRegistry();
 kRegistry.registerSchema(kSchema);
+kRegistry.registerSchema(kDateSchema);
+kRegistry.registerSchema(kBoolSchema);
 
 export default function setup(): void {
   TEST(
@@ -883,6 +901,483 @@ export default function setup(): void {
       items[2].set('value', 35); // item30 → 35
       assertEquals(query.find('value', 30), undefined);
       assertEquals(query.find('value', 35)?.get('value'), 35);
+
+      query.close();
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('LiveQuery', 'find() matches epsilon-equal sort values', async (ctx) => {
+    const db = await ctx.createDB('live-query-find-epsilon', {
+      registry: kRegistry,
+    });
+    try {
+      await db.readyPromise();
+      for (const value of [0, 1, 2]) {
+        const item = db.create(`/data/items/item${value}`, kSchema, { value });
+        await item.commit();
+      }
+
+      const query = new Query({
+        db,
+        source: '/data/items',
+        schema: kSchema,
+        sortBy: 'value',
+      });
+      await query.loadingFinished();
+
+      assertEquals(query.find('value', Number.EPSILON / 2)?.get('value'), 0);
+
+      query.close();
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST(
+    'LiveQuery',
+    'find() descending epsilon-equal sort values',
+    async (ctx) => {
+      const db = await ctx.createDB('live-query-find-epsilon-desc', {
+        registry: kRegistry,
+      });
+      try {
+        await db.readyPromise();
+        for (const value of [0, 1, 2]) {
+          const item = db.create(`/data/items/item${value}`, kSchema, {
+            value,
+          });
+          await item.commit();
+        }
+
+        const query = new Query({
+          db,
+          source: '/data/items',
+          schema: kSchema,
+          sortBy: 'value',
+          sortDescending: true,
+        });
+        await query.loadingFinished();
+
+        // Descending order: [2, 1, 0]. Epsilon-neighborhood of 0 matches item with value 0.
+        assertEquals(query.find('value', Number.EPSILON / 2)?.get('value'), 0);
+        // Epsilon-neighborhood of 1 matches item with value 1.
+        assertEquals(
+          query.find('value', 1 + Number.EPSILON / 2)?.get('value'),
+          1,
+        );
+
+        query.close();
+      } finally {
+        await db.flushAll();
+        await db.close();
+      }
+    },
+  );
+
+  TEST('LiveQuery', 'find() Invalid Date returns undefined', async (ctx) => {
+    const db = await ctx.createDB('live-query-find-invalid-date', {
+      registry: kRegistry,
+    });
+    try {
+      await db.readyPromise();
+      // WHY: compare clusters Invalid==Invalid for ordering, but equals says distinct Invalid != Invalid.
+      const invalidA = db.create('/data/items/inv-a', kDateSchema, {
+        date: new Date('invalid'),
+      });
+      const invalidB = db.create('/data/items/inv-b', kDateSchema, {
+        date: new Date('invalid'),
+      });
+      const valid = db.create('/data/items/valid', kDateSchema, {
+        date: new Date('2024-06-15T12:00:00.000Z'),
+      });
+      await invalidA.commit();
+      await invalidB.commit();
+      await valid.commit();
+
+      const query = new Query({
+        db,
+        source: '/data/items',
+        schema: kDateSchema,
+        sortBy: 'date',
+      });
+      await query.loadingFinished();
+
+      assertEquals(query.count, 3);
+      // Distinct Invalid Date instance: equals rejects NaN != NaN.
+      assertEquals(query.find('date', new Date('invalid')), undefined);
+      // Valid date still found.
+      assertEquals(
+        query.find('date', new Date('2024-06-15T12:00:00.000Z'))?.get('date')
+          .getTime(),
+        new Date('2024-06-15T12:00:00.000Z').getTime(),
+      );
+
+      query.close();
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('LiveQuery', 'find() sorted Date lookup', async (ctx) => {
+    const db = await ctx.createDB('live-query-find-date-sorted', {
+      registry: kRegistry,
+    });
+    try {
+      await db.readyPromise();
+      const dates = [
+        new Date('2024-01-03T00:00:00.000Z'),
+        new Date('2024-01-01T00:00:00.000Z'),
+        new Date('2024-01-02T00:00:00.000Z'),
+      ];
+      for (const [index, date] of dates.entries()) {
+        const item = db.create(`/data/items/item${index}`, kDateSchema, {
+          date,
+        });
+        await item.commit();
+      }
+
+      const query = new Query({
+        db,
+        source: '/data/items',
+        schema: kDateSchema,
+        sortBy: 'date',
+      });
+      await query.loadingFinished();
+
+      // Ascending sort: earliest first.
+      assertEquals(
+        query.results().map((item) => item.get('date').getTime()),
+        [dates[1], dates[2], dates[0]].map((date) => date.getTime()),
+      );
+      // Boundaries: first and last via find.
+      assertEquals(
+        query.find('date', new Date(dates[1].getTime()))?.get('date')
+          .getTime(),
+        dates[1].getTime(),
+      );
+      assertEquals(
+        query.find('date', new Date(dates[0].getTime()))?.get('date')
+          .getTime(),
+        dates[0].getTime(),
+      );
+      assertEquals(
+        query.find('date', new Date(dates[2].getTime()))?.get('date')
+          .getTime(),
+        dates[2].getTime(),
+      );
+      // Miss returns undefined (binary search + equals verification).
+      assertEquals(
+        query.find('date', new Date('2099-01-01T00:00:00.000Z')),
+        undefined,
+      );
+
+      // Duplicate timestamp: live addition with same getTime as middle date.
+      const dupDate = new Date(dates[2].getTime());
+      const dupItem = db.create('/data/items/dup', kDateSchema, {
+        date: dupDate,
+      });
+      await dupItem.commit();
+      assertEquals(query.count, 4);
+      assertEquals(
+        query.find('date', dupDate)?.get('date').getTime(),
+        dupDate.getTime(),
+      );
+
+      query.close();
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('LiveQuery', 'find() descending Date lookup', async (ctx) => {
+    const db = await ctx.createDB('live-query-find-date-desc', {
+      registry: kRegistry,
+    });
+    try {
+      await db.readyPromise();
+      const dates = [
+        new Date('2024-01-03T00:00:00.000Z'),
+        new Date('2024-01-01T00:00:00.000Z'),
+        new Date('2024-01-02T00:00:00.000Z'),
+      ];
+      for (const [index, date] of dates.entries()) {
+        const item = db.create(`/data/items/item${index}`, kDateSchema, {
+          date,
+        });
+        await item.commit();
+      }
+
+      const query = new Query({
+        db,
+        source: '/data/items',
+        schema: kDateSchema,
+        sortBy: 'date',
+        sortDescending: true,
+      });
+      await query.loadingFinished();
+
+      // Descending sort: latest first.
+      assertEquals(
+        query.results().map((item) => item.get('date').getTime()),
+        [dates[0], dates[2], dates[1]].map((date) => date.getTime()),
+      );
+      // Boundaries: first (latest) and last (earliest) via find.
+      assertEquals(
+        query.find('date', new Date(dates[0].getTime()))?.get('date')
+          .getTime(),
+        dates[0].getTime(),
+      );
+      assertEquals(
+        query.find('date', new Date(dates[1].getTime()))?.get('date')
+          .getTime(),
+        dates[1].getTime(),
+      );
+      // Miss returns undefined.
+      assertEquals(
+        query.find('date', new Date('2099-01-01T00:00:00.000Z')),
+        undefined,
+      );
+
+      query.close();
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('LiveQuery', 'find() unsorted Date scan', async (ctx) => {
+    const db = await ctx.createDB('live-query-find-date-unsorted', {
+      registry: kRegistry,
+    });
+    try {
+      await db.readyPromise();
+      const dates = [
+        new Date('2024-01-03T00:00:00.000Z'),
+        new Date('2024-01-01T00:00:00.000Z'),
+        new Date('2024-01-02T00:00:00.000Z'),
+      ];
+      for (const [index, date] of dates.entries()) {
+        const item = db.create(`/data/items/item${index}`, kDateSchema, {
+          date,
+        });
+        await item.commit();
+      }
+
+      const query = new Query({
+        db,
+        source: '/data/items',
+        schema: kDateSchema,
+      });
+      await query.loadingFinished();
+
+      // Unsorted path uses linear scan with coreValueEquals; find via new Date instance.
+      assertEquals(
+        query.find('date', new Date(dates[0].getTime()))?.get('date')
+          .getTime(),
+        dates[0].getTime(),
+      );
+      assertEquals(
+        query.find('date', new Date(dates[1].getTime()))?.get('date')
+          .getTime(),
+        dates[1].getTime(),
+      );
+      // Miss returns undefined.
+      assertEquals(
+        query.find('date', new Date('2099-01-01T00:00:00.000Z')),
+        undefined,
+      );
+
+      query.close();
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('LiveQuery', 'find() Date duplicate timestamp', async (ctx) => {
+    const db = await ctx.createDB('live-query-find-date-dup', {
+      registry: kRegistry,
+    });
+    try {
+      await db.readyPromise();
+      const instant = new Date('2024-06-15T12:00:00.000Z');
+      const dupA = db.create('/data/items/a', kDateSchema, {
+        date: new Date(instant.getTime()),
+      });
+      const dupB = db.create('/data/items/b', kDateSchema, {
+        date: new Date(instant.getTime()),
+      });
+      await dupA.commit();
+      await dupB.commit();
+
+      const query = new Query({
+        db,
+        source: '/data/items',
+        schema: kDateSchema,
+        sortBy: 'date',
+      });
+      await query.loadingFinished();
+
+      // Two items share same getTime: count 2, find returns one with matching getTime.
+      assertEquals(query.count, 2);
+      assertEquals(
+        query.find('date', new Date(instant.getTime()))?.get('date')
+          .getTime(),
+        instant.getTime(),
+      );
+      // Miss: 2099 date doesn't match any stored dates
+      assertEquals(
+        query.find('date', new Date('2099-01-01T00:00:00.000Z')),
+        undefined,
+      );
+      assertEquals(query.find('date', new Date('invalid')), undefined);
+
+      query.close();
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('LiveQuery', 'find() Date empty and single boundaries', async (ctx) => {
+    const db = await ctx.createDB('live-query-find-date-boundaries', {
+      registry: kRegistry,
+    });
+    try {
+      await db.readyPromise();
+
+      // Empty repo: find miss.
+      const emptyQuery = new Query({
+        db,
+        source: '/data/items',
+        schema: kDateSchema,
+        sortBy: 'date',
+      });
+      await emptyQuery.loadingFinished();
+      assertEquals(emptyQuery.count, 0);
+      assertEquals(
+        emptyQuery.find('date', new Date('2024-01-01T00:00:00.000Z')),
+        undefined,
+      );
+      emptyQuery.close();
+
+      // Single item: first==last.
+      const onlyDate = new Date('2024-01-01T00:00:00.000Z');
+      const only = db.create('/data/items/only', kDateSchema, {
+        date: onlyDate,
+      });
+      await only.commit();
+
+      const singleAsc = new Query({
+        db,
+        source: '/data/items',
+        schema: kDateSchema,
+        sortBy: 'date',
+      });
+      await singleAsc.loadingFinished();
+      assertEquals(singleAsc.count, 1);
+      assertEquals(
+        singleAsc.find('date', new Date(onlyDate.getTime()))?.get('date')
+          .getTime(),
+        onlyDate.getTime(),
+      );
+      assertEquals(
+        singleAsc.find('date', new Date('2099-01-01T00:00:00.000Z')),
+        undefined,
+      );
+      singleAsc.close();
+
+      const singleDesc = new Query({
+        db,
+        source: '/data/items',
+        schema: kDateSchema,
+        sortBy: 'date',
+        sortDescending: true,
+      });
+      await singleDesc.loadingFinished();
+      assertEquals(singleDesc.count, 1);
+      assertEquals(
+        singleDesc.find('date', new Date(onlyDate.getTime()))?.get('date')
+          .getTime(),
+        onlyDate.getTime(),
+      );
+      singleDesc.close();
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('LiveQuery', 'find() NaN returns undefined', async (ctx) => {
+    const db = await ctx.createDB('live-query-find-nan', {
+      registry: kRegistry,
+    });
+    try {
+      await db.readyPromise();
+      // Store NaN in sorted number field.
+      const nanItem = db.create('/data/items/nan', kSchema, { value: NaN });
+      await nanItem.commit();
+      const zeroItem = db.create('/data/items/zero', kSchema, { value: 0 });
+      await zeroItem.commit();
+
+      const query = new Query({
+        db,
+        source: '/data/items',
+        schema: kSchema,
+        sortBy: 'value',
+      });
+      await query.loadingFinished();
+
+      // WHY: compare clusters NaN==NaN for ordering, but equals says distinct NaN != NaN.
+      // find() must return undefined when searching for NaN.
+      assertEquals(query.find('value', NaN), undefined);
+      // Valid number still found.
+      assertEquals(query.find('value', 0)?.get('value'), 0);
+
+      query.close();
+    } finally {
+      await db.flushAll();
+      await db.close();
+    }
+  });
+
+  TEST('LiveQuery', 'find() Boolean sorted lookup', async (ctx) => {
+    const db = await ctx.createDB('live-query-find-bool', {
+      registry: kRegistry,
+    });
+    try {
+      await db.readyPromise();
+      const falseItem = db.create('/data/items/false', kBoolSchema, {
+        flag: false,
+      });
+      await falseItem.commit();
+      const trueItem = db.create('/data/items/true', kBoolSchema, {
+        flag: true,
+      });
+      await trueItem.commit();
+
+      const query = new Query({
+        db,
+        source: '/data/items',
+        schema: kBoolSchema,
+        sortBy: 'flag',
+      });
+      await query.loadingFinished();
+
+      // Ascending sort: false < true.
+      assertEquals(query.results()[0].get('flag'), false);
+      assertEquals(query.results()[1].get('flag'), true);
+      // find() both values.
+      assertEquals(query.find('flag', false)?.get('flag'), false);
+      assertEquals(query.find('flag', true)?.get('flag'), true);
+      // Miss: no third boolean value.
+      assertEquals(query.find('flag', 'not-a-boolean' as any), undefined);
 
       query.close();
     } finally {
