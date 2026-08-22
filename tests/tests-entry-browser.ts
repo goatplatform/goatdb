@@ -30,6 +30,8 @@ import setupBinaryEncoding from './binary-encoding.test.ts';
 import setupJsonLogFormats from './json-log-formats.test.ts';
 import setupCommit from './commit.test.ts';
 import setupSession from './session.test.ts';
+import setupCoroutineQueueTests from './coroutine-queue.test.ts';
+import setupCoroutineSchedulerTests from './coroutine-scheduler.test.ts';
 import setupTrusted from './db-trusted.test.ts';
 import setupGoatRequest from './goat-request.test.ts';
 import setupStaticAssetsEndpoint from './static-assets-endpoint.test.ts';
@@ -77,6 +79,8 @@ async function main(): Promise<void> {
   setupHashMap(); // HashSet and HashMap collision-safe cardinality
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
+  setupCoroutineQueueTests(); // Coroutine FIFO execution contract
+  setupCoroutineSchedulerTests(); // Coroutine failure isolation contract
   setupBinaryEncoding(); // Binary commit format encoding roundtrip
   setupJsonLogFormats(); // GOAT binary/JSONL storage format roundtrip and edge cases
   setupCommit(); // Core commit/versioning logic
