@@ -57,6 +57,7 @@ import setupLiveQuery from './live-query.test.ts';
 import setupWriteFailure from './write-failure.test.ts';
 import setupQueryId from './query-id.test.ts';
 import setupHashMap from './hash-map.test.ts';
+import setupCoreValueCompare from './core-value-compare.test.ts';
 
 /**
  * Registers all test suites with the default TestsRunner.
@@ -83,6 +84,7 @@ export async function registerAllTests(): Promise<void> {
   setupAncestorLeafDetection(); // Ancestor edges and leaf detection via AdjacencyList
   setupQueryId(); // generateQueryId cache-key determinism and uniqueness
   setupHashMap(); // HashSet and HashMap collision-safe cardinality
+  setupCoreValueCompare(); // Core-value ordering invariants
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
   setupBinaryEncoding(); // Binary commit format encoding roundtrip
