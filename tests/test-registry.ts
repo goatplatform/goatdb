@@ -58,6 +58,7 @@ import setupWriteFailure from './write-failure.test.ts';
 import setupQueryId from './query-id.test.ts';
 import setupHashMap from './hash-map.test.ts';
 import setupCoreValueCompare from './core-value-compare.test.ts';
+import setupDocsMdxEscape from './docs-mdx-escape.test.ts';
 
 /**
  * Registers all test suites with the default TestsRunner.
@@ -78,6 +79,7 @@ export async function registerAllTests(): Promise<void> {
   setupProgressTests(); // TUI progress tracking - Task state machine, aggregation
   setupHealthCheckEndpointTest(); // Simple HTTP endpoint check
   setupMergeAdjList(); // Adjacency list data structure
+  setupDocsMdxEscape(); // MDX escaping for generated docs (pure string transforms)
   setupMergeBloom(); // Bloom filter operations
   setupBloomFPR(); // Bloom filter false-positive rate verification
   setupShardFormat(); // Shard file format read/write primitives
