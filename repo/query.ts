@@ -35,7 +35,7 @@ export type Entry<S extends Schema = Schema> = [
 ];
 
 // WHY: sort uses total-order coreValueCompare (transitive). find uses
-// coreValueEquals (epsilon <2.2e-16 near-zero; Date ms ~1.7e12 unaffected).
+// coreValueEquals (epsilon `< Number.EPSILON` near-zero; Date ms ~1.7e12 unaffected).
 // Invalid Date/NaN: compare says Invalid==Invalid/NaN==NaN for ordering,
 // but equals says distinct instances != each other — find misses them,
 // sort clusters them. (Same-reference objects match via e1===e2 shortcut.)
@@ -545,7 +545,7 @@ export class Query<
 
   /**
    * Finds an item in the query results whose field equals the given
-   * value according to core-value equality (epsilon <2.2e-16 near-zero;
+   * value according to core-value equality (epsilon `< Number.EPSILON` near-zero;
    * distinct Invalid Date instances and NaN never match in `coreValueEquals`).
    * If the field is the sort field, uses binary search (total-order)
    * for O(log n) lookup then scans the epsilon-neighborhood.
