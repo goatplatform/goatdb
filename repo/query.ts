@@ -18,6 +18,8 @@ import type { ManagedItem } from '../db/managed-item.ts';
 import type { SchemaDataType } from '../mod.ts';
 import { bsearch_idx } from '../base/algorithms.ts';
 import { coreValueCompare } from '../base/core-types/comparable.ts';
+import { coreValueEquals } from '../base/core-types/equals.ts';
+import type { CoreValue } from '../base/core-types/base.ts';
 
 /**
  * A tuple representing a query result entry, containing a path and an item.
@@ -31,6 +33,14 @@ export type Entry<S extends Schema = Schema> = [
   path: string,
   item: Item<S>,
 ];
+
+// WHY: sort uses total-order coreValueCompare (transitive). find uses
+// coreValueEquals (epsilon `< Number.EPSILON` near-zero; Date ms ~1.7e12 unaffected).
+// Invalid Date/NaN: compare says Invalid==Invalid/NaN==NaN for ordering,
+// but equals says distinct instances != each other — find misses them,
+// sort clusters them. (Same-reference objects match via e1===e2 shortcut.)
+// find does bsearch via compare then scans the epsilon-neighborhood.
+
 /**
  * Information passed to a query predicate function to help determine if an
  * item matches.
@@ -294,8 +304,8 @@ export class Query<
       this._sortField = sortBy as keyof SchemaDataType<OS> & string;
       sortBy = ({ left, right }) =>
         coreValueCompare(
-          left.get(this._sortField!),
-          right.get(this._sortField!),
+          left.get(this._sortField!) as CoreValue,
+          right.get(this._sortField!) as CoreValue,
         ) * (sortDescending ? -1 : 1);
     } else if (typeof sortBy === 'function' && sortDescending) {
       sortBy = (info) => (sortBy as SortDescriptor<OS, CTX>)(info) * -1;
@@ -429,7 +439,8 @@ export class Query<
             const rVal = rHead
               ? this.repo.itemForCommit(rHead)?.get(field)
               : right.get(field);
-            return coreValueCompare(lVal, rVal) * sign;
+            return coreValueCompare(lVal as CoreValue, rVal as CoreValue) *
+              sign;
           });
         } else {
           this._cachedResults.sort((left, right) => {
@@ -533,37 +544,72 @@ export class Query<
   }
 
   /**
-   * Finds the first item in the query results where the specified field matches
-   * the given value. If the field is the sort field, uses binary search for
-   * O(log n) lookup. Otherwise performs a linear scan.
+   * Finds an item in the query results whose field equals the given
+   * value according to core-value equality (epsilon `< Number.EPSILON` near-zero;
+   * distinct Invalid Date instances and NaN never match in `coreValueEquals`).
+   * If the field is the sort field, uses binary search (total-order)
+   * for O(log n) lookup then scans the epsilon-neighborhood.
+   * Otherwise performs a linear scan. When multiple epsilon-equal
+   * values exist, any may be returned.
    *
    * @param fieldName The name of the field to search on
    * @param value The value to search for
-   * @returns The first matching item, or undefined if no match found
+   * @returns A matching item, or undefined if no match found
    */
   find(
     fieldName: keyof SchemaDataType<OS>,
     value: SchemaDataType<OS>[keyof SchemaDataType<OS>],
   ): ManagedItem<OS> | undefined {
     const results = this.results();
+    const field = fieldName as string;
     if (fieldName === this._sortField) {
-      const userIdx = bsearch_idx(
+      // WHY: bsearch uses total-order compare, verify with equals (may disagree on epsilon/near-zero).
+      let candidateIdx = bsearch_idx(
         results.length,
         (idx) =>
           coreValueCompare(
-            value,
-            results[idx].get(fieldName as string),
+            value as CoreValue,
+            results[idx].get(field) as CoreValue,
           ) * (this.sortDescending ? -1 : 1),
       );
-      if (
-        userIdx >= 0 && userIdx < results.length &&
-        results[userIdx].get(fieldName as string) === value
-      ) {
-        return results[userIdx];
+      // -1 when length is 0 or insertion point is past end
+      if (candidateIdx === -1) {
+        candidateIdx = results.length - 1;
       }
+      if (candidateIdx < 0 || candidateIdx >= results.length) {
+        return undefined;
+      }
+      // Direct hit.
+      if (
+        coreValueEquals(
+          results[candidateIdx].get(field) as CoreValue,
+          value as CoreValue,
+        )
+      ) {
+        return results[candidateIdx];
+      }
+      // Scan ±1 neighbor: insertion point can be off by one for near-equal values
+      for (const delta of [-1, 1] as const) {
+        const idx = candidateIdx + delta;
+        if (idx < 0 || idx >= results.length) continue;
+        if (
+          coreValueEquals(
+            results[idx].get(field) as CoreValue,
+            value as CoreValue,
+          )
+        ) {
+          return results[idx];
+        }
+      }
+      return undefined;
     } else {
       for (const item of results) {
-        if (item.get(fieldName as string) === value) {
+        if (
+          coreValueEquals(
+            item.get(field) as CoreValue,
+            value as CoreValue,
+          )
+        ) {
           return item;
         }
       }

@@ -1,6 +1,7 @@
 #!/usr/bin/env -S deno run -A
 import { Application } from 'typedoc';
 import { dirname, fromFileUrl, join } from '@std/path';
+import { convertAnchorsToJsx, escapeMarkdownForMdx } from './mdx-escape.ts';
 
 const SCRIPT_DIR = dirname(fromFileUrl(import.meta.url));
 const ROOT_DIR = dirname(SCRIPT_DIR);
@@ -63,56 +64,6 @@ async function writeCategoryFiles(dir: string): Promise<void> {
   }
 }
 
-function escapeLineBraces(line: string): string {
-  let result = '';
-  let codeDelimLen = 0; // 0 = not in inline code
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '`') {
-      // Count consecutive backticks to handle multi-backtick delimiters
-      let count = 1;
-      while (i + count < line.length && line[i + count] === '`') count++;
-      if (codeDelimLen === 0) {
-        codeDelimLen = count;
-      } else if (count >= codeDelimLen) {
-        codeDelimLen = 0;
-      }
-      result += line.slice(i, i + count);
-      i += count - 1;
-    } else if (
-      codeDelimLen === 0 &&
-      ch === '{' &&
-      (i === 0 || line[i - 1] !== '\\')
-    ) {
-      result += '\\{';
-    } else if (
-      codeDelimLen === 0 &&
-      ch === '}' &&
-      (i === 0 || line[i - 1] !== '\\')
-    ) {
-      result += '\\}';
-    } else {
-      result += ch;
-    }
-  }
-  return result;
-}
-
-function escapeBracesOutsideCodeFences(text: string): string {
-  const lines = text.split('\n');
-  let inCodeFence = false;
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trimStart().startsWith('```')) {
-      inCodeFence = !inCodeFence;
-      continue;
-    }
-    if (!inCodeFence) {
-      lines[i] = escapeLineBraces(lines[i]);
-    }
-  }
-  return lines.join('\n');
-}
-
 function injectSidebarLabel(text: string): string {
   if (text.startsWith('---')) return text;
   // Strip the "Class:", "Function:", etc. prefix from H1 headings to produce
@@ -122,12 +73,6 @@ function injectSidebarLabel(text: string): string {
   if (!h1Match) return text;
   const name = h1Match[1];
   return `---\nsidebar_label: "${name}"\n---\n\n${text}`;
-}
-
-function convertAnchorsToJsx(text: string): string {
-  // Replace <a id="..."></a> with <Anchor id="..."/> so MDX processes them
-  // as JSX components (uppercase) rather than raw HTML (lowercase).
-  return text.replace(/<a id="([^"]*?)"><\/a>/g, '<Anchor id="$1"/>');
 }
 
 async function main(): Promise<void> {
@@ -146,7 +91,7 @@ async function main(): Promise<void> {
   await app.generateOutputs(project);
 
   // Post-process generated markdown files:
-  // Escape { and } so MDX doesn't interpret them as JSX expressions
+  // Escape prose { } < so MDX doesn't interpret them as JSX/expressions
   let count = 0;
   async function processFiles(dir: string): Promise<void> {
     for await (const entry of Deno.readDir(dir)) {
@@ -158,10 +103,11 @@ async function main(): Promise<void> {
         let text = await Deno.readTextFile(path);
         // Inject sidebar_label for files with HTML-encoded generics in h1
         text = injectSidebarLabel(text);
-        // Escape braces outside fenced code blocks for MDX compatibility
-        text = escapeBracesOutsideCodeFences(text);
         // Convert <a id> anchors to <Anchor id> JSX for MDX broken-link detection
         text = convertAnchorsToJsx(text);
+        // Escape { } < outside fenced/inline code so MDX doesn't read them as
+        // JSX/expressions (runs AFTER convertAnchorsToJsx so <Anchor> stays JSX)
+        text = escapeMarkdownForMdx(text);
         await Deno.writeTextFile(path, text);
       }
     }

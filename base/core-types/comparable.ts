@@ -76,9 +76,38 @@ export function coreValueCompare(
     case CoreType.Undefined:
       if (v2 === undefined) return 0;
       break;
-    case CoreType.Boolean:
+    // WHY Date: value equality via getTime() gives total order.
+    // Invalid < valid and Invalid==Invalid for ordering (differs from
+    // equals.ts where numbersEqual(NaN,NaN)==false so Invalid!=Invalid for equality).
+    // Date vs non-Date breaks to hash fallback (encodableValueHash).
     case CoreType.Date:
+      if (getCoreType(v2 as CoreValue) === CoreType.Date) {
+        const time1 = (v1 as Date).getTime();
+        const time2 = (v2 as Date).getTime();
+        if (Number.isNaN(time1)) return Number.isNaN(time2) ? 0 : -1;
+        if (Number.isNaN(time2)) return 1;
+        return time1 === time2 ? 0 : time1 < time2 ? -1 : 1;
+      }
+      break;
+    case CoreType.Boolean:
+      type2 = getCoreType(v2 as CoreValue);
+      if (type1 === type2) {
+        return (v1 as boolean) === (v2 as boolean)
+          ? 0
+          : (v1 as boolean)
+          ? 1
+          : -1;
+      }
+      break;
     case CoreType.Number:
+      type2 = getCoreType(v2 as CoreValue);
+      if (type1 === type2) {
+        const n1 = v1 as number, n2 = v2 as number;
+        if (Number.isNaN(n1)) return Number.isNaN(n2) ? 0 : -1;
+        if (Number.isNaN(n2)) return 1;
+        return n1 === n2 ? 0 : n1 < n2 ? -1 : 1;
+      }
+      break;
     case CoreType.String:
       type2 = getCoreType(v2 as CoreValue);
       if (type1 === type2) {
