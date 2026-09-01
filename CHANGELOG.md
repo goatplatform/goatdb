@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-01
+
+### Fixed
+
+- Republish 0.6.0 as 0.6.1: npm prohibits re-publishing an unpublished version (tombstone retention in registry `time` metadata), so 0.6.1 supersedes with identical code.
+
 ## [0.6.0] - 2026-08-30
 
 ### Breaking Changes
