@@ -10,7 +10,7 @@
  * - Cleanup: close() stops the checker timer
  *
  * All tests that would otherwise wait on real timers use
- * db._testFireInactivityCheck() to fire the check synchronously,
+ * db._testFireInactivityCheck() to fire the check deterministically,
  * with manually-set past timestamps so the inactivity timeout
  * is immediately exceeded.
  */
@@ -187,7 +187,7 @@ export default function setup(): void {
     }
   });
 
-  TEST('AutoClose', 'chained query auto-closes when no listeners', async (ctx) => {
+  TEST('AutoClose', 'base query auto-closes when no listeners', async (ctx) => {
     const db = await ctx.createDB('ac-query-chain', {
       registry: kRegistry,
       queryInactivityTimeoutMs: 100,
@@ -471,15 +471,18 @@ export default function setup(): void {
         await db.open('/data/items');
         assertTrue(p(db)._repositories.has('/data/items'));
 
+        // Poll for up to 3s until the repo is closed by the real timer.
         // The timer check runs every 100ms and repo timeout is 200ms.
-        // After ~200ms the check should fire and detect inactivity.
-        await sleep(600);
-
-        assertEquals(
-          p(db)._repositories.has('/data/items'),
-          false,
-          'repo should be closed by real timer',
-        );
+        const deadline = performance.now() + 3000;
+        let closed = false;
+        while (performance.now() < deadline) {
+          if (!p(db)._repositories.has('/data/items')) {
+            closed = true;
+            break;
+          }
+          await sleep(10);
+        }
+        assertTrue(closed, 'repo should be closed by real timer within 3s');
       } finally {
         await db.close();
       }

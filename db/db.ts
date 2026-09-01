@@ -262,7 +262,6 @@ export class GoatDB<US extends Schema = Schema>
   // writing, simulating I/O failures. Decremented on each triggered failure.
   _testForceAppendFailures = 0;
   // Tracks the most recent fire-and-forget drain promise per file so that
-  // Tracks the most recent fire-and-forget drain promise per file so that
   // flush()/closeRepo() can await it before their own drain loop.
   private readonly _inFlightDrains = new Map<JSONLogFile, Promise<void>>();
   // Tracks repos that have already emitted the legacy-format fallback warning,
@@ -436,11 +435,11 @@ export class GoatDB<US extends Schema = Schema>
    * when you're done using the database instance.
    */
   async close(): Promise<void> {
-    // Stop the inactivity checker first
+    // Stop the inactivity checker first (prevents timer fires during teardown)
     this._inactivityTimer?.unschedule();
     this._inactivityTimer = undefined;
 
-    // Stop all sync operations first (prevents new writes)
+    // Stop all sync operations (prevents new writes)
     if (this._syncSchedulers) {
       for (const scheduler of this._syncSchedulers) {
         scheduler.close();
@@ -1117,6 +1116,10 @@ export class GoatDB<US extends Schema = Schema>
    * for deterministic testing.
    */
   private _checkInactivity(): void {
+    // Re-entrancy guard: if closeRepo promises are still in-flight from a
+    // previous check, skip this cycle. Prevents _closeInFlight overwrite.
+    if (this._closeInFlight) return;
+
     const now = performance.now();
 
     // Build active repo set from ManagedItems — single O(n) pass

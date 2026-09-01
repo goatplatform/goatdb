@@ -678,7 +678,7 @@ export class Query<
     // Only 'DocumentChanged' is an external listener; 'Closed' and
     // 'LoadingFinished' are used internally.
     if (e === 'DocumentChanged') {
-      (this as any)._hasExternalListeners = true;
+      this._hasExternalListeners = true;
     }
     return result;
   }
