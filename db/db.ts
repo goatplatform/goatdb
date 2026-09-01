@@ -44,6 +44,7 @@ import { assert } from '../base/error.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { Emitter } from '../base/emitter.ts';
 import { getGoatConfig } from '../base/config.ts';
+import { SimpleTimer } from '../base/timer.ts';
 import { makeShardConfig, type ShardConfig } from '../repo/shard-format.ts';
 
 /**
@@ -142,6 +143,28 @@ export interface DBInstanceConfig {
   splitThreshold?: number;
   /** Shards below this count are candidates for merging. Defaults to 10% of maxShardCommits. */
   minShardCommits?: number;
+  /**
+   * Auto-close repositories after this many ms of inactivity.
+   * A repository is inactive when no ManagedItem references it,
+   * no Query depends on it, and no event listeners are attached.
+   * Set to 0 (default) to disable. System repos (/sys/) are
+   * never auto-closed.
+   */
+  repoInactivityTimeoutMs?: number;
+
+  /**
+   * Auto-close queries after this many ms of inactivity.
+   * A query is inactive when no external listeners are attached
+   * to its events. Set to 0 (default) to disable.
+   */
+  queryInactivityTimeoutMs?: number;
+
+  /**
+   * How often (in ms) to check for inactive repos/queries.
+   * Defaults to 30,000 (30 seconds). Only used when at least
+   * one timeout is > 0.
+   */
+  inactivityCheckIntervalMs?: number;
 }
 
 /**
@@ -239,6 +262,7 @@ export class GoatDB<US extends Schema = Schema>
   // writing, simulating I/O failures. Decremented on each triggered failure.
   _testForceAppendFailures = 0;
   // Tracks the most recent fire-and-forget drain promise per file so that
+  // Tracks the most recent fire-and-forget drain promise per file so that
   // flush()/closeRepo() can await it before their own drain loop.
   private readonly _inFlightDrains = new Map<JSONLogFile, Promise<void>>();
   // Tracks repos that have already emitted the legacy-format fallback warning,
@@ -259,6 +283,17 @@ export class GoatDB<US extends Schema = Schema>
   private _trustPoolPromise: Promise<TrustPool>;
   private _ready: boolean = false;
   readonly shardConfig: ShardConfig;
+
+  // ── Inactivity auto-close fields ──────────────────────────────
+  readonly repoInactivityTimeoutMs: number;
+  readonly queryInactivityTimeoutMs: number;
+  readonly inactivityCheckIntervalMs: number;
+
+  private readonly _lastActivityByRepo = new Map<string, number>();
+  private readonly _lastActivityByQuery = new Map<string, number>();
+  private _inactivityTimer: SimpleTimer | undefined;
+  /** @internal Tracks in-flight closeRepo promises for test hook. */
+  private _closeInFlight: Promise<void> | undefined;
 
   constructor(config: DBInstanceConfig) {
     super();
@@ -281,6 +316,10 @@ export class GoatDB<US extends Schema = Schema>
       splitThreshold: config.splitThreshold,
       minCommits: config.minShardCommits,
     });
+    this.repoInactivityTimeoutMs = config.repoInactivityTimeoutMs ?? 0;
+    this.queryInactivityTimeoutMs = config.queryInactivityTimeoutMs ?? 0;
+    this.inactivityCheckIntervalMs = config.inactivityCheckIntervalMs ?? 30_000;
+
     if (config?.peers !== undefined) {
       this._peerURLs = typeof config.peers === 'string'
         ? [config.peers]
@@ -292,6 +331,16 @@ export class GoatDB<US extends Schema = Schema>
       // It will be re-thrown when readyPromise() is called
       return Promise.reject(err);
     });
+
+    // Start inactivity checker if any timeout is enabled
+    if (this.repoInactivityTimeoutMs > 0 || this.queryInactivityTimeoutMs > 0) {
+      this._inactivityTimer = new SimpleTimer(
+        this.inactivityCheckIntervalMs,
+        true,
+        () => { this._checkInactivity(); },
+        'InactivityChecker',
+      ).schedule() as SimpleTimer;
+    }
   }
 
   /**
@@ -387,6 +436,10 @@ export class GoatDB<US extends Schema = Schema>
    * when you're done using the database instance.
    */
   async close(): Promise<void> {
+    // Stop the inactivity checker first
+    this._inactivityTimer?.unschedule();
+    this._inactivityTimer = undefined;
+
     // Stop all sync operations first (prevents new writes)
     if (this._syncSchedulers) {
       for (const scheduler of this._syncSchedulers) {
@@ -438,6 +491,7 @@ export class GoatDB<US extends Schema = Schema>
   open(path: string, opts?: OpenOptions): Promise<Repository> {
     path = itemPathNormalize(path);
     const repoId = itemPathGetRepoId(path);
+    this._touchRepo(repoId);
     if (this._repositories.has(repoId)) {
       return Promise.resolve(this._repositories.get(repoId)!);
     }
@@ -504,6 +558,14 @@ export class GoatDB<US extends Schema = Schema>
     // Detach event handlers first to prevent new file operations
     repo.detachAll();
 
+    // ❗ Race guard: was the repo reopened while we were waiting?
+    if (this.repository(repoId) !== repo) {
+      // Someone else reopened this repo concurrently — don't delete the
+      // new instance. Clean up only our local state.
+      this._lastActivityByRepo.delete(repoId);
+      return;
+    }
+
     // Close log file
     if (fileEntry) {
       await JSONLogFileClose(fileEntry);
@@ -512,6 +574,7 @@ export class GoatDB<US extends Schema = Schema>
     this._files.delete(repoId);
     this._repositories.delete(repoId);
     this._warnedLegacyRepos.delete(repoId);
+    this._lastActivityByRepo.delete(repoId);
   }
 
   /**
@@ -533,6 +596,7 @@ export class GoatDB<US extends Schema = Schema>
       assert(typeof s === 'string'); // Sanity check
     }
     const path = itemPathNormalize(pathComps.join('/'));
+    this._touchRepo(itemPathGetRepoId(path));
     let item = this._items.get(path);
     if (!item) {
       item = new ManagedItem(this, path);
@@ -704,6 +768,7 @@ export class GoatDB<US extends Schema = Schema>
       });
       this._openQueries.set(id, q);
     }
+    this._touchQuery(q.id);
     return q as unknown as Query<IS, OS, CTX>;
   }
 
@@ -1041,6 +1106,138 @@ export class GoatDB<US extends Schema = Schema>
             this.registry,
           ),
       );
+    }
+  }
+
+  /**
+   * Checks for inactive repositories and queries and closes them if their
+   * inactivity timeout has been exceeded.
+   *
+   * Called by the inactivity timer. Also exposed via _testFireInactivityCheck
+   * for deterministic testing.
+   */
+  private _checkInactivity(): void {
+    const now = performance.now();
+
+    // Build active repo set from ManagedItems — single O(n) pass
+    const activeReposFromItems = new Set<string>();
+    for (const itemPath of this._items.keys()) {
+      activeReposFromItems.add(itemPathGetRepoId(itemPath));
+    }
+
+    // ── Check queries ───────────────────────────────────────────
+    if (this.queryInactivityTimeoutMs > 0) {
+      const staleQueries: string[] = [];
+      for (const [qid, q] of this._openQueries) {
+        if ((q as any)._closed) {
+          staleQueries.push(qid);
+          continue;
+        }
+        // Keep queries that are still loading their initial scan
+        if (!(q as any)._loadingFinished) {
+          this._touchQuery(qid);
+          continue;
+        }
+        // Keep queries that have external listeners attached
+        if ((q as any)._hasExternalListeners) {
+          this._touchQuery(qid);
+          continue;
+        }
+        const lastActivity = this._lastActivityByQuery.get(qid) ?? 0;
+        if (now - lastActivity > this.queryInactivityTimeoutMs) {
+          staleQueries.push(qid);
+        }
+      }
+      for (const qid of staleQueries) {
+        const q = this._openQueries.get(qid);
+        if (q && !(q as any)._closed) {
+          q.close();
+        }
+        this._openQueries.delete(qid);
+        this._lastActivityByQuery.delete(qid);
+      }
+    }
+
+    // ── Check repositories ──────────────────────────────────────
+    if (this.repoInactivityTimeoutMs > 0) {
+      const staleRepos: string[] = [];
+      for (const [repoId, repo] of this._repositories) {
+        // System repos are never auto-closed
+        if (repoId === '/sys/sessions' || repoId === '/sys/users') {
+          this._touchRepo(repoId);
+          continue;
+        }
+
+        // If any ManagedItem references this repo, keep it alive
+        if (activeReposFromItems.has(repoId)) {
+          this._touchRepo(repoId);
+          continue;
+        }
+
+        // If any open Query depends on this repo, keep it alive
+        let hasDependentQuery = false;
+        for (const q of this._openQueries.values()) {
+          if ((q as any).repo?.path === repoId) {
+            hasDependentQuery = true;
+            break;
+          }
+        }
+        if (hasDependentQuery) {
+          this._touchRepo(repoId);
+          continue;
+        }
+
+        // NOTE: repo.isActive is NOT checked here: the Repository
+        // internally attaches listeners (NewCommitSync, NewCommit)
+        // during _openImpl, so isActive is always true regardless of
+        // external listeners. Instead we rely on item & query presence
+        // (checked above) to decide whether the repo is in use.
+
+        // Check timeout
+        const lastActivity = this._lastActivityByRepo.get(repoId) ?? 0;
+        if (now - lastActivity > this.repoInactivityTimeoutMs) {
+          staleRepos.push(repoId);
+        }
+      }
+      if (staleRepos.length > 0) {
+        const promises = staleRepos.map((repoId) =>
+          this.closeRepo(repoId).catch((e) => {
+            log({
+              severity: 'WARNING',
+              error: 'StorageError',
+              message: `Auto-close of repo ${repoId} failed: ${e}`,
+            });
+          })
+        );
+        this._closeInFlight = Promise.all(promises).then(() => {});
+      }
+    }
+  }
+
+  /** @internal Test-only: manually fire the inactivity check. */
+  async _testFireInactivityCheck(): Promise<void> {
+    this._checkInactivity();
+    if (this._closeInFlight) {
+      await this._closeInFlight;
+      this._closeInFlight = undefined;
+    }
+  }
+
+  /**
+   * Records activity for a repository, resetting its inactivity timer.
+   */
+  private _touchRepo(repoId: string): void {
+    if (this.repoInactivityTimeoutMs > 0) {
+      this._lastActivityByRepo.set(repoId, performance.now());
+    }
+  }
+
+  /**
+   * Records activity for a query, resetting its inactivity timer.
+   */
+  private _touchQuery(queryId: string): void {
+    if (this.queryInactivityTimeoutMs > 0) {
+      this._lastActivityByQuery.set(queryId, performance.now());
     }
   }
 

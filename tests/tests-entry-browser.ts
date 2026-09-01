@@ -39,6 +39,7 @@ import setupHealthCheckEndpoint from './health-check-endpoint.test.ts';
 import setupLiveQuery from './live-query.test.ts';
 import setupHashMap from './hash-map.test.ts';
 import setupCoreValueCompare from './core-value-compare.test.ts';
+import setupAutoClose from './auto-close.test.ts';
 import { getEnvVar } from '../base/os.ts';
 import { notReached } from '../base/error.ts';
 
@@ -91,6 +92,7 @@ async function main(): Promise<void> {
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
   setupLiveQuery(); // Live query membership updates on ManagedItem edits
+  setupAutoClose(); // Auto-close of inactive repos and queries
   setupTrusted(); // Database operations in trusted mode - CRITICAL for browser
   setupStaticAssetsEndpoint(); // File serving and asset management
 

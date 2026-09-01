@@ -271,6 +271,8 @@ export class Query<
   private _resultsGeneration: number = 0;
   private _repoPrefix: string | undefined;
   private _closed = false;
+  /** @internal True when attach() was called for a non-internal event. */
+  _hasExternalListeners = false;
   private _cachedResults: ManagedItem<OS>[] | undefined;
   private _cachedResultsAge = -1;
   private _loading: boolean = true;
@@ -666,6 +668,21 @@ export class Query<
    * its event listeners. A FinalizationRegistry safety net exists for the
    * live-updates listener, but GC timing is non-deterministic.
    */
+  /** @internal Override attach to track external listeners. */
+  // deno-lint-ignore ban-types
+  attach<C extends Function, E extends string>(
+    e: E,
+    c: C,
+  ): () => void {
+    const result = super.attach(e as any, c);
+    // Only 'DocumentChanged' is an external listener; 'Closed' and
+    // 'LoadingFinished' are used internally.
+    if (e === 'DocumentChanged') {
+      (this as any)._hasExternalListeners = true;
+    }
+    return result;
+  }
+
   close(): void {
     if (!this._closed) {
       this._closed = true;
