@@ -1212,7 +1212,13 @@ export class GoatDB<US extends Schema = Schema>
             });
           })
         );
-        this._closeInFlight = Promise.all(promises).then(() => {});
+        const allDone = Promise.all(promises).then(() => {});
+        allDone.finally(() => {
+          if (this._closeInFlight === allDone) {
+            this._closeInFlight = undefined;
+          }
+        });
+        this._closeInFlight = allDone;
       }
     }
   }
