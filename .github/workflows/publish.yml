@@ -3,6 +3,7 @@ name: Publish
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -32,17 +33,22 @@ jobs:
       - name: Build npm artifact
         run: npm run build:npm
 
-      # Extract version from deno.json; rewrite package.json version + exports for npm publish.
+      # Extract version once from deno.json; reused across all publish steps (DRY).
+      - name: Extract version from deno.json
+        id: extract_version
+        run: |
+          VERSION=$(deno eval --node-modules-dir=none "import cfg from './deno.json' with {type:'json'}; console.log(cfg.version)")
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      # Rewrite package.json version + exports for npm publish.
       # In the repo, exports point to .ts source (for local dev/tests). Here we switch to dist/.
-      # --node-modules-dir=none prevents Deno from populating node_modules/ during the eval,
-      # which would otherwise seed vitest into the tree and break npm 11's peer-dep resolution.
       # This runs AFTER npm install + build so the lockfile matches during install.
       - name: Sync version and exports from deno.json → package.json
         run: |
-          VERSION=$(deno eval --node-modules-dir=none "import cfg from './deno.json' with {type:'json'}; console.log(cfg.version)")
           deno eval --node-modules-dir=none "
             import pkg from './package.json' with {type:'json'};
-            pkg.version = '$VERSION';
+            import cfg from './deno.json' with {type:'json'};
+            pkg.version = cfg.version;
             pkg.exports = {
               '.':              { import: './dist/mod.js',          types: './dist/mod.d.ts' },
               './react':        { import: './dist/react/hooks.js',  types: './dist/react/hooks.d.ts' },
@@ -54,12 +60,20 @@ jobs:
           "
 
       - name: Publish to JSR
-        run: npx jsr publish --allow-dirty
+        run: |
+          VERSION=${{ steps.extract_version.outputs.VERSION }}
+          if curl -sf "https://registry.jsr.io/@goatdb/goatdb/$VERSION" >/dev/null 2>&1; then
+            echo "v$VERSION already on JSR, skipping"
+          else
+            npx jsr publish --allow-dirty
+          fi
 
       - name: Publish to npm
         run: |
-          VERSION=$(deno eval --node-modules-dir=none "import cfg from './deno.json' with {type:'json'}; console.log(cfg.version)")
-          if [[ "$VERSION" == *"-"* ]]; then
+          VERSION=${{ steps.extract_version.outputs.VERSION }}
+          if curl -sf "https://registry.npmjs.org/@goatdb/goatdb/$VERSION" >/dev/null 2>&1; then
+            echo "v$VERSION already on npm, skipping"
+          elif [[ "$VERSION" == *"-"* ]]; then
             npm publish --access public --tag next
           else
             npm publish --access public
@@ -69,8 +83,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          gh release create "$GITHUB_REF_NAME" \
-            --title "v$VERSION" \
-            --notes-file CHANGELOG.md \
-            --verify-tag
+          VERSION=${{ steps.extract_version.outputs.VERSION }}
+          TAG=${GITHUB_REF_NAME}
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, skipping"
+          else
+            gh release create "$TAG" \
+              --title "v$VERSION" \
+              --notes-file CHANGELOG.md \
+              --verify-tag
+          fi
