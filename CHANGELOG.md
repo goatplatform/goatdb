@@ -2,75 +2,61 @@
 
 All notable changes to GoatDB will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and GoatDB adheres to
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and GoatDB adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+> **Pre-1.0 compatibility notice:** GoatDB is still pre-1.0. Backward compatibility is not guaranteed between releases; APIs, storage formats, and behavior may change without notice.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-30
+
 ### Breaking Changes
 
-- **Binary `.goat` storage format**: Commits are now stored in a compact binary
-  format (magic byte `0x47 'G'`, little-endian commit fields, big-endian 4-byte
-  length framing). Both `.jsonl` and the new binary format are first-class
-  citizens; the format is selected via `DBInstanceConfig.storageFormat`. Manual
-  migration required for any tooling that reads `.goat` files directly.
+- **Binary `.goat` storage format**: Commits are now stored in a compact binary format (magic byte `0x47 'G'`, little-endian commit fields, big-endian 4-byte length framing). Both `.jsonl` and binary storage are supported, with the format selected through `DBInstanceConfig.storageFormat`. Tooling that reads `.goat` files directly requires manual migration.
 
-- **Bloom-filter ancestors replaced with explicit string arrays**: The `'af'`
-  (ancestor filter) and `'ac'` (ancestor count) commit fields are no longer
-  written or read. Existing commits that used Bloom-filter ancestry load with
-  `ancestors=[]`; ancestor edges are rebuilt as new merge commits are written.
-  No data loss occurs, but one extra merge cycle may run per affected key on
-  first upgrade.
+- **Bloom-filter ancestors replaced with explicit string arrays**: The `af` and `ac` commit fields are no longer written or read. Existing commits using Bloom-filter ancestry load with empty ancestor arrays and rebuild their ancestry through new merge commits.
 
-- **Strict `.goat` binary format**: Non-binary records in `.goat` files are now
-  rejected with an error log (previously silently loaded). Any `.goat` file with
-  mixed JSON/binary content requires manual migration.
+- **Strict `.goat` binary records**: Non-binary records in `.goat` files are rejected instead of being silently loaded. Mixed JSON/binary files require manual migration.
 
-- **`leavesForKey()` session parameter removed**: The optional `session`
-  parameter has been removed from `Repository.leavesForKey()`.
+- **Ed25519 signing replaces ECDSA P-384**: Existing ECDSA-signed commits cannot be verified after upgrading and require a fresh trust pool.
 
-- **`commitIsHighProbabilityLeaf()` renamed to `commitIsLeaf()`**: Reflects the
-  switch from probabilistic Bloom-filter ancestry to exact ancestor tracking.
+- **Query cache identity changed**: Query IDs now use Murmur3 and account for relevant options and normalized source paths. Persisted caches from earlier versions may miss and be rebuilt lazily.
 
-- **Ed25519 signing replaces ECDSA P-384**: Session keys now use Ed25519.
-  Existing ECDSA-signed commits cannot be verified; a fresh trust pool is
-  required.
+- **Query live updates are enabled by default**: Queries now receive uncommitted updates from `set()`. Set `liveUpdates: false` to retain commit-only behavior.
 
-- **`liveUpdates` defaults to `true`**: Queries now push live (uncommitted)
-  updates on `set()` by default. Set `liveUpdates: false` to restore commit-only
-  update behavior.
+- **Public API changes**: The optional `session` parameter was removed from `Repository.leavesForKey()`, and `commitIsHighProbabilityLeaf()` was renamed to `commitIsLeaf()`.
 
-- **Query cache IDs changed (MD5 -> Murmur3)**: `generateQueryId` now uses
-  Murmur3 instead of MD5. Persisted query caches from prior versions will miss
-  on upgrade and be lazily rebuilt -- no data loss, but expect a one-time
-  re-scan on first open.
+- **Item path components are limited to 39 characters**: Type, repository, item, and embed path components longer than 39 characters are rejected.
 
 ### Added
 
-- `GoatDB.insert()` — bulk API for batch item creation without ancestor
-  computation overhead for new keys
-- `liveUpdates` option on queries — live push updates from the repo
-- `WriteFailure` event on `GoatDB` — surfaced when a commit fails to persist
-- Binary commit codec (`base/core-types/encoding/binary-commit.ts`) bundled into
-  the storage worker for zero-copy encode/decode
+- `GoatDB.insert()` for creating batches of new items without redundant ancestor computation.
+- `liveUpdates` query configuration for selecting live or commit-only updates.
+- `WriteFailure` events on `GoatDB` when a commit cannot be persisted.
+- Shard configuration through `maxShardCommits`, `splitThreshold`, and `minShardCommits`, with read-only access through `GoatDB.shardConfig`.
+- Public `AppConfig.esbuildPlugins` support for build customization.
 
 ### Changed
 
-- Sync Bloom filter FPR cap lowered from `0.5` to `0.001` for normal-accuracy
-  sync, reducing unnecessary resync rounds during peer-to-peer commit exchange
-  (low-accuracy path retains `0.5`)
-- Auth concurrency captured once at `Repository` construction, preventing a
-  potential race between pool sizing and batch slicing in `verifyCommits`
-- Homepage redesigned with new hero, logo, and quick-start component
-- Benchmark suite overhauled; documentation updated
+- CSS is bundled through esbuild during compile and debug builds, including plugin processing, hashed `url()` assets, and composed sourcemaps.
+- The normal-accuracy sync Bloom-filter false-positive rate is capped at `0.001` to reduce unnecessary resynchronization rounds. The low-accuracy path retains its previous setting.
+- Repository authentication concurrency is captured when the repository is created, preventing inconsistent verification batching.
+- The homepage, benchmarks, and documentation have been overhauled.
+
+### Fixed
+
+- Conflict resolution now selects the closest available lowest common ancestor and defers merging when that ancestor is unavailable, avoiding destructive fallback merges.
+- Query IDs no longer collide across relevant options or source paths, explicit empty IDs are preserved, stale aliases are avoided, and generated-ID caching is bounded.
+- Query ordering and `find()` now handle dates, booleans, numbers, `NaN`, and near-equal values consistently.
+- Locally created commits retain monotonic creation order when timestamps collide.
+- `CoroutineQueue` now preserves FIFO ordering, runs a single worker, and recovers after task failures.
+- Zero-byte writes now fail explicitly instead of retrying indefinitely.
 
 ## [0.5.1] - 2026-03-05
 
 ### Breaking Changes
 
-- **`./init` sub-path export removed.** `deno run -A jsr:@goatdb/goatdb/init` no
-  longer works.
+- **`./init` sub-path export removed.** `deno run -A jsr:@goatdb/goatdb/init` no longer works.
 
   **Migration:**
   ```bash
@@ -98,10 +84,7 @@ and GoatDB adheres to
 
 ### Breaking Changes
 
-- **Build tools moved from `@goatdb/goatdb/server`**: `compile`,
-  `startDebugServer`, and `AppConfig` moved to `@goatdb/goatdb/server/build`.
-  Runtime exports (`Server`, `createHttpServer`, etc.) remain in
-  `@goatdb/goatdb/server`.
+- **Build tools moved from `@goatdb/goatdb/server`**: `compile`, `startDebugServer`, and `AppConfig` moved to `@goatdb/goatdb/server/build`. Runtime exports (`Server`, `createHttpServer`, etc.) remain in `@goatdb/goatdb/server`.
 
   **Migration:**
   ```typescript
@@ -115,8 +98,7 @@ and GoatDB adheres to
 
 ### Security
 
-- Fixed two vulnerabilities in `persistCommits`: null namespace guard and
-  delta-based record bypass
+- Fixed two vulnerabilities in `persistCommits`: null namespace guard and delta-based record bypass
 
 ### Added
 
@@ -128,23 +110,18 @@ and GoatDB adheres to
 - Loading status exposed on `ManagedItem`
 - `itemPathIsValid()` exported as a public utility
 - `getEnvVar` exported as stable cross-runtime API
-- `setup` callback in `DebugServerOptions` for configuring server-side logic
-  during development
+- `setup` callback in `DebugServerOptions` for configuring server-side logic during development
 - Health check endpoint on `Server`
 - `port` and `address` getters on `Server`; graceful shutdown support
 - Node.js Single Executable Application (SEA) compilation via `compile()`
 - `jsr:@goatdb/goatdb/link` now works in Node.js in addition to Deno
-- HTTPS support with automatic self-signed certificate generation for secure
-  development
+- HTTPS support with automatic self-signed certificate generation for secure development
 
 ### Changed
 
-- Runtime abstraction layer refactored for cross-platform compatibility (Deno,
-  Node.js, Browser)
-- Path utilities moved to `base/path.ts` with POSIX-style handling across all
-  environments
-- Windows path support — backslashes from `Deno.cwd()`/`process.cwd()` are
-  normalized to forward slashes
+- Runtime abstraction layer refactored for cross-platform compatibility (Deno, Node.js, Browser)
+- Path utilities moved to `base/path.ts` with POSIX-style handling across all environments
+- Windows path support — backslashes from `Deno.cwd()`/`process.cwd()` are normalized to forward slashes
 - `FileImpl` interface extended with `exists`, `copyFile`, and `readDir` methods
 - CLI `init` templates externalized to `cli/templates/` directory
 - CLI commands (`init`, `link`) now work in Node.js
@@ -152,12 +129,9 @@ and GoatDB adheres to
 - Node.js minimum version raised to 24 (required for SEA support)
 - Node.js is now production-ready; experimental warning removed
 - esbuild bumped from 0.24 to 0.25.4
-- Browser `getOS()` uses 3-tier detection (User-Agent Client Hints,
-  `navigator.platform`, User-Agent string) and returns `'unknown'` when platform
-  cannot be detected
+- Browser `getOS()` uses 3-tier detection (User-Agent Client Hints, `navigator.platform`, User-Agent string) and returns `'unknown'` when platform cannot be detected
 - Default server port for HTTPS changed to 8443 (HTTP remains 8080)
-- `ManagedItem.commit()` now ensures all changes are fully committed before
-  returning
+- `ManagedItem.commit()` now ensures all changes are fully committed before returning
 
 ### Removed
 
@@ -170,15 +144,12 @@ and GoatDB adheres to
 - First sync awaited when opening a repository for the first time
 - Query scan now correctly awaited in browser environments
 - Resource leak in OPFS `copyFile()` — file handles now properly closed on error
-- Template `DomainConfig` used incorrect method names (`resolveOrg` instead of
-  `mapToOrg`)
+- Template `DomainConfig` used incorrect method names (`resolveOrg` instead of `mapToOrg`)
 - Template HTML referenced raw `index.tsx` instead of built `/app.js`
-- Sync engine: recursive `serverUrl` expansion, infinite loop, dangling promise,
-  and sync-before-open bugs
+- Sync engine: recursive `serverUrl` expansion, infinite loop, dangling promise, and sync-before-open bugs
 - `FileImpl`: partial-read loop and resource cleanup on error
 - No longer crashes when the cache file is missing
-- Now throws an error when commit contents are missing instead of failing
-  silently
+- Now throws an error when commit contents are missing instead of failing silently
 
 ## [0.3.1]
 
@@ -197,8 +168,7 @@ and GoatDB adheres to
 
 ### Added
 
-- [Orderstamp](https://github.com/goatplatform/orderstamp-js) is now bundled and
-  exposed directly within GoatDB
+- [Orderstamp](https://github.com/goatplatform/orderstamp-js) is now bundled and exposed directly within GoatDB
 
 ## [0.2.2]
 
@@ -221,27 +191,23 @@ and GoatDB adheres to
 ### Added
 
 - `FieldDef.validate` enables custom field level validation
-- Before/After hooks for integrating with external build steps via
-  `LiveReloadOptions.beforeBuild` and `LiveReloadOptions.afterBuild`
+- Before/After hooks for integrating with external build steps via `LiveReloadOptions.beforeBuild` and `LiveReloadOptions.afterBuild`
 - `CoreTypes` are now exported by the top level `mod.ts`
 - It's now possible to set a custom user schema via `SchemaManager.userSchema`
-- Attempting to commit an item with invalid data now throws with a detailed
-  message when running in debug mode
+- Attempting to commit an item with invalid data now throws with a detailed message when running in debug mode
 
 ### Fixed
 
 - Live reload in debug server is now working again
 - Set types being deserialized incorrectly
-- Crash in `useItem` React hook when first passing `undefined` then a
-  `ManagedItem` instance
+- Crash in `useItem` React hook when first passing `undefined` then a `ManagedItem` instance
 
 ## [0.2.0]
 
 ### Added
 
 - Initial support for Node.js
-- Trusted mode which disables security mechanisms for increased performance in
-  trusted environments
+- Trusted mode which disables security mechanisms for increased performance in trusted environments
 
 ### Changed
 
@@ -257,16 +223,14 @@ and GoatDB adheres to
 
 ### Removed
 
-- Order stamps have been moved to their own repository —
-  https://github.com/goatplatform/orderstamp-js
+- Order stamps have been moved to their own repository — https://github.com/goatplatform/orderstamp-js
 
 ## [0.1.6] - 2025-02-26
 
 ### Added
 
 - `FileImpl.getCWD` to get the current working directory
-- `cli/link.ts` now enables easy development of GoatDB alongside an existing
-  project
+- `cli/link.ts` now enables easy development of GoatDB alongside an existing project
 
 ### Fixed
 
@@ -282,8 +246,7 @@ and GoatDB adheres to
 
 - GoatDB is now licensed under Apache 2.0
 - `JSONLogFile.append` now automatically scans the log file rather than throw
-- `JSONLogFile` worker now uses the transpiled JS version both for the server
-  and the browser
+- `JSONLogFile` worker now uses the transpiled JS version both for the server and the browser
 - Improved React SPA scaffold
 - `ServerOptions.domain` enables fine control over domain / organization mapping
 
@@ -296,8 +259,7 @@ and GoatDB adheres to
 ### Added
 
 - `Item.isNull` to check if an item has a null schema
-- It's now possible to override the authorization rules for `/sys/users` and
-  `/sys/*`
+- It's now possible to override the authorization rules for `/sys/users` and `/sys/*`
 - `Query.sortDescending` to sort results in descending order
 
 ### Changed
@@ -329,7 +291,8 @@ and GoatDB adheres to
 
 - Initial release
 
-[Unreleased]: https://github.com/goatplatform/goatdb/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/goatplatform/goatdb/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/goatplatform/goatdb/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/goatplatform/goatdb/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/goatplatform/goatdb/compare/v0.3.1...v0.5.0
 [0.3.1]: https://github.com/goatplatform/goatdb/compare/v0.3.0...v0.3.1
