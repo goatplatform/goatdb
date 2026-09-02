@@ -13,6 +13,7 @@ import { assert } from '../base/error.ts';
 import * as SetUtils from '../base/set.ts';
 import { Edit } from '../cfds/base/edit.ts';
 import { Code, ServerError, serviceUnavailable } from '../cfds/base/errors.ts';
+import { SimpleTimer } from '../base/timer.ts';
 import { concatChanges, type DataChanges } from '../cfds/base/object.ts';
 import { Item } from '../cfds/base/item.ts';
 import {
@@ -133,6 +134,10 @@ export class Repository<
   // its own object — no per-call allocation on the hot path.
   private readonly _concurrency: number;
   private readonly _authInfoPool: AuthRuleInfo[];
+  /** @internal One-shot idle close timer. */
+  private _idleTimer: SimpleTimer | undefined;
+  /** @internal True while an idle/repo close is in flight for this repo. */
+  _closeInFlight = false;
 
   constructor(
     readonly db: GoatDB,
@@ -173,6 +178,17 @@ export class Repository<
       session: this.trustPool.currentSession,
       op: 'read' as AuthOp,
     }));
+    // Create idle close timer if configured
+    if (this.db.repoInactivityTimeoutMs > 0) {
+      this._idleTimer = new SimpleTimer(
+        this.db.repoInactivityTimeoutMs,
+        false,
+        () => this._onIdleTimeout(),
+        'RepoIdle',
+      );
+      // Start ticking; _touchIdle() resets on activity
+      this._idleTimer.schedule();
+    }
   }
 
   static path(storage: string, id: string): string {
@@ -198,6 +214,32 @@ export class Repository<
     return id;
   }
 
+  /**
+   * Resets the idle close timer on activity.
+   */
+  _touchIdle(): void {
+    if (this._closeInFlight || !this._idleTimer) return;
+    this._idleTimer.unschedule();
+    this._idleTimer.schedule();
+  }
+
+  /** @internal Called by the idle timer to request close. */
+  _onIdleTimeout(): void {
+    if (this._closeInFlight) return;
+    // System repos are never auto-closed
+    if (this.path.startsWith('/sys/') || this.path === '/sys') return;
+    this.db._requestRepoIdleClose(this as any);
+  }
+
+  /** @internal Test-only: trigger idle close immediately. */
+  async _testTriggerIdleTimeout(): Promise<void> {
+    this._idleTimer?.unschedule();
+    if (this._closeInFlight) return;
+    // System repos are never auto-closed
+    if (this.path.startsWith('/sys/') || this.path === '/sys') return;
+    await this.db._requestRepoIdleClose(this as any);
+  }
+
   get orgId(): string {
     return this.trustPool.orgId;
   }
@@ -220,6 +262,7 @@ export class Repository<
   }
 
   getCommit(id: string, session?: Session): Commit {
+    this._touchIdle();
     const c = this.storage.getCommit(id);
     if (!c) {
       throw serviceUnavailable();
@@ -309,6 +352,7 @@ export class Repository<
   }
 
   keyExists(key: string): boolean {
+    this._touchIdle();
     for (const _c of this.storage.commitsForKeyDesc(key)) {
       return true;
     }
@@ -385,6 +429,7 @@ export class Repository<
   }
 
   keys(session?: Session): Iterable<string> {
+    this._touchIdle();
     const { authorizer } = this;
     if (
       !this.db.trusted &&
@@ -407,6 +452,7 @@ export class Repository<
   }
 
   paths(session?: Session): Iterable<string> {
+    this._touchIdle();
     return mapIterable(
       this.keys(session),
       (key) => itemPathJoin(this.path, key),
@@ -795,6 +841,7 @@ export class Repository<
    *          rendering them unreadable.
    */
   headForKey(key: string): Commit | undefined {
+    this._touchIdle();
     const cacheEntry = this._cachedHeadsByKey.get(key);
     if (
       cacheEntry &&
@@ -1107,6 +1154,7 @@ export class Repository<
   valueForKey<T extends Schema = Schema>(
     key: string,
   ): [Item<T>, Commit] | undefined {
+    this._touchIdle();
     let result = this._cachedValueForKey.get(key);
     if (!this._cachedValueForKey.has(key)) {
       const head = this.headForKey(key);
@@ -1133,6 +1181,7 @@ export class Repository<
     value: Item<S>,
     parentCommit: string | Commit | undefined,
   ): Promise<Commit | undefined> {
+    this._touchIdle();
     assert(
       itemPathIsValid(itemPathJoin(this.path, key)),
       `Invalid key: ${key}`,
@@ -1215,6 +1264,7 @@ export class Repository<
    * significantly lower overhead.
    */
   async insert(entries: { key: string; value: Item }[]): Promise<Commit[]> {
+    this._touchIdle();
     const session = this.trustPool.currentSession;
     const newEntries: { key: string; value: Item }[] = [];
     const existingPromises: Promise<Commit | undefined>[] = [];
