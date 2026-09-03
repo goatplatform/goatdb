@@ -271,8 +271,6 @@ export class Query<
   private _resultsGeneration: number = 0;
   private _repoPrefix: string | undefined;
   private _closed = false;
-  /** @internal Number of external DocumentChanged listeners. */
-  _externalListenerCount = 0;
   /** @internal One-shot idle close timer. */
   private _idleTimer: SimpleTimer | undefined;
   private _cachedResults: ManagedItem<OS>[] | undefined;
@@ -515,29 +513,35 @@ export class Query<
   }
 
   /**
-   * Resets the idle close timer on activity.
-   * Schedules or reschedules the one-shot timer.
+   * Resets the idle close timer on activity. Schedules the one-shot timer
+   * only when no external DocumentChanged listeners are attached (otherwise
+   * the timer is kept unscheduled so a pinned query cannot close).
    */
   _touchIdle(): void {
     if (this._idleTimer && !this._closed) {
       this._idleTimer.unschedule();
-      this._idleTimer.schedule();
+      if (this.listenerCount('DocumentChanged') === 0) {
+        this._idleTimer.schedule();
+      }
     }
   }
 
   /** @internal Called by the idle timer to close this query. */
   _onIdleTimeout(): void {
-    if (!this._closed) {
-      this.close();
+    if (this._closed) return;
+    // Derived from Emitter registrations: if any external DocumentChanged
+    // listener remains, defer (reschedule) instead of closing.
+    if (this.listenerCount('DocumentChanged') > 0) {
+      this._touchIdle();
+      return;
     }
+    this.close();
   }
 
   /** @internal Test-only: trigger idle close immediately. */
   async _testTriggerIdleTimeout(): Promise<void> {
     this._idleTimer?.unschedule();
-    if (!this._closed) {
-      this._onIdleTimeout();
-    }
+    this._onIdleTimeout();
   }
 
   /**
@@ -711,19 +715,12 @@ export class Query<
    * its event listeners. A FinalizationRegistry safety net exists for the
    * live-updates listener, but GC timing is non-deterministic.
    */
-  /** @internal Override detach to keep listener count accurate. */
-  // deno-lint-ignore ban-types
-  override detach<C extends Function, E extends string>(e: E, c: C): void {
-    super.detach(e as any, c as any);
-    if (e === 'DocumentChanged') {
-      this._externalListenerCount = Math.max(0, this._externalListenerCount - 1);
-      if (this._externalListenerCount === 0 && this._loadingFinished) {
-        this._touchIdle();
-      }
-    }
-  }
-
-  /** @internal Override attach to track external listener count. */
+  /**
+   * Minimal overrides that keep the idle timer in sync with DocumentChanged
+   * listeners. Eligibility is derived from Emitter own registrations (no
+   * parallel counter), so detachAll, dedup, and missing-detach semantics are
+   * always correct. Other events pass through unchanged.
+   */
   // deno-lint-ignore ban-types
   override attach<C extends Function, E extends string>(
     e: E,
@@ -731,13 +728,19 @@ export class Query<
   ): () => void {
     const unsub = super.attach(e as any, c);
     if (e === 'DocumentChanged') {
-      this._externalListenerCount++;
-      if (this._externalListenerCount === 1 && this._idleTimer) {
-        // Unscheduled idle timer while listeners are attached
-        this._idleTimer.unschedule();
-      }
+      // Pinned while listeners exist -> keep the idle timer unscheduled.
+      this._idleTimer?.unschedule();
     }
-    return unsub;   // unsub calls this.detach (our override) which decrements
+    return unsub;
+  }
+
+  // deno-lint-ignore ban-types
+  override detach<C extends Function, E extends string>(e: E, c: C): void {
+    super.detach(e as any, c as any);
+    if (e === 'DocumentChanged') {
+      // Re-arm the idle timer only once the last external listener is gone.
+      this._touchIdle();
+    }
   }
 
   close(): void {
@@ -986,7 +989,7 @@ export class Query<
       if (!this._loadingFinished) {
         this._loadingFinished = true;
         // Schedule idle close timer if no external listeners
-        if (this._idleTimer && this._externalListenerCount === 0) {
+        if (this._idleTimer && this.listenerCount('DocumentChanged') === 0) {
           this._touchIdle();
         }
         this.repo.db.queryPersistence?.register(
@@ -1038,7 +1041,7 @@ export class Query<
         if (!this._loadingFinished) {
           this._loadingFinished = true;
           // Schedule idle close timer if no external listeners
-          if (this._idleTimer && this._externalListenerCount === 0) {
+          if (this._idleTimer && this.listenerCount('DocumentChanged') === 0) {
             this._touchIdle();
           }
           this.repo.db.queryPersistence?.register(
