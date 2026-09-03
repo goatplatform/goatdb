@@ -59,6 +59,23 @@ export class Emitter<T extends string> {
   }
 
   /**
+   * Returns the number of live (non-null) callbacks registered for a given
+   * event. Used by lifecycle policies (e.g. auto-close) to derive listener
+   * 'pins' from the Emitter's own registrations instead of parallel counters,
+   * so detachAll / dedup / missing-detach semantics are always respected.
+   * @group Events
+   */
+  listenerCount(event: T | EmitterEvent): number {
+    const arr = this._callbacks.get(event as T);
+    if (!arr) return 0;
+    let count = 0;
+    for (const cb of arr) {
+      if (cb !== null) count++;
+    }
+    return count;
+  }
+
+  /**
    * Emits an event to all registered listeners in registration (FIFO) order.
    * This ordering is a stable contract -- chained query listeners depend on it.
    */

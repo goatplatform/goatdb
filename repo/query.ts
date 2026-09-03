@@ -2,7 +2,7 @@ import { type EventDocumentChanged, Repository } from './repo.ts';
 import { Item } from '../cfds/base/item.ts';
 import type { Commit } from './commit.ts';
 import { Emitter } from '../base/emitter.ts';
-import { NextEventLoopCycleTimer } from '../base/timer.ts';
+import { NextEventLoopCycleTimer, SimpleTimer } from '../base/timer.ts';
 import { murmur3 } from '../base/hash.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import type { GoatDB } from '../db/db.ts';
@@ -271,6 +271,8 @@ export class Query<
   private _resultsGeneration: number = 0;
   private _repoPrefix: string | undefined;
   private _closed = false;
+  /** @internal One-shot idle close timer. */
+  private _idleTimer: SimpleTimer | undefined;
   private _cachedResults: ManagedItem<OS>[] | undefined;
   private _cachedResultsAge = -1;
   private _loading: boolean = true;
@@ -320,6 +322,15 @@ export class Query<
     this._liveUpdates = liveUpdates ?? true;
     this._headIdForKey = new Map();
     this._includedPaths = new Set();
+    // Create idle close timer if configured
+    if (this.db.queryInactivityTimeoutMs > 0) {
+      this._idleTimer = new SimpleTimer(
+        this.db.queryInactivityTimeoutMs,
+        false,
+        () => this._onIdleTimeout(),
+        'QueryIdle',
+      );
+    }
   }
 
   /**
@@ -390,6 +401,7 @@ export class Query<
    * @returns true if the path is included in the query results, false otherwise.
    */
   has(path: string): boolean {
+    this._touchIdle();
     return this._includedPaths.has(path);
   }
 
@@ -403,6 +415,7 @@ export class Query<
    * @returns An iterable containing all paths that match the query criteria.
    */
   paths(): Iterable<string> {
+    this._touchIdle();
     return this._includedPaths;
   }
 
@@ -414,6 +427,7 @@ export class Query<
    * @returns An array of managed items that match the query criteria.
    */
   results(): readonly ManagedItem<OS>[] {
+    this._touchIdle();
     if (
       !this._cachedResults || this._cachedResultsAge !== this._resultsGeneration
     ) {
@@ -475,6 +489,7 @@ export class Query<
    * @returns The item value if found, undefined otherwise
    */
   valueForPath(path: string): Item<OS> | undefined {
+    this._touchIdle();
     if (this._liveUpdates && this.db.itemLoaded(path)) {
       return this.db.item<OS>(path).currentItem;
     }
@@ -491,9 +506,42 @@ export class Query<
    *          query
    */
   *entries(): Generator<Entry<OS>> {
+    this._touchIdle();
     for (const key of this._includedPaths) {
       yield [key, this.valueForPath(key)!];
     }
+  }
+
+  /**
+   * Resets the idle close timer on activity. Schedules the one-shot timer
+   * only when no external DocumentChanged listeners are attached (otherwise
+   * the timer is kept unscheduled so a pinned query cannot close).
+   */
+  _touchIdle(): void {
+    if (this._idleTimer && !this._closed) {
+      this._idleTimer.unschedule();
+      if (this.listenerCount('DocumentChanged') === 0) {
+        this._idleTimer.schedule();
+      }
+    }
+  }
+
+  /** @internal Called by the idle timer to close this query. */
+  _onIdleTimeout(): void {
+    if (this._closed) return;
+    // Derived from Emitter registrations: if any external DocumentChanged
+    // listener remains, defer (reschedule) instead of closing.
+    if (this.listenerCount('DocumentChanged') > 0) {
+      this._touchIdle();
+      return;
+    }
+    this.close();
+  }
+
+  /** @internal Test-only: trigger idle close immediately. */
+  async _testTriggerIdleTimeout(): Promise<void> {
+    this._idleTimer?.unschedule();
+    this._onIdleTimeout();
   }
 
   /**
@@ -560,6 +608,7 @@ export class Query<
     fieldName: keyof SchemaDataType<OS>,
     value: SchemaDataType<OS>[keyof SchemaDataType<OS>],
   ): ManagedItem<OS> | undefined {
+    this._touchIdle();
     const results = this.results();
     const field = fieldName as string;
     if (fieldName === this._sortField) {
@@ -666,9 +715,39 @@ export class Query<
    * its event listeners. A FinalizationRegistry safety net exists for the
    * live-updates listener, but GC timing is non-deterministic.
    */
+  /**
+   * Minimal overrides that keep the idle timer in sync with DocumentChanged
+   * listeners. Eligibility is derived from Emitter own registrations (no
+   * parallel counter), so detachAll, dedup, and missing-detach semantics are
+   * always correct. Other events pass through unchanged.
+   */
+  // deno-lint-ignore ban-types
+  override attach<C extends Function, E extends string>(
+    e: E,
+    c: C,
+  ): () => void {
+    const unsub = super.attach(e as any, c);
+    if (e === 'DocumentChanged') {
+      // Pinned while listeners exist -> keep the idle timer unscheduled.
+      this._idleTimer?.unschedule();
+    }
+    return unsub;
+  }
+
+  // deno-lint-ignore ban-types
+  override detach<C extends Function, E extends string>(e: E, c: C): void {
+    super.detach(e as any, c as any);
+    if (e === 'DocumentChanged') {
+      // Re-arm the idle timer only once the last external listener is gone.
+      this._touchIdle();
+    }
+  }
+
   close(): void {
     if (!this._closed) {
       this._closed = true;
+      this._idleTimer?.unschedule();
+      this._idleTimer = undefined;
       this.emit('Closed');
       this.repo.db.queryPersistence?.unregister(
         this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
@@ -909,6 +988,10 @@ export class Query<
       this._scanTimeMs = performance.now() - startTime;
       if (!this._loadingFinished) {
         this._loadingFinished = true;
+        // Schedule idle close timer if no external listeners
+        if (this._idleTimer && this.listenerCount('DocumentChanged') === 0) {
+          this._touchIdle();
+        }
         this.repo.db.queryPersistence?.register(
           this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
         );
@@ -957,6 +1040,10 @@ export class Query<
         this._age = Math.max(this._age, maxAge);
         if (!this._loadingFinished) {
           this._loadingFinished = true;
+          // Schedule idle close timer if no external listeners
+          if (this._idleTimer && this.listenerCount('DocumentChanged') === 0) {
+            this._touchIdle();
+          }
           this.repo.db.queryPersistence?.register(
             this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
           );

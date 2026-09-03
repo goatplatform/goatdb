@@ -142,6 +142,19 @@ export interface DBInstanceConfig {
   splitThreshold?: number;
   /** Shards below this count are candidates for merging. Defaults to 10% of maxShardCommits. */
   minShardCommits?: number;
+  /**
+   * Auto-close repositories after this many ms of inactivity.
+   * Each resource owns its own one-shot timer. Set to 0 (default)
+   * to disable. System repos (/sys/) are never auto-closed.
+   */
+  repoInactivityTimeoutMs?: number;
+
+  /**
+   * Auto-close queries after this many ms of inactivity.
+   * A query is inactive when no external DocumentChanged listeners
+   * are attached. Set to 0 (default) to disable.
+   */
+  queryInactivityTimeoutMs?: number;
 }
 
 /**
@@ -251,6 +264,8 @@ export class GoatDB<US extends Schema = Schema>
     string,
     Query<Schema, Schema, ReadonlyJSONValue>
   >();
+  /** In-flight repo closes, keyed by repoId (serializes open/close). */
+  private readonly _closePromises = new Map<string, Promise<void>>();
   private _path: string | undefined;
   private _settingsProvider: DBSettingsProvider | undefined;
   queryPersistence?: QueryPersistence;
@@ -259,6 +274,10 @@ export class GoatDB<US extends Schema = Schema>
   private _trustPoolPromise: Promise<TrustPool>;
   private _ready: boolean = false;
   readonly shardConfig: ShardConfig;
+
+  // ── Inactivity auto-close config ──────────────────────────────
+  readonly repoInactivityTimeoutMs: number;
+  readonly queryInactivityTimeoutMs: number;
 
   constructor(config: DBInstanceConfig) {
     super();
@@ -281,6 +300,21 @@ export class GoatDB<US extends Schema = Schema>
       splitThreshold: config.splitThreshold,
       minCommits: config.minShardCommits,
     });
+    this.repoInactivityTimeoutMs = config.repoInactivityTimeoutMs ?? 0;
+    this.queryInactivityTimeoutMs = config.queryInactivityTimeoutMs ?? 0;
+    if (
+      config.repoInactivityTimeoutMs !== undefined &&
+      config.repoInactivityTimeoutMs < 0
+    ) {
+      throw new Error('repoInactivityTimeoutMs must be >= 0');
+    }
+    if (
+      config.queryInactivityTimeoutMs !== undefined &&
+      config.queryInactivityTimeoutMs < 0
+    ) {
+      throw new Error('queryInactivityTimeoutMs must be >= 0');
+    }
+
     if (config?.peers !== undefined) {
       this._peerURLs = typeof config.peers === 'string'
         ? [config.peers]
@@ -292,6 +326,9 @@ export class GoatDB<US extends Schema = Schema>
       // It will be re-thrown when readyPromise() is called
       return Promise.reject(err);
     });
+
+    // Inactivity is now handled per-resource via one-shot timers
+    // (owned by Repository and Query classes). No global poller needed.
   }
 
   /**
@@ -387,7 +424,15 @@ export class GoatDB<US extends Schema = Schema>
    * when you're done using the database instance.
    */
   async close(): Promise<void> {
-    // Stop all sync operations first (prevents new writes)
+    // Unschedule all idle timers to prevent concurrent fires during teardown
+    for (const repo of this._repositories.values()) {
+      (repo as any)._idleTimer?.unschedule();
+    }
+    for (const q of this._openQueries.values()) {
+      (q as any)._idleTimer?.unschedule();
+    }
+
+    // Stop all sync operations (prevents new writes)
     if (this._syncSchedulers) {
       for (const scheduler of this._syncSchedulers) {
         scheduler.close();
@@ -411,6 +456,13 @@ export class GoatDB<US extends Schema = Schema>
       await this.queryPersistence.close();
       this.queryPersistence = undefined;
     }
+
+    // Deactivate any leftover managed items (e.g. from auto-closed repos) so
+    // their pending commit timers cannot reopen a repo after teardown.
+    for (const item of this._items.values()) {
+      (item as any).deactivate();
+    }
+    this._items.clear();
   }
 
   /**
@@ -438,12 +490,27 @@ export class GoatDB<US extends Schema = Schema>
   open(path: string, opts?: OpenOptions): Promise<Repository> {
     path = itemPathNormalize(path);
     const repoId = itemPathGetRepoId(path);
-    if (this._repositories.has(repoId)) {
-      return Promise.resolve(this._repositories.get(repoId)!);
+    const existing = this._repositories.get(repoId);
+    if (existing && existing._closeState === 'open') {
+      existing._touchIdle();
+      return Promise.resolve(existing);
     }
+    // No open repo, or one mid-close. If a close is in flight, await it (this
+    // serializes Open -> Closing -> Closed per repo), then open a fresh
+    // instance. This replaces the old mid-close branch that opened a
+    // replacement repo while the old close was still operating -- the race
+    // that could delete the replacement file/clients.
+    const closeP = this._closePromises.get(repoId);
     let result = this._openPromises.get(repoId);
     if (!result) {
-      result = this._openImpl(repoId, opts).finally(() => {
+      result = (async () => {
+        if (closeP) await closeP;
+        const again = this._repositories.get(repoId);
+        if (again && again._closeState === 'open') {
+          return again;
+        }
+        return this._openImpl(repoId, opts);
+      })().finally(() => {
         if (this._openPromises.get(repoId) === result) {
           this._openPromises.delete(repoId);
         }
@@ -451,6 +518,22 @@ export class GoatDB<US extends Schema = Schema>
       this._openPromises.set(repoId, result);
     }
     return result;
+  }
+
+  /**
+   * Acquires an open repository and an idle lease that pins it from being
+   * auto-closed until the returned RepoLease is disposed (e.g. via a using
+   * block). Reopening waits for any in-flight close to finish.
+   *
+   * @param pathComps A full repository path or path components.
+   * @returns A disposable lease; releasing it re-arms the idle timer.
+   * @group Database
+   */
+  async acquireRepo(...pathComps: string[]): Promise<RepoLease> {
+    const path = itemPathNormalize(pathComps.join('/'));
+    const repo = await this.open(path);
+    repo.acquireIdleLease();
+    return new RepoLease(repo, () => repo.releaseIdleLease());
   }
 
   /**
@@ -464,26 +547,85 @@ export class GoatDB<US extends Schema = Schema>
   async closeRepo(path: string): Promise<void> {
     path = itemPathNormalize(path);
     const repoId = itemPathGetRepoId(path);
-    if (this._openPromises.has(repoId)) {
-      await this._openPromises.get(repoId);
-    }
-    const repo = this.repository(repoId);
-    if (!repo) {
+    // Wait for any in-flight open (do not close a half-loaded repo).
+    const openP = this._openPromises.get(repoId);
+    if (openP) await openP;
+    // Serialize: if a close is already in flight, wait for it and return.
+    const inFlight = this._closePromises.get(repoId);
+    if (inFlight) {
+      await inFlight;
       return;
     }
-    const deletedKeys = new Set<string>();
-    const commitPromises: Promise<void>[] = [];
-    for (const [itemPath, item] of this._items) {
-      if (item.repository === repo) {
-        deletedKeys.add(itemPath);
-        commitPromises.push(item.commit());
+    const repo = this.repository(repoId);
+    if (!repo || repo._closeState !== 'open') {
+      return;
+    }
+    // Unschedule idle timer so it cannot fire during the close.
+    (repo as any)._idleTimer?.unschedule();
+    // Tear down dependent queries (manual close owns this; auto-close never
+    // reaches here with queries attached because listener pins prevent it).
+    this._closeDependentQueries(repoId);
+    // Commit pending item edits before tearing down file handles. This goes
+    // through item.commit() -> acquireRepo -> open(), which returns THIS same
+    // 'open' repo (state stays 'open' until after commits), so no replacement
+    // repo is created -- the auto-close race is eliminated.
+    await this._commitDependentItems(repo);
+    for (const k of [...this._items.keys()]) {
+      const item = this._items.get(k);
+      if (item && item.repository === repo) {
+        item.deactivate();
+        this._items.delete(k);
       }
     }
-    await Promise.allSettled(commitPromises);
-    for (const k of deletedKeys) {
-      this._items.get(k)!.deactivate();
-      this._items.delete(k);
+    // Transition to Closing and tear down.
+    repo._closeState = 'closing';
+    const cp = this._tearDownRepo(repo);
+    this._closePromises.set(repoId, cp);
+    try {
+      await cp;
+    } finally {
+      this._closePromises.delete(repoId);
+      repo._closeState = 'closed';
     }
+  }
+
+  /** @internal Closes queries whose source repo matches the given repoId. */
+  private _closeDependentQueries(repoId: string): void {
+    for (const [qid, q] of [...this._openQueries]) {
+      if (!(q as any)._closed && (q as any).repo?.path === repoId) {
+        q.close();
+        this._openQueries.delete(qid);
+      }
+    }
+  }
+
+  /**
+   * Commits pending item edits for a repo being manually closed. Each
+   * item.commit() is deduped (awaits an in-flight commit or runs now) and
+   * uses acquireRepo so it targets this same 'open' repo -- no db.open()
+   * replacement race.
+   */
+  private async _commitDependentItems(repo: Repository): Promise<void> {
+    const items: ManagedItem[] = [];
+    for (const item of this._items.values()) {
+      if (item.repository === repo) {
+        items.push(item as unknown as ManagedItem);
+      }
+    }
+    for (const item of items) {
+      await (item.commit() as Promise<void>);
+    }
+  }
+
+  /**
+   * Shared teardown: flush+close the log file, drain query caches, drop repo
+   * clients, detach listeners, and remove the repo from the registry. Does
+   * NOT commit items and does NOT close dependent queries (callers control
+   * that). Caller must have set repo._closeState = 'closing'.
+   */
+  private async _tearDownRepo(repo: Repository): Promise<void> {
+    const repoId = repo.path;
+    (repo as any)._idleTimer?.unschedule();
     // Flush log file - retry if data was re-queued after a transient failure
     const fileEntry = this._files.get(repoId);
     if (fileEntry) {
@@ -503,14 +645,16 @@ export class GoatDB<US extends Schema = Schema>
     this._repoClients?.delete(repoId);
     // Detach event handlers first to prevent new file operations
     repo.detachAll();
-
     // Close log file
     if (fileEntry) {
       await JSONLogFileClose(fileEntry);
       this._appendFailCounts.delete(fileEntry);
     }
     this._files.delete(repoId);
-    this._repositories.delete(repoId);
+    // Identity guard: a concurrent open() may have installed a fresh repo.
+    if (this._repositories.get(repoId) === repo) {
+      this._repositories.delete(repoId);
+    }
     this._warnedLegacyRepos.delete(repoId);
   }
 
@@ -657,7 +801,9 @@ export class GoatDB<US extends Schema = Schema>
   count(path: string): number {
     const repoId = itemPathGetRepoId(path);
     const repo = this.repository(repoId);
-    return repo ? repo.storage.numberOfKeys() : -1;
+    if (!repo) return -1;
+    (repo as any)._touchIdle();
+    return repo.storage.numberOfKeys();
   }
 
   /**
@@ -1044,6 +1190,34 @@ export class GoatDB<US extends Schema = Schema>
     }
   }
 
+  /**
+   * @internal Called by a Repository idle timer. Auto-close NEVER calls
+   * item.commit(): pending item edits reopen the repo on demand via
+   * acquireRepo -> open(). It proceeds only when the repo is idle-eligible
+   * (no leases, no DocumentChanged listeners, no dependent queries), and
+   * serializes through the Open -> Closing -> Closed state machine.
+   */
+  async _requestRepoIdleClose(repo: Repository): Promise<void> {
+    if (repo._closeState !== 'open') return;
+    if (this.repository(repo.path) !== repo) return; // stale instance
+    if (!repo._isIdleEligible()) return;
+    repo._closeState = 'closing';
+    const cp = this._tearDownRepo(repo);
+    this._closePromises.set(repo.path, cp);
+    try {
+      await cp;
+    } catch (e) {
+      log({
+        severity: 'WARNING',
+        error: 'StorageError',
+        message: `Auto-close of repo ${repo.path} failed: ${e}`,
+      });
+    } finally {
+      this._closePromises.delete(repo.path);
+      repo._closeState = 'closed';
+    }
+  }
+
   private async _openImpl(
     repoId: string,
     opts?: OpenOptions,
@@ -1212,6 +1386,9 @@ export class GoatDB<US extends Schema = Schema>
       }
       this._repoClients!.set(repoId, clients);
     }
+    // Arm the idle timer only after the repo is fully loaded, so a slow open
+    // cannot immediately expire itself.
+    repo._startIdleTimer();
     return repo;
   }
 
@@ -1224,6 +1401,28 @@ export class GoatDB<US extends Schema = Schema>
    */
   itemLoaded(path: string): boolean {
     return this._items.has(itemPathNormalize(path));
+  }
+}
+
+/**
+ * Disposable lease returned by GoatDB.acquireRepo. Holding it keeps a
+ * repository open (its idle timer is unscheduled); releasing it (via a using
+ * block or dispose()) re-arms the timer. Used by ManagedItem commits so an
+ * in-flight write prevents an idle close from tearing down the target repo;
+ * releasing it only updates liveness and reschedules the timer.
+ * @group Database
+ */
+export class RepoLease implements Disposable {
+  constructor(
+    readonly repo: Repository,
+    private readonly _release: () => void,
+  ) {}
+  /** @internal */
+  dispose(): void {
+    this._release();
+  }
+  [Symbol.dispose](): void {
+    this._release();
   }
 }
 

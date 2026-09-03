@@ -413,8 +413,17 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
       this._commitDelayTimer.unschedule();
       const currentDoc = this._item.clone();
       const key = itemPathGetPart(this.path, 'item')!;
-      const repo = await this.db.open(itemPathGetRepoId(this.path));
-      const newHead = await repo.setValueForKey(key, currentDoc, this._head);
+      const repoId = itemPathGetRepoId(this.path);
+      // Acquire an open repo + idle lease atomically. Holding the lease
+      // prevents an idle close from tearing down the repo this write targets;
+      // releasing it (on `using` scope exit) re-arms the idle timer. db.open
+      // awaits any in-flight close, so a commit can never race with a close.
+      using _lease = await this.db.acquireRepo(repoId);
+      const newHead = await _lease.repo.setValueForKey(
+        key,
+        currentDoc,
+        this._head,
+      );
       if (newHead) {
         this._head = newHead;
         this.rebase();
