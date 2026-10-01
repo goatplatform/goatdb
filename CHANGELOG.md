@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `DBInstanceConfig.repoInactivityTimeoutMs` and
+  `queryInactivityTimeoutMs` auto-close idle repositories and queries. Both
+  default to `0` (disabled). A repository closes only when it has no in-flight
+  leases, no external `DocumentChanged` listeners, and no open dependent
+  queries; `/sys/` repositories are exempt.
+- Query loading is lazy: `db.query()` no longer starts a scan. Loading begins
+  on the first subscription (`onResultsChanged`), `onLoadingFinished`, or
+  `loadingFinished()`; reads (`results()`, `has()`, ...) are side-effect free
+  and do not start loading. A fresh unobserved query reports `loading === false`
+  and, when `queryInactivityTimeoutMs` is set, is eligible for auto-close. A
+  closed query is replaced by calling `db.query()` again.
+
 ## [0.6.1] - 2026-09-01
 
 ### Fixed

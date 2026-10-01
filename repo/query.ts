@@ -2,7 +2,7 @@ import { type EventDocumentChanged, Repository } from './repo.ts';
 import { Item } from '../cfds/base/item.ts';
 import type { Commit } from './commit.ts';
 import { Emitter } from '../base/emitter.ts';
-import { NextEventLoopCycleTimer } from '../base/timer.ts';
+import { NextEventLoopCycleTimer, SimpleTimer } from '../base/timer.ts';
 import { murmur3 } from '../base/hash.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import type { GoatDB } from '../db/db.ts';
@@ -20,6 +20,7 @@ import { bsearch_idx } from '../base/algorithms.ts';
 import { coreValueCompare } from '../base/core-types/comparable.ts';
 import { coreValueEquals } from '../base/core-types/equals.ts';
 import type { CoreValue } from '../base/core-types/base.ts';
+import { log } from '../logging/log.ts';
 
 /**
  * A tuple representing a query result entry, containing a path and an item.
@@ -270,10 +271,16 @@ export class Query<
   private _liveUpdates: boolean;
   private _resultsGeneration: number = 0;
   private _repoPrefix: string | undefined;
-  private _closed = false;
+  /** @internal Closed flag -- public so lifecycle code can check without casts. */
+  _closed = false;
+  /** @internal One-shot idle close timer. */
+  declare _idleTimer: SimpleTimer | undefined;
   private _cachedResults: ManagedItem<OS>[] | undefined;
   private _cachedResultsAge = -1;
-  private _loading: boolean = true;
+  // "Scan in flight" (TanStack fetchStatus), NOT "data not ready": an
+  // unstarted query is _loading=false and therefore idle-eligible. resume()
+  // sets it true while scanRepo() runs; scanRepo()/close() clear it.
+  private _loading: boolean = false;
 
   /**
    * Creates a new Query instance.
@@ -320,6 +327,18 @@ export class Query<
     this._liveUpdates = liveUpdates ?? true;
     this._headIdForKey = new Map();
     this._includedPaths = new Set();
+    // Create idle close timer if configured
+    if (this.db.queryInactivityTimeoutMs > 0) {
+      this._idleTimer = new SimpleTimer(
+        this.db.queryInactivityTimeoutMs,
+        false,
+        () => this._onIdleTimeout(),
+        'QueryIdle',
+      );
+      // An unstarted, unobserved query is idle-eligible (loading is lazy).
+      // Arm the timer now; attach() will unschedule it while pinned.
+      this._touchIdle();
+    }
   }
 
   /**
@@ -370,13 +389,14 @@ export class Query<
   }
 
   /**
-   * Gets the loading status of the query. Checking this status allows building
-   * more responsive interfaces by showing intermediate results while the full
-   * query loads. See {@link loadingFinished()} for waiting until loading
-   * completes.
+   * Gets whether a load/scan is currently in flight. Loading is lazy: it
+   * begins on the first subscription ({@link onResultsChanged}), a
+   * {@link loadingFinished()} wait, or the base Emitter's resume. A freshly
+   * created, unobserved query reports `false`. See
+   * {@link loadingFinished()} for waiting until loading completes.
    *
-   * @returns true if the query is still loading results, false if loading is
-   *          complete.
+   * @returns true while the initial (or a re-)scan is running, false
+   *          otherwise.
    */
   get loading(): boolean {
     return this._loading;
@@ -390,6 +410,7 @@ export class Query<
    * @returns true if the path is included in the query results, false otherwise.
    */
   has(path: string): boolean {
+    this._touchIdle();
     return this._includedPaths.has(path);
   }
 
@@ -403,6 +424,7 @@ export class Query<
    * @returns An iterable containing all paths that match the query criteria.
    */
   paths(): Iterable<string> {
+    this._touchIdle();
     return this._includedPaths;
   }
 
@@ -414,6 +436,7 @@ export class Query<
    * @returns An array of managed items that match the query criteria.
    */
   results(): readonly ManagedItem<OS>[] {
+    this._touchIdle();
     if (
       !this._cachedResults || this._cachedResultsAge !== this._resultsGeneration
     ) {
@@ -475,6 +498,7 @@ export class Query<
    * @returns The item value if found, undefined otherwise
    */
   valueForPath(path: string): Item<OS> | undefined {
+    this._touchIdle();
     if (this._liveUpdates && this.db.itemLoaded(path)) {
       return this.db.item<OS>(path).currentItem;
     }
@@ -491,9 +515,46 @@ export class Query<
    *          query
    */
   *entries(): Generator<Entry<OS>> {
+    this._touchIdle();
     for (const key of this._includedPaths) {
       yield [key, this.valueForPath(key)!];
     }
+  }
+
+  /**
+   * @internal Resets the idle close timer on activity. Schedules the one-shot
+   * timer only when the query has finished loading AND no external
+   * DocumentChanged listeners are attached (otherwise the timer is kept
+   * unscheduled so a pinned or still-loading query cannot close).
+   */
+  override _touchIdle(): void {
+    if (this._idleTimer && !this._closed) {
+      this._idleTimer.unschedule();
+      if (!this._loading && this.listenerCount('DocumentChanged') === 0) {
+        this._idleTimer.schedule();
+      }
+    }
+  }
+
+  /** @internal Called by the idle timer to close this query. */
+  _onIdleTimeout(): void {
+    if (this._closed) return;
+    // Derived from Emitter registrations: if any external DocumentChanged
+    // listener remains, defer (reschedule) instead of closing. In-flight scans
+    // are kept ineligible by _touchIdle() unscheduling the timer; a test
+    // trigger may still close a loading query, and close() settles any pending
+    // loadingFinished() waiter.
+    if (this.listenerCount('DocumentChanged') > 0) {
+      this._touchIdle();
+      return;
+    }
+    this.close();
+  }
+
+  /** @internal Test-only: trigger idle close immediately. */
+  _testTriggerIdleTimeout(): void {
+    this._idleTimer?.unschedule();
+    this._onIdleTimeout();
   }
 
   /**
@@ -560,6 +621,7 @@ export class Query<
     fieldName: keyof SchemaDataType<OS>,
     value: SchemaDataType<OS>[keyof SchemaDataType<OS>],
   ): ManagedItem<OS> | undefined {
+    this._touchIdle();
     const results = this.results();
     const field = fieldName as string;
     if (fieldName === this._sortField) {
@@ -617,60 +679,114 @@ export class Query<
     return undefined;
   }
 
+  private _failResume(e: unknown): void {
+    log({
+      severity: 'WARNING',
+      error: 'StorageError',
+      message: `Query ${this.id} failed to start loading: ${e}`,
+    });
+    if (this._closed) return;
+    // Never leave the query in the "scan in flight" state on failure: it
+    // would be exempt from the idle timer forever and any loadingFinished()
+    // waiter would hang. Settle it like close() does.
+    this._loading = false;
+    if (!this._loadingFinished) {
+      this._loadingFinished = true;
+      this.emit('LoadingFinished');
+    }
+    this._touchIdle();
+  }
+
   protected override async resume(): Promise<void> {
     super.resume();
     if (!this._closed) {
-      if (typeof this.source === 'string') {
-        await this.db.open(this.source);
-      }
-      this.scanRepo();
-      if (!this._sourceListenerCleanup) {
-        // Repo emits the plain item key; a chained Query emits the full path.
-        const isChainedQuery = this.source instanceof Query;
-        this._sourceListenerCleanup = (
-          (typeof this.source === 'string'
-            ? this.repo
-            : this.source) as Emitter<EventDocumentChanged>
-        ).attach('DocumentChanged', (keyOrPath: string) => {
-          const key = isChainedQuery
-            ? itemPathGetPart(keyOrPath, 'item')!
-            : keyOrPath;
-          const commit = this.repo.headForKey(key);
-          if (commit) {
-            this.onNewCommit(commit);
-          }
-        });
-      }
-      if (this._liveUpdates && !this._liveListenerCleanup) {
-        this._liveListenerCleanup = this.db.attach(
-          'ItemChanged',
-          (path: string, isRebase: boolean) =>
-            this.onItemChanged(path, isRebase),
-        );
-        LIVE_QUERY_CLEANUP.register(this, this._liveListenerCleanup);
+      // Loading is lazy: the first subscription/loadingFinished() starts the
+      // scan. Mark it in flight and drop any armed idle timer for the
+      // duration of the scan.
+      this._loading = true;
+      this._touchIdle();
+      try {
+        if (typeof this.source === 'string') {
+          await this.db.open(this.source);
+        }
+        // close() may have run while we awaited the open. If so, do NOT scan
+        // or attach the source/live listeners: close() already cleaned up (an
+        // as-yet-unset) _sourceListenerCleanup, so attaching now would leak a
+        // DocumentChanged listener that pins the repo open forever and
+        // defeats idle auto-close.
+        if (this._closed) return;
+        this.scanRepo().catch((e) => this._failResume(e));
+        if (!this._sourceListenerCleanup) {
+          // Repo emits the plain item key; a chained Query emits the full path.
+          const isChainedQuery = this.source instanceof Query;
+          this._sourceListenerCleanup = (
+            (typeof this.source === 'string'
+              ? this.repo
+              : this.source) as Emitter<EventDocumentChanged>
+          ).attach('DocumentChanged', (keyOrPath: string) => {
+            const key = isChainedQuery
+              ? itemPathGetPart(keyOrPath, 'item')!
+              : keyOrPath;
+            const commit = this.repo.headForKey(key);
+            if (commit) {
+              this.onNewCommit(commit);
+            }
+          });
+        }
+        if (this._liveUpdates && !this._liveListenerCleanup) {
+          this._liveListenerCleanup = this.db.attach(
+            'ItemChanged',
+            (path: string, isRebase: boolean) =>
+              this.onItemChanged(path, isRebase),
+          );
+          LIVE_QUERY_CLEANUP.register(this, this._liveListenerCleanup);
+        }
+      } catch (e) {
+        this._failResume(e);
       }
     }
   }
 
   /**
-   * Closes this query and cleans up its resources. This:
+   * Closes this query, releasing its memory and unregistering from persistence.
+   * This:
+   * - Settles any pending loading waiters (resolves `loadingFinished()` if the
+   *   query is closed mid-load)
    * - Emits a 'Closed' event
    * - Unregisters from query persistence to stop caching
-   * - Removes source change listeners
+   * - Removes the query's DocumentChanged listener on its source repo, which
+   *   may make the source repo eligible for auto-close
    * - Marks the query as closed
    *
-   * Once closed, a query cannot be reopened. Create a new query instance
-   * instead.
+   * After close(), the query stops tracking updates and `results()` returns
+   * the snapshot captured at close time. Calling any method on a closed query
+   * is undefined behavior, and a closed query cannot be reopened -- create a
+   * new query instance instead.
    *
-   * Callers MUST call close() when a query is no longer needed to release
-   * its event listeners. A FinalizationRegistry safety net exists for the
+   * Callers MUST call close() when a query is no longer needed to release its
+   * event listeners. A FinalizationRegistry safety net exists for the
    * live-updates listener, but GC timing is non-deterministic.
    */
   close(): void {
     if (!this._closed) {
       this._closed = true;
+      // Use this.db rather than this.repo.db: a query may be closed before it
+      // ever resumed (e.g. created without loadingFinished()), in which case
+      // this.repo is undefined because its source repo was never opened.
+      this.db._forgetQuery(this.id, this);
+      this._idleTimer?.unschedule();
+      this._idleTimer = undefined;
+      // If closed mid-load, settle any loading waiters so a later
+      // loadingFinished() resolves instead of hanging forever.
+      if (!this._loadingFinished) {
+        this._loadingFinished = true;
+        this.emit('LoadingFinished');
+      }
+      // A closed query is never "scan in flight", including when closed
+      // during a re-scan after the initial load already completed.
+      this._loading = false;
       this.emit('Closed');
-      this.repo.db.queryPersistence?.unregister(
+      this.db.queryPersistence?.unregister(
         this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
       );
       if (this._sourceListenerCleanup) {
@@ -687,7 +803,9 @@ export class Query<
 
   protected override suspend(): void {
     if (!this._closed) {
-      this.repo.db.queryPersistence?.unregister(
+      // this.db, not this.repo.db: suspend() can run before the source repo is
+      // opened (e.g. a listener is attached and immediately detached).
+      this.db.queryPersistence?.unregister(
         this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
       );
       // After initial load completes, keep source and live listeners alive
@@ -907,14 +1025,17 @@ export class Query<
       }
       this._age = cache.age;
       this._scanTimeMs = performance.now() - startTime;
+      // Scan finished: loading is no longer in flight (covers re-scans where
+      // _loadingFinished is already true).
+      this._loading = false;
       if (!this._loadingFinished) {
         this._loadingFinished = true;
         this.repo.db.queryPersistence?.register(
           this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
         );
-        this._loading = false;
         this.emit('LoadingFinished');
       }
+      this._touchIdle();
       return;
     }
 
@@ -952,6 +1073,10 @@ export class Query<
     ).paths();
 
     const cleanup = async () => {
+      // Scan finished (or was cancelled): loading is no longer in flight, even
+      // when !isActive or when this was a re-scan.
+      this._loading = false;
+      this._touchIdle();
       if (this.isActive) {
         this._scanTimeMs = performance.now() - startTime;
         this._age = Math.max(this._age, maxAge);
@@ -961,7 +1086,6 @@ export class Query<
             this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
           );
           await this.repo.db.queryPersistence?.flush(this.repo.path);
-          this._loading = false;
           this.emit('LoadingFinished');
         }
       }

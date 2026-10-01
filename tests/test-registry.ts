@@ -61,6 +61,7 @@ import setupQueryId from './query-id.test.ts';
 import setupHashMap from './hash-map.test.ts';
 import setupCoreValueCompare from './core-value-compare.test.ts';
 import setupDocsMdxEscape from './docs-mdx-escape.test.ts';
+import setupAutoClose from './auto-close.test.ts';
 
 /**
  * Registers all test suites with the default TestsRunner.
@@ -115,6 +116,7 @@ export async function registerAllTests(): Promise<void> {
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
   setupLiveQuery(); // Live query membership updates on ManagedItem edits
+  setupAutoClose(); // Auto-close of inactive repos and queries
   setupWriteFailure(); // WriteFailure event after 3 consecutive I/O failures
   setupTrusted(); // Database operations in trusted mode
   setupUntrusted(); // Database operations in untrusted mode

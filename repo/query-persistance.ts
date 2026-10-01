@@ -158,12 +158,18 @@ export class QueryPersistence {
    * @param query The query to unregister
    */
   unregister(query: Query<Schema, Schema, ReadonlyJSONValue>): void {
-    const set = this._queries.get(query.repo.path);
+    // A query can be closed before its source repo was ever opened (e.g. a
+    // query created without loadingFinished()). Such a query was never
+    // registered, so there is nothing to remove -- do not dereference the
+    // missing repo, whose getter returns undefined at runtime.
+    const repoPath = (query.repo as Repository | undefined)?.path;
+    if (repoPath === undefined) return;
+    const set = this._queries.get(repoPath);
     if (set) {
       set.delete(query);
       this._persistedGeneration.delete(query);
       if (set.size === 0) {
-        this._queries.delete(query.repo.path);
+        this._queries.delete(repoPath);
       }
     }
   }

@@ -7,7 +7,7 @@
  *
  * @module GoatDB
  */
-import { GoatDB } from './db/db.ts';
+import { GoatDB, RepoLease } from './db/db.ts';
 import { Query } from './repo/query.ts';
 import type { AppConfig } from './cli/app-config.ts';
 import {
@@ -80,6 +80,7 @@ export {
   normalizeEmail,
   prettyJSON,
   Query,
+  RepoLease,
   Repository,
   TrustPool,
   uniqueId,

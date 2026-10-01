@@ -31,6 +31,10 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
   private _commitPromise?: Promise<void>;
   private _age: number = 0;
   private _commitInProgress: boolean = false;
+  // True when local edits have not yet been persisted. Cleared only after a
+  // successful commit that was not overtaken by a newer edit; a failed commit
+  // leaves it set so db.close() can retry instead of silently dropping edits.
+  private _dirty: boolean = false;
   private _ready: boolean = false;
   private _readyPromiseResolve?: () => void;
   private _readyPromise?: Promise<void>;
@@ -377,6 +381,16 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
   }
 
   /**
+   * @internal True when this item has unpersisted edits (or an in-flight
+   * commit). Used by db.close() to avoid reopening a repo for a clean, no-op
+   * commit. A failed commit keeps this true so the edit is retried rather than
+   * silently dropped.
+   */
+  get isDirty(): boolean {
+    return this._dirty || this._commitInProgress;
+  }
+
+  /**
    * @internal
    * Deactivates the managed item by canceling any pending commits.
    * This method is idempotent - calling it multiple times has no additional
@@ -403,6 +417,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     ++this._age;
     this.emit('change', mutations);
     this.db.emit('ItemChanged', this.path, isRebase);
+    this._dirty = true;
     this._commitDelayTimer.schedule();
   }
 
@@ -412,15 +427,59 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     try {
       this._commitDelayTimer.unschedule();
       const currentDoc = this._item.clone();
+      const commitAge = this._age;
       const key = itemPathGetPart(this.path, 'item')!;
-      const repo = await this.db.open(itemPathGetRepoId(this.path));
-      const newHead = await repo.setValueForKey(key, currentDoc, this._head);
-      if (newHead) {
-        this._head = newHead;
-        this.rebase();
+      const repoId = itemPathGetRepoId(this.path);
+      // Acquire an open repo + idle lease atomically. Holding the lease
+      // prevents an idle close from tearing down the repo this write targets;
+      // releasing it (in the finally block via dispose()) re-arms the idle
+      // timer. This awaits any close promise registered by closeRepo or
+      // auto-close, so the commit targets a fully open repo.
+      const _lease = await this.db.acquireRepo(repoId);
+      try {
+        const newHead = await _lease.repo.setValueForKey(
+          key,
+          currentDoc,
+          this._head,
+        );
+        if (newHead) {
+          this._head = newHead;
+          this.rebase();
+        }
+        // Persisted: clear dirty unless a newer edit landed during the await
+        // (age changed) or rebase merged remote fields into the local doc.
+        if (this._age === commitAge) {
+          this._dirty = false;
+        }
+      } finally {
+        _lease.dispose();
       }
     } finally {
       this._commitInProgress = false;
+    }
+  }
+
+  /**
+   * @internal Commits the current pending edits directly to a repository that
+   * is being closed. Unlike commit(), this does NOT acquire a repo via
+   * db.acquireRepo/open() (which would await the in-flight close promise and
+   * deadlock); the close pipeline owns the repo's teardown.
+   */
+  async _commitTo(repo: Repository): Promise<void> {
+    const currentDoc = this._item.clone();
+    const commitAge = this._age;
+    const key = itemPathGetPart(this.path, 'item')!;
+    const newHead = await repo._setValueForKeyForClose(
+      key,
+      currentDoc,
+      this._head,
+    );
+    if (newHead) {
+      this._head = newHead;
+      this.rebase();
+    }
+    if (this._age === commitAge) {
+      this._dirty = false;
     }
   }
 
@@ -455,6 +514,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
         // version
         if (this._item.upgradeSchema()) {
           // Commit after schema upgrade
+          this._dirty = true;
           this._commitDelayTimer.schedule();
         }
         // Generate mutations for all initial values

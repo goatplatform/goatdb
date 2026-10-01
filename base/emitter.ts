@@ -17,6 +17,12 @@ export class Emitter<T extends string> {
   private _isActive: boolean;
   private _dispatching = 0;
   private _dispatchDirty = false;
+  /**
+   * Optional one-shot idle timer owned by subclasses (Repository, Query) that
+   * implement inactivity auto-close. The shared listener hook below keeps it
+   * unscheduled whenever a DocumentChanged listener is registered.
+   */
+  protected _idleTimer?: Timer;
 
   constructor(
     delayedEmissionTimerConstructor?: (callback: TimerCallback) => Timer,
@@ -56,6 +62,23 @@ export class Emitter<T extends string> {
 
   get isActive(): boolean {
     return this._isActive;
+  }
+
+  /**
+   * Returns the number of live (non-null) callbacks registered for a given
+   * event. Used by lifecycle policies (e.g. auto-close) to derive listener
+   * 'pins' from the Emitter's own registrations instead of parallel counters,
+   * so detachAll / dedup / missing-detach semantics are always respected.
+   * @group Events
+   */
+  listenerCount(event: T | EmitterEvent): number {
+    const arr = this._callbacks.get(event as T);
+    if (!arr) return 0;
+    let count = 0;
+    for (const cb of arr) {
+      if (cb !== null) count++;
+    }
+    return count;
   }
 
   /**
@@ -142,6 +165,7 @@ export class Emitter<T extends string> {
       this.emit('resumed');
     }
     this._isActive = this.calcIsActive();
+    this._onListenersChanged(e as T);
     return () => this.detach(e, c);
   }
 
@@ -170,6 +194,7 @@ export class Emitter<T extends string> {
     if (this._dispatching > 0) {
       (arr as (EmitterCallback | null)[])[idx] = null;
       this._dispatchDirty = true;
+      this._onListenersChanged(e as T);
       return;
     }
     if (arr.length === 1) {
@@ -183,6 +208,7 @@ export class Emitter<T extends string> {
       arr.splice(idx, 1);
       this._isActive = this.calcIsActive();
     }
+    this._onListenersChanged(e as T);
   }
 
   detachAll<E extends T | EmitterEvent>(e?: E): void {
@@ -198,6 +224,7 @@ export class Emitter<T extends string> {
           (this._resumeCallbacks as (EmitterCallback | null)[])[i] = null;
         }
         this._dispatchDirty = true;
+        this._onListenersChanged(undefined);
         return;
       }
       this._suspendCallbacks = [];
@@ -210,6 +237,7 @@ export class Emitter<T extends string> {
           this.emit('suspended');
         }
       }
+      this._onListenersChanged(undefined);
       return;
     }
     if (e === 'EmitterSuspended' || e === 'EmitterResumed') {
@@ -233,6 +261,7 @@ export class Emitter<T extends string> {
       if (this._dispatching > 0) {
         for (let i = 0; i < callbacks!.length; i++) callbacks![i] = null;
         this._dispatchDirty = true;
+        this._onListenersChanged(e as T);
         return;
       }
       this._callbacks.delete(e);
@@ -242,6 +271,7 @@ export class Emitter<T extends string> {
         this.emit('suspended');
       }
     }
+    this._onListenersChanged(e as T);
   }
 
   // deno-lint-ignore ban-types
@@ -280,6 +310,32 @@ export class Emitter<T extends string> {
       }
     }
   }
+
+  /**
+   * Hook called whenever listeners change for a specific event (attach, detach,
+   * or detachAll). The event argument is the event whose listener set changed,
+   * or undefined for detachAll() with no argument. The default implementation
+   * keeps a subclass-owned `_idleTimer` in sync with DocumentChanged pins;
+   * `_touchIdle()` is the subclass-specific reset policy.
+   */
+  protected _onListenersChanged(event: string | undefined): void {
+    if (event === 'DocumentChanged' || event === undefined) {
+      // Widened to string: concrete subclasses (Repository, Query) include
+      // 'DocumentChanged' in their event union.
+      const count = (this as Emitter<string>).listenerCount('DocumentChanged');
+      if (count > 0) {
+        this._idleTimer?.unschedule();
+      } else {
+        this._touchIdle();
+      }
+    }
+  }
+
+  /**
+   * Idle-timer reset hook. Subclasses that own an `_idleTimer` override this;
+   * the default is a no-op.
+   */
+  protected _touchIdle(): void {}
 
   protected suspend(): void {}
 
