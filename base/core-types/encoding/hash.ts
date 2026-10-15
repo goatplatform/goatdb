@@ -1,17 +1,12 @@
-import { CoreOptions, CoreValue } from '../base.ts';
-import {
-  ChecksumEncoderOpts,
-  Murmur3Checksum,
-  Murmur3Opts,
-} from './checksum.ts';
+import type { CoreOptions, CoreValue } from '../base.ts';
+import { Murmur3Checksum } from './checksum.ts';
+import type { ChecksumEncoderOpts, Murmur3Opts } from './checksum.ts';
 
 const kMurmurEncoder = new Murmur3Checksum({ typeSafe: false });
 
-export function coreValueHash(
+export function encodableValueHash(
   v: CoreValue | object,
   options?: CoreOptions | ChecksumEncoderOpts,
 ): string {
   return kMurmurEncoder.checksumForValue(v, options as Murmur3Opts);
 }
-
-export const encodableValueHash = coreValueHash;
