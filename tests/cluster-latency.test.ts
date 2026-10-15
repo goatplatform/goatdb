@@ -8,8 +8,31 @@ import { encodeSession, generateSession } from '../db/session.ts';
 import { prettyJSON } from '../base/common.ts';
 import * as path from '../base/path.ts';
 import { FileImplGet, writeTextFile } from '../base/json-log/file-impl.ts';
+import {
+  kStorageFormatEpoch,
+  kStorageFormatMarkerFile,
+} from '../db/storage-epoch.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
 import { Schema } from '../cfds/base/schema.ts';
+
+/**
+ * Seeds a shared settings file (pre-created store) plus the storage-format
+ * epoch marker at the same store root. Any test that manually seeds a store
+ * must declare its epoch, or GoatDB will reject it as an older store.
+ */
+async function seedStoreSettings(
+  settingsPath: string,
+  settingsText: string,
+): Promise<void> {
+  const storeRoot = path.dirname(settingsPath);
+  const fileImpl = await FileImplGet();
+  await fileImpl.mkdir(storeRoot);
+  await writeTextFile(settingsPath, settingsText);
+  await writeTextFile(
+    path.join(storeRoot, kStorageFormatMarkerFile),
+    String(kStorageFormatEpoch) + '\n',
+  );
+}
 
 // Schema definition for cluster latency test items
 const ClusterLatencyTestSchema = {
@@ -251,9 +274,7 @@ export default function setupClusterLatency() {
               ORG_ID,
               'settings.json',
             );
-            const fileImpl = await FileImplGet();
-            await fileImpl.mkdir(path.dirname(settingsPath));
-            await writeTextFile(settingsPath, prettyJSON(encodedSettings));
+            await seedStoreSettings(settingsPath, prettyJSON(encodedSettings));
 
             const { domain } = createTestDomainConfig();
             const tempServer = new Server({
@@ -305,9 +326,7 @@ export default function setupClusterLatency() {
 
           // Re-write the shared root session to this server's settings file
           const settingsPath = path.join(serverPath, ORG_ID, 'settings.json');
-          const fileImpl = await FileImplGet();
-          await fileImpl.mkdir(path.dirname(settingsPath));
-          await writeTextFile(settingsPath, prettyJSON(encodedSettings));
+          await seedStoreSettings(settingsPath, prettyJSON(encodedSettings));
 
           const domainConfig = createTestDomainConfig();
           domainConfigs.push(domainConfig);

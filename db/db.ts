@@ -49,6 +49,7 @@ import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { Emitter } from '../base/emitter.ts';
 import { getGoatConfig } from '../base/config.ts';
 import { makeShardConfig, type ShardConfig } from '../repo/shard-format.ts';
+import { ensureStorageFormatEpoch } from './storage-epoch.ts';
 
 /**
  * The result of a sync operation with all peers for a repository.
@@ -1272,6 +1273,15 @@ export class GoatDB<US extends Schema = Schema>
         path.basename(this._basePath) + '_' + fileIndex,
       )
       : this._basePath;
+    // Fail fast on stores written by an incompatible GoatDB before any
+    // repository, settings, or query-persistence file touches the store.
+    // WHY both paths: settings live at the base path, but repos and query
+    // persistence live under `_path`, which is a sibling shard directory in
+    // OPFS multi-instance mode. A legacy shard without a marker must fail too.
+    await ensureStorageFormatEpoch(this._basePath);
+    if (this._path !== this._basePath) {
+      await ensureStorageFormatEpoch(this._path);
+    }
     this._settingsProvider = new FileSettings(
       this._basePath,
       this.mode,

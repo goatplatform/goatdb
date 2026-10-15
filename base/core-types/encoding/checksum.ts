@@ -105,6 +105,16 @@ export abstract class ChecksumEncoder<
       return v;
     }
     const converted = super.convertValue(value as CoreValue, options);
+    // A Date tags as Date in every checksum position (issue #58 §5). Nested
+    // Dates tag only when typeSafe is true, yet the typed-field path drops
+    // typeSafe before BaseEncoder.set, so an untagged top-level Date collides
+    // with a Number. Unconditional Date tagging removes that Date-vs-Number
+    // asymmetry. Limit: non-typeSafe strings stay untagged, so a string such
+    // as "41700000000" can still collide with a tagged Date. Use typeSafe
+    // checksums where untrusted input matters; no other gate changes.
+    if (type === CoreType.Date) {
+      return String(type) + converted;
+    }
     const typeSafe = typeof options?.typeSafe === 'boolean'
       ? options.typeSafe
       : this.typeSafe;
