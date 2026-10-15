@@ -67,7 +67,11 @@ export interface EncodedItem {
   data: ReadonlyDecodedObject;
 }
 
-const checksumSerOptions: ChecksumEncoderOpts = {
+/**
+ * Shared checksum encoder options. Exported for characterization tests only.
+ * @internal
+ */
+export const kChecksumSerOptions: ChecksumEncoderOpts = {
   // For checksum purposes we need to use the flat rep or we won't account
   // for depth changes. Computing the checksum on a DFS run of the tree
   // completely strips out the depth info.
@@ -225,7 +229,7 @@ export class Item<S extends Schema = Schema>
     this.normalize();
     if (this._checksum === undefined) {
       const csEncoder = new Murmur3Checksum();
-      serialize(csEncoder, this._schema, this._data, checksumSerOptions);
+      serialize(csEncoder, this._schema, this._data, kChecksumSerOptions);
       this._checksum = csEncoder.getOutput();
     }
     return this._checksum;

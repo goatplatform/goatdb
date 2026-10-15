@@ -24,14 +24,21 @@ export type ValueType =
   | 'map'
   | 'richtext';
 
+/**
+ * Options common to value-type operations. `local`/`byCharacter` describe
+ * richtext semantics, but the generic entry points (cfds/base/object.ts) pass
+ * one opaque options object to every type op, so they must be visible here.
+ * This is the single source of truth: `SerializeValueTypeOptions` and
+ * `RichTextSerializeOptions` inherit these fields instead of redeclaring them.
+ */
 export interface ValueTypeOptions {
   local?: boolean;
   byCharacter?: boolean;
 }
 
-export interface SerializeValueTypeOptions extends ChecksumEncoderOpts {
-  local?: boolean;
-  flatRep?: boolean;
+export interface SerializeValueTypeOptions extends ValueTypeOptions {
+  objectFilterFields?: ObjFieldsFilterFunc;
+  iterableFilter?: IterableFilterFunc;
 }
 
 export interface IValueTypeOperations<T extends CoreValue = CoreValue> {
