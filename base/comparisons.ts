@@ -191,7 +191,7 @@ export function isFunction(v: any): v is Function {
 
 export function isEmptyObject(obj: any): boolean {
   for (const k in obj) {
-    if (obj.hasOwnProperty(k)) {
+    if (Object.hasOwn(obj, k)) {
       return false;
     }
   }
