@@ -85,8 +85,7 @@ export function* keysOf<T extends Record<string, unknown>>(
   obj: T,
 ): Generator<string> {
   for (const k in obj) {
-    // deno-lint-ignore no-prototype-builtins
-    if (obj.hasOwnProperty(k)) {
+    if (Object.hasOwn(obj, k)) {
       yield k;
     }
   }
@@ -128,10 +127,6 @@ export function* unionIter<T>(...args: Iterable<T>[]): Iterable<T> {
       yield v;
     }
   }
-}
-
-export function newInstance<T = any>(instance: any, ...args: any[]): T {
-  return new (instance.constructor as any)(...args) as T;
 }
 
 /**

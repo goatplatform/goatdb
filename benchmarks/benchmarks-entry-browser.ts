@@ -21,6 +21,7 @@ import { clearOPFS } from '../base/json-log/file-impl-opfs.ts';
 
 // Import benchmark setup functions
 import setupGoatDB from './goatdb.bench.ts';
+import setupCoreValue from './core-value.bench.ts';
 import setupSQLiteBrowser from './sqlite-browser.bench.ts';
 
 /**
@@ -68,6 +69,7 @@ async function main(): Promise<void> {
 
   // Register all browser-compatible benchmarks
   setupGoatDB();
+  setupCoreValue();
   setupSQLiteBrowser(); // Browser-specific SQLite with OPFS
 
   // Get benchmark filter from environment/config

@@ -215,7 +215,7 @@ export class SyncScheduler {
         let found = false;
         for (const resp of json as ReadonlyJSONObject[]) {
           if (resp.path === req.req.path) {
-            const decoder = JSONCyclicalDecoder.get(
+            using decoder = JSONCyclicalDecoder.get(
               resp.res as ReadonlyJSONObject,
             );
             const syncResp = await SyncMessage.decodeAsync(
@@ -225,7 +225,6 @@ export class SyncScheduler {
               },
               this.registry,
             );
-            decoder.finalize();
             req.resolve(syncResp);
             found = true;
             break;
