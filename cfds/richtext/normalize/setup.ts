@@ -1,5 +1,5 @@
-import { ElementNode, isElementNode } from '../tree.ts';
-import { RuleSetup } from './types.ts';
+import { type ElementNode, isElementNode } from '../tree.ts';
+import type { RuleSetup } from './types.ts';
 
 export const userDefinedRules: RuleSetup[] = [
   {
@@ -83,7 +83,10 @@ export const userDefinedRules: RuleSetup[] = [
     },
   },
   {
-    node: { isRefMarker: true, tag: 'inline-task' },
+    // WHY broadened: legacy `isRefMarker` refs now throw at ingress
+    // (legacy-ref.ts), so all surviving `inline-task` nodes are non-ref and
+    // take the same `to-sibling-below` path the ref ones once took.
+    node: { tag: 'inline-task' },
     condition: { source: 'grandparent', isDefined: true },
     action: {
       name: 'to-sibling-below',
@@ -126,7 +129,7 @@ export const userDefinedRules: RuleSetup[] = [
     },
   },
   {
-    node: { tags: ['ref', 'inline-task'] },
+    node: { tags: ['inline-task'] },
     condition: {
       source: 'node',
       func: (n) => {

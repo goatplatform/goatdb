@@ -214,8 +214,7 @@ export function isTrivialTextNode(node: TreeNode): node is TextNode {
     return false;
   }
   for (const k in node) {
-    // deno-lint-ignore no-prototype-builtins
-    if (node.hasOwnProperty(k) && k !== 'text') {
+    if (Object.hasOwn(node, k) && k !== 'text') {
       return false;
     }
   }
@@ -396,47 +395,6 @@ export function isExpiredPointer(v: CoreValue, buffer = 0): boolean {
     v.expiration !== undefined &&
     v.expiration.getTime() + buffer < Date.now()
   );
-}
-
-/**
- * @param rt
- * @param buffer in milliseconds
- * @returns
- */
-export function purgeExpiredPointers(
-  rt: RichText,
-  buffer = 0,
-): RichText | undefined {
-  if (rt.pointers === undefined || rt.pointers.size === 0) {
-    return undefined;
-  }
-  const now = Date.now();
-  let foundExpired = false;
-  for (const ptr of rt.pointers) {
-    if (
-      ptr.expiration !== undefined &&
-      ptr.expiration.getTime() + buffer < now
-    ) {
-      foundExpired = true;
-      break;
-    }
-  }
-  if (foundExpired) {
-    const newPtrs = new Set<Pointer>();
-    for (const ptr of rt.pointers) {
-      if (ptr.expiration === undefined || ptr.expiration.getTime() >= now) {
-        newPtrs.add(ptr);
-      }
-    }
-    const result: RichText = {
-      root: rt.root,
-    };
-    if (newPtrs.size > 0) {
-      result.pointers = newPtrs;
-    }
-    return result;
-  }
-  return undefined;
 }
 
 export function* pointersForNode(

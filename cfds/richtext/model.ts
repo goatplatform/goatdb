@@ -1,8 +1,4 @@
 import {
-  type CoreValue,
-  isReadonlyCoreObject,
-} from '../../base/core-types/index.ts';
-import {
   type ElementNode,
   isTextNode,
   type RichTextValue,
@@ -20,8 +16,7 @@ export type MarkupElement =
   | Header6Node
   | UnorderedListNode
   | OrderedListNode
-  | ListItemNode
-  | RefNode;
+  | ListItemNode;
 export type MarkupNode = MarkupElement | TextNode;
 // | TableNode
 // | TableRowNode
@@ -89,53 +84,6 @@ export interface TableRowNode extends ElementNode {
 
 export interface TableCellNode extends ElementNode {
   readonly tagName: 'td';
-}
-
-export enum RefType {
-  Link = 'link',
-  InternalDoc = 'inter-doc',
-}
-
-/**
- * A leaf node marker for a reference. It is used in the following cases:
- *
- * - In persistent, decomposed, rich text. This node is what's actually stored
- *   in the body field of a note.
- *
- * - During composition, to represent a reference that's still loading.
- */
-export interface RefMarker extends RichTextValue, NodeWithDirection {
-  ref: string;
-  readonly type: RefType;
-  readonly loading?: true;
-}
-
-/**
- * A composited reference node as an element. Its children hold a
- * representation of the reference's target.
- */
-export interface RefNode extends ElementNode, RefMarker, NodeWithDirection {
-  readonly tagName: 'ref';
-  ref: string;
-  type: RefType;
-}
-
-export function isRefNode(atom: CoreValue): atom is RefNode {
-  return (
-    isReadonlyCoreObject(atom) &&
-    atom.tagName === 'ref' &&
-    typeof atom.ref === 'string' &&
-    typeof atom.type === 'string'
-  );
-}
-
-export function isRefMarker(atom: CoreValue): atom is RefMarker {
-  return (
-    isReadonlyCoreObject(atom) &&
-    typeof atom.ref === 'string' &&
-    typeof atom.type === 'string' &&
-    (atom.local === undefined || atom.local === true)
-  );
 }
 
 export interface SpanNode extends TextNode {
