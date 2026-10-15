@@ -1,6 +1,12 @@
 {
   "compilerOptions": {
-    "lib": ["dom", "dom.iterable", "dom.asynciterable", "deno.ns"]
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "dom.asynciterable",
+      "deno.ns",
+      "esnext.disposable"
+    ]
   },
   "lock": false,
   "publish": {
@@ -30,7 +36,7 @@
     ]
   },
   "name": "@goatdb/goatdb",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "license": "MIT",
   "exports": {
     ".": "./mod.ts",
@@ -40,6 +46,7 @@
     "./link": "./cli/link.ts"
   },
   "tasks": {
+    "check": "deno check mod.ts server.ts server-build.ts",
     "build": "deno run -A system-assets/build-sys-assets.ts",
     "test": "deno run -A tests/run.ts",
     "test:smoke": "deno run -A tests/run.ts --runtime=deno --suite=SecurityBoundaries",
@@ -64,7 +71,7 @@
     "@types/nodemailer": "npm:@types/nodemailer@^6.4.17",
     "esbuild": "npm:esbuild@^0.25.4",
     "nodemailer": "npm:nodemailer@^6.10.0",
-    "playwright": "npm:playwright@^1.48.0",
+    "playwright": "npm:playwright@^1.51.0",
     "react": "npm:react@^19.1.0",
     "source-map": "npm:source-map@^0.7.4",
     "sql.js": "npm:sql.js@^1.11.0",

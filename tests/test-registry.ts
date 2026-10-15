@@ -60,6 +60,8 @@ import setupWriteFailure from './write-failure.test.ts';
 import setupQueryId from './query-id.test.ts';
 import setupHashMap from './hash-map.test.ts';
 import setupCoreValueCompare from './core-value-compare.test.ts';
+import setupCoreValueSerialization from './core-value-serialization.test.ts';
+import setupStorageFormatEpoch from './storage-format-epoch.test.ts';
 import setupDocsMdxEscape from './docs-mdx-escape.test.ts';
 import setupAutoClose from './auto-close.test.ts';
 
@@ -90,8 +92,10 @@ export async function registerAllTests(): Promise<void> {
   setupQueryId(); // generateQueryId cache-key determinism and uniqueness
   setupHashMap(); // HashSet and HashMap collision-safe cardinality
   setupCoreValueCompare(); // Core-value ordering invariants
+  setupCoreValueSerialization(); // Serializer and core-type characterization goldens
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
+  setupStorageFormatEpoch(); // Store-root storage-format epoch fail-fast
   setupCoroutineQueueTests(); // Coroutine FIFO execution contract
   setupCoroutineSchedulerTests(); // Coroutine failure isolation contract
   setupBinaryEncoding(); // Binary commit format encoding roundtrip

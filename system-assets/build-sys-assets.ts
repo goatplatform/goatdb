@@ -24,6 +24,9 @@ export async function buildSysAssets(): Promise<void> {
     write: false,
     sourcemap: 'external',
     outdir: outputDir,
+    // Browser floor: ES2022 (see clientBuildOptions in build.ts). esbuild
+    // lowers `using`/Symbol.dispose, so no native ERM runtime is required.
+    target: 'es2022',
     // minify: true,
     logOverride: {
       'empty-import-meta': 'silent',

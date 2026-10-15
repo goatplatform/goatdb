@@ -19,12 +19,19 @@ jobs:
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24.x'
+
+      - name: Type check and runtime floor probe
+        run: |
+          deno task check
+          deno eval 'using x = { [Symbol.dispose]() {} };'
+          # deno eval defaults to TypeScript; --ext=js guards the native JS path.
+          deno eval --ext=js 'using x = { [Symbol.dispose]() {} };'
 
       - name: Run Deno tests
         run: deno task test --runtime=deno
@@ -45,7 +52,7 @@ jobs:
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -89,7 +96,7 @@ jobs:
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -105,7 +112,7 @@ jobs:
             playwright-
 
       - name: Install Playwright browsers and system dependencies
-        run: deno run -A npm:playwright@^1.48.0 install --with-deps chromium
+        run: deno run -A npm:playwright@^1.51.0 install --with-deps chromium
 
       - name: Run browser tests
         run: deno task test --runtime=browser
