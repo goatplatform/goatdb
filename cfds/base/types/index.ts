@@ -1,17 +1,19 @@
-import { DecodedValue } from '../../../base/core-types/encoding/index.ts';
-import { Change, EncodedChange } from '../../change/index.ts';
+import type { DecodedValue } from '../../../base/core-types/encoding/index.ts';
+import type { Change, EncodedChange } from '../../change/index.ts';
 import { MapTypeOperations } from './map-type.ts';
 import { PrimitiveTypeOperations } from './primitive-type.ts';
 import { SetTypeOperations } from './set-type.ts';
-import { StringTypeOperations } from './string-type.ts';
 import { RichText3TypeOperations } from './richtext3-type.ts';
 import {
   CoreType,
-  CoreValue,
-  Encoder,
+  type CoreValue,
+  type Encoder,
 } from '../../../base/core-types/index.ts';
 import { DateTypeOperations } from './date-type.ts';
-import { ChecksumEncoderOpts } from '../../../base/core-types/encoding/checksum.ts';
+import type {
+  IterableFilterFunc,
+  ObjFieldsFilterFunc,
+} from '../../../base/core-types/base.ts';
 
 export type ValueType =
   | 'string'
@@ -84,71 +86,30 @@ export interface IValueTypeOperations<T extends CoreValue = CoreValue> {
     options?: ValueTypeOptions,
   ): T | undefined;
 
-  fillRefs(refs: Set<string>, value: T): void;
-
   normalize(value: T): T;
 
   isEmpty(value: T): boolean;
-
-  needGC(value: T): boolean;
-  gc(value: T): T | undefined;
-
-  rewriteRefs(
-    keyMapping: Map<string, string>,
-    value: T,
-    deleteRefs?: Set<string>,
-  ): T | undefined;
 }
 
-const registeredTypeOperations: Record<
-  string,
-  IValueTypeOperations<CoreValue>
-> = {};
+/** Every `ValueType` has exactly one op set. `satisfies` + `Object.freeze`
+ * make this exhaustive and immutable at compile time. */
+const kTypeOperations = Object.freeze({
+  string: new PrimitiveTypeOperations(CoreType.String, 'string'),
+  number: new PrimitiveTypeOperations(CoreType.Number, 'number'),
+  boolean: new PrimitiveTypeOperations(CoreType.Boolean, 'boolean'),
+  date: new DateTypeOperations(),
+  set: new SetTypeOperations('set'),
+  map: new MapTypeOperations('map'),
+  richtext: new RichText3TypeOperations(),
+}) satisfies Record<ValueType, IValueTypeOperations<CoreValue>>;
 
 export function getTypeOperations<T extends CoreValue>(
   type: ValueType,
 ): IValueTypeOperations<T> {
-  const op = registeredTypeOperations[type];
-  if (op === undefined) {
-    throw new Error(`type operations for: ${type} has not been implemented`);
-  }
+  // `kTypeOperations` satisfies Record<ValueType, ...>, so the lookup is total.
+  // Widen to the erased op type before narrowing to `T` (TS needs the step).
+  const op: IValueTypeOperations<CoreValue> = kTypeOperations[type];
   return op as IValueTypeOperations<T>;
-}
-
-export function getTypeOperationsByValue<T extends CoreValue>(
-  value: T,
-): IValueTypeOperations<T> {
-  for (const typeOP of Object.values(registeredTypeOperations)) {
-    if (typeOP.validate(value)) {
-      return typeOP as IValueTypeOperations<T>;
-    }
-  }
-
-  throw new Error(`getTypeOperationsByValue failed for: ${value}`);
-}
-
-registerTypeOperations();
-function registerType<T extends CoreValue>(op: IValueTypeOperations<T>): void {
-  registeredTypeOperations[op.valueType] = op as IValueTypeOperations<
-    CoreValue
-  >;
-}
-
-function registerTypeOperations(): void {
-  if (Object.entries(registeredTypeOperations).length === 0) {
-    registerType(new StringTypeOperations(CoreType.String, 'string'));
-    registerType(new PrimitiveTypeOperations(CoreType.Number, 'number'));
-    registerType(new PrimitiveTypeOperations(CoreType.Boolean, 'boolean'));
-    registerType(new DateTypeOperations());
-    registerType(new SetTypeOperations(false, 'set'));
-    // registerType(new SetTypeOperations(false, 'stringset'));
-    // registerType(new SetTypeOperations(false, 'refset'));
-    registerType(new MapTypeOperations(false, 'map'));
-    // registerType(new MapTypeOperations(false, 'refmap'));
-    registerType(new RichText3TypeOperations());
-
-    //Add Types Here
-  }
 }
 
 export function valueTypeEquals<TValue>(

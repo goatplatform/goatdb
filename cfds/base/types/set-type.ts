@@ -1,15 +1,17 @@
-import { ValueType, ValueTypeOptions } from './index.ts';
-import { Change, EncodedChange } from '../../change/index.ts';
+import type { ValueType, ValueTypeOptions } from './index.ts';
+import type { Change, EncodedChange } from '../../change/index.ts';
 import { CoreTypeOperations } from './core-type.ts';
 import { FieldChange, FieldOperation } from '../../change/field-change.ts';
-import { ConcreteCoreValue, CoreType } from '../../../base/core-types/index.ts';
-import { DecodedValue } from '../../../base/core-types/encoding/index.ts';
+import {
+  type ConcreteCoreValue,
+  CoreType,
+} from '../../../base/core-types/index.ts';
 import * as SetUtils from '../../../base/set.ts';
 
 export class SetTypeOperations extends CoreTypeOperations<
   Set<ConcreteCoreValue>
 > {
-  constructor(readonly isRef: boolean, valueType: ValueType) {
+  constructor(valueType: ValueType) {
     super(CoreType.Set, valueType);
   }
 
@@ -48,33 +50,6 @@ export class SetTypeOperations extends CoreTypeOperations<
     return newValue.size > 0 ? newValue : undefined;
   }
 
-  override fillRefs(refs: Set<string>, value: Set<ConcreteCoreValue>): void {
-    if (this.isRef && value && value instanceof Set) {
-      for (const val of value) {
-        if (typeof val === 'string') {
-          refs.add(val);
-        }
-      }
-    }
-  }
-
-  override rewriteRefs(
-    keyMapping: Map<string, string>,
-    value: Set<ConcreteCoreValue>,
-    deleteRefs?: Set<string>,
-  ): Set<ConcreteCoreValue> {
-    if (!this.isRef) {
-      return value;
-    }
-    const result = new Set<ConcreteCoreValue>();
-    for (const v of value) {
-      if (!deleteRefs?.has(v as string)) {
-        result.add(keyMapping.get(v as string) || v);
-      }
-    }
-    return result;
-  }
-
   valueChangedDiff(
     value1: Set<ConcreteCoreValue>,
     value2: Set<ConcreteCoreValue>,
@@ -102,14 +77,5 @@ export class SetTypeOperations extends CoreTypeOperations<
 
   isEmpty(value: Set<ConcreteCoreValue>) {
     return value.size === 0;
-  }
-
-  override deserialize(value: DecodedValue, options?: ValueTypeOptions) {
-    const desValue = super.deserialize(value, options);
-    if (desValue instanceof Array) {
-      //Backward compatibility from old deserialize that save as array of json
-      return SetUtils.from(desValue, JSON.parse);
-    }
-    return desValue;
   }
 }

@@ -1,13 +1,17 @@
-import { IValueTypeOperations, ValueType, ValueTypeOptions } from './index.ts';
-import { DecodedValue } from '../../../base/core-types/encoding/index.ts';
-import { Change, EncodedChange } from '../../change/index.ts';
+import type {
+  IValueTypeOperations,
+  ValueType,
+  ValueTypeOptions,
+} from './index.ts';
+import type { DecodedValue } from '../../../base/core-types/encoding/index.ts';
+import type { Change, EncodedChange } from '../../change/index.ts';
 import { FieldChange } from '../../change/field-change.ts';
 import {
-  ConcreteCoreValue,
-  CoreType,
+  type ConcreteCoreValue,
+  type CoreType,
   coreValueClone,
   coreValueEquals,
-  Encoder,
+  type Encoder,
   getCoreTypeOrUndef,
 } from '../../../base/core-types/index.ts';
 
@@ -30,13 +34,11 @@ export abstract class CoreTypeOperations<
     return value;
   }
 
-  fillRefs(refs: Set<string>, value: TValue): void {}
-
-  validate(value: any): boolean {
+  validate(value: unknown): boolean {
     return getCoreTypeOrUndef(value) === this._coreType;
   }
 
-  equals(val1: TValue, val2: TValue, options?: ValueTypeOptions): boolean {
+  equals(val1: TValue, val2: TValue, _options?: ValueTypeOptions): boolean {
     return coreValueEquals(val1, val2);
   }
 
@@ -48,46 +50,27 @@ export abstract class CoreTypeOperations<
     key: string,
     value: TValue,
     encoder: Encoder,
-    options?: ValueTypeOptions,
+    _options?: ValueTypeOptions,
   ): void {
     encoder.set(key, value);
   }
 
-  deserialize(value: DecodedValue, options?: ValueTypeOptions) {
+  deserialize(value: DecodedValue, _options?: ValueTypeOptions) {
     return value as TValue;
   }
 
   valueAddedDiff(
     value2: TValue,
-    options?: ValueTypeOptions,
+    _options?: ValueTypeOptions,
   ): undefined | Change<EncodedChange> | Change<EncodedChange>[] {
     return FieldChange.insert(value2, this._valueType);
   }
 
   valueRemovedDiff(
     value1: TValue,
-    options?: ValueTypeOptions,
+    _options?: ValueTypeOptions,
   ): undefined | Change<EncodedChange> | Change<EncodedChange>[] {
     return FieldChange.delete(value1, this._valueType);
-  }
-
-  needGC(value: TValue): boolean {
-    return false;
-  }
-
-  gc(value: TValue): TValue | undefined {
-    return undefined;
-  }
-
-  rewriteRefs(
-    keyMapping: Map<string, string>,
-    value: TValue,
-    deleteRefs?: Set<string>,
-  ): TValue | undefined {
-    if (deleteRefs && deleteRefs.has(value as string)) {
-      return undefined;
-    }
-    return (keyMapping.get(value as string) as TValue) || value;
   }
 
   abstract valueChangedDiff(
