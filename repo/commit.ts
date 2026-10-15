@@ -438,11 +438,10 @@ export abstract class Commit
       const ref = COMMIT_REFS.get(id);
       let c = ref?.deref();
       if (!c) {
-        const decoder = JSONCyclicalDecoder.get(obj);
+        using decoder = JSONCyclicalDecoder.get(obj);
         c = new FieldCommit({ decoder, orgId }, registry);
         (c as FieldCommit).setFrozen(true);
         (c as FieldCommit).setCachedJS(obj);
-        decoder.finalize();
         internCommitRef(id, c);
       }
       result.push(c);
@@ -649,12 +648,11 @@ export class FieldCommit extends Commit {
           'Commit uses legacy Bloom filter fields (af/ac); ancestors will be empty until re-merged. Re-write the commit to upgrade.',
       });
     }
-    const contentsDecoder = decoder.getDecoder('c');
+    using contentsDecoder = decoder.getDecoder('c');
     this._contents = commitContentsDeserialize(
       contentsDecoder,
       this.registry,
     );
-    contentsDecoder.finalize?.();
     this._signature = decoder.get<string | undefined>('sig');
     this._mergeBase = decoder.get<string | undefined>('mb');
     this._mergeLeader = decoder.get<string | undefined>('ml');
@@ -837,12 +835,11 @@ export class BinaryCommit extends Commit {
       const obj = JSON.parse(
         gTextDecoder.decode(this._buf.subarray(cStart, cEnd)),
       );
-      const contentsDecoder = JSONCyclicalDecoder.get(obj);
+      using contentsDecoder = JSONCyclicalDecoder.get(obj);
       this._contents = commitContentsDeserialize(
         contentsDecoder,
         this.registry,
       );
-      contentsDecoder.finalize();
     }
     return this._contents;
   }
@@ -1041,21 +1038,19 @@ export function commitContentsDeserialize(
   registry: DataRegistry,
 ): CommitContents {
   if (decoder.has('r')) {
-    const recordDecoder = decoder.getDecoder('r');
+    using recordDecoder = decoder.getDecoder('r');
     const record = new Item({ decoder: recordDecoder }, registry);
-    recordDecoder.finalize?.();
     record.lock();
     return {
       record: record,
     };
   } else {
     assert(decoder.has('e'), 'Commit has no contents');
-    const editDecoder = decoder.getDecoder('e');
+    using editDecoder = decoder.getDecoder('e');
     const r = {
       base: decoder.get<string>('b')!,
       edit: new Edit({ decoder: editDecoder }),
     };
-    editDecoder.finalize?.();
     return r;
   }
 }
