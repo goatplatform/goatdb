@@ -23,6 +23,7 @@ import {
 } from '../base/json-log/file-impl.ts';
 import {
   bundleServerForSEA,
+  denoExecutableName,
   denoTarget,
   targetFromOSArch,
 } from '../cli/compile.ts';
@@ -88,6 +89,23 @@ export default function setupCliCompileTests() {
       assertEquals(denoTarget('linux', 'x64'), 'x86_64-unknown-linux-gnu');
       assertEquals(denoTarget('linux', 'arm64'), 'aarch64-unknown-linux-gnu');
       assertEquals(denoTarget('windows', 'x64'), 'x86_64-pc-windows-msvc');
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'denoExecutableName appends .exe only for Windows targets',
+    () => {
+      if (isBrowser()) return;
+      // Deno appends `.exe` based on the TARGET OS, not the host, so this
+      // cross-platform check guards the path for cross-compiled Windows
+      // binaries without running a Windows host.
+      assertEquals(denoExecutableName('app', 'mac-arm64'), 'app-mac-arm64');
+      assertEquals(denoExecutableName('app', 'linux-x64'), 'app-linux-x64');
+      assertEquals(
+        denoExecutableName('app', 'windows-x64'),
+        'app-windows-x64.exe',
+      );
     },
   );
 
@@ -242,7 +260,7 @@ export default function setupCliCompileTests() {
           });
         },
       };
-      await compile({
+      const binaryPath = await compile({
         buildDir: path.join(testDir, 'build'),
         serverEntry,
         jsPath: path.join(testDir, 'client/index.tsx'),
@@ -258,17 +276,9 @@ export default function setupCliCompileTests() {
 
       assertEquals(pluginBuilds, 1, 'Compile must invoke configured plugin');
 
-      // 4. Verify binary exists
-      const osName = runtime.getOS();
-
-      let binaryName: string;
-      if (runtime.id === 'deno') {
-        binaryName = `test-app-${targetFromOSArch()}`;
-      } else {
-        binaryName = osName === 'windows' ? 'test-app.exe' : 'test-app';
-      }
-
-      const binaryPath = path.join(testDir, 'build', binaryName);
+      // 4. Verify binary exists. `compile` returns the compiler's real output
+      // path (including `.exe` for Windows targets), so the test never
+      // re-derives the platform-specific name.
       assertTrue(
         await pathExists(binaryPath),
         `Binary should exist at ${binaryPath}`,

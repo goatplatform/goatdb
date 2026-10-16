@@ -50,9 +50,13 @@ The following behaviors are intentional artifacts of the current implementation 
   and do not start loading. A fresh unobserved query reports `loading === false`
   and, when `queryInactivityTimeoutMs` is set, is eligible for auto-close. A
   closed query is replaced by calling `db.query()` again.
+- `compile()` now resolves to the path of the compiled executable
+  (`Promise<string>`). Callers that ignore the value need no change.
 
 ### Fixed
 
+- `deno compile` output names now include `.exe` for Windows targets, so
+  `compile()` returns and logs the path that the compiler actually writes.
 - Reading a directory now fails with `EISDIR` on Deno, Node.js, and the
   browser instead of returning empty bytes on Windows.
 - `coreValueEquals` is now symmetric for objects when `objectFilterFields`
