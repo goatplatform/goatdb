@@ -294,15 +294,15 @@ export async function runAcrossPlatforms(
     // Use Worker for responsive TUI, unless debugging (debugger needs main process)
     if (!config.denoInspectBrk && config.mode === 'test') {
       // Worker-based execution for tests
+      let denoFailed = 0;
       try {
         const result = await runDenoWithWorker(config.suite, config.test);
         denoElapsed = result.elapsed;
         TestsRunner.printSummary(result.summary);
+        denoFailed = result.summary.failed;
 
-        if (result.summary.failed > 0) {
-          console.log(
-            `=== 🦖 Deno: ${result.summary.failed} failed ===`,
-          );
+        if (denoFailed > 0) {
+          console.log(`=== 🦖 Deno: ${denoFailed} failed ===`);
         } else {
           console.log(`=== 🦖 Deno: all passed ===`);
         }
@@ -310,6 +310,11 @@ export async function runAcrossPlatforms(
         console.error('=== 🦖 Deno Worker execution failed ===');
         console.error('Error:', (error as Error).message);
         throw error;
+      }
+      // Fail the run so CI cannot mask Deno regressions. The Node branch below
+      // already gates on process exit status.
+      if (denoFailed > 0) {
+        throw new Error(`Deno tests failed: ${denoFailed}`);
       }
     } else {
       // Subprocess execution for debugging or benchmarks
