@@ -115,7 +115,17 @@ jobs:
             playwright-
 
       - name: Install Playwright browsers and system dependencies
-        run: deno run -A npm:playwright@^1.51.0 install --with-deps chromium
+        # Runs under Node, not Deno: Playwright's downloader passes a `lookup`
+        # option that Deno's node:http does not implement. Tests still run on Deno.
+        # Version comes from deno.json so the install and the test runner cannot drift.
+        # deno.json must stay strict JSON (no comments): the probe reads it with require().
+        run: |
+          PLAYWRIGHT_VERSION=$(node -e "console.log(require('./deno.json').imports.playwright.split('@').pop().replace(/^[\^~]/, ''))")
+          if [ -z "$PLAYWRIGHT_VERSION" ]; then
+            echo '::error::Could not parse the playwright version from deno.json imports.playwright (expected e.g. npm:playwright@1.64.1)'
+            exit 1
+          fi
+          npx --yes "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium
 
       - name: Run browser tests
         run: deno task test --runtime=browser
