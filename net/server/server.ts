@@ -703,8 +703,9 @@ export class Server<US extends Schema> {
     this._abortController = undefined;
     this._stopping = true;
 
-    // Stop HTTP server first so no new requests hit closing DBs
-    this._httpServer?.stop();
+    // Stop HTTP server first so no new requests hit closing DBs. Await the
+    // teardown so the listener is closed before databases start closing.
+    await this._httpServer?.stop();
 
     // Await any in-flight service creation before cleanup
     for (const pending of this._pendingServices.values()) {

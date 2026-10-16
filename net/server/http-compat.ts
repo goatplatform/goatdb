@@ -476,8 +476,13 @@ export interface MinimalHttpServer {
     port: number,
     signal?: AbortSignal,
   ): Promise<void>;
-  /** Stops the server. Idempotent; port and address read as undefined afterwards. */
-  stop(): void;
+  /**
+   * Stops the server. Idempotent; port and address read as undefined immediately.
+   * Resolves once the listener is closed, so the port no longer accepts
+   * connections. Abort-based shutdown is asynchronous on Deno (notably on
+   * Windows), so callers MUST await this before assuming the port is free.
+   */
+  stop(): Promise<void>;
   readonly port?: number;
   readonly address?: { hostname: string; port: number };
 }
@@ -489,6 +494,7 @@ export class DenoHttpServer implements MinimalHttpServer {
   private _abortController?: AbortController;
   private _server?: Deno.HttpServer;
   private _started: boolean = false;
+  private _stopPromise?: Promise<void>;
   private _options: HttpServerOptions;
 
   constructor(options: HttpServerOptions = {}) {
@@ -506,6 +512,7 @@ export class DenoHttpServer implements MinimalHttpServer {
     if (this._started) {
       return Promise.resolve();
     }
+    this._stopPromise = undefined;
     this._abortController = new AbortController();
     if (signal) {
       signal.addEventListener(
@@ -551,10 +558,19 @@ export class DenoHttpServer implements MinimalHttpServer {
     return started;
   }
 
-  stop(): void {
+  stop(): Promise<void> {
+    const server = this._server;
+    if (!server) {
+      return this._stopPromise ?? Promise.resolve();
+    }
     this._abortController?.abort();
     this._server = undefined;
     this._started = false;
+    // WHY: abort() only signals cancellation. `finished` resolves after the
+    // accept loop ends and the OS listener socket is dropped, which is the
+    // only point at which the port stops accepting connections.
+    this._stopPromise = server.finished;
+    return this._stopPromise;
   }
 
   get port(): number | undefined {
@@ -593,6 +609,8 @@ export class NodeHttpServer implements MinimalHttpServer {
   private _server?: import('node:http').Server;
   /** Whether the server has been started */
   private _started: boolean = false;
+  /** In-flight stop, so repeated stop() calls share one teardown. */
+  private _stopPromise?: Promise<void>;
   /** Cached reference to the Node.js Buffer implementation */
   private _Buffer?: typeof import('node:buffer').Buffer;
   /** HTTPS configuration options */
@@ -695,6 +713,7 @@ export class NodeHttpServer implements MinimalHttpServer {
     if (this._started) {
       return;
     }
+    this._stopPromise = undefined;
 
     // Load required Node.js modules
     const { Buffer } = await getNodeBufferModule();
@@ -751,16 +770,24 @@ export class NodeHttpServer implements MinimalHttpServer {
   }
 
   /**
-   * Stops the HTTP server and cleans up resources.
+   * Stops the HTTP server and cleans up resources. Resolves once the listener
+   * is closed.
    */
-  stop(): void {
-    // WHY: guard keeps stop idempotent on runtimes without closeAllConnections.
-    if (this._server && 'closeAllConnections' in this._server) {
-      this._server.closeAllConnections();
+  stop(): Promise<void> {
+    const server = this._server;
+    if (!server) {
+      return this._stopPromise ?? Promise.resolve();
     }
-    this._server?.close();
+    // WHY: guard keeps stop idempotent on runtimes without closeAllConnections.
+    if ('closeAllConnections' in server) {
+      server.closeAllConnections();
+    }
     this._server = undefined;
     this._started = false;
+    this._stopPromise = new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
+    return this._stopPromise;
   }
 
   get port(): number | undefined {
