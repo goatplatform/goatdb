@@ -15,15 +15,23 @@ function createServer(): MinimalHttpServer {
     : new DenoHttpServer();
 }
 
-function stopTwice(server: MinimalHttpServer): void {
-  server.stop();
-  server.stop();
-  assertEquals(server.port, undefined, 'port must clear after stop');
-  assertEquals(server.address, undefined, 'address must clear after stop');
+async function stopTwice(server: MinimalHttpServer): Promise<void> {
+  const firstStop = server.stop();
+  const secondStop = server.stop();
+  assertEquals(server.port, undefined, 'port must clear when stop starts');
+  assertEquals(
+    server.address,
+    undefined,
+    'address must clear when stop starts',
+  );
+  await Promise.all([firstStop, secondStop]);
 }
 
-async function startAndRead(server: MinimalHttpServer): Promise<number> {
-  await server.start(() => Promise.resolve(new Response('ok')), 0);
+async function startAndRead(
+  server: MinimalHttpServer,
+  listenPort = 0,
+): Promise<number> {
+  await server.start(() => Promise.resolve(new Response('ok')), listenPort);
   const port = server.port;
   if (port === undefined) {
     throw new Error('Started server must expose its port');
@@ -33,37 +41,38 @@ async function startAndRead(server: MinimalHttpServer): Promise<number> {
   return port;
 }
 
-/**
- * Probes the port once. Resolves true only on an active refusal
- * (ECONNREFUSED). A pending connect or transient error means "not refused
- * yet", so the caller retries until the overall deadline.
- */
-function connectionRefused(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
+/** True means refused, false means connected, undefined means still pending. */
+function connectionRefused(port: number): Promise<boolean | undefined> {
+  return new Promise((resolve, reject) => {
     const socket = createConnection({ host: '127.0.0.1', port });
     let settled = false;
     // WHY: Windows can leave a connect to a just-closed listener pending past
     // any single-probe timeout; that is not a hard failure, just "retry".
-    const timer = setTimeout(() => settle(false), 250);
-    const settle = (refused: boolean) => {
+    const timer = setTimeout(() => settle(undefined), 250);
+    const settle = (result: boolean | undefined | Error) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       socket.destroy();
-      resolve(refused);
+      if (result instanceof Error) reject(result);
+      else resolve(result);
     };
     socket.once('connect', () => settle(false));
     socket.once('error', (error: Error & { code?: string }) => {
-      settle(error.code === 'ECONNREFUSED');
+      settle(error.code === 'ECONNREFUSED' ? true : error);
     });
   });
 }
 
 async function assertConnectionRefused(port: number): Promise<void> {
-  // stop() is synchronous; listener closure can finish on a later event-loop turn.
+  // A closed listener can remain pending on Windows; retry only pending probes.
   const deadline = performance.now() + 2000;
   while (performance.now() < deadline) {
-    if (await connectionRefused(port)) return;
+    const refused = await connectionRefused(port);
+    if (refused === true) return;
+    if (refused === false) {
+      throw new Error(`Stopped server accepted a connection on port ${port}`);
+    }
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   throw new Error(`Stopped server did not refuse connections on port ${port}`);
@@ -77,10 +86,25 @@ export default function setupHttpServerStop() {
       const server = createServer();
       try {
         const port = await startAndRead(server);
-        stopTwice(server);
+        await stopTwice(server);
         await assertConnectionRefused(port);
       } finally {
-        server.stop();
+        await server.stop();
+      }
+    },
+  );
+  TEST(
+    'HttpServerStop',
+    'awaited stop permits immediate same-port restart',
+    async () => {
+      const server = createServer();
+      try {
+        const port = await startAndRead(server);
+        await stopTwice(server);
+        assertEquals(await startAndRead(server, port), port);
+        await stopTwice(server);
+      } finally {
+        await server.stop();
       }
     },
   );
@@ -99,11 +123,11 @@ export default function setupHttpServerStop() {
           'a live listener must not look refused',
         );
       } finally {
-        server.stop();
+        await server.stop();
       }
     },
   );
-  TEST('HttpServerStop', 'stop before start is safe', () => {
-    stopTwice(createServer());
+  TEST('HttpServerStop', 'stop before start is safe', async () => {
+    await stopTwice(createServer());
   });
 }
