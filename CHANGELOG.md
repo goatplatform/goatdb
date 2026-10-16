@@ -53,6 +53,8 @@ The following behaviors are intentional artifacts of the current implementation 
 
 ### Fixed
 
+- Reading a directory now fails with `EISDIR` on Deno, Node.js, and the
+  browser instead of returning empty bytes on Windows.
 - `coreValueEquals` is now symmetric for objects when `objectFilterFields`
   inspects the object; previously the second comparison loop passed the wrong
   object to the filter.

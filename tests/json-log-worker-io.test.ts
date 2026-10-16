@@ -96,6 +96,22 @@ export default function setupJsonLogWorkerIO(): void {
 
   TEST(
     'JsonLogWorkerIO',
+    'readFile of a directory surfaces EISDIR',
+    async (ctx) => {
+      // WHY: pins the shared EISDIR identity across the worker transport and
+      // the browser-only OPFS normalization (TypeMismatchError -> EISDIR).
+      const dir = await ctx.tempDir('eisdir');
+      const error = await fileError(() => readFile(dir));
+      assertEquals(
+        error.code,
+        'EISDIR',
+        `lost EISDIR identity: ${error.name}: ${error.message}`,
+      );
+    },
+  );
+
+  TEST(
+    'JsonLogWorkerIO',
     'unknown worker command details carry the command name',
     () => {
       // WHY: a stale worker bundle predating a request type must stay
