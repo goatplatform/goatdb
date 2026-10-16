@@ -14,12 +14,16 @@ import { TEST } from './mod.ts';
 import { assertEquals, assertTrue } from './asserts.ts';
 import * as path from '../base/path.ts';
 import { unknownCommandDetails } from '../base/json-log/json-log-worker-req.ts';
+import { kStorageFormatMarkerFile } from '../db/storage-epoch.ts';
 import {
   mkdir,
   readDir,
   readFile,
   writeFile,
 } from '../base/json-log/json-log.ts';
+
+/** Fragment of the epoch mismatch message; the DB must not fail for it here. */
+const kOlderStoreMessage = 'created by an older GoatDB';
 
 /** Runs an operation that must fail and returns the error with its identity. */
 async function fileError(operation: () => Promise<unknown>): Promise<
@@ -56,6 +60,55 @@ export default function setupJsonLogWorkerIO(): void {
       assertTrue(
         error.code !== undefined || error.name !== 'Error',
         `filesystem identity lost: ${error.name}: ${error.message}`,
+      );
+    },
+  );
+
+  TEST(
+    'JsonLogWorkerIO',
+    'DB open surfaces the underlying file error, not the epoch error',
+    async (ctx) => {
+      // The store root holds a DIRECTORY at the marker path. Every marker read
+      // fails with a directory error, which is not "not found". The DB open
+      // must relay that error, never turn it into an epoch mismatch.
+      // WHY this lives here: on Windows a directory read only fails once the
+      // EISDIR fix below lands, so the fixture needs it.
+      const storePath = await ctx.tempDir('io-errors');
+      const marker = path.join(storePath, kStorageFormatMarkerFile);
+      const missing = await fileError(() => readFile(marker));
+      assertTrue(
+        missing.name === 'NotFound' || missing.name === 'NotFoundError' ||
+          missing.code === 'ENOENT',
+        `missing-file identity lost: ${missing.name}: ${missing.message}`,
+      );
+      await mkdir(marker);
+      const expected = await fileError(() => readFile(marker));
+      const db = await ctx.createDB('io-errors');
+      try {
+        const actual = await fileError(() => db.readyPromise());
+        // Compare stable identifiers only. Message text changes between engine
+        // versions, so pinning it would be a change-detector.
+        assertEquals(actual.name, expected.name);
+        assertEquals(actual.code, expected.code);
+        assertTrue(!actual.message.includes(kOlderStoreMessage));
+      } finally {
+        await db.close();
+      }
+    },
+  );
+
+  TEST(
+    'JsonLogWorkerIO',
+    'readFile of a directory surfaces EISDIR',
+    async (ctx) => {
+      // WHY: pins the shared EISDIR identity across the worker transport and
+      // the browser-only OPFS normalization (TypeMismatchError -> EISDIR).
+      const dir = await ctx.tempDir('eisdir');
+      const error = await fileError(() => readFile(dir));
+      assertEquals(
+        error.code,
+        'EISDIR',
+        `lost EISDIR identity: ${error.name}: ${error.message}`,
       );
     },
   );

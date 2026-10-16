@@ -1,16 +1,23 @@
 import * as path from '../path.ts';
 import type { DirEntry, FileImpl } from './file-impl-interface.ts';
+import { eisdirError } from './file-impl-errors.ts';
 
 export const FileImplDeno: FileImpl<Deno.FsFile> = {
   async open(filePath, write) {
-    // try {
     await Deno.mkdir(path.dirname(filePath), { recursive: true });
-    // } catch (_: unknown) {}
-    return Deno.open(filePath, {
+    const file = await Deno.open(filePath, {
       read: true,
       write,
       create: write,
     });
+    // A directory must never open as a file. Windows reports a directory's
+    // length as 0, so without this guard readFile() returns empty bytes
+    // instead of surfacing EISDIR.
+    if ((await file.stat()).isDirectory) {
+      file.close();
+      throw eisdirError(filePath);
+    }
+    return file;
   },
 
   seek(handle, offset, from) {
