@@ -68,6 +68,13 @@ and are pinned by characterization tests:
   and do not start loading. A fresh unobserved query reports `loading === false`
   and, when `queryInactivityTimeoutMs` is set, is eligible for auto-close. A
   closed query is replaced by calling `db.query()` again.
+- `compile()` now resolves to the path of the compiled executable
+  (`Promise<string>`). Callers that ignore the value need no change.
+
+### Fixed
+
+- `deno compile` output names now include `.exe` for Windows targets, so
+  `compile()` returns and logs the path that the compiler actually writes.
 
 ### Breaking Changes
 
