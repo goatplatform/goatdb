@@ -46,6 +46,23 @@ jobs:
         env:
           CI: true
 
+  system-assets-check:
+    name: System Assets Freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
+
+      - name: Rebuild system assets
+        run: deno task build
+
+      - name: Verify system assets are fresh
+        run: git diff --exit-code -- system-assets/assets.json
+
   docs-build:
     name: Docs Build
     runs-on: ubuntu-latest
