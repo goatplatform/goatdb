@@ -26,6 +26,7 @@ import setupWorkerBoundary from './worker-boundary.test.ts';
 import setupJsonLogWorkerIO from './json-log-worker-io.test.ts';
 import setupJsonLogFormats from './json-log-formats.test.ts';
 import setupNodeHttpServerTests from './node-http-server.test.ts';
+import setupHttpServerStop from './http-server-stop.test.ts';
 import setupHealthCheckEndpointTest from './health-check-endpoint.test.ts';
 import setupMinimalSync from './minimal-client-server-sync.test.ts';
 import setupE2ELatency from './e2e-latency.test.ts';
@@ -131,6 +132,7 @@ export async function registerAllTests(): Promise<void> {
   setupUntrusted(); // Database operations in untrusted mode
   await setupServerArchitectureTest(); // Server initialization and configuration
   setupNodeHttpServerTests(); // Node.js HTTP server integration
+  setupHttpServerStop(); // MinimalHttpServer stop contract (Deno + Node)
   setupStaticAssetsEndpointTest(); // File serving and asset management
   setupCliBuildAssetsTests(); // Client bundling plugins, CSS, and assets
   setupMergeRichText(); // Rich text merge operations
