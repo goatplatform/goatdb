@@ -5,27 +5,34 @@
  * store that predates the marker, or carries a different epoch, is rejected
  * with a clear "older GoatDB - delete and re-sync" error. These tests drive
  * real GoatDB instances against real temp directories (file system or OPFS
- * depending on runtime) and manipulate the store root through the FileImpl
- * abstraction, so they hold across Deno, Node, and the browser.
+ * depending on runtime) through worker-backed file operations, so browser
+ * tests exercise the same main-thread boundary as applications.
  */
 import { TEST } from './mod.ts';
 import { assertEquals, assertExists, assertTrue } from './asserts.ts';
 import * as path from '../base/path.ts';
 import type { GoatDB } from '../db/db.ts';
-import { JSONDecoder } from '../base/core-types/encoding/json.ts';
-import { deserialize } from '../cfds/base/object.ts';
-import type { Schema } from '../cfds/base/schema.ts';
 import {
+  ensureStorageFormatEpoch,
   kStorageFormatEpoch,
   kStorageFormatMarkerFile,
 } from '../db/storage-epoch.ts';
 import {
   readDir,
+  readFile,
   readTextFile,
   writeFile,
-} from '../base/json-log/file-impl.ts';
+} from '../base/json-log/json-log.ts';
+import { DataRegistry } from '../cfds/base/data-registry.ts';
 
 const gTextEncoder = new TextEncoder();
+const kSchema = {
+  ns: 'epoch-test',
+  version: 1,
+  fields: { value: { type: 'string', required: true } },
+} as const;
+const kRegistry = new DataRegistry();
+kRegistry.registerSchema(kSchema);
 /** Marker message fragment shared by every rejection path. */
 const kOlderStoreMessage = 'created by an older GoatDB';
 
@@ -53,18 +60,8 @@ async function writeMarker(storePath: string, epoch: string): Promise<void> {
   await writeFile(markerPath(storePath), gTextEncoder.encode(epoch + '\n'));
 }
 
-function rejectionMessage(r: PromiseRejectedResult): string {
-  return r.reason instanceof Error ? r.reason.message : String(r.reason);
-}
-
-/**
- * Matches the OPFS concurrent/rapid-reopen platform errors (see
- * file-impl-opfs.ts). These are storage-layer limitations, not epoch bugs.
- */
-function isOpfsPlatformError(msg: string): boolean {
-  return msg.includes('OPFS') || msg.includes('Access Handle') ||
-    msg.includes('Access Handles') || msg.includes('another open') ||
-    msg.includes('Writable stream') || msg.includes('InternalError');
+async function readMarkerText(storePath: string): Promise<string> {
+  return new TextDecoder().decode(await readFile(markerPath(storePath)));
 }
 
 export default function setup() {
@@ -87,67 +84,57 @@ export default function setup() {
 
   TEST(
     'StorageFormatEpoch',
-    'concurrent first-opens do not spuriously reject',
+    'concurrent epoch checks do not spuriously reject',
     async (ctx) => {
-      const db1 = await ctx.createDB('concurrent');
-      const db2 = await ctx.createDB('concurrent');
-      try {
-        // On the browser, OPFS rejects concurrent sync access handles to the
-        // same file with an InternalError (platform limitation, not our code).
-        // If either DB fails, verify the error is NOT from our epoch logic
-        // ("older GoatDB"). If both succeed, verify the marker is correct.
-        const results = await Promise.allSettled([
-          db1.readyPromise(),
-          db2.readyPromise(),
-        ]);
-        const rejections = results.filter(
-          (r): r is PromiseRejectedResult => r.status === 'rejected',
+      const storePath = await ctx.tempDir('concurrent');
+      // WHY: call the gate directly. Two GoatDB instances on one store path are
+      // an unsupported configuration, so opening two DBs here would test an
+      // invalid setup instead of the concurrent-initialization contract. The
+      // worker serializes these file operations.
+      const results = await Promise.allSettled(
+        Array.from({ length: 8 }, () => ensureStorageFormatEpoch(storePath)),
+      );
+      for (const r of results) {
+        assertTrue(
+          r.status === 'fulfilled',
+          r.status === 'rejected' ? String(r.reason) : 'unreachable',
         );
-        for (const r of rejections) {
-          const msg = rejectionMessage(r);
-          // OPFS platform error is acceptable; our epoch error is not. This
-          // guard is why a false "older GoatDB" rejection fails the test.
-          assertTrue(
-            !msg.includes(kOlderStoreMessage),
-            `epoch logic spuriously rejected concurrent open: ${msg}`,
-          );
-        }
-        // At least one opener must win unless OPFS's concurrent-handle
-        // limitation rejected every opener. Any other error is unexpected.
-        if (!results.some((r) => r.status === 'fulfilled')) {
-          assertTrue(
-            rejections.length > 0 &&
-              rejections.every((r) => isOpfsPlatformError(rejectionMessage(r))),
-            `concurrent first-opens failed for a non-OPFS reason: ` +
-              rejections.map(rejectionMessage).join('; '),
-          );
-        } else {
-          const storePath = await ctx.tempDir('concurrent');
-          const recorded = await readTextFile(markerPath(storePath));
-          assertEquals(recorded?.trim(), String(kStorageFormatEpoch));
-        }
+      }
+      assertEquals(
+        (await readMarkerText(storePath)).trim(),
+        String(kStorageFormatEpoch),
+      );
+      const db = await ctx.createDB('concurrent');
+      try {
+        await db.readyPromise();
       } finally {
-        await db1.flushAll().catch(() => {});
-        await db1.close().catch(() => {});
-        await db2.flushAll().catch(() => {});
-        await db2.close().catch(() => {});
+        await db.close();
       }
     },
   );
 
   TEST(
     'StorageFormatEpoch',
-    'reopening a store with the current epoch succeeds',
+    'reopening a store with the current epoch preserves committed data',
     async (ctx) => {
-      const first = await ctx.createDB('reopen');
-      await first.readyPromise();
-      await first.flushAll();
-      await first.close();
+      const first = await ctx.createDB('reopen', { registry: kRegistry });
+      try {
+        await first.readyPromise();
+        await first.create('/data/items/saved', kSchema, { value: 'persisted' })
+          .commit();
+        await first.flushAll();
+      } finally {
+        await first.close();
+      }
 
-      const second = await ctx.createDB('reopen');
+      const second = await ctx.createDB('reopen', { registry: kRegistry });
       try {
         await second.readyPromise();
-        assertTrue(second.ready);
+        await second.open('/data/items');
+        assertEquals(
+          second.item('/data/items/saved').get('value'),
+          'persisted',
+        );
       } finally {
         await second.flushAll();
         await second.close();
@@ -241,50 +228,6 @@ export default function setup() {
       try {
         await db.readyPromise();
         assertTrue(db.ready);
-      } finally {
-        await db.flushAll();
-        await db.close();
-      }
-    },
-  );
-
-  TEST(
-    'StorageFormatEpoch',
-    'epoch-OK store still rejects a legacy bare-number date payload',
-    async (ctx) => {
-      const db = await ctx.createDB('epoch-ok-legacy-date');
-      await db.readyPromise();
-      try {
-        const storePath = await ctx.tempDir('epoch-ok-legacy-date');
-        // WHY: the epoch marker is current, so the store itself opens. The
-        // legacy failure lives in the payload: pre-0.7 writers stored dates
-        // as bare numbers, which the date field must reject loudly.
-        const recorded = await readTextFile(markerPath(storePath));
-        assertEquals(recorded?.trim(), String(kStorageFormatEpoch));
-        const legacyPath = path.join(storePath, 'legacy-payload.json');
-        await writeFile(
-          legacyPath,
-          gTextEncoder.encode(JSON.stringify({ when: 1700000000 })),
-        );
-        const raw = await readTextFile(legacyPath);
-        assertExists(raw, 'expected legacy payload to be readable');
-        const schema: Schema = {
-          ns: 'storage-format-epoch-legacy-date',
-          version: 1,
-          fields: { when: { type: 'date' } },
-        };
-        let error: unknown;
-        try {
-          deserialize(new JSONDecoder(JSON.parse(raw) as never), schema);
-        } catch (e) {
-          error = e;
-        }
-        assertExists(error, 'expected legacy bare-number date to reject');
-        const message = error instanceof Error ? error.message : String(error);
-        assertTrue(
-          message.includes('Legacy date value'),
-          `expected legacy-date rejection, got: ${message}`,
-        );
       } finally {
         await db.flushAll();
         await db.close();

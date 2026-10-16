@@ -49,6 +49,8 @@ import {
   assertTrue,
 } from './asserts.ts';
 import { TEST } from './mod.ts';
+import * as path from '../base/path.ts';
+import { readTextFile, writeFile } from '../base/json-log/json-log.ts';
 
 /**
  * Characterization tests for the core-value serialization surface (issue #58
@@ -1108,6 +1110,45 @@ export default function setup(): void {
       assertEquals(
         new JSONDecoder({ when: 1700000000 }).get('when'),
         1700000000,
+      );
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'legacy bare-number date payload rejects after file roundtrip',
+    async (ctx) => {
+      // WHY: moved from the epoch suite. The epoch gate owns store
+      // rejection; the payload owns date rejection. The worker roundtrip
+      // pins that persistence preserves the legacy bytes exactly.
+      const file = path.join(
+        await ctx.tempDir('legacy-date-roundtrip'),
+        'legacy-payload.json',
+      );
+      const bytes = new TextEncoder().encode(
+        JSON.stringify({ when: 1700000000 }),
+      );
+      await writeFile(file, bytes);
+      const raw = await readTextFile(file);
+      assertExists(raw, 'expected legacy payload to be readable');
+      const schema: Schema = {
+        ns: 'core-value-serialization-legacy-date',
+        version: 1,
+        fields: { when: { type: 'date' } },
+      };
+      // Pin the rejection reason: a bare number in a date field must fail
+      // with the legacy-date error, not any parse/validation error.
+      let error: unknown;
+      try {
+        deserialize(new JSONDecoder(JSON.parse(raw) as never), schema);
+      } catch (e) {
+        error = e;
+      }
+      assertExists(error, 'expected legacy bare-number date to reject');
+      const message = error instanceof Error ? error.message : String(error);
+      assertTrue(
+        message.includes('Legacy date value'),
+        `expected legacy-date rejection, got: ${message}`,
       );
     },
   );

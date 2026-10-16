@@ -115,10 +115,10 @@ export interface FileImpl<T> {
    * and "/a/b/c" directories.
    *
    * @param path The path where to create the directory
-   * @returns A promise that resolves to true if the directory was created,
-   *          false otherwise
+   * @returns Resolves on success and rejects on failure. All impls (Deno,
+   *          Node, OPFS) behave the same.
    */
-  mkdir(path: string): Promise<boolean>;
+  mkdir(path: string): Promise<void>;
 
   /**
    * Checks if a file or directory exists at the specified path.

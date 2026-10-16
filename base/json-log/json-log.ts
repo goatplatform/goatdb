@@ -14,6 +14,7 @@
 import { kStaticAssetsSystem } from '../../system-assets/system-assets.ts';
 import { assert } from '../error.ts';
 import type {
+  WorkerErrorResp,
   WorkerFileReq,
   WorkerFileReqAppend,
   WorkerFileReqClose,
@@ -25,10 +26,15 @@ import type {
   WorkerFileRespForReq,
   WorkerFileRespScan,
   WorkerLogRelay,
+  WorkerMkdirReq,
+  WorkerReadDirReq,
+  WorkerReadFileReq,
   WorkerReadTextFileReq,
   WorkerRemoveReq,
+  WorkerWriteFileReq,
   WorkerWriteTextFileReq,
 } from './json-log-worker-req.ts';
+import type { DirEntry } from './file-impl-interface.ts';
 import { getRuntime } from '../runtime/index.ts';
 import { log } from '../../logging/log.ts';
 import type { LogEntry } from '../../logging/log.ts';
@@ -152,6 +158,17 @@ async function sendRequest<T extends WorkerFileReq>(
   return promise as Promise<WorkerFileRespForReq<T>>;
 }
 
+function workerResponseError(resp: WorkerErrorResp): Error {
+  const error = new Error(resp.details?.message ?? resp.error);
+  if (resp.details) {
+    error.name = resp.details.name;
+    if (resp.details.code !== undefined) {
+      Object.assign(error, { code: resp.details.code });
+    }
+  }
+  return error;
+}
+
 function handleResponse(resp: WorkerFileResp): void {
   const relayedLogs = (resp as Record<string, unknown>).logs as
     | WorkerLogRelay[]
@@ -165,7 +182,7 @@ function handleResponse(resp: WorkerFileResp): void {
   assert(entry !== undefined, 'Received unknown response from worker');
   gPendingResolveFuncs.delete(resp.id);
   if (resp.type === 'error') {
-    entry.reject(new Error(resp.error));
+    entry.reject(workerResponseError(resp));
   } else {
     entry.resolve(resp);
   }
@@ -345,6 +362,36 @@ export async function JSONLogFileAppend(
     ids,
   });
   await trackFileOperation(file, promise);
+}
+
+// Worker-backed file operations (worker owns FileImpl; direct calls break OPFS
+// handle discipline). Rule source: tests/worker-boundary.test.ts.
+/** Reads file bytes in the worker. I/O failures reject without suppression. */
+export async function readFile(path: string): Promise<Uint8Array> {
+  return (await sendRequest<WorkerReadFileReq>({ type: 'readFile', path }))
+    .bytes;
+}
+
+/**
+ * Writes file bytes in the worker. The clone copies the bytes, so the
+ * caller's buffer stays attached. Fine for markers. Not for large files.
+ */
+export async function writeFile(
+  path: string,
+  bytes: Uint8Array,
+): Promise<void> {
+  await sendRequest<WorkerWriteFileReq>({ type: 'writeFile', path, bytes });
+}
+
+/** Creates a directory recursively in the worker. I/O failures reject. */
+export async function mkdir(path: string): Promise<void> {
+  await sendRequest<WorkerMkdirReq>({ type: 'mkdir', path });
+}
+
+/** Lists a directory in the worker. I/O failures reject. */
+export async function readDir(path: string): Promise<DirEntry[]> {
+  return (await sendRequest<WorkerReadDirReq>({ type: 'readDir', path }))
+    .entries;
 }
 
 /**

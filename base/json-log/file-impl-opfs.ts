@@ -204,7 +204,6 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
 
   async mkdir(path: string) {
     await getDir(path);
-    return true;
   },
 
   async exists(filePath: string): Promise<boolean> {
@@ -254,8 +253,11 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
   async readDir(dirPath: string): Promise<DirEntry[]> {
     const dir = await getDirReadOnly(dirPath);
     if (!dir) {
-      throw new Error(
-        `ENOENT: no such file or directory, scandir '${dirPath}'`,
+      // Attach ENOENT so the worker error transport can classify a missing
+      // directory as "not found" (see isNotFound in db/storage-epoch.ts).
+      throw Object.assign(
+        new Error(`ENOENT: no such file or directory, scandir '${dirPath}'`),
+        { code: 'ENOENT' },
       );
     }
     const entries: DirEntry[] = [];
