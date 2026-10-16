@@ -26,12 +26,15 @@ jobs:
         with:
           node-version: '24.x'
 
-      - name: Type check and runtime floor probe
-        run: |
-          deno task check
-          deno eval 'using x = { [Symbol.dispose]() {} };'
-          # deno eval defaults to TypeScript; --ext=js guards the native JS path.
-          deno eval --ext=js 'using x = { [Symbol.dispose]() {} };'
+      - name: Type check
+        run: deno task check
+
+      - name: Runtime floor probe (TypeScript)
+        run: deno eval 'using x = { [Symbol.dispose]() {} };'
+
+      - name: Runtime floor probe (native JavaScript)
+        # deno eval defaults to TypeScript; --ext=js guards the native JS path.
+        run: deno eval --ext=js 'using x = { [Symbol.dispose]() {} };'
 
       - name: Run Deno tests
         run: deno task test --runtime=deno
