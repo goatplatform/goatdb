@@ -476,6 +476,7 @@ export interface MinimalHttpServer {
     port: number,
     signal?: AbortSignal,
   ): Promise<void>;
+  /** Stops the server. Idempotent; port and address read as undefined afterwards. */
   stop(): void;
   readonly port?: number;
   readonly address?: { hostname: string; port: number };
@@ -552,6 +553,7 @@ export class DenoHttpServer implements MinimalHttpServer {
 
   stop(): void {
     this._abortController?.abort();
+    this._server = undefined;
     this._started = false;
   }
 
@@ -584,8 +586,11 @@ export class DenoHttpServer implements MinimalHttpServer {
  * This class provides a Node.js-specific implementation of the HTTP server.
  */
 export class NodeHttpServer implements MinimalHttpServer {
-  /** The underlying Node.js HTTP/HTTPS server instance */
-  private _server?: import('node:http').Server | import('node:https').Server;
+  /** The underlying Node.js HTTP/HTTPS server instance. */
+  // Single type, not http.Server|https.Server: calling methods on that union
+  // fails because the two classes have incompatible generic overloads.
+  // https.Server is assignable to http.Server through its merged interface.
+  private _server?: import('node:http').Server;
   /** Whether the server has been started */
   private _started: boolean = false;
   /** Cached reference to the Node.js Buffer implementation */
@@ -749,10 +754,12 @@ export class NodeHttpServer implements MinimalHttpServer {
    * Stops the HTTP server and cleans up resources.
    */
   stop(): void {
+    // WHY: guard keeps stop idempotent on runtimes without closeAllConnections.
     if (this._server && 'closeAllConnections' in this._server) {
-      (this._server as any).closeAllConnections();
+      this._server.closeAllConnections();
     }
     this._server?.close();
+    this._server = undefined;
     this._started = false;
   }
 
