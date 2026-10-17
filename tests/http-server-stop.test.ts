@@ -36,7 +36,12 @@ async function startAndRead(
   if (port === undefined) {
     throw new Error('Started server must expose its port');
   }
-  const response = await fetch(`http://127.0.0.1:${port}`);
+  const response = await fetch(`http://127.0.0.1:${port}`, {
+    // WHY: Deno < 2.9 reuses pooled keep-alive sockets across a server
+    // restart and fails the next request (denoland/deno#17754). This test
+    // checks listener release, not client-pool recovery.
+    headers: { connection: 'close' },
+  });
   assertEquals(await response.text(), 'ok', 'body should match');
   return port;
 }
