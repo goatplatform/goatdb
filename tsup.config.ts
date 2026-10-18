@@ -1,6 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
+  // scripts/check-npm-entrypoints.ts checks public entrypoint coverage.
   entry: {
     mod: 'mod.ts',
     'react/hooks': 'react/hooks.ts',

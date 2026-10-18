@@ -24,6 +24,7 @@
     "goatdb": "./dist/cli/init.js"
   },
   "scripts": {
+    "check:npm-types": "node scripts/check-npm-entrypoints.ts && node --test scripts/check-npm-entrypoints.test.ts && tsc -p tsconfig.npm.json",
     "build:npm": "tsup"
   },
   "dependencies": {
@@ -50,6 +51,7 @@
   },
   "devDependencies": {
     "@deno/esbuild-plugin": "npm:@jsr/deno__esbuild-plugin@^1.2.1",
+    "@types/deno": "2.7.0",
     "@types/node": "^24.0.0",
     "@types/nodemailer": "^6.4.17",
     "@types/react": "^19.0.0",

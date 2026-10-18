@@ -14,9 +14,11 @@
       "package.json",
       "tsup.config.ts",
       "tsconfig.node.json",
+      "tsconfig.npm.json",
       ".npmrc",
       ".github/",
       "tests/",
+      "scripts/",
       "benchmarks/",
       "docs/",
       "examples/"
