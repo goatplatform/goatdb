@@ -166,6 +166,36 @@ export default function setupCliInitTests() {
 
   TEST(
     'CLI-Init',
+    'should align shutdown force-exit with the drain budget',
+    async (ctx: TestSuite) => {
+      const testDir = await ctx.tempDir('init-shutdown');
+
+      const initModule = await import('../cli/init.ts');
+      await initModule.bootstrapProject({
+        targetDir: testDir,
+        skipDependencies: true,
+      });
+
+      const serverFiles = isDeno()
+        ? ['server/server.ts']
+        : ['server/server.ts', 'server/server-sea.ts'];
+      for (const file of serverFiles) {
+        const text = await readTextFile(path.join(testDir, file));
+        assertExists(text, `${file} should exist`);
+        assertTrue(
+          text.includes('DEFAULT_STOP_TIMEOUT_MS'),
+          `${file} must use the drain budget`,
+        );
+        assertTrue(
+          !text.includes('5000'),
+          `${file} must not hardcode a 5s force exit`,
+        );
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Init',
     'should create correct directory structure',
     async (ctx: TestSuite) => {
       const testDir = await ctx.tempDir('init-structure');
