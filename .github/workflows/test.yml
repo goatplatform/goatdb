@@ -104,6 +104,9 @@ jobs:
       - name: Install npm dependencies
         run: npm install
 
+      - name: Type check npm surface
+        run: npm run check:npm-types
+
       - name: Build npm package
         run: npm run build:npm
 
