@@ -115,10 +115,12 @@ Starts the server and all associated services.
 
 ### stop()
 
-**<code>stop(): Promise&lt;void&gt;</code>**
+**<code>stop(options?: HttpServerStopOptions): Promise&lt;void&gt;</code>**
 
 Gracefully stops the server and all its services.
 Safe to call multiple times.
+
+`timeoutMs` bounds the drain, not the final listener close. `force` skips the drain. Direct `processRequest` calls are not tracked; embedded servers must drain them.
 
 ### updateStaticAssets()
 

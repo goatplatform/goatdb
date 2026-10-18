@@ -55,6 +55,8 @@ export interface LogEntryDeveloperError extends BaseErrorLogEntry {
  * - DuplicateFailed: Failed to handle duplicate message
  * - SessionError: Error occurred while handling session
  * - EmailSendFailed: Failed to send email
+ * - ServerStopFailed: HTTP server stop failed
+ * - StopTimeout: HTTP server drain timed out
  */
 export type OperationalError =
   | 'FetchError'
@@ -68,7 +70,9 @@ export type OperationalError =
   | 'SessionError'
   | 'EmailSendFailed'
   | 'MissingConfiguration'
+  | 'ServerStopFailed'
   | 'StorageError'
+  | 'StopTimeout'
   | 'ValidationError';
 
 /**
