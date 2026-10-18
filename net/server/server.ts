@@ -28,6 +28,7 @@ import {
   createHttpServer,
   type GoatRequest,
   type HttpServerInstance,
+  type HttpServerStopOptions,
   type ServeHandlerInfo,
 } from './http-compat.ts';
 import { generateSelfSignedCertificate } from './crypto-utils.ts';
@@ -342,6 +343,8 @@ export class Server<US extends Schema> {
   private _abortController: AbortController | undefined;
   private _httpServer?: HttpServerInstance;
   private _stopping = false;
+  /** In-flight stop, so repeated stop() calls await the same teardown. */
+  private _stopPromise?: Promise<void>;
 
   constructor(options: ServerOptions<US>) {
     this._endpoints = [];
@@ -528,11 +531,14 @@ export class Server<US extends Schema> {
     goatReq: GoatRequest,
     info: ServeHandlerInfo,
   ): Promise<Response> {
-    if (goatReq.url === 'http://AWSALB/healthy') {
-      return new Response(null, { status: 200 });
-    }
     if (this._stopping) {
       return new Response(null, { status: 503 });
+    }
+    // AWS ALB sends this fixed host for health checks. Do not resolve it as
+    // a tenant domain; a host-based resolver can return 404 for it. Hosts are
+    // case-insensitive and URL parsers lowercase them.
+    if (goatReq.url.toLowerCase() === 'http://awsalb/healthy') {
+      return new Response(null, { status: 200 });
     }
     const orgId = this._domain.resolveDomain(goatReq.url);
     if (!orgId) {
@@ -626,7 +632,11 @@ export class Server<US extends Schema> {
    * @returns Promise that resolves when server is fully started
    */
   async start(): Promise<void> {
+    // WHY: a restart must not reset lifecycle state while the old teardown
+    // still drains requests and closes databases.
+    if (this._stopPromise) await this._stopPromise;
     this._stopping = false; // Reset from prior stop()
+    this._stopPromise = undefined;
 
     // Return early if server is already running
     if (this._abortController) {
@@ -689,23 +699,32 @@ export class Server<US extends Schema> {
    * Gracefully stops the server and all its services.
    * Safe to call multiple times.
    *
-   * Shutdown sequence: stops accepting new connections, rejects new service
-   * lookups via `_stopping` flag, then flushes and closes all databases.
-   * Already-dispatched request handlers may still be running during flush —
-   * there is no request-draining mechanism.
+   * Shutdown sequence: rejects new requests, drains active handlers and
+   * responses on the internal HTTP server, then flushes and closes databases.
+   * `force` skips the drain; `timeoutMs` bounds the drain, not the final
+   * listener close. A later `force` escalates only while the drain is pending,
+   * while `timeoutMs` is fixed by the first call. Direct `processRequest` calls
+   * are not tracked; embedded servers must drain them themselves. A handler
+   * that calls `stop()` is part of the drain, so shutdown endpoints should pass
+   * `force: true`. Neither force nor timeout can cancel application handlers,
+   * which may continue after their databases close.
    */
-  async stop(): Promise<void> {
+  stop(options?: HttpServerStopOptions): Promise<void> {
     if (!this._abortController) {
-      return;
+      // A later force must be able to escalate the active graceful teardown.
+      if (options?.force) void this._httpServer?.stop(options);
+      return this._stopPromise ?? Promise.resolve();
     }
-    // Capture and clear immediately to prevent concurrent stop() calls
-    const ac = this._abortController;
     this._abortController = undefined;
     this._stopping = true;
+    this._stopPromise = this._stop(options);
+    return this._stopPromise;
+  }
 
-    // Stop HTTP server first so no new requests hit closing DBs. Await the
-    // teardown so the listener is closed before databases start closing.
-    await this._httpServer?.stop();
+  private async _stop(options?: HttpServerStopOptions): Promise<void> {
+    // Wait for handlers and responses before closing DBs, unless force or the
+    // drain timeout permits teardown while application work is still running.
+    await this._httpServer?.stop(options);
 
     // Await any in-flight service creation before cleanup
     for (const pending of this._pendingServices.values()) {
@@ -726,21 +745,34 @@ export class Server<US extends Schema> {
       }
     }
 
-    // Flush and close all databases before aborting
+    // HTTP stop has drained requests or exhausted the caller's drain budget.
     for (const services of this._servicesByOrg.values()) {
       try {
         await services.db.flushAll();
       } catch (e) {
-        console.error('Error flushing database during shutdown:', e);
+        log({
+          severity: 'ERROR',
+          error: 'StorageError',
+          message: `Error flushing database during shutdown: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+          trace: e instanceof Error ? e.stack : undefined,
+        });
       }
       try {
         await services.db.close();
       } catch (e) {
-        console.error('Error closing database during shutdown:', e);
+        log({
+          severity: 'ERROR',
+          error: 'StorageError',
+          message: `Error closing database during shutdown: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+          trace: e instanceof Error ? e.stack : undefined,
+        });
       }
     }
 
-    ac.abort();
     this._servicesByOrg.clear();
   }
 }
