@@ -60,6 +60,11 @@ The following behaviors are intentional artifacts of the current implementation 
   `/healthy`. The comparison is now case-sensitive, so a mixed-case probe such
   as `/HEALTHY` returns 404; the `/healthy` endpoint itself still matches
   case-insensitively. Keep ALB health-check paths lowercase.
+- `GOATDB_TEST_TIMEOUT_MS` now sets the whole-worker timeout and is validated
+  strictly: non-integer values and values outside `1` to `2147483647` abort the
+  run with an explicit error instead of silently using the 5-minute default.
+  Workers send a heartbeat every 10 seconds, and a timeout reports the active
+  suite and test, the test's elapsed time and the last heartbeat age.
 
 ### Fixed
 
@@ -76,6 +81,9 @@ The following behaviors are intentional artifacts of the current implementation 
   cleanly, and a later `force` stop interrupts an in-progress drain even when
   the stop is queued behind a restart. Drain-then-close ordering is unchanged,
   and force or timeout still never cancel application handlers.
+- The test runner no longer stops at the first failing runtime. Deno, Node and
+  browser results are all collected, and the process exits non-zero with the
+  combined failures.
 
 ## [0.6.1] - 2026-09-01
 
