@@ -40,6 +40,10 @@ export async function compileForNodeWithEsbuild(
       '@jsr/deno__esbuild-plugin',
       'chokidar',
       'postject',
+      // Deno-run-only browser dep: bundling it pulls playwright-core's
+      // uninstalled optional packages (chromium-bidi, electron, bufferutil,
+      // utf-8-validate, kerberos) and fails the Node bundle.
+      'playwright',
     ],
     banner: {
       // Aliased to __createRequire__ to avoid potential naming conflicts with
@@ -54,19 +58,26 @@ export async function compileForNodeWithEsbuild(
   });
 }
 
+/** Result of running the esbuild bundle in Node.js. */
+export interface NodeRunResult {
+  readonly success: boolean;
+  readonly code: number;
+}
+
 /**
  * Runs a pre-compiled esbuild result in Node.js environment.
  *
  * @param result - The esbuild BuildResult (output of compileForNodeWithEsbuild)
  * @param inspectBrk - Optional flag to enable Node.js inspector with break on start
  * @param env - Optional environment variables to set for the Node.js process
- * @returns A Promise that resolves to true if the Node.js process exits successfully, false otherwise
+ * @returns The process outcome with its exit code. `code` is -1 when the
+ *          process could not be started or collected.
  */
 export async function nodeRun(
   result: Awaited<ReturnType<typeof compileForNodeWithEsbuild>>,
   inspectBrk?: boolean,
   env?: Record<string, string>,
-): Promise<boolean> {
+): Promise<NodeRunResult> {
   try {
     const nodeCmd = new Deno.Command('node', {
       stdin: 'piped',
@@ -86,10 +97,12 @@ export async function nodeRun(
     const writer = nodeProcess.stdin.getWriter();
     await writer.write(result.outputFiles![0].contents);
     await writer.close();
-    await nodeProcess.output();
-    return (await nodeProcess.status).success;
-  } catch (_: unknown) {
-    return false;
+    const status = await nodeProcess.output();
+    return { success: status.success, code: status.code };
+  } catch (error: unknown) {
+    // Never hide a spawn/collection failure: the caller reports the exit code.
+    console.error('Node.js process failed:', error);
+    return { success: false, code: -1 };
   } finally {
     await stopBackgroundCompiler();
   }

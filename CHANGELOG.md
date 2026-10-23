@@ -71,10 +71,21 @@ and are pinned by characterization tests:
 - `compile()` now resolves to the path of the compiled executable
   (`Promise<string>`). Callers that ignore the value need no change.
 
+### Changed
+
+- `GOATDB_TEST_TIMEOUT_MS` now sets the whole-worker timeout and is validated
+  strictly: non-integer values and values outside `1` to `2147483647` abort the
+  run with an explicit error instead of silently using the 5-minute default.
+  Workers send a heartbeat every 10 seconds, and a timeout reports the active
+  suite and test, the test's elapsed time and the last heartbeat age.
+
 ### Fixed
 
 - `deno compile` output names now include `.exe` for Windows targets, so
   `compile()` returns and logs the path that the compiler actually writes.
+- The test runner no longer stops at the first failing runtime. Deno, Node and
+  browser results are all collected, and the process exits non-zero with the
+  combined failures.
 
 ### Breaking Changes
 
