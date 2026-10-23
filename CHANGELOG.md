@@ -73,6 +73,11 @@ and are pinned by characterization tests:
 
 ### Changed
 
+- `goatdb init` on Deno now requests `react`, `react-dom`, `yargs` and
+  `@types/react` as `^` ranges and installs all dependencies in one
+  `deno add` call, bounded by a 180s timeout. Exact pins let a transitive
+  peer resolve a newer `react` than `react-dom`, which crashes at runtime
+  with "Incompatible React versions".
 - `GOATDB_TEST_TIMEOUT_MS` now sets the whole-worker timeout and is validated
   strictly: non-integer values and values outside `1` to `2147483647` abort the
   run with an explicit error instead of silently using the 5-minute default.
@@ -83,6 +88,13 @@ and are pinned by characterization tests:
 
 - `deno compile` output names now include `.exe` for Windows targets, so
   `compile()` returns and logs the path that the compiler actually writes.
+- `goatdb init` now scaffolds `.gitignore` and `.npmrc` again when run from
+  the published npm package. `npm pack` drops dotfile sources, so the
+  templates use plain names (`gitignore`, `npmrc`) that `init` maps back to
+  their dotted targets.
+- `goatdb init` now exits non-zero when dependency installation fails,
+  reporting the command, its exit code and its output. Previously a failed
+  `npm install` only warned, so a broken scaffold looked successful.
 - The test runner no longer stops at the first failing runtime. Deno, Node and
   browser results are all collected, and the process exits non-zero with the
   combined failures.
