@@ -17,7 +17,7 @@ jobs:
 
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
 
       - uses: actions/setup-node@v4
         with:
@@ -30,6 +30,13 @@ jobs:
       - name: Install npm dependencies
         run: rm -rf node_modules && npm install
 
+      - name: Type check and runtime floor probe
+        run: |
+          deno task check
+          deno eval 'using x = { [Symbol.dispose]() {} };'
+          # deno eval defaults to TypeScript; --ext=js guards the native JS path.
+          deno eval --ext=js 'using x = { [Symbol.dispose]() {} };'
+
       - name: Build npm artifact
         run: npm run build:npm
 
@@ -41,23 +48,13 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
       # Rewrite package.json version + exports for npm publish.
-      # In the repo, exports point to .ts source (for local dev/tests). Here we switch to dist/.
+      # In the repo, exports point to .ts source (for local dev/tests). The shared
+      # transform in scripts/npm-manifest.ts switches them to dist/. The package
+      # contract test applies the same transform, so a shipped-manifest
+      # regression fails the gate rather than the release.
       # This runs AFTER npm install + build so the lockfile matches during install.
       - name: Sync version and exports from deno.json → package.json
-        run: |
-          deno eval --node-modules-dir=none "
-            import pkg from './package.json' with {type:'json'};
-            import cfg from './deno.json' with {type:'json'};
-            pkg.version = cfg.version;
-            pkg.exports = {
-              '.':              { import: './dist/mod.js',          types: './dist/mod.d.ts' },
-              './react':        { import: './dist/react/hooks.js',  types: './dist/react/hooks.d.ts' },
-              './server':       { import: './dist/server.js',       types: './dist/server.d.ts' },
-              './server/build': { import: './dist/server-build.js', types: './dist/server-build.d.ts' },
-              './link':         { import: './dist/cli/link.js',     types: './dist/cli/link.d.ts' },
-            };
-            await Deno.writeTextFile('./package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
+        run: deno run -A scripts/npm-manifest.ts
 
       - name: Publish to JSR
         run: |

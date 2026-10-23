@@ -1,5 +1,6 @@
 import {
   type BuildInfo,
+  DEFAULT_STOP_TIMEOUT_MS,
   Server,
   staticAssetsFromJS,
 } from '@goatdb/goatdb/server';
@@ -86,7 +87,11 @@ async function main(): Promise<void> {
   const shutdown = () => {
     if (stopping) return;
     stopping = true;
-    const forceExit = setTimeout(() => process.exit(1), 5000);
+    // The drain budget plus a margin for database flush.
+    const forceExit = setTimeout(
+      () => process.exit(1),
+      DEFAULT_STOP_TIMEOUT_MS + 1_000,
+    );
     forceExit.unref();
     server.stop().then(() => process.exit(0)).catch((e) => {
       console.error(e);

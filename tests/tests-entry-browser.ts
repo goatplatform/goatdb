@@ -39,6 +39,9 @@ import setupHealthCheckEndpoint from './health-check-endpoint.test.ts';
 import setupLiveQuery from './live-query.test.ts';
 import setupHashMap from './hash-map.test.ts';
 import setupCoreValueCompare from './core-value-compare.test.ts';
+import setupCoreValueSerialization from './core-value-serialization.test.ts';
+import setupStorageFormatEpoch from './storage-format-epoch.test.ts';
+import setupJsonLogWorkerIO from './json-log-worker-io.test.ts';
 import setupAutoClose from './auto-close.test.ts';
 import { getEnvVar } from '../base/os.ts';
 import { notReached } from '../base/error.ts';
@@ -61,6 +64,8 @@ class TestConsoleLogStream implements LogStream {
 
 /**
  * Browser test entry point - all browser-compatible existing tests.
+ * Manual subset of test-registry.ts by capability (excludes Node-only and
+ * repo-scan guards). Add browser-safe suites here and in the registry.
  */
 async function main(): Promise<void> {
   // Wipe OPFS to prevent stale data from previous runs contaminating results
@@ -80,8 +85,11 @@ async function main(): Promise<void> {
   setupHealthCheckEndpoint(); // Simple HTTP endpoint check
   setupHashMap(); // HashSet and HashMap collision-safe cardinality
   setupCoreValueCompare(); // Core-value ordering invariants
+  setupCoreValueSerialization(); // Serializer and core-type characterization goldens
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
+  setupStorageFormatEpoch(); // Store-root storage-format epoch fail-fast
+  setupJsonLogWorkerIO(); // Worker-backed file I/O contract (readFile/writeFile/mkdir/readDir)
   setupCoroutineQueueTests(); // Coroutine FIFO execution contract
   setupCoroutineSchedulerTests(); // Coroutine failure isolation contract
   setupBinaryEncoding(); // Binary commit format encoding roundtrip

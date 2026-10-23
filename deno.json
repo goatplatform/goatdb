@@ -1,6 +1,12 @@
 {
   "compilerOptions": {
-    "lib": ["dom", "dom.iterable", "dom.asynciterable", "deno.ns"]
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "dom.asynciterable",
+      "deno.ns",
+      "esnext.disposable"
+    ]
   },
   "lock": false,
   "publish": {
@@ -8,9 +14,11 @@
       "package.json",
       "tsup.config.ts",
       "tsconfig.node.json",
+      "tsconfig.npm.json",
       ".npmrc",
       ".github/",
       "tests/",
+      "scripts/",
       "benchmarks/",
       "docs/",
       "examples/"
@@ -30,7 +38,7 @@
     ]
   },
   "name": "@goatdb/goatdb",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "license": "MIT",
   "exports": {
     ".": "./mod.ts",
@@ -40,9 +48,12 @@
     "./link": "./cli/link.ts"
   },
   "tasks": {
+    "check": "deno check mod.ts server.ts server-build.ts",
     "build": "deno run -A system-assets/build-sys-assets.ts",
     "test": "deno run -A tests/run.ts",
     "test:smoke": "deno run -A tests/run.ts --runtime=deno --suite=SecurityBoundaries",
+    "test:registry": "deno run -A tests/run.ts --suite=CLI-Init-Registry",
+    "test:package": "deno run -A tests/run.ts --suite=CLI-Package --runtime=node",
     "bench": "deno run -A benchmarks/run.ts",
     "bench:json": "deno run -A benchmarks/run.ts --output-json --output-dir=benchmarks/results",
     "bench:update-docs": "deno run -A benchmarks/update-docs.ts --input-dir=benchmarks/results",
@@ -56,15 +67,15 @@
   "imports": {
     "@goatdb/orderstamp": "jsr:@goatdb/orderstamp@^1.1.1",
     "@jridgewell/trace-mapping": "npm:@jridgewell/trace-mapping@^0.3.31",
-    "@deno/esbuild-plugin": "jsr:@deno/esbuild-plugin@^1.2.1",
+    "@deno/esbuild-plugin": "jsr:@deno/esbuild-plugin@1.2.1",
     "@std/data-structures": "jsr:@std/data-structures@^1.0.8",
     "@std/expect": "jsr:@std/expect@^1.0.16",
     "@std/path": "jsr:@std/path@^1.0.9",
     "@std/encoding": "jsr:@std/encoding@^1.0.10",
     "@types/nodemailer": "npm:@types/nodemailer@^6.4.17",
-    "esbuild": "npm:esbuild@^0.25.4",
+    "esbuild": "npm:esbuild@0.25.12",
     "nodemailer": "npm:nodemailer@^6.10.0",
-    "playwright": "npm:playwright@^1.48.0",
+    "playwright": "npm:playwright@1.64.1",
     "react": "npm:react@^19.1.0",
     "source-map": "npm:source-map@^0.7.4",
     "sql.js": "npm:sql.js@^1.11.0",

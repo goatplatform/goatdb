@@ -56,12 +56,25 @@ import type {
   WorkerFileRespFlush,
   WorkerFileRespOpen,
   WorkerFileRespScan,
+  WorkerMkdirResp,
+  WorkerReadDirResp,
+  WorkerReadFileResp,
   WorkerReadTextFileResp,
   WorkerRemoveResp,
+  WorkerWriteFileResp,
   WorkerWriteTextFileResp,
 } from './json-log-worker-req.ts';
+import { unknownCommandDetails } from './json-log-worker-req.ts';
 import type { FileImpl } from './file-impl-interface.ts';
-import { FileImplGet, readTextFile, writeTextFile } from './file-impl.ts';
+import {
+  FileImplGet,
+  mkdir,
+  readDir,
+  readFile,
+  readTextFile,
+  writeFile,
+  writeTextFile,
+} from './file-impl.ts';
 import { isNode } from '../common.ts';
 
 const FILE_READ_BUF_SIZE_BYTES = 1024 * 1024;
@@ -774,6 +787,34 @@ async function handleRequest(
       break;
     }
 
+    case 'readFile': {
+      const bytes = await readFile(req.path);
+      const resp: WorkerReadFileResp = { type: 'readFile', id: req.id, bytes };
+      postWithLogs(resp, [bytes.buffer as ArrayBuffer]);
+      break;
+    }
+
+    case 'writeFile': {
+      await writeFile(req.path, req.bytes);
+      const resp: WorkerWriteFileResp = { type: 'writeFile', id: req.id };
+      postWithLogs(resp);
+      break;
+    }
+
+    case 'mkdir': {
+      await mkdir(req.path);
+      const resp: WorkerMkdirResp = { type: 'mkdir', id: req.id };
+      postWithLogs(resp);
+      break;
+    }
+
+    case 'readDir': {
+      const entries = await readDir(req.path);
+      const resp: WorkerReadDirResp = { type: 'readDir', id: req.id, entries };
+      postWithLogs(resp);
+      break;
+    }
+
     case 'readTextFile': {
       const resp: WorkerReadTextFileResp = {
         type: 'readTextFile',
@@ -809,11 +850,25 @@ async function handleRequest(
         type: 'error',
         id: (req as WorkerFileReq).id,
         error: 'UnknownCommand',
+        details: unknownCommandDetails((req as WorkerFileReq).type),
       };
       postWithLogs(resp);
       break;
     }
   }
+}
+
+function workerErrorDetails(error: unknown): WorkerErrorResp['details'] {
+  const err = error as
+    | { message?: unknown; name?: unknown; code?: unknown }
+    | null;
+  return {
+    message: typeof err?.message === 'string' ? err.message : String(error),
+    name: typeof err?.name === 'string' ? err.name : 'Error',
+    code: typeof err?.code === 'string' || typeof err?.code === 'number'
+      ? err.code
+      : undefined,
+  };
 }
 
 export function jsonLogWorkerMain(): void {
@@ -827,7 +882,7 @@ export function jsonLogWorkerMain(): void {
     processingChain = processingChain.then(
       () => handleRequest(event),
       () => handleRequest(event),
-    ).catch((_err) => {
+    ).catch((err: unknown) => {
       const req = isNode()
         ? (event as WorkerFileReq)
         : (event as MessageEvent<WorkerFileReq>).data;
@@ -835,6 +890,7 @@ export function jsonLogWorkerMain(): void {
         type: 'error',
         id: req.id,
         error: 'InternalError',
+        details: workerErrorDetails(err),
       };
       postWithLogs(resp as unknown as Record<string, unknown>);
     });

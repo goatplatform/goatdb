@@ -2,7 +2,7 @@ import { assert } from '../../base/error.ts';
 import type {
   DecodedValue,
   Decoder,
-  ReadonlyDecodedArray,
+  OwnedDecoder,
   ReadonlyDecodedObject,
 } from '../../base/core-types/encoding/index.ts';
 import {
@@ -360,16 +360,21 @@ export interface DataChanges extends CoreObject {
 }
 
 export interface DecodedDataChange extends ReadonlyDecodedObject {
-  [key: string]: Decoder[];
+  [key: string]: OwnedDecoder[];
 }
 
 export function decodedDataChanges(dec: DecodedDataChange): DataChanges {
   const changes: DataChanges = {};
 
   for (const key in dec) {
-    changes[key] = (dec[key] as ReadonlyDecodedArray).map((v) =>
-      decodeTs.decodeChange(v as Decoder)
-    );
+    const decoded: Change<EncodedChange>[] = [];
+    for (const v of dec[key]) {
+      // Each element is an owned decoder acquired during decode; `using`
+      // releases it on this iteration even if decodeChange throws.
+      using element = v;
+      decoded.push(decodeTs.decodeChange(element as Decoder));
+    }
+    changes[key] = decoded;
   }
 
   return changes;

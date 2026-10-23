@@ -2,32 +2,36 @@ import * as path from '../path.ts';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import type { DirEntry, FileImpl } from './file-impl-interface.ts';
+import { eisdirError } from './file-impl-errors.ts';
 
 interface NodeFsFile {
   file: fs.FileHandle;
   pos: number;
 }
 
+/** Opens writable, falling back to create when the file does not exist yet. */
+async function openWritable(filePath: string): Promise<fs.FileHandle> {
+  try {
+    return await fs.open(filePath, 'r+');
+  } catch (_: unknown) {
+    return await fs.open(filePath, 'w+');
+  }
+}
+
 export const FileImplNode: FileImpl<NodeFsFile> = {
   async open(filePath, write) {
     await fs.mkdir(path.dirname(filePath), { recursive: true });
-    if (write) {
-      try {
-        return {
-          file: await fs.open(filePath, 'r+'),
-          pos: 0,
-        };
-      } catch (_: unknown) {
-        return {
-          file: await fs.open(filePath, 'w+'),
-          pos: 0,
-        };
-      }
+    const file = write
+      ? await openWritable(filePath)
+      : await fs.open(filePath, 'r');
+    // A directory must never open as a file. Windows reports a directory's
+    // length as 0, so without this guard readFile() returns empty bytes
+    // instead of surfacing EISDIR.
+    if ((await file.stat()).isDirectory()) {
+      await file.close();
+      throw eisdirError(filePath);
     }
-    return {
-      file: await fs.open(filePath, 'r'),
-      pos: 0,
-    };
+    return { file, pos: 0 };
   },
 
   async seek(handle, offset, from) {
@@ -111,7 +115,6 @@ export const FileImplNode: FileImpl<NodeFsFile> = {
 
   async mkdir(path: string) {
     await fs.mkdir(path, { recursive: true });
-    return true;
   },
 
   async exists(path: string): Promise<boolean> {

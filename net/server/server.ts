@@ -10,7 +10,7 @@ import {
 import type { HTTPMethod } from '../../logging/metrics.ts';
 import { StaticAssetsEndpoint } from './static-assets.ts';
 import { AuthEndpoint } from './auth.ts';
-import { HealthCheckEndpoint } from './health.ts';
+import { HealthCheckEndpoint, kHealthCheckPath } from './health.ts';
 import { MetricsMiddleware } from './metrics.ts';
 import { BaseService } from './service.ts';
 import { CORSEndpoint, CORSMiddleware } from './cors.ts';
@@ -25,12 +25,37 @@ import type { StaticAssets } from '../../system-assets/system-assets.ts';
 import type { Schema } from '../../cfds/base/schema.ts';
 import type { ManagedItem } from '../../db/managed-item.ts';
 import {
+  awaitPendingStop,
+  clearPendingOnReject,
   createHttpServer,
   type GoatRequest,
   type HttpServerInstance,
+  type HttpServerStopOptions,
+  logStopFailure,
   type ServeHandlerInfo,
+  StartStopGate,
 } from './http-compat.ts';
 import { generateSelfSignedCertificate } from './crypto-utils.ts';
+
+const kAlbHealthCheckHost = 'awsalb';
+
+/**
+ * AWS ALB sends a fixed host for health checks. Match the parsed host and path
+ * only, so case normalization does not leak into tenant domain resolution.
+ * Per URL parsing: host is case-insensitive, path is case-sensitive, and the
+ * port and query string are ignored. Both http: and https: URLs match because
+ * ALB supports both probe protocols. Malformed URLs never match.
+ */
+function isAlbHealthCheck(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+      parsed.hostname === kAlbHealthCheckHost &&
+      parsed.pathname === kHealthCheckPath;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Information about a user attempting to log in for the first time.
@@ -342,6 +367,10 @@ export class Server<US extends Schema> {
   private _abortController: AbortController | undefined;
   private _httpServer?: HttpServerInstance;
   private _stopping = false;
+  /** In-flight stop, so repeated stop() calls await the same teardown. */
+  private _stopPromise?: Promise<void>;
+  /** Serializes start/stop so a stop racing start() cannot return early. */
+  private readonly _lifecycle = new StartStopGate();
 
   constructor(options: ServerOptions<US>) {
     this._endpoints = [];
@@ -528,11 +557,11 @@ export class Server<US extends Schema> {
     goatReq: GoatRequest,
     info: ServeHandlerInfo,
   ): Promise<Response> {
-    if (goatReq.url === 'http://AWSALB/healthy') {
-      return new Response(null, { status: 200 });
-    }
     if (this._stopping) {
       return new Response(null, { status: 503 });
+    }
+    if (isAlbHealthCheck(goatReq.url)) {
+      return new Response(null, { status: 200 });
     }
     const orgId = this._domain.resolveDomain(goatReq.url);
     if (!orgId) {
@@ -625,7 +654,16 @@ export class Server<US extends Schema> {
    *
    * @returns Promise that resolves when server is fully started
    */
-  async start(): Promise<void> {
+  start(): Promise<void> {
+    return this._lifecycle.start(() => this._start());
+  }
+
+  private async _start(): Promise<void> {
+    // WHY: a restart must not reset lifecycle state while the old teardown
+    // still drains requests and closes databases.
+    await awaitPendingStop(this._stopPromise, () => {
+      this._stopPromise = undefined;
+    });
     this._stopping = false; // Reset from prior stop()
 
     // Return early if server is already running
@@ -689,22 +727,53 @@ export class Server<US extends Schema> {
    * Gracefully stops the server and all its services.
    * Safe to call multiple times.
    *
-   * Shutdown sequence: stops accepting new connections, rejects new service
-   * lookups via `_stopping` flag, then flushes and closes all databases.
-   * Already-dispatched request handlers may still be running during flush —
-   * there is no request-draining mechanism.
+   * Shutdown sequence: rejects new requests, drains active handlers and
+   * responses on the internal HTTP server, then flushes and closes databases.
+   * `force` skips the drain; `timeoutMs` bounds the drain, not the final
+   * listener close. A later `force` escalates only while the drain is pending,
+   * while `timeoutMs` is fixed by the first call; a `force` interrupts a pending
+   * drain even when the stop is queued behind a restart. Direct `processRequest`
+   * calls are not tracked; embedded servers must drain them themselves. A handler
+   * that calls `stop()` is part of the drain, so shutdown endpoints should pass
+   * `force: true`. A stop() racing an in-flight start() resolves only after
+   * that start settles and the listener is closed. Neither force nor timeout
+   * can cancel application handlers, which may continue after their databases
+   * close. A failed escalated teardown is logged as `ServerStopFailed`; callers
+   * still observe the primary stop result.
    */
-  async stop(): Promise<void> {
-    if (!this._abortController) {
-      return;
+  stop(options?: HttpServerStopOptions): Promise<void> {
+    // WHY: the lifecycle gate may queue this stop behind a restart, so force
+    // must interrupt the active teardown now; the queued stop still closes the
+    // restarted listener.
+    if (options?.force && this._stopPromise) {
+      void this._httpServer?.stop(options).catch(logStopFailure);
     }
-    // Capture and clear immediately to prevent concurrent stop() calls
-    const ac = this._abortController;
+    return this._lifecycle.stop(() => this._requestStop(options));
+  }
+
+  private _requestStop(options?: HttpServerStopOptions): Promise<void> {
+    if (!this._abortController) {
+      // A later force must be able to escalate the active graceful teardown.
+      if (options?.force) {
+        void this._httpServer?.stop(options).catch(logStopFailure);
+      }
+      return this._stopPromise ?? Promise.resolve();
+    }
     this._abortController = undefined;
     this._stopping = true;
+    this._stopPromise = clearPendingOnReject(
+      this._stop(options),
+      () => {
+        this._stopPromise = undefined;
+      },
+    );
+    return this._stopPromise;
+  }
 
-    // Stop HTTP server first so no new requests hit closing DBs
-    this._httpServer?.stop();
+  private async _stop(options?: HttpServerStopOptions): Promise<void> {
+    // Wait for handlers and responses before closing DBs, unless force or the
+    // drain timeout permits teardown while application work is still running.
+    await this._httpServer?.stop(options);
 
     // Await any in-flight service creation before cleanup
     for (const pending of this._pendingServices.values()) {
@@ -725,21 +794,34 @@ export class Server<US extends Schema> {
       }
     }
 
-    // Flush and close all databases before aborting
+    // HTTP stop has drained requests or exhausted the caller's drain budget.
     for (const services of this._servicesByOrg.values()) {
       try {
         await services.db.flushAll();
       } catch (e) {
-        console.error('Error flushing database during shutdown:', e);
+        log({
+          severity: 'ERROR',
+          error: 'StorageError',
+          message: `Error flushing database during shutdown: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+          trace: e instanceof Error ? e.stack : undefined,
+        });
       }
       try {
         await services.db.close();
       } catch (e) {
-        console.error('Error closing database during shutdown:', e);
+        log({
+          severity: 'ERROR',
+          error: 'StorageError',
+          message: `Error closing database during shutdown: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+          trace: e instanceof Error ? e.stack : undefined,
+        });
       }
     }
 
-    ac.abort();
     this._servicesByOrg.clear();
   }
 }

@@ -67,7 +67,11 @@ export interface EncodedItem {
   data: ReadonlyDecodedObject;
 }
 
-const checksumSerOptions: ChecksumEncoderOpts = {
+/**
+ * Shared checksum encoder options. Exported for characterization tests only.
+ * @internal
+ */
+export const kChecksumSerOptions: ChecksumEncoderOpts = {
   // For checksum purposes we need to use the flat rep or we won't account
   // for depth changes. Computing the checksum on a DFS run of the tree
   // completely strips out the depth info.
@@ -225,7 +229,7 @@ export class Item<S extends Schema = Schema>
     this.normalize();
     if (this._checksum === undefined) {
       const csEncoder = new Murmur3Checksum();
-      serialize(csEncoder, this._schema, this._data, checksumSerOptions);
+      serialize(csEncoder, this._schema, this._data, kChecksumSerOptions);
       this._checksum = csEncoder.getOutput();
     }
     return this._checksum;
@@ -606,16 +610,11 @@ export class Item<S extends Schema = Schema>
     const schema = this.registry.decode(decoder.get<string>('s')!);
     assert(schema !== undefined, 'Unknown schema');
     this._schema = schema as S;
-    const dataDecoder = decoder.getDecoder('d');
+    using dataDecoder = decoder.getDecoder('d');
     this._data = deserialize(dataDecoder, this.schema);
-    dataDecoder.finalize?.();
     // this.invalidateCaches();
     this._normalized = decoder.get<boolean>('n') || false;
     this.normalize();
-    // this.assertValidData();
-    // if (decoder.has('cs')) {
-    //   assert(decoder.get('cs') === this.checksum, 'Checksum mismatch');
-    // }
     this._checksum = decoder.get('cs');
   }
 
@@ -639,9 +638,8 @@ export class Item<S extends Schema = Schema>
    * @returns An Item instance representing the deserialized data
    */
   static fromJS<S extends Schema>(obj: ReadonlyJSONObject): Item<S> {
-    const decoder = JSONCyclicalDecoder.get(obj);
+    using decoder = JSONCyclicalDecoder.get(obj);
     const record = new this({ decoder });
-    decoder.finalize();
     return record as unknown as Item<S>;
   }
 

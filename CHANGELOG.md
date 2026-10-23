@@ -8,6 +8,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Known Quirks
+
+The following behaviors are intentional artifacts of the current implementation and are pinned by characterization tests:
+
+- **iterableFilter is not applied during ref collection.** The Object branch drops options when recursing, so the filter never runs during ref collection. The filter is re-applied during final JSON encode, which can produce counterintuitive `__r`/`__d` wrappers. Pinned intentionally; see TODO(#58-followup) in `base/core-types/type-ops.ts`. Tests: `refs matrix: array iterableFilter is not applied during ref collection`, `refs matrix: set iterableFilter is not applied during ref collection`.
+
+### Breaking Changes
+
+- **Unified `Date` wire format and redefined commit checksum.** Dates in typed
+  fields now encode as `{ "__t": "D", "__v": <epoch-seconds> }` instead of a
+  bare number, and a `Date` is tagged uniformly in every checksum position
+  (a typed date-field checksum changes from `416277608` to `1391363808`). A
+  store written by an earlier version is rejected on open with a clear
+  "older GoatDB - delete and re-sync" error, rather than silently mis-decoding
+  or marking every commit as corrupted. Mixed-version fleets are unsupported.
+- `coreValueHash` alias removed. Use `encodableValueHash`.
+- Mixed-version sync unsupported. Bare-number dates from old peers throw
+  on typed-field deserialize and the commit is skipped. Epoch guards protect
+  local store only.
+- Checksum limit: a non-`typeSafe` string can collide with a tagged `Date`
+  (e.g. `"41700000000"`). Use `typeSafe` checksums where untrusted input
+  matters.
+- Stray ref marker: a sole-key `{ "__rId": <number> }` object outside a
+  `__r`/`__d` wrapper now throws at decode instead of passing through as user
+  data. Wider objects containing `__rId` among other keys are unaffected.
+- Clone aliasing: `coreValueClone`/`coreObjectClone` now preserve shared-ref
+  aliasing across array/set siblings (they previously produced distinct
+  copies). Alias identity within an object's fields was already preserved.
+
 ### Added
 
 - `DBInstanceConfig.repoInactivityTimeoutMs` and
@@ -21,6 +50,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   and do not start loading. A fresh unobserved query reports `loading === false`
   and, when `queryInactivityTimeoutMs` is set, is eligible for auto-close. A
   closed query is replaced by calling `db.query()` again.
+- `compile()` now resolves to the path of the compiled executable
+  (`Promise<string>`). Callers that ignore the value need no change.
+
+### Changed
+
+- `goatdb init` on Deno now requests `react`, `react-dom`, `yargs` and
+  `@types/react` as `^` ranges and installs all dependencies in one
+  `deno add` call, bounded by a 180s timeout. Exact pins let a transitive
+  peer resolve a newer `react` than `react-dom`, which crashes at runtime
+  with "Incompatible React versions".
+- HTTP health checks from the `awsalb` host now accept `http` and `https`
+  URLs on any port and ignore the query string; the path must be exactly
+  `/healthy`. The comparison is now case-sensitive, so a mixed-case probe such
+  as `/HEALTHY` returns 404; the `/healthy` endpoint itself still matches
+  case-insensitively. Keep ALB health-check paths lowercase.
+- `GOATDB_TEST_TIMEOUT_MS` now sets the whole-worker timeout and is validated
+  strictly: non-integer values and values outside `1` to `2147483647` abort the
+  run with an explicit error instead of silently using the 5-minute default.
+  Workers send a heartbeat every 10 seconds, and a timeout reports the active
+  suite and test, the test's elapsed time and the last heartbeat age.
+
+### Fixed
+
+- `deno compile` output names now include `.exe` for Windows targets, so
+  `compile()` returns and logs the path that the compiler actually writes.
+- Reading a directory now fails with `EISDIR` on Deno, Node.js, and the
+  browser instead of returning empty bytes on Windows.
+- `coreValueEquals` is now symmetric for objects when `objectFilterFields`
+  inspects the object; previously the second comparison loop passed the wrong
+  object to the filter.
+- `goatdb init` now scaffolds `.gitignore` and `.npmrc` again when run from
+  the published npm package. `npm pack` drops dotfile sources, so the
+  templates use plain names (`gitignore`, `npmrc`) that `init` maps back to
+  their dotted targets.
+- `goatdb init` now exits non-zero when dependency installation fails,
+  reporting the command, its exit code and its output. Previously a failed
+  `npm install` only warned, so a broken scaffold looked successful.
+- A server `stop()` that races an in-flight `start()` now waits for that start
+  to settle before closing the listener, instead of returning early and
+  leaving a bound server behind. A `start()` after a failed teardown retries
+  cleanly, and a later `force` stop interrupts an in-progress drain even when
+  the stop is queued behind a restart. Drain-then-close ordering is unchanged,
+  and force or timeout still never cancel application handlers.
+- The test runner no longer stops at the first failing runtime. Deno, Node and
+  browser results are all collected, and the process exits non-zero with the
+  combined failures.
 
 ## [0.6.1] - 2026-09-01
 

@@ -12,6 +12,7 @@
  *   Worker → Main:
  *     { type: 'ready', payload: { suiteCount, testCount } }
  *     { type: 'testStart', payload: { suiteName, testName, current, total } }
+ *     { type: 'heartbeat', payload: { suiteName, testName, elapsedMs } }
  *     { type: 'testComplete', payload: { suiteName, testName, passed, duration, error? } }
  *     { type: 'done', payload: { exitCode, summary } }
  */
@@ -48,6 +49,15 @@ interface TestStartMessage {
   };
 }
 
+interface HeartbeatMessage {
+  type: 'heartbeat';
+  payload: {
+    suiteName: string;
+    testName: string;
+    elapsedMs: number;
+  };
+}
+
 interface TestCompleteMessage {
   type: 'testComplete';
   payload: {
@@ -74,8 +84,16 @@ interface DoneMessage {
 type OutgoingMessage =
   | ReadyMessage
   | TestStartMessage
+  | HeartbeatMessage
   | TestCompleteMessage
   | DoneMessage;
+
+/**
+ * How often the worker reports that it is still alive. The main thread treats a
+ * stale heartbeat as evidence that the active test blocked the event loop
+ * (for example a synchronous loop or an unbounded subprocess wait).
+ */
+const kHeartbeatIntervalMs = 10_000;
 
 /**
  * Serializes an Error for postMessage (Error objects don't serialize).
@@ -151,12 +169,27 @@ async function runTests(
       let passed = true;
       let error: Error | undefined;
 
+      const heartbeat = setInterval(() => {
+        self.postMessage(
+          {
+            type: 'heartbeat',
+            payload: {
+              suiteName: name,
+              testName: tName,
+              elapsedMs: performance.now() - start,
+            },
+          } satisfies HeartbeatMessage,
+        );
+      }, kHeartbeatIntervalMs);
+
       try {
         // Execute the test with suite context
         await testFn(suite);
       } catch (e) {
         passed = false;
         error = e instanceof Error ? e : new Error(String(e));
+      } finally {
+        clearInterval(heartbeat);
       }
 
       const duration = performance.now() - start;

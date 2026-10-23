@@ -10,7 +10,6 @@ import type {
 } from '../base/core-types/encoding/types.ts';
 import { isDecoderConfig } from '../base/core-types/encoding/utils.ts';
 import { CoroutineScheduler, SchedulerPriority } from '../base/coroutine.ts';
-import type { ReadonlyJSONObject } from '../base/interfaces.ts';
 import type { VersionNumber } from '../base/version-number.ts';
 import type { DataRegistry } from '../cfds/base/data-registry.ts';
 import { Commit } from '../repo/commit.ts';
@@ -219,21 +218,17 @@ export class SyncMessage implements Encodable, Decodable {
     if (!this._filter) {
       this._filter = new BloomFilter({ size: 1, fpr: 0.5 });
     }
-    const filterDecoder = decoder.getDecoder('f');
+    using filterDecoder = decoder.getDecoder('f');
     this._filter.deserialize(filterDecoder);
-    filterDecoder.finalize?.();
     this._size = decoder.get<number>('s')!;
     this._accessDenied = decoder.get('ad', []);
     const values: Commit[] = [];
     const commits = decoder.get<ReadonlyDecodedArray>('c', [])!;
     for (let i = 0; i < commits.length; ++i) {
       try {
+        using commitDecoder = decoder.getDecoder('c', i);
         values.push(
-          Commit.fromJS(
-            this.orgId,
-            decoder.getDecoder('c', i),
-            this.registry,
-          ),
+          Commit.fromJS(this.orgId, commitDecoder, this.registry),
         );
       } catch (e: unknown) {
         log({
@@ -253,21 +248,22 @@ export class SyncMessage implements Encodable, Decodable {
     const decoder: Decoder<string, DecodedValue> = decoderConfig.decoder;
     const buildVersion = decoder.get<VersionNumber>('ver')!;
     const filter = new BloomFilter({ size: 1, fpr: 0.5 });
-    const filterDecoder = decoder.getDecoder('f');
+    using filterDecoder = decoder.getDecoder('f');
     filter.deserialize(filterDecoder);
-    filterDecoder.finalize?.();
     const size = decoder.get<number>('s')!;
     const accessDenied = decoder.get('ad', []);
     const values: Commit[] | undefined = !decoder.has('c')
       ? undefined
       : await CoroutineScheduler.sharedScheduler().map(
         decoder.get<ReadonlyDecodedArray>('c', [])!,
-        (obj, idx) =>
-          Commit.fromJS(
+        (_obj, idx) => {
+          using commitDecoder = decoder.getDecoder('c', idx);
+          return Commit.fromJS(
             decoderConfig.orgId,
-            decoder.getDecoder('c', idx),
+            commitDecoder,
             registry,
-          ),
+          );
+        },
         SchedulerPriority.Normal,
         'SyncMessageDecode',
         true,

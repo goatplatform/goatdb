@@ -3,13 +3,15 @@
  *
  * This module consolidates test imports and registration order in a single
  * location, eliminating duplication between tests-entry-server.ts and
- * worker-runner.ts.
+ * worker-runner.ts. tests/tests-entry-browser.ts stays a manual subset by
+ * capability (no Node-only or repo-scan tests); add new tests in both places.
  *
  * Test execution order is optimized for developer feedback speed:
  * Run fast tests first so developers get immediate pass/fail results,
  * then progressively run slower tests (test pyramid principle).
  */
 
+import { getEnvVar } from '../base/os.ts';
 import setupUntrusted from './db-untrusted.test.ts';
 import setupTrusted from './db-trusted.test.ts';
 import setupItemPath from './item-path.ts';
@@ -21,20 +23,27 @@ import setupBinaryEncoding from './binary-encoding.test.ts';
 import setupServerArchitectureTest from './server-architecture.test.ts';
 import setupStaticAssetsEndpointTest from './static-assets-endpoint.test.ts';
 import setupFileImplTests from './file-impl.test.ts';
+import setupWorkerBoundary from './worker-boundary.test.ts';
+import setupJsonLogWorkerIO from './json-log-worker-io.test.ts';
 import setupJsonLogFormats from './json-log-formats.test.ts';
 import setupNodeHttpServerTests from './node-http-server.test.ts';
+import setupHttpServerStop from './http-server-stop.test.ts';
 import setupHealthCheckEndpointTest from './health-check-endpoint.test.ts';
 import setupMinimalSync from './minimal-client-server-sync.test.ts';
 import setupE2ELatency from './e2e-latency.test.ts';
 import setupClusterLatency from './cluster-latency.test.ts';
 import setupCliInitTests from './cli-init.test.ts';
 import setupCliCompileTests from './cli-compile.test.ts';
+import setupCliPackageTests from './cli-package.test.ts';
 import setupCliBuildAssetsTests from './cli-build-assets.test.ts';
 import setupPathTests from './path.test.ts';
 import setupRuntimeTests from './runtime.test.ts';
 import setupCoroutineQueueTests from './coroutine-queue.test.ts';
 import setupCoroutineSchedulerTests from './coroutine-scheduler.test.ts';
 import setupProgressTests from './progress.test.ts';
+import setupWorkerTimeoutOverrideTests, {
+  setupWorkerTimeoutHangTests,
+} from './worker-timeout.test.ts';
 import setupMergeAdjList from './merge-adjlist.test.ts';
 import setupMergeBloom from './merge-bloom.test.ts';
 import setupBloomFPR from './bloom-fpr.test.ts';
@@ -60,6 +69,8 @@ import setupWriteFailure from './write-failure.test.ts';
 import setupQueryId from './query-id.test.ts';
 import setupHashMap from './hash-map.test.ts';
 import setupCoreValueCompare from './core-value-compare.test.ts';
+import setupCoreValueSerialization from './core-value-serialization.test.ts';
+import setupStorageFormatEpoch from './storage-format-epoch.test.ts';
 import setupDocsMdxEscape from './docs-mdx-escape.test.ts';
 import setupAutoClose from './auto-close.test.ts';
 
@@ -80,6 +91,12 @@ export async function registerAllTests(): Promise<void> {
   setupPathTests(); // Cross-platform path utilities
   setupRuntimeTests(); // Runtime abstraction layer invariants
   setupProgressTests(); // TUI progress tracking - Task state machine, aggregation
+  setupWorkerTimeoutOverrideTests(); // GOATDB_TEST_TIMEOUT_MS range contract + CLI guard
+  // The hang suite exists only for the timeout diagnostic test. Registering
+  // it unconditionally would stall every normal run for a worker timeout.
+  if (getEnvVar('GOATDB_TEST_WORKER_HANG') === '1') {
+    setupWorkerTimeoutHangTests();
+  }
   setupHealthCheckEndpointTest(); // Simple HTTP endpoint check
   setupMergeAdjList(); // Adjacency list data structure
   setupDocsMdxEscape(); // MDX escaping for generated docs (pure string transforms)
@@ -90,8 +107,10 @@ export async function registerAllTests(): Promise<void> {
   setupQueryId(); // generateQueryId cache-key determinism and uniqueness
   setupHashMap(); // HashSet and HashMap collision-safe cardinality
   setupCoreValueCompare(); // Core-value ordering invariants
+  setupCoreValueSerialization(); // Serializer and core-type characterization goldens
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
+  setupStorageFormatEpoch(); // Store-root storage-format epoch fail-fast
   setupCoroutineQueueTests(); // Coroutine FIFO execution contract
   setupCoroutineSchedulerTests(); // Coroutine failure isolation contract
   setupBinaryEncoding(); // Binary commit format encoding roundtrip
@@ -100,6 +119,7 @@ export async function registerAllTests(): Promise<void> {
   setupSecurityBoundaries(); // Security boundary invariants (auth, sync, signatures)
   setupGoatRequestTest(); // HTTP request processing
   setupCliInitTests(); // CLI scaffolding functionality
+  setupCliPackageTests(); // npm tarball, bin, and template contract (gated)
   setupMergeLCA(); // Lowest Common Ancestor / merge base
   setupMergeRecord(); // Record merge and schema upgrade
   setupMergeCorruption(); // Corruption detection via checksums
@@ -112,6 +132,8 @@ export async function registerAllTests(): Promise<void> {
   setupSyncMessageMissing(); // SyncMessage missing-commit detection
   setupSyncConvergence(); // Multi-round sync convergence simulation
   setupFileImplTests(); // FileImpl abstraction (Deno + Node.js)
+  setupWorkerBoundary(); // Worker-owned FS boundary (no new file-impl importers)
+  setupJsonLogWorkerIO(); // Worker-backed file I/O contract (readFile/writeFile/mkdir/readDir)
   setupJsonLogFormats(); // JSONLog storage format (GOAT binary + JSONL)
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
@@ -122,6 +144,7 @@ export async function registerAllTests(): Promise<void> {
   setupUntrusted(); // Database operations in untrusted mode
   await setupServerArchitectureTest(); // Server initialization and configuration
   setupNodeHttpServerTests(); // Node.js HTTP server integration
+  setupHttpServerStop(); // MinimalHttpServer stop contract (Deno + Node)
   setupStaticAssetsEndpointTest(); // File serving and asset management
   setupCliBuildAssetsTests(); // Client bundling plugins, CSS, and assets
   setupMergeRichText(); // Rich text merge operations

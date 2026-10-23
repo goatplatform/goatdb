@@ -1,7 +1,11 @@
-import { isRefMarker } from '../model.ts';
-import { ElementNode, isElementNode, isTextNode, TreeNode } from '../tree.ts';
+import {
+  type ElementNode,
+  isElementNode,
+  isTextNode,
+  type TreeNode,
+} from '../tree.ts';
 import { userDefinedRules } from './setup.ts';
-import { ConditionSource, RuleAction } from './types.ts';
+import type { ConditionSource, RuleAction } from './types.ts';
 import * as SetUtils from '../../../base/set.ts';
 
 interface SingleRuleCondition {
@@ -25,13 +29,10 @@ const ELEMENT_KEY = 'elem';
 const NOT_ELEMENT_KEY = 'n_elem';
 const TEXT_KEY = 'txt';
 const NOT_TEXT_KEY = 'n_txt';
-const REF_MARKER_KEY = 'rm';
-const NOT_REF_MARKER_KEY = 'n_rm';
 
-const ELEMENT_KEYS = [ELEMENT_KEY, NOT_TEXT_KEY, NOT_REF_MARKER_KEY];
-const TEXT_KEYS = [TEXT_KEY, NOT_ELEMENT_KEY, NOT_REF_MARKER_KEY];
-const REF_MARKER_KEYS = [REF_MARKER_KEY, NOT_ELEMENT_KEY, NOT_TEXT_KEY];
-const NON_KEYS = [NOT_TEXT_KEY, NOT_ELEMENT_KEY, NOT_REF_MARKER_KEY];
+const ELEMENT_KEYS = [ELEMENT_KEY, NOT_TEXT_KEY];
+const TEXT_KEYS = [TEXT_KEY, NOT_ELEMENT_KEY];
+const NON_KEYS = [NOT_TEXT_KEY, NOT_ELEMENT_KEY];
 
 function getKeysForNode(node: TreeNode) {
   if (typeof node.tagName === 'string') {
@@ -42,8 +43,6 @@ function getKeysForNode(node: TreeNode) {
       tags.push(...ELEMENT_KEYS);
     } else if (isTextNode(node)) {
       tags.push(...TEXT_KEYS);
-    } else if (isRefMarker(node)) {
-      tags.push(...REF_MARKER_KEYS);
     } else {
       tags.push(...NON_KEYS);
     }
@@ -58,8 +57,6 @@ function getKeysForNode(node: TreeNode) {
     return ELEMENT_KEYS;
   } else if (isTextNode(node)) {
     return TEXT_KEYS;
-  } else if (isRefMarker(node)) {
-    return REF_MARKER_KEYS;
   }
 
   return NON_KEYS;
@@ -179,13 +176,6 @@ function convertNodeCondition(node: any): string[] | undefined {
     }
   }
 
-  if (typeof node.isRefMarker === 'boolean') {
-    if (node.isRefMarker) {
-      keys.push(REF_MARKER_KEY);
-    } else {
-      keys.push(NOT_REF_MARKER_KEY);
-    }
-  }
   return keys;
 }
 

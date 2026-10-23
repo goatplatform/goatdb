@@ -31,7 +31,7 @@ export default function setupNodeHttpServerTests() {
       const body = await res.text();
       assertEquals(body, 'hello', 'body should match');
     } finally {
-      server.stop();
+      await server.stop();
     }
   });
 
@@ -54,7 +54,7 @@ export default function setupNodeHttpServerTests() {
       const text = await res.text();
       assertEquals(text, 'echo this', 'echoed body should match sent body');
     } finally {
-      server.stop();
+      await server.stop();
     }
   });
 
@@ -79,7 +79,7 @@ export default function setupNodeHttpServerTests() {
         'custom response header should be present',
       );
     } finally {
-      server.stop();
+      await server.stop();
     }
   });
 
@@ -97,7 +97,7 @@ export default function setupNodeHttpServerTests() {
       await res.text();
       assertEquals(res.status, 404, 'status should be 404');
     } finally {
-      server.stop();
+      await server.stop();
     }
   });
 
@@ -125,7 +125,7 @@ export default function setupNodeHttpServerTests() {
         'server.port must be undefined after abort',
       );
     } finally {
-      server.stop(); // idempotent safety cleanup
+      await server.stop(); // idempotent safety cleanup
     }
   });
 
@@ -143,7 +143,7 @@ export default function setupNodeHttpServerTests() {
       assertTrue(addr.port > 0, 'port should be positive');
       assertExists(addr.hostname, 'hostname should be defined');
     } finally {
-      server.stop();
+      await server.stop();
     }
   });
 }

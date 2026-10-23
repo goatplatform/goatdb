@@ -2,6 +2,9 @@
   "name": "@goatdb/goatdb",
   "version": "0.0.0-dev",
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "files": [
     "dist"
   ],
@@ -21,7 +24,8 @@
     "goatdb": "./dist/cli/init.js"
   },
   "scripts": {
-    "build:npm": "tsup"
+    "check:npm-types": "node scripts/check-npm-entrypoints.ts && node --test scripts/check-npm-entrypoints.test.ts scripts/npm-manifest.test.ts && tsc -p tsconfig.npm.json",
+    "build:npm": "tsup && node scripts/copy-cli-templates.ts"
   },
   "dependencies": {
     "@goatdb/orderstamp": "npm:@jsr/goatdb__orderstamp@^1.1.1",
@@ -47,6 +51,7 @@
   },
   "devDependencies": {
     "@deno/esbuild-plugin": "npm:@jsr/deno__esbuild-plugin@^1.2.1",
+    "@types/deno": "2.7.0",
     "@types/node": "^24.0.0",
     "@types/nodemailer": "^6.4.17",
     "@types/react": "^19.0.0",

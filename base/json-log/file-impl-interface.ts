@@ -37,6 +37,10 @@ export interface FileImpl<T> {
    * @param path The path to the file
    * @param write Whether to open the file for writing
    * @returns A promise that resolves to a platform-specific file handle
+   * @throws A read open of a directory rejects with code 'EISDIR'. A directory
+   *         is never a valid read target; Windows reports its length as 0, so
+   *         the size-driven read loop would return empty bytes. A write open
+   *         surfaces the platform error unchanged (Windows may reject earlier).
    */
   open(path: string, write: boolean): Promise<T>;
 
@@ -115,10 +119,10 @@ export interface FileImpl<T> {
    * and "/a/b/c" directories.
    *
    * @param path The path where to create the directory
-   * @returns A promise that resolves to true if the directory was created,
-   *          false otherwise
+   * @returns Resolves on success and rejects on failure. All impls (Deno,
+   *          Node, OPFS) behave the same.
    */
-  mkdir(path: string): Promise<boolean>;
+  mkdir(path: string): Promise<void>;
 
   /**
    * Checks if a file or directory exists at the specified path.

@@ -1,4 +1,4 @@
-import { HealthCheckEndpoint } from '../net/server/health.ts';
+import { HealthCheckEndpoint, kHealthCheckPath } from '../net/server/health.ts';
 import { TEST } from './mod.ts';
 import { assertEquals, assertTrue } from './asserts.ts';
 import type { Schema } from '../cfds/base/schema.ts';
@@ -85,4 +85,16 @@ export default function setupHealthCheckEndpointTest(): void {
     const req = makeRequest('/HeAlThY', 'GET');
     assertTrue(endpoint.filter(services as any, req as any, info as any));
   });
+
+  TEST(
+    'HealthCheckEndpoint',
+    'filter accepts the shared constant regardless of its literal case',
+    () => {
+      const endpoint = new HealthCheckEndpoint<typeof TestSchema>();
+      const services = makeServices();
+      const info = makeInfo();
+      const req = makeRequest(kHealthCheckPath.toUpperCase(), 'GET');
+      assertTrue(endpoint.filter(services as any, req as any, info as any));
+    },
+  );
 }

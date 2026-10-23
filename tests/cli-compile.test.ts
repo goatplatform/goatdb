@@ -23,6 +23,7 @@ import {
 } from '../base/json-log/file-impl.ts';
 import {
   bundleServerForSEA,
+  denoExecutableName,
   denoTarget,
   targetFromOSArch,
 } from '../cli/compile.ts';
@@ -31,6 +32,94 @@ import { goatEntryPoints } from '../cli/link.ts';
 import type { Plugin } from 'esbuild';
 import { getRuntime } from '../base/runtime/index.ts';
 import { cli } from '../base/development.ts';
+import { assertScaffoldTemplates, denoInfo } from './cli-template-utils.ts';
+
+async function readJsonFile<T>(filePath: string): Promise<T> {
+  const text = await readTextFile(filePath);
+  assertExists(text, `Expected JSON file at ${filePath}`);
+  return JSON.parse(text) as T;
+}
+
+/**
+ * Fails if the scaffold resolves GoatDB from a registry instead of the checkout.
+ * This is the regression guard for the E2E installing the published package.
+ */
+async function assertLocalGoatDB(
+  testDir: string,
+  goatdbRoot: string,
+): Promise<void> {
+  if (getRuntime().id === 'deno') {
+    const denoJson = await readJsonFile<{
+      imports?: Record<string, string>;
+    }>(path.join(testDir, 'deno.json'));
+    const goatdbImports = Object.entries(denoJson.imports ?? {}).filter((
+      [key],
+    ) => key === '@goatdb/goatdb' || key.startsWith('@goatdb/goatdb/'));
+    assertTrue(goatdbImports.length > 0, 'Expected GoatDB import mappings');
+    for (const [key, value] of goatdbImports) {
+      assertTrue(
+        value.startsWith('./vendor/goatdb/'),
+        `${key} must point at the local checkout, got ${value}`,
+      );
+      assertTrue(
+        !value.startsWith('jsr:@goatdb/goatdb'),
+        `${key} must not resolve the published JSR package`,
+      );
+    }
+    assertEquals(
+      await Deno.realPath(path.join(testDir, 'vendor/goatdb')),
+      await Deno.realPath(goatdbRoot),
+      'vendor/goatdb must resolve to the checkout',
+    );
+    return;
+  }
+
+  const projectPkg = await readJsonFile<{
+    dependencies?: Record<string, string>;
+  }>(path.join(testDir, 'package.json'));
+  const dependency = projectPkg.dependencies?.['@goatdb/goatdb'];
+  assertExists(dependency, 'Expected @goatdb/goatdb dependency');
+  assertTrue(
+    dependency.startsWith('file:'),
+    `@goatdb/goatdb must use the local file protocol, got ${dependency}`,
+  );
+  const installedPkg = await readJsonFile<{ version: string }>(
+    path.join(testDir, 'node_modules/@goatdb/goatdb/package.json'),
+  );
+  const checkoutPkg = await readJsonFile<{ version: string }>(
+    path.join(goatdbRoot, 'package.json'),
+  );
+  assertEquals(
+    installedPkg.version,
+    checkoutPkg.version,
+    'Installed GoatDB must be the checkout, not the published package',
+  );
+}
+
+/**
+ * Adds the template-only npm imports that GoatDB does not export. `linkGoatDB`
+ * injects the checkout's own import map, so only these two remain external.
+ * Specs come from the scaffold's own list, so the E2E resolves the same ranges
+ * `init` installs.
+ */
+async function addDenoTemplateImports(
+  testDir: string,
+  npmDependencies: Readonly<Record<string, string>>,
+): Promise<void> {
+  const denoJsonPath = path.join(testDir, 'deno.json');
+  const denoJson = await readJsonFile<{
+    imports?: Record<string, string>;
+  }>(denoJsonPath);
+  const imports = denoJson.imports ?? {};
+  const reactDomClient = npmDependencies['react-dom/client'];
+  const typesReact = npmDependencies['@types/react'];
+  assertExists(reactDomClient, 'Missing react-dom/client scaffold spec');
+  assertExists(typesReact, 'Missing @types/react scaffold spec');
+  imports['react-dom/client'] ??= reactDomClient;
+  imports['@types/react'] ??= typesReact;
+  denoJson.imports = imports;
+  await writeTextFile(denoJsonPath, JSON.stringify(denoJson, null, 2) + '\n');
+}
 
 export default function setupCliCompileTests() {
   TEST(
@@ -88,6 +177,23 @@ export default function setupCliCompileTests() {
       assertEquals(denoTarget('linux', 'x64'), 'x86_64-unknown-linux-gnu');
       assertEquals(denoTarget('linux', 'arm64'), 'aarch64-unknown-linux-gnu');
       assertEquals(denoTarget('windows', 'x64'), 'x86_64-pc-windows-msvc');
+    },
+  );
+
+  TEST(
+    'CLI-Compile',
+    'denoExecutableName appends .exe only for Windows targets',
+    () => {
+      if (isBrowser()) return;
+      // Deno appends `.exe` based on the TARGET OS, not the host, so this
+      // cross-platform check guards the path for cross-compiled Windows
+      // binaries without running a Windows host.
+      assertEquals(denoExecutableName('app', 'mac-arm64'), 'app-mac-arm64');
+      assertEquals(denoExecutableName('app', 'linux-x64'), 'app-linux-x64');
+      assertEquals(
+        denoExecutableName('app', 'windows-x64'),
+        'app-windows-x64.exe',
+      );
     },
   );
 
@@ -188,12 +294,14 @@ export default function setupCliCompileTests() {
 
       const testDir = await ctx.tempDir('compile-e2e');
 
-      // 1. Bootstrap a project
+      // 1. Bootstrap without touching the registry. The generated project
+      // must resolve GoatDB from this checkout, never from the published
+      // package; otherwise the E2E proves nothing about the current code.
       console.log('Bootstrapping project...');
       const initModule = await import('../cli/init.ts');
       await initModule.bootstrapProject({
         targetDir: testDir,
-        skipDependencies: false, // Need deps for compilation
+        skipDependencies: true,
       });
 
       // Verify project was created
@@ -202,25 +310,61 @@ export default function setupCliCompileTests() {
         'Project should be bootstrapped',
       );
 
-      // 2. Link to local GoatDB sources instead of published package
-      // This ensures we test against the current codebase, not the published version
+      // Templates are copied before linking. Linking patches config and
+      // .gitignore, so assert the scaffold effect first.
+      await assertScaffoldTemplates(
+        testDir,
+        runtime.id === 'deno' ? 'deno' : 'node',
+        runtime.getCWD(),
+      );
+
+      // 2. Link the checkout before installing anything, so installation can
+      // only observe the local source.
       console.log('Linking to local GoatDB sources...');
       const linkModule = await import('../cli/link.ts');
 
-      // Get path to GoatDB repo root
       // In bundled Node.js, import.meta.url points to bundled code, not original source.
       // Use the runtime's CWD which should be the goatdb repo root during tests.
       const goatdbRoot = runtime.getCWD();
-
       await linkModule.linkGoatDB(goatdbRoot, testDir);
 
-      // For Node.js, reinstall to update node_modules with local link
-      if (runtime.id === 'node') {
-        console.log('Reinstalling dependencies with local link...');
-        const installResult = await cli('npm', 'install', { cwd: testDir });
+      if (runtime.id === 'deno') {
+        await addDenoTemplateImports(
+          testDir,
+          initModule.kDenoTemplateNpmDependencies,
+        );
+      } else {
+        console.log(
+          'Installing template dependencies against the local link...',
+        );
+        const installResult = await cli('npm', 'install', {
+          cwd: testDir,
+          timeout: 180_000,
+        });
         if (installResult.exitCode !== 0) {
-          throw new Error(`npm install failed: ${installResult.result}`);
+          throw new Error(
+            `npm install failed with exit code ${installResult.exitCode}:\n${installResult.result}`,
+          );
         }
+      }
+
+      await assertLocalGoatDB(testDir, goatdbRoot);
+
+      // Resolve the real graph, not only the config that describes it.
+      if (runtime.id === 'deno') {
+        const info = await denoInfo(testDir, 'client/index.tsx');
+        assertTrue(
+          info.modules.some((module) =>
+            module.local?.includes('/vendor/goatdb/') ?? false
+          ),
+          'Generated graph must resolve GoatDB from vendor/goatdb',
+        );
+        assertTrue(
+          !info.modules.some((module) =>
+            module.specifier.includes('jsr:@goatdb/goatdb')
+          ),
+          'Generated graph must not resolve the published JSR package',
+        );
       }
 
       // 3. Compile the project
@@ -242,7 +386,7 @@ export default function setupCliCompileTests() {
           });
         },
       };
-      await compile({
+      const binaryPath = await compile({
         buildDir: path.join(testDir, 'build'),
         serverEntry,
         jsPath: path.join(testDir, 'client/index.tsx'),
@@ -258,17 +402,9 @@ export default function setupCliCompileTests() {
 
       assertEquals(pluginBuilds, 1, 'Compile must invoke configured plugin');
 
-      // 4. Verify binary exists
-      const osName = runtime.getOS();
-
-      let binaryName: string;
-      if (runtime.id === 'deno') {
-        binaryName = `test-app-${targetFromOSArch()}`;
-      } else {
-        binaryName = osName === 'windows' ? 'test-app.exe' : 'test-app';
-      }
-
-      const binaryPath = path.join(testDir, 'build', binaryName);
+      // 4. Verify binary exists. `compile` returns the compiler's real output
+      // path (including `.exe` for Windows targets), so the test never
+      // re-derives the platform-specific name.
       assertTrue(
         await pathExists(binaryPath),
         `Binary should exist at ${binaryPath}`,

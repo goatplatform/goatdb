@@ -2,6 +2,7 @@ import * as path from '../path.ts';
 import type { DirEntry, FileImpl } from './file-impl-interface.ts';
 import { retry, TryAgain } from '../time.ts';
 import { log } from '../../logging/log.ts';
+import { eisdirError } from './file-impl-errors.ts';
 
 interface FileSystemSyncAccessHandle {
   close(): void;
@@ -66,9 +67,19 @@ export async function clearOPFS(): Promise<void> {
 export const FileImplOPFS: FileImpl<OPFSFile> = {
   async open(filePath, write) {
     const dir = await getDir(path.dirname(filePath));
-    const handle = await dir.getFileHandle(path.basename(filePath), {
-      create: write,
-    });
+    let handle: FileSystemFileHandle;
+    try {
+      handle = await dir.getFileHandle(path.basename(filePath), {
+        create: write,
+      });
+    } catch (e: unknown) {
+      // OPFS refuses to hand out a file handle for a directory. Normalize its
+      // DOMException to the shared EISDIR identity so all runtimes agree.
+      if (e instanceof DOMException && e.name === 'TypeMismatchError') {
+        throw eisdirError(filePath);
+      }
+      throw e;
+    }
 
     // For benchmarks and tests that rapidly close and reopen files,
     // we need to handle the race condition where the browser hasn't
@@ -204,7 +215,6 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
 
   async mkdir(path: string) {
     await getDir(path);
-    return true;
   },
 
   async exists(filePath: string): Promise<boolean> {
@@ -254,8 +264,11 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
   async readDir(dirPath: string): Promise<DirEntry[]> {
     const dir = await getDirReadOnly(dirPath);
     if (!dir) {
-      throw new Error(
-        `ENOENT: no such file or directory, scandir '${dirPath}'`,
+      // Attach ENOENT so the worker error transport can classify a missing
+      // directory as "not found" (see isNotFound in db/storage-epoch.ts).
+      throw Object.assign(
+        new Error(`ENOENT: no such file or directory, scandir '${dirPath}'`),
+        { code: 'ENOENT' },
       );
     }
     const entries: DirEntry[] = [];
