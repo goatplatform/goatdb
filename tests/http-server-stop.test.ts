@@ -1,6 +1,7 @@
 /** Real-socket shutdown contract for both server runtimes. */
 import { DEFAULT_STOP_TIMEOUT_MS, Server } from '../server.ts';
 import {
+  awaitPendingStop,
   createHttpServer,
   GoatRequest,
   type HttpServerStopOptions,
@@ -196,6 +197,7 @@ async function createStopTestServer(
   serverPath: string,
   registry: DataRegistry,
   getPort: () => number,
+  resolveDomain: (url: string) => string = () => 'localhost',
 ) {
   const buildInfo = await generateBuildInfo(
     path.join(getRuntime().getCWD(), 'deno.json'),
@@ -210,7 +212,7 @@ async function createStopTestServer(
     // port at construction.
     domain: {
       resolveOrg: () => `http://localhost:${getPort()}`,
-      resolveDomain: () => 'localhost',
+      resolveDomain,
     },
   });
 }
@@ -424,7 +426,7 @@ export default function setupHttpServerStop() {
         }));
         assertEquals(rejected.status, 503);
         assertTrue(
-          rejected.headers.get('connection')?.includes('close'),
+          rejected.headers.get('connection')?.includes('close') ?? false,
           'rejection must tell clients not to reuse the socket',
         );
         await rejected.text();
@@ -671,6 +673,328 @@ export default function setupHttpServerStop() {
 
   TEST(
     'HttpServerStop',
+    'stop() racing start() closes the restarted listener',
+    async () => {
+      const server = createHttpServer();
+      const ok = () => Promise.resolve(new Response('ok'));
+      const started = deferred();
+      const release = deferred();
+      const blocking = async () => {
+        started.resolve();
+        await release.promise;
+        return new Response('ok');
+      };
+      try {
+        await server.start(blocking, 0);
+        requirePort(server);
+        const inFlight = request(server);
+        void inFlight.catch(() => {});
+        await bounded(started.promise);
+
+        // The graceful stop waits for the handler, so the restart awaits it.
+        const parking = server.stop({ timeoutMs: 10_000 });
+        const restarting = server.start(ok, 0);
+        // WHY: without a start guard this stop() sees no listener yet, returns
+        // immediately, and the restart keeps the server running.
+        const racingStop = server.stop({ force: true });
+        release.resolve();
+        await inFlight.catch(() => {});
+        await bounded(Promise.all([parking, restarting, racingStop]));
+
+        assertEquals(
+          server.port,
+          undefined,
+          'racing stop must close the restarted listener',
+        );
+      } finally {
+        release.resolve();
+        await server.stop({ force: true });
+      }
+    },
+  );
+
+  TEST(
+    'HttpServerStop',
+    'force interrupts a drain queued behind a restart',
+    async () => {
+      const server = createHttpServer();
+      const ok = () => Promise.resolve(new Response('ok'));
+      const started = deferred();
+      const release = deferred();
+      const blocking = async () => {
+        started.resolve();
+        await release.promise;
+        return new Response('ok');
+      };
+      try {
+        await server.start(blocking, 0);
+        const inFlight = request(server);
+        void inFlight.catch(() => {});
+        await bounded(started.promise);
+
+        // The restart queues the forced stop behind the graceful teardown.
+        const parking = server.stop({ timeoutMs: 30_000 });
+        const restarting = server.start(ok, 0);
+        // WHY: the handler stays pending, so only immediate escalation can
+        // free the teardown before the graceful budget expires.
+        await bounded(server.stop({ force: true }), 2000);
+        assertEquals(
+          server.port,
+          undefined,
+          'the forced stop must close the restarted listener',
+        );
+        await expectRejected(inFlight);
+        await bounded(Promise.all([parking, restarting]));
+      } finally {
+        release.resolve();
+        await server.stop({ force: true });
+      }
+    },
+  );
+
+  TEST(
+    'HttpServerStop',
+    'Server.stop during start leaves no running listener',
+    async (ctx) => {
+      const serverPath = await ctx.tempDir('server-stop-race');
+      let actualPort = 0;
+      const server = await createStopTestServer(
+        serverPath,
+        new DataRegistry(),
+        () => actualPort,
+      );
+      const started = deferred();
+      const release = deferred();
+      server.registerEndpoint({
+        filter() {
+          return true;
+        },
+        async processRequest() {
+          started.resolve();
+          await release.promise;
+          return new Response('ok');
+        },
+      });
+      try {
+        await server.start();
+        actualPort = requirePort(server);
+        const inFlight = fetch(`http://127.0.0.1:${actualPort}/x`, {
+          headers: { connection: 'close' },
+        });
+        void inFlight.catch(() => {});
+        await bounded(started.promise);
+
+        // The graceful stop waits for the handler, so the restart awaits it.
+        const parking = server.stop({ timeoutMs: 10_000 });
+        const restarting = server.start();
+        // WHY: this used to return before start() resumed, leaving the server
+        // bound while the caller believed it had stopped.
+        const racingStop = server.stop({ force: true });
+        release.resolve();
+        await inFlight.catch(() => {});
+        await bounded(Promise.all([parking, restarting, racingStop]));
+
+        assertEquals(
+          server.port,
+          undefined,
+          'racing stop must close the restarted listener',
+        );
+
+        // The raced restart must not wedge the services for a later start.
+        await bounded(server.start());
+        actualPort = requirePort(server);
+        const after = await fetch(`http://127.0.0.1:${actualPort}/x`, {
+          headers: { connection: 'close' },
+        });
+        assertEquals(after.status, 200, 'server must still start after race');
+        await after.text();
+      } finally {
+        release.resolve();
+        await server.stop({ force: true });
+      }
+    },
+  );
+
+  TEST(
+    'HttpServerStop',
+    'Server.stop force interrupts a drain queued behind a restart',
+    async (ctx) => {
+      const serverPath = await ctx.tempDir('server-stop-force-race');
+      let actualPort = 0;
+      const server = await createStopTestServer(
+        serverPath,
+        new DataRegistry(),
+        () => actualPort,
+      );
+      const started = deferred();
+      const release = deferred();
+      server.registerEndpoint({
+        filter() {
+          return true;
+        },
+        async processRequest() {
+          started.resolve();
+          await release.promise;
+          return new Response('late');
+        },
+      });
+      try {
+        await server.start();
+        actualPort = requirePort(server);
+        const inFlight = fetch(`http://127.0.0.1:${actualPort}/x`, {
+          headers: { connection: 'close' },
+        });
+        void inFlight.catch(() => {});
+        await bounded(started.promise);
+
+        // The restart queues the forced stop behind the graceful teardown.
+        const parking = server.stop({ timeoutMs: 30_000 });
+        const restarting = server.start();
+        // WHY: the handler stays pending, so force must escalate now instead
+        // of waiting for the restart queue to reach it.
+        await bounded(server.stop({ force: true }), 2000);
+        assertEquals(
+          server.port,
+          undefined,
+          'the forced stop must close the restarted listener',
+        );
+        await expectRejected(inFlight);
+        await bounded(Promise.all([parking, restarting]));
+      } finally {
+        release.resolve();
+        await server.stop({ force: true });
+      }
+    },
+  );
+
+  TEST(
+    'HttpServerStop',
+    'ALB health check matches parsed host and path',
+    async (ctx) => {
+      const serverPath = await ctx.tempDir('server-health');
+      let resolvedUrl: string | undefined;
+      const server = await createStopTestServer(
+        serverPath,
+        new DataRegistry(),
+        () => 0,
+        (url) => {
+          resolvedUrl = url;
+          return 'localhost';
+        },
+      );
+      const info = {
+        remoteAddr: { hostname: 'localhost' },
+        completed: Promise.resolve(),
+      };
+      // WHY: Request normalizes host case and drops default ports. Mutate the
+      // normalized URL so the check sees the string Node builds from Host.
+      const requestFor = (url: string) => {
+        const req = new GoatRequest(new Request('http://placeholder.invalid/'));
+        req.url = url;
+        return req;
+      };
+      try {
+        await server.start();
+        const cases: Array<{ url: string; status: number; resolved?: string }> =
+          [
+            { url: 'http://AWSALB:80/healthy?probe=1', status: 200 },
+            { url: 'http://awsalb:8080/healthy', status: 200 },
+            { url: 'https://awsalb/healthy', status: 200 },
+            {
+              url: 'http://awsalb/HEALTHY',
+              status: 404,
+              resolved: 'http://awsalb/HEALTHY',
+            },
+            {
+              url: 'http://otherhost/healthy',
+              status: 404,
+              resolved: 'http://otherhost/healthy',
+            },
+            {
+              url: 'http://awsalb/healthy/',
+              status: 404,
+              resolved: 'http://awsalb/healthy/',
+            },
+            {
+              url: 'http://awsalb/not-healthy',
+              status: 404,
+              resolved: 'http://awsalb/not-healthy',
+            },
+            {
+              url: 'not a valid url',
+              status: 404,
+              resolved: 'not a valid url',
+            },
+          ];
+        for (const { url, status, resolved } of cases) {
+          resolvedUrl = undefined;
+          const response = await server.processRequest(requestFor(url), info);
+          assertEquals(response.status, status, url);
+          assertEquals(resolvedUrl, resolved, `resolution for ${url}`);
+        }
+      } finally {
+        await server.stop({ force: true });
+      }
+    },
+  );
+
+  TEST(
+    'HttpServerStop',
+    'a pre-aborted start signal leaves no listener',
+    async () => {
+      const server = createHttpServer();
+      const ac = new AbortController();
+      try {
+        ac.abort();
+        await bounded(server.start(
+          () => Promise.resolve(new Response('ok')),
+          0,
+          ac.signal,
+        ));
+        assertEquals(
+          server.port,
+          undefined,
+          'a pre-aborted signal must release the port at once',
+        );
+        assertEquals(
+          server.address,
+          undefined,
+          'a pre-aborted signal must release the address at once',
+        );
+        await bounded(server.stop());
+        await bounded(server.start(
+          () => Promise.resolve(new Response('ok')),
+          0,
+        ));
+        const response = await bounded(request(server));
+        assertEquals(await response.text(), 'ok');
+      } finally {
+        await server.stop({ force: true });
+      }
+    },
+  );
+
+  TEST(
+    'HttpServerStop',
+    'awaitPendingStop clears the slot when teardown rejects',
+    async () => {
+      const failure = new Error('teardown failed');
+      let cleared = false;
+      let outcome: unknown;
+      try {
+        await awaitPendingStop(Promise.reject(failure), () => {
+          cleared = true;
+        });
+      } catch (error) {
+        outcome = error;
+      }
+      assertTrue(cleared, 'a rejected teardown must clear the pending slot');
+      assertTrue(outcome === failure, 'the teardown error must propagate');
+    },
+  );
+
+  TEST(
+    'HttpServerStop',
     'Server.stop force escalates an in-flight stop',
     async (ctx) => {
       const serverPath = await ctx.tempDir('server-stop-force');
@@ -707,6 +1031,48 @@ export default function setupHttpServerStop() {
         await expectRejected(pending);
       } finally {
         release.resolve();
+        await server.stop({ force: true });
+      }
+    },
+  );
+
+  TEST(
+    'HttpServerStop',
+    'restart ignores the previous start signal and honors the current one',
+    async () => {
+      const server = createHttpServer();
+      const stale = new AbortController();
+      const fresh = new AbortController();
+      try {
+        await server.start(
+          () => Promise.resolve(new Response('ok')),
+          0,
+          stale.signal,
+        );
+        await server.stop();
+        await server.start(
+          () => Promise.resolve(new Response('ok')),
+          0,
+          fresh.signal,
+        );
+        const port = requirePort(server);
+        stale.abort();
+        // Abort dispatch is synchronous. The stale listener must not stop the
+        // restart, so the port stays bound.
+        assertEquals(
+          server.port,
+          port,
+          'stale signal must not stop the restart',
+        );
+        const response = await bounded(request(server));
+        assertEquals(await response.text(), 'ok');
+        fresh.abort();
+        assertEquals(
+          server.port,
+          undefined,
+          'the current signal must stop the restarted listener',
+        );
+      } finally {
         await server.stop({ force: true });
       }
     },

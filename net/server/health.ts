@@ -3,6 +3,14 @@ import type { Schema } from '../../cfds/base/schema.ts';
 import type { GoatRequest, ServeHandlerInfo } from './http-compat.ts';
 
 /**
+ * Canonical health-check path, shared by the endpoint and the ALB short-circuit.
+ * WHY normalized here: the endpoint lowercases probe paths before comparison,
+ * so a mixed-case literal would silently stop matching. Normalizing at the
+ * definition keeps both comparisons on one canonical value.
+ */
+export const kHealthCheckPath = '/healthy'.toLowerCase();
+
+/**
  * Endpoint that handles health check requests.
  *
  * This endpoint responds to GET requests at /healthy with a 200 OK response
@@ -21,7 +29,7 @@ export class HealthCheckEndpoint<US extends Schema> implements Endpoint<US> {
       return false;
     }
     const path = new URL(req.url).pathname.toLowerCase();
-    return path === '/healthy';
+    return path === kHealthCheckPath;
   }
 
   processRequest(

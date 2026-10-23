@@ -589,8 +589,8 @@ async function beginDrain(
   return drained;
 }
 
-/** Surfaces a rejected signal-driven stop instead of dropping the promise. */
-function logStopFailure(error: unknown): void {
+/** Surfaces a rejected background stop instead of dropping the promise. */
+export function logStopFailure(error: unknown): void {
   log({
     severity: 'ERROR',
     error: 'ServerStopFailed',
@@ -599,6 +599,107 @@ function logStopFailure(error: unknown): void {
     }`,
     trace: error instanceof Error ? error.stack : undefined,
   });
+}
+
+function wireStopSignal(
+  signal: AbortSignal | undefined,
+  isCurrent: () => boolean,
+  stop: () => Promise<void>,
+): void {
+  if (!signal) return;
+  if (signal.aborted) {
+    void stop().catch(logStopFailure);
+    return;
+  }
+  signal.addEventListener('abort', () => {
+    // A restart may own the server now; ignore this signal for that listener.
+    if (isCurrent()) void stop().catch(logStopFailure);
+  }, { once: true });
+}
+
+/**
+ * Awaits a previous teardown, then clears it. WHY: a start must not race the
+ * old teardown. Clears even on rejection so the slot cannot stay poisoned; the
+ * rejection still propagates to this caller.
+ */
+export async function awaitPendingStop(
+  pending: Promise<void> | undefined,
+  clear: () => void,
+): Promise<void> {
+  if (!pending) return;
+  try {
+    await pending;
+  } finally {
+    clear();
+  }
+}
+
+/**
+ * Clears a pending-stop slot when a teardown rejects, then rethrows. WHY: the
+ * stop caller must see the failure, but a later start must be able to retry.
+ */
+export function clearPendingOnReject(
+  pending: Promise<void>,
+  clear: () => void,
+): Promise<void> {
+  return pending.catch((error) => {
+    clear();
+    throw error;
+  });
+}
+
+/**
+ * Interrupts an active drain when a force stop is queued behind a restart.
+ *
+ * WHY: the lifecycle gate defers a stop until the in-flight start settles, so
+ * without this the force waits for the handler or the graceful budget. While a
+ * teardown is pending, the drain field holds that teardown's drain: a start
+ * clears the pending stop before it installs a new drain.
+ */
+function escalatePendingStop(
+  pending: Promise<void> | undefined,
+  drain: RequestDrain,
+): void {
+  if (pending) drain.force();
+}
+
+/**
+ * Single-flight start gate shared by the server lifecycle classes.
+ *
+ * WHY: stop() racing an in-flight start() must not observe a not-yet-started
+ * server and return early. The caller would then believe the server is closed
+ * while start() goes on to bind the listener.
+ */
+export class StartStopGate {
+  private _starting?: Promise<void>;
+
+  /** Runs `start` once; concurrent callers share the in-flight promise. */
+  start(start: () => Promise<void>): Promise<void> {
+    const inFlight = this._starting;
+    if (inFlight) return inFlight;
+    const starting = start();
+    this._starting = starting;
+    // WHY: registered before any stop() continuation, so the slot is clear by
+    // the time a chained stop runs and cannot re-chain recursively.
+    const clear = () => this._clear(starting);
+    void starting.then(clear, clear);
+    return starting;
+  }
+
+  /** Runs `stop` after any in-flight start settles, success or failure. */
+  stop(stop: () => Promise<void>): Promise<void> {
+    const starting = this._starting;
+    if (!starting) return stop();
+    const settle = () => {
+      this._clear(starting);
+      return stop();
+    };
+    return starting.then(settle, settle);
+  }
+
+  private _clear(starting: Promise<void>): void {
+    if (this._starting === starting) this._starting = undefined;
+  }
 }
 
 /**
@@ -621,9 +722,12 @@ export interface MinimalHttpServer {
    * finishes. Pass `force: true` to close immediately, or `timeoutMs` to bound
    * the drain. `timeoutMs` does not bound the final listener close. Repeated
    * calls share one teardown; a later `force` escalates only while the drain is
-   * pending, while `timeoutMs` is fixed by the first call. Resolves once the
-   * listener is closed. Forced or timed-out stops cannot cancel application
-   * handlers; these can continue after stop resolves.
+   * pending, while `timeoutMs` is fixed by the first call. A `force` interrupts
+   * a pending drain even when the stop is queued behind a restart. Resolves
+   * once the listener is closed. A stop() racing an in-flight start() resolves only
+   * after that start settles and the listener is closed. Forced or timed-out
+   * stops cannot cancel application handlers; these can continue after stop
+   * resolves.
    */
   stop(options?: HttpServerStopOptions): Promise<void>;
   readonly port?: number;
@@ -638,6 +742,7 @@ export class DenoHttpServer implements MinimalHttpServer {
   private _server?: Deno.HttpServer;
   private _started: boolean = false;
   private _stopPromise?: Promise<void>;
+  private readonly _lifecycle = new StartStopGate();
   private _drain = new RequestDrain();
   private _options: HttpServerOptions;
 
@@ -645,7 +750,18 @@ export class DenoHttpServer implements MinimalHttpServer {
     this._options = options;
   }
 
-  async start(
+  start(
+    handler: (
+      req: GoatRequest,
+      info: ServeHandlerInfo,
+    ) => Promise<Response>,
+    port: number,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    return this._lifecycle.start(() => this._start(handler, port, signal));
+  }
+
+  private async _start(
     handler: (
       req: GoatRequest,
       info: ServeHandlerInfo,
@@ -655,11 +771,12 @@ export class DenoHttpServer implements MinimalHttpServer {
   ): Promise<void> {
     // WHY: a restart must not bind the port while the old teardown still
     // drains requests and closes databases.
-    if (this._stopPromise) await this._stopPromise;
+    await awaitPendingStop(this._stopPromise, () => {
+      this._stopPromise = undefined;
+    });
     if (this._started) {
       return;
     }
-    this._stopPromise = undefined;
     this._drain = new RequestDrain();
     this._abortController = new AbortController();
     const combinedSignal = this._abortController.signal;
@@ -700,17 +817,21 @@ export class DenoHttpServer implements MinimalHttpServer {
       : Deno.serve(serveOptions, onRequest);
     this._started = true;
     // Wire the signal only after the server exists; stop() must see _server.
-    if (signal?.aborted) {
-      void this.stop().catch(logStopFailure);
-    } else if (signal) {
-      signal.addEventListener('abort', () => {
-        void this.stop().catch(logStopFailure);
-      }, { once: true });
-    }
+    const startedServer = this._server;
+    wireStopSignal(
+      signal,
+      () => this._server === startedServer,
+      () => this.stop(),
+    );
     return started;
   }
 
   stop(options: HttpServerStopOptions = {}): Promise<void> {
+    if (options.force) escalatePendingStop(this._stopPromise, this._drain);
+    return this._lifecycle.stop(() => this._requestStop(options));
+  }
+
+  private _requestStop(options: HttpServerStopOptions): Promise<void> {
     const server = this._server;
     if (!server) {
       if (options.force) this._drain.force();
@@ -722,7 +843,12 @@ export class DenoHttpServer implements MinimalHttpServer {
     // the teardown must use the drain and controller it started with.
     const drain = this._drain;
     const controller = this._abortController;
-    const stopped = this._stopServer(server, drain, controller, options);
+    const stopped = clearPendingOnReject(
+      this._stopServer(server, drain, controller, options),
+      () => {
+        this._stopPromise = undefined;
+      },
+    );
     this._stopPromise = stopped;
     return stopped;
   }
@@ -785,6 +911,7 @@ export class NodeHttpServer implements MinimalHttpServer {
   private _started: boolean = false;
   /** In-flight stop, so repeated stop() calls share one teardown. */
   private _stopPromise?: Promise<void>;
+  private readonly _lifecycle = new StartStopGate();
   /** In-flight request tracker for graceful stop. */
   private _drain = new RequestDrain();
   /** Cached reference to the Node.js Buffer implementation */
@@ -901,7 +1028,18 @@ export class NodeHttpServer implements MinimalHttpServer {
    * @param signal - Optional AbortSignal for server shutdown
    * @returns A promise that resolves when the server is ready to accept connections
    */
-  async start(
+  start(
+    handler: (
+      req: GoatRequest,
+      info: ServeHandlerInfo,
+    ) => Promise<Response>,
+    port: number,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    return this._lifecycle.start(() => this._start(handler, port, signal));
+  }
+
+  private async _start(
     handler: (
       req: GoatRequest,
       info: ServeHandlerInfo,
@@ -911,11 +1049,12 @@ export class NodeHttpServer implements MinimalHttpServer {
   ): Promise<void> {
     // WHY: a restart must not bind the port while the old teardown still
     // drains requests and closes databases.
-    if (this._stopPromise) await this._stopPromise;
+    await awaitPendingStop(this._stopPromise, () => {
+      this._stopPromise = undefined;
+    });
     if (this._started) {
       return;
     }
-    this._stopPromise = undefined;
     this._drain = new RequestDrain();
 
     // Load required Node.js modules
@@ -963,13 +1102,12 @@ export class NodeHttpServer implements MinimalHttpServer {
     this._started = true;
 
     // Wire abort signal for graceful shutdown
-    if (signal?.aborted) {
-      void this.stop().catch(logStopFailure);
-    } else if (signal) {
-      signal.addEventListener('abort', () => {
-        void this.stop().catch(logStopFailure);
-      }, { once: true });
-    }
+    const startedServer = this._server;
+    wireStopSignal(
+      signal,
+      () => this._server === startedServer,
+      () => this.stop(),
+    );
   }
 
   /**
@@ -977,6 +1115,11 @@ export class NodeHttpServer implements MinimalHttpServer {
    * is closed.
    */
   stop(options: HttpServerStopOptions = {}): Promise<void> {
+    if (options.force) escalatePendingStop(this._stopPromise, this._drain);
+    return this._lifecycle.stop(() => this._requestStop(options));
+  }
+
+  private _requestStop(options: HttpServerStopOptions): Promise<void> {
     const server = this._server;
     if (!server) {
       if (options.force) this._drain.force();
@@ -986,7 +1129,12 @@ export class NodeHttpServer implements MinimalHttpServer {
     this._started = false;
     // Capture the drain. A restart must not swap it under the active teardown.
     const drain = this._drain;
-    const stopped = this._stopServer(server, drain, options);
+    const stopped = clearPendingOnReject(
+      this._stopServer(server, drain, options),
+      () => {
+        this._stopPromise = undefined;
+      },
+    );
     this._stopPromise = stopped;
     return stopped;
   }
