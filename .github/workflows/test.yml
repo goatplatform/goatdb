@@ -127,6 +127,60 @@ jobs:
       - name: Build npm package
         run: npm run build:npm
 
+  cli-registry:
+    name: CLI Registry
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      # Consumes published packages. Kept out of the deterministic test matrix
+      # on purpose: registry availability must not gate normal PR feedback.
+      - name: Deno consumer
+        run: deno task test:registry --runtime=deno
+        env:
+          GOATDB_TEST_REGISTRY: '1'
+
+      - name: Node.js consumer
+        run: deno task test:registry --runtime=node
+        env:
+          GOATDB_TEST_REGISTRY: '1'
+
+  cli-package:
+    name: CLI Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      - name: Install npm dependencies
+        run: npm install
+
+      # Builds, packs, installs into a consumer outside the repo, then runs the
+      # bin and asserts the generated project effects.
+      - name: Package contract
+        run: deno task test:package
+        env:
+          GOATDB_TEST_PACKAGE: '1'
+
   test-browser:
     name: Browser Tests
     runs-on: ubuntu-latest

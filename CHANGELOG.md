@@ -55,6 +55,11 @@ The following behaviors are intentional artifacts of the current implementation 
 
 ### Changed
 
+- `goatdb init` on Deno now requests `react`, `react-dom`, `yargs` and
+  `@types/react` as `^` ranges and installs all dependencies in one
+  `deno add` call, bounded by a 180s timeout. Exact pins let a transitive
+  peer resolve a newer `react` than `react-dom`, which crashes at runtime
+  with "Incompatible React versions".
 - HTTP health checks from the `awsalb` host now accept `http` and `https`
   URLs on any port and ignore the query string; the path must be exactly
   `/healthy`. The comparison is now case-sensitive, so a mixed-case probe such
@@ -75,6 +80,13 @@ The following behaviors are intentional artifacts of the current implementation 
 - `coreValueEquals` is now symmetric for objects when `objectFilterFields`
   inspects the object; previously the second comparison loop passed the wrong
   object to the filter.
+- `goatdb init` now scaffolds `.gitignore` and `.npmrc` again when run from
+  the published npm package. `npm pack` drops dotfile sources, so the
+  templates use plain names (`gitignore`, `npmrc`) that `init` maps back to
+  their dotted targets.
+- `goatdb init` now exits non-zero when dependency installation fails,
+  reporting the command, its exit code and its output. Previously a failed
+  `npm install` only warned, so a broken scaffold looked successful.
 - A server `stop()` that races an in-flight `start()` now waits for that start
   to settle before closing the listener, instead of returning early and
   leaving a bound server behind. A `start()` after a failed teardown retries

@@ -25,7 +25,7 @@
   },
   "scripts": {
     "check:npm-types": "node scripts/check-npm-entrypoints.ts && node --test scripts/check-npm-entrypoints.test.ts scripts/npm-manifest.test.ts && tsc -p tsconfig.npm.json",
-    "build:npm": "tsup"
+    "build:npm": "tsup && node scripts/copy-cli-templates.ts"
   },
   "dependencies": {
     "@goatdb/orderstamp": "npm:@jsr/goatdb__orderstamp@^1.1.1",
