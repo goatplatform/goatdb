@@ -46,6 +46,23 @@ jobs:
         env:
           CI: true
 
+  package-validation:
+    name: Package Archive
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
+
+      # Validates the JSR upload set and publish-time specifier rewriting
+      # without publishing. The compile E2E links local source, so it cannot
+      # cover this package-boundary contract.
+      - name: Validate JSR package
+        run: deno publish --dry-run
+
   system-assets-check:
     name: System Assets Freshness
     runs-on: ubuntu-latest
