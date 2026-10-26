@@ -1,51 +1,46 @@
 /**
- * npm package contract for the CLI.
+ * Built artifact contract for the CLI.
  *
- * WHY: Source-tree tests cannot see missing templates, a wrong shipped
+ * WHY: Source-tree tests cannot see missing dist files, a wrong shipped
  * manifest, or an entry point that resolves but cannot load. This suite builds
- * the production tarball, installs it into a consumer outside the repo, then
- * imports the public entry points and asserts the generated effects.
+ * the current checkout and loads the build outputs in place.
  *
- * Gated because it performs registry installs. Run with:
+ * It must not install the package or resolve it from a registry. Registry
+ * checks validate the publication process; they do not validate this checkout.
+ *
+ * Gated because it runs the production build. Run with:
  *   GOATDB_TEST_PACKAGE=1 deno task test:package
  */
 
 import { TEST, type TestSuite } from './mod.ts';
 import { assertEquals, assertExists, assertTrue } from './asserts.ts';
 import * as path from '../base/path.ts';
-import { getEnvVar } from '../base/os.ts';
 import { isBrowser, isNode } from '../base/common.ts';
+import { getEnvVar, isWindows } from '../base/os.ts';
 import { cli } from '../base/development.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 import {
   mkdir,
-  readDir,
-  readFile,
   readTextFile,
-  writeFile,
   writeTextFile,
 } from '../base/json-log/json-log.ts';
+import { chmod } from 'node:fs/promises';
+import { builtinModules } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import {
   type NpmManifest,
+  type ProductionManifest,
   productionManifest,
 } from '../scripts/npm-manifest.ts';
 import {
-  allTemplateRelativePaths,
-  assertImportsWork,
   assertScaffoldTemplates,
   assertTemplateTree,
   readJson,
 } from './cli-template-utils.ts';
 
-const kPackageName = '@goatdb/goatdb';
-
-/** Optional peers that public entry points import at module load. */
-const kPeerDependencies = ['react@^19', 'nodemailer@^6'];
-
 /**
  * Public API contract: each published subpath must expose its documented
- * symbol. Resolution plus a non-empty module also passes when a subpath points
- * at the wrong source, so the symbol is the only runtime proof of routing.
+ * symbol. A target that exists but exports the wrong surface must fail.
  */
 const kPublicExports: Record<string, string> = {
   '.': 'GoatDB',
@@ -55,28 +50,13 @@ const kPublicExports: Record<string, string> = {
   './link': 'linkGoatDB',
 };
 
-interface PackEntry {
-  filename: string;
-  files: Array<{ path: string }>;
-}
-
 function packageTestsEnabled(): boolean {
   return getEnvVar('GOATDB_TEST_PACKAGE') === '1';
 }
 
-async function fileExists(file: string): Promise<boolean> {
-  try {
-    return (await readTextFile(file)) !== undefined;
-  } catch {
-    return false;
-  }
-}
-
-function parsePackOutput(text: string): PackEntry[] {
-  const start = text.indexOf('[');
-  const end = text.lastIndexOf(']');
-  assertTrue(start >= 0 && end > start, `npm pack produced no JSON:\n${text}`);
-  return JSON.parse(text.slice(start, end + 1)) as PackEntry[];
+/** File-only existence probe; every caller checks a file, never a directory. */
+async function fileExists(file: path.PosixPath): Promise<boolean> {
+  return (await readTextFile(file)) !== undefined;
 }
 
 function assertCliFailure(output: string): void {
@@ -98,292 +78,232 @@ async function readVersion(repoRoot: string): Promise<string> {
   return config.version;
 }
 
-async function copyTree(source: string, target: string): Promise<void> {
-  await mkdir(target);
-  for (const entry of await readDir(source)) {
-    const from = path.join(source, entry.name);
-    const to = path.join(target, entry.name);
-    if (entry.isDirectory) {
-      await copyTree(from, to);
-    } else if (entry.isFile) {
-      await writeFile(to, await readFile(from));
-    }
-  }
+function binTarget(manifest: NpmManifest): string {
+  const bin = manifest.bin as Record<string, string> | undefined;
+  const target = bin?.goatdb;
+  assertExists(target, 'npm bin target missing');
+  return target;
 }
 
-/** Root files npm always ships, so the archive matches a real publish. */
-async function copyRootDocs(
+/** Asserts every shipped target exists in the current build. */
+async function assertManifestTargets(
   repoRoot: string,
-  stage: string,
+  manifest: ProductionManifest,
 ): Promise<void> {
-  for (const name of ['README.md', 'LICENSE']) {
-    const text = await readTextFile(path.join(repoRoot, name));
-    if (text !== undefined) {
-      await writeTextFile(path.join(stage, name), text);
+  const entries = Object.entries(manifest.exports);
+  for (const [subpath, entry] of entries) {
+    for (const target of [entry.import, entry.types]) {
+      assertTrue(
+        await fileExists(path.join(repoRoot, target)),
+        `Missing build target for ${subpath}: ${target}`,
+      );
+    }
+  }
+  for (const subpath of Object.keys(kPublicExports)) {
+    assertTrue(
+      entries.some(([entrySubpath]) => entrySubpath === subpath),
+      `Missing public export: ${subpath}`,
+    );
+  }
+  const target = binTarget(manifest);
+  assertTrue(
+    await fileExists(path.join(repoRoot, target)),
+    `Missing npm bin target: ${target}`,
+  );
+}
+
+/** Loads every public entry and proves its documented symbol is present. */
+async function assertExportsLoad(
+  repoRoot: string,
+  manifest: ProductionManifest,
+): Promise<void> {
+  for (const [subpath, entry] of Object.entries(manifest.exports)) {
+    const module = await import(
+      pathToFileURL(path.join(repoRoot, entry.import)).href
+    );
+    assertTrue(
+      Object.keys(module).length > 0,
+      `Entry point exported nothing: ${subpath}`,
+    );
+    const expected = kPublicExports[subpath];
+    if (expected !== undefined) {
+      assertTrue(
+        expected in module,
+        `Entry point must export ${expected}: ${subpath}`,
+      );
     }
   }
 }
 
-/**
- * Builds the archive npm would publish: the shared production manifest plus the
- * built output. Staged outside the repo so the checkout manifest stays intact.
- */
-async function stagePackage(
-  ctx: TestSuite,
+function declaredPackages(manifest: NpmManifest): Set<string> {
+  const declared = new Set<string>();
+  for (
+    const field of [
+      'dependencies',
+      'peerDependencies',
+      'optionalDependencies',
+    ]
+  ) {
+    const deps = manifest[field];
+    if (typeof deps !== 'object' || deps === null) continue;
+    for (const name of Object.keys(deps)) declared.add(name);
+  }
+  return declared;
+}
+
+function packageName(specifier: string): string {
+  if (specifier.startsWith('@')) {
+    return specifier.split('/').slice(0, 2).join('/');
+  }
+  return specifier.split('/')[0];
+}
+
+/** Import and re-export specifiers, including dynamic imports. */
+const kImportSpecifier =
+  /(?:^|\n)\s*(?:import|export)\s+[^'"]*?from\s*['"]([^'"]+)['"]|(?:^|\n)\s*import\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/gm;
+
+async function importSpecifiers(file: path.PosixPath): Promise<string[]> {
+  const text = await readTextFile(file);
+  assertExists(text, `Unable to read dist file: ${file}`);
+  return [...text.matchAll(kImportSpecifier)].flatMap((match) =>
+    match[1] ?? match[2] ?? match[3] ?? []
+  );
+}
+
+/** Walks the dist graph so transitive bare imports are checked too. */
+async function distBareImports(
+  entryFiles: path.PosixPath[],
+): Promise<Set<string>> {
+  const visited = new Set<path.PosixPath>();
+  const bare = new Set<string>();
+
+  async function visit(file: path.PosixPath): Promise<void> {
+    if (visited.has(file)) return;
+    visited.add(file);
+    for (const specifier of await importSpecifiers(file)) {
+      if (specifier.startsWith('.')) {
+        await visit(path.join(path.dirname(file), specifier));
+      } else if (
+        !specifier.startsWith('/') && !/^[a-z]+:/i.test(specifier)
+      ) {
+        const name = packageName(specifier);
+        if (!builtinModules.includes(name)) bare.add(name);
+      }
+    }
+  }
+
+  for (const entry of entryFiles) await visit(entry);
+  return bare;
+}
+
+async function assertDistImports(
   repoRoot: string,
-): Promise<{ stage: string; manifest: NpmManifest }> {
-  const checkout = await readJson<NpmManifest>(
-    path.join(repoRoot, 'package.json'),
+  manifest: ProductionManifest,
+): Promise<void> {
+  const entries = Object.entries(manifest.exports).map(([, entry]) =>
+    path.join(repoRoot, entry.import)
   );
-  assertExists(checkout, 'Checkout package.json missing');
-  const manifest = productionManifest(checkout, await readVersion(repoRoot));
-  const stage = await ctx.tempDir('stage');
-  await writeTextFile(
-    path.join(stage, 'package.json'),
-    JSON.stringify(manifest, null, 2) + '\n',
-  );
-  await copyTree(path.join(repoRoot, 'dist'), path.join(stage, 'dist'));
-  await copyRootDocs(repoRoot, stage);
-  return { stage, manifest };
+  entries.push(path.join(repoRoot, binTarget(manifest)));
+  const bare = await distBareImports(entries);
+  assertTrue(bare.size > 0, 'No imports found in the dist entry points');
+  const declared = declaredPackages(manifest);
+  for (const name of bare) {
+    assertTrue(
+      declared.has(name),
+      `Dist imports undeclared package: ${name}`,
+    );
+  }
 }
 
-function exportTargets(manifest: NpmManifest): string[] {
-  const entries = Object.values(manifest.exports ?? {});
-  return entries.flatMap((entry) =>
-    typeof entry === 'string' ? [entry] : [entry.import, entry.types]
-  ).map((target) => target.replace(/^\.\//, ''));
+/** Fake npm proves the bin reaches the install step without the registry. */
+async function writeNpmShim(
+  dir: path.PosixPath,
+  marker: path.PosixPath,
+): Promise<void> {
+  await mkdir(dir);
+  const shell = path.join(dir, 'npm');
+  assertTrue(
+    await writeTextFile(
+      shell,
+      `#!/bin/sh\nprintf ok > "$GOATDB_FAKE_NPM_MARKER"\nexit 0\n`,
+    ),
+    'Unable to write npm shim',
+  );
+  await chmod(shell, 0o755);
+  assertTrue(
+    await writeTextFile(
+      path.join(dir, 'npm.cmd'),
+      `@echo off\r\n> "%GOATDB_FAKE_NPM_MARKER%" echo ok\r\nexit /b 0\r\n`,
+    ),
+    'Unable to write npm.cmd shim',
+  );
+  assertTrue(await fileExists(marker) === false, 'Shim marker already exists');
 }
 
-async function requiredShipPaths(
+/** Runs the real npm bin and proves it scaffolds from the shipped templates. */
+async function assertDistBinInit(
+  ctx: TestSuite,
   repoRoot: string,
   manifest: NpmManifest,
-): Promise<string[]> {
-  const templates = await allTemplateRelativePaths(repoRoot);
-  return [
-    'dist/cli/init.js', // package.json bin
-    ...exportTargets(manifest),
-    ...templates.map((file) => `dist/cli/templates/${file}`),
-  ];
-}
-
-async function buildAndPack(
-  ctx: TestSuite,
-  repoRoot: string,
-): Promise<{ tarball: string; manifest: NpmManifest }> {
-  const build = await cli('npm', 'run', 'build:npm', {
-    cwd: repoRoot,
-    timeout: 300_000,
-  });
-  assertEquals(build.exitCode, 0, build.result);
-  await assertTemplateTree(
-    path.join(repoRoot, 'dist/cli/templates'),
-    repoRoot,
-  );
-
-  const { stage, manifest } = await stagePackage(ctx, repoRoot);
-  const packDir = await ctx.tempDir('pack');
-  const pack = await cli(
-    'npm',
-    'pack',
-    '--json',
-    '--pack-destination',
-    packDir,
-    { cwd: stage, timeout: 180_000 },
-  );
-  assertEquals(pack.exitCode, 0, pack.result);
-  const entries = parsePackOutput(pack.result);
-  assertEquals(entries.length, 1, 'Expected exactly one tarball');
-
-  const shipped = new Set(entries[0].files.map((file) => file.path));
-  for (const file of await requiredShipPaths(repoRoot, manifest)) {
-    assertTrue(shipped.has(file), `Tarball is missing ${file}`);
-  }
-  return { tarball: path.join(packDir, entries[0].filename), manifest };
-}
-
-/**
- * Installs the tarball outside the repo. Optional peers of public entry points
- * are installed explicitly, since `--omit=dev` skips them and the import probe
- * must load those entries.
- */
-async function installConsumer(
-  ctx: TestSuite,
-  tarball: string,
-): Promise<string> {
-  const consumer = await ctx.tempDir('consumer');
-  await writeTextFile(
-    path.join(consumer, 'package.json'),
-    JSON.stringify(
-      { name: 'goatdb-package-consumer', private: true, type: 'module' },
-      null,
-      2,
-    ) + '\n',
-  );
-  const install = await cli(
-    'npm',
-    'install',
-    '--omit=dev',
-    '--ignore-scripts',
-    tarball,
-    ...kPeerDependencies,
-    { cwd: consumer, timeout: 300_000 },
-  );
-  assertEquals(install.exitCode, 0, install.result);
-  return consumer;
-}
-
-async function assertBinLinks(consumer: string): Promise<void> {
-  const bin = await fileExists(
-    path.join(consumer, 'node_modules/.bin/goatdb'),
-  );
-  const binCmd = await fileExists(
-    path.join(consumer, 'node_modules/.bin/goatdb.cmd'),
-  );
-  assertTrue(bin || binCmd, 'Installed goatdb bin missing');
-}
-
-async function assertResolvesLocally(consumer: string): Promise<void> {
-  const resolved = await cli(
+): Promise<void> {
+  const targetDir = await ctx.tempDir('dist-bin-init');
+  const shimDir = await ctx.tempDir('npm-shim');
+  const marker = path.join(shimDir, 'invoked');
+  await writeNpmShim(shimDir, marker);
+  const separator = isWindows() ? ';' : ':';
+  const result = await cli(
     'node',
-    '--input-type=module',
-    '-e',
-    `console.log(import.meta.resolve('${kPackageName}'))`,
-    { cwd: consumer, timeout: 120_000 },
+    path.join(repoRoot, binTarget(manifest)),
+    'init',
+    targetDir,
+    {
+      cwd: repoRoot,
+      env: {
+        PATH: `${shimDir}${separator}${process.env.PATH ?? ''}`,
+        GOATDB_FAKE_NPM_MARKER: marker,
+      },
+      timeout: 120_000,
+    },
   );
-  assertEquals(resolved.exitCode, 0, resolved.result);
+  assertEquals(result.exitCode, 0, result.result);
   assertTrue(
-    resolved.result.includes(consumer) &&
-      resolved.result.includes('node_modules/@goatdb/goatdb'),
-    `Consumer resolved outside its node_modules:\n${resolved.result}`,
+    await fileExists(marker),
+    `Bin did not invoke npm:\n${result.result}`,
   );
+  await assertScaffoldTemplates(targetDir, 'node', repoRoot);
 }
 
-function subpathSpecifier(subpath: string): string {
-  return subpath === '.' ? kPackageName : kPackageName + subpath.slice(1);
-}
-
-function entrySpecifiers(manifest: NpmManifest): string[] {
-  return Object.keys(manifest.exports ?? {}).map(subpathSpecifier);
-}
-
-/**
- * Imports every public export from the consumer. Resolution alone passes for
- * archives whose targets are absent, so the modules must actually load.
- */
-async function assertEntryPointsLoad(
-  consumer: string,
+async function assertBuiltCli(
+  repoRoot: string,
   manifest: NpmManifest,
 ): Promise<void> {
-  const specifiers = entrySpecifiers(manifest);
-  await writeTextFile(
-    path.join(consumer, 'entrypoint-probe.mjs'),
-    [
-      `const specifiers = ${JSON.stringify(specifiers)};`,
-      'const report = {};',
-      'for (const specifier of specifiers) {',
-      '  report[specifier] = Object.keys(await import(specifier));',
-      '}',
-      'console.log(JSON.stringify(report));',
-    ].join('\n'),
-  );
-  const run = await cli('node', 'entrypoint-probe.mjs', {
-    cwd: consumer,
-    timeout: 120_000,
-  });
-  assertEquals(run.exitCode, 0, run.result);
-  const report = JSON.parse(
-    run.result.trim().split('\n').at(-1)!,
-  ) as Record<string, string[]>;
-  for (const specifier of specifiers) {
-    assertTrue(
-      (report[specifier] ?? []).length > 0,
-      `Entry point exported nothing: ${specifier}`,
-    );
-  }
-  for (const [subpath, symbol] of Object.entries(kPublicExports)) {
-    const specifier = subpathSpecifier(subpath);
-    assertTrue(
-      report[specifier]?.includes(symbol) ?? false,
-      `Entry point must export ${symbol}: ${specifier}`,
-    );
-  }
-}
-
-async function assertInstalledPackage(
-  consumer: string,
-  repoRoot: string,
-  expected: NpmManifest,
-): Promise<void> {
-  const installed = path.join(consumer, 'node_modules', kPackageName);
-  const installedPkg = await readJson<NpmManifest>(
-    path.join(installed, 'package.json'),
-  );
-  assertExists(installedPkg, 'Installed package.json missing');
-  assertEquals(installedPkg.version, expected.version, 'Shipped version drift');
-  assertEquals(installedPkg.exports, expected.exports, 'Shipped exports drift');
-  await assertTemplateTree(
-    path.join(installed, 'dist/cli/templates'),
-    repoRoot,
-  );
-  await assertBinLinks(consumer);
-  await assertResolvesLocally(consumer);
-  await assertEntryPointsLoad(consumer, expected);
-}
-
-async function assertCliWorks(
-  consumer: string,
-  repoRoot: string,
-): Promise<void> {
-  const help = await cli(
-    'npx',
-    '--no-install',
-    'goatdb',
+  const result = await cli(
+    'node',
+    path.join(repoRoot, binTarget(manifest)),
     '--help',
-    { cwd: consumer, timeout: 120_000 },
+    { cwd: repoRoot, timeout: 120_000 },
   );
-  assertEquals(help.exitCode, 0, help.result);
+  assertEquals(result.exitCode, 0, result.result);
   assertTrue(
-    help.result.includes('Commands:') &&
-      help.result.includes('init [dir]'),
-    `Unexpected help output:\n${help.result}`,
+    result.result.includes('Commands:') &&
+      result.result.includes('init [dir]'),
+    `Unexpected help output:\n${result.result}`,
   );
-
-  const target = path.join(consumer, 'generated-app');
-  const init = await cli(
-    'npx',
-    '--no-install',
-    'goatdb',
-    'init',
-    target,
-    { cwd: consumer, timeout: 300_000 },
-  );
-  assertEquals(init.exitCode, 0, init.result);
-
-  await assertScaffoldTemplates(target, 'node', repoRoot);
-  const packageJson = await readJson<{
-    dependencies?: Record<string, string>;
-    devDependencies?: Record<string, string>;
-  }>(path.join(target, 'package.json'));
-  assertExists(packageJson, 'Generated package.json missing');
-  assertTrue(
-    packageJson.dependencies?.['@goatdb/goatdb']?.includes(
-      '@jsr/goatdb__goatdb',
-    ) ?? false,
-    'Generated project must install GoatDB from the registry',
-  );
-  await assertImportsWork(target, 'node');
 }
 
-async function assertCliFailureContract(consumer: string): Promise<void> {
-  const invalid = path.join(consumer, 'invalid-app');
+async function assertCliFailureContract(
+  ctx: TestSuite,
+  repoRoot: string,
+  manifest: NpmManifest,
+): Promise<void> {
+  const invalid = await ctx.tempDir('invalid-app');
   await writeTextFile(path.join(invalid, 'package.json'), '{ invalid json');
   const result = await cli(
-    'npx',
-    '--no-install',
-    'goatdb',
+    'node',
+    path.join(repoRoot, binTarget(manifest)),
     'init',
     invalid,
-    { cwd: consumer, timeout: 120_000 },
+    { cwd: repoRoot, timeout: 120_000 },
   );
   assertEquals(result.exitCode, 1, result.result);
   assertCliFailure(result.result);
@@ -392,7 +312,7 @@ async function assertCliFailureContract(consumer: string): Promise<void> {
 export default function setupCliPackageTests() {
   TEST(
     'CLI-Package',
-    'npm tarball ships templates and loads every public entry point',
+    'built artifact ships templates and loads every public entry point',
     async (ctx) => {
       if (isBrowser() || !isNode()) return;
       if (!packageTestsEnabled()) {
@@ -402,11 +322,29 @@ export default function setupCliPackageTests() {
         return;
       }
       const repoRoot = getRuntime().getCWD();
-      const { tarball, manifest } = await buildAndPack(ctx, repoRoot);
-      const consumer = await installConsumer(ctx, tarball);
-      await assertInstalledPackage(consumer, repoRoot, manifest);
-      await assertCliWorks(consumer, repoRoot);
-      await assertCliFailureContract(consumer);
+      const build = await cli('npm', 'run', 'build:npm', {
+        cwd: repoRoot,
+        timeout: 300_000,
+      });
+      assertEquals(build.exitCode, 0, build.result);
+      await assertTemplateTree(
+        path.join(repoRoot, 'dist/cli/templates'),
+        repoRoot,
+      );
+
+      const checkout = await readJson<NpmManifest>(
+        path.join(repoRoot, 'package.json'),
+      );
+      assertExists(checkout, 'Checkout package.json missing');
+      const version = await readVersion(repoRoot);
+      const manifest = productionManifest(checkout, version);
+
+      await assertManifestTargets(repoRoot, manifest);
+      await assertExportsLoad(repoRoot, manifest);
+      await assertDistImports(repoRoot, manifest);
+      await assertDistBinInit(ctx, repoRoot, manifest);
+      await assertBuiltCli(repoRoot, manifest);
+      await assertCliFailureContract(ctx, repoRoot, manifest);
     },
   );
 }

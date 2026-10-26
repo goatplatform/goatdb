@@ -9,6 +9,10 @@
 import * as path from '../base/path.ts';
 import { cli } from '../base/development.ts';
 import {
+  getEsbuild,
+  stopBackgroundCompiler,
+} from '../base/build-dependencies.ts';
+import {
   readDir,
   readTextFile,
   writeTextFile,
@@ -23,13 +27,15 @@ export interface DenoInfo {
   modules: Array<{
     specifier: string;
     npmPackage?: string;
-    local?: string;
+    local?: path.PosixPath;
   }>;
   npmPackages: Record<string, { name: string; version: string }>;
 }
 
 /** Worker-boundary-safe recursive walk over template files. */
-async function* walkFiles(dir: string): AsyncGenerator<string> {
+async function* walkFiles(
+  dir: path.PosixPath,
+): AsyncGenerator<path.PosixPath> {
   for (const entry of await readDir(dir)) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory) {
@@ -48,9 +54,9 @@ async function* walkFiles(dir: string): AsyncGenerator<string> {
 async function templateFiles(
   runtime: CliTemplateRuntime,
   repoRoot: string,
-): Promise<Map<string, string>> {
+): Promise<Map<string, path.PosixPath>> {
   const templateRoot = path.join(repoRoot, 'cli/templates');
-  const files = new Map<string, string>();
+  const files = new Map<string, path.PosixPath>();
   for await (const source of walkFiles(templateRoot)) {
     const relative = source.slice(templateRoot.length + 1);
     if (
@@ -118,6 +124,95 @@ export async function assertTemplateTree(
   }
 }
 
+/**
+ * Parses and normalizes `deno info --json`.
+ *
+ * WHY: `deno info` emits native `PathBuf` values. On Windows those contain
+ * backslashes, so consumers must parse them into the POSIX path contract
+ * before comparing paths.
+ */
+export function parseDenoInfo(text: string): DenoInfo {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) {
+    throw new Error(`deno info produced no JSON:\n${text}`);
+  }
+  const raw = JSON.parse(text.slice(start, end + 1)) as {
+    modules: Array<{ specifier: string; npmPackage?: string; local?: string }>;
+    npmPackages: DenoInfo['npmPackages'];
+  };
+  return {
+    ...raw,
+    modules: raw.modules.map((module) => ({
+      ...module,
+      local: module.local === undefined
+        ? undefined
+        : path.parsePath(module.local),
+    })),
+  };
+}
+
+/**
+ * Builds and runs a probe that imports the scaffold's public modules.
+ *
+ * WHY: A resolvable graph can still throw on import (missing export or split
+ * React runtime). Node cannot load the checkout's .ts exports directly, so the
+ * probe is bundled exactly as a Node app would be before it runs.
+ */
+export async function assertImportsWork(
+  projectDir: path.PosixPath,
+  runtime: CliTemplateRuntime,
+): Promise<void> {
+  const sourcePath = path.join(projectDir, 'import-probe.ts');
+  const probeName = runtime === 'deno' ? 'import-probe.ts' : 'import-probe.mjs';
+  const probePath = path.join(projectDir, probeName);
+  await writeTextFile(
+    sourcePath,
+    [
+      "import { createRoot } from 'react-dom/client';",
+      "import { DataRegistry, GoatDB } from '@goatdb/goatdb';",
+      "import { useDBReady } from '@goatdb/goatdb/react';",
+      'console.log(JSON.stringify({',
+      '  createRoot: typeof createRoot,',
+      '  DataRegistry: typeof DataRegistry,',
+      '  GoatDB: typeof GoatDB,',
+      '  useDBReady: typeof useDBReady,',
+      '}));',
+    ].join('\n'),
+  );
+  if (runtime === 'node') {
+    const esbuild = await getEsbuild();
+    try {
+      await esbuild.build({
+        entryPoints: [sourcePath],
+        outfile: probePath,
+        bundle: true,
+        platform: 'node',
+        format: 'esm',
+        // Node 24 defines import.meta.main; the bundled probe is the entry, so
+        // without this the library's CLI branch runs instead of the probe.
+        define: { 'import.meta.main': 'false' },
+      });
+    } finally {
+      await stopBackgroundCompiler();
+    }
+  }
+  const { result, exitCode } = runtime === 'deno'
+    ? await cli('deno', 'run', '-A', probeName, {
+      cwd: projectDir,
+      timeout: 120_000,
+    })
+    : await cli('node', probeName, { cwd: projectDir, timeout: 120_000 });
+  assertEquals(exitCode, 0, `import probe failed:\n${result}`);
+  const parsed = JSON.parse(result.trim().split('\n').at(-1)!) as Record<
+    string,
+    string
+  >;
+  for (const name of Object.keys(parsed)) {
+    assertEquals(parsed[name], 'function', `${name} export missing`);
+  }
+}
+
 /** Parses `deno info --json` for a generated entry point. */
 export async function denoInfo(
   testDir: string,
@@ -132,66 +227,13 @@ export async function denoInfo(
     { cwd: testDir, timeout },
   );
   assertEquals(exitCode, 0, `deno info failed:\n${result}`);
-  const start = result.indexOf('{');
-  const end = result.lastIndexOf('}');
-  assertTrue(
-    start >= 0 && end > start,
-    `deno info produced no JSON:\n${result}`,
-  );
-  return JSON.parse(result.slice(start, end + 1)) as DenoInfo;
-}
-
-/** Asserts a bare specifier resolved to the expected npm subpath. */
-export function assertModuleSpecifier(
-  info: DenoInfo,
-  includes: string[],
-): void {
-  const found = info.modules.find((module) =>
-    includes.every((part) => module.specifier.includes(part))
-  );
-  assertExists(found, `No resolved module matching ${includes.join(', ')}`);
-}
-
-/** Writes and runs a probe that proves imports resolve and export values. */
-export async function assertImportsWork(
-  projectDir: string,
-  runtime: CliTemplateRuntime,
-): Promise<void> {
-  const probe = runtime === 'deno' ? 'import-probe.ts' : 'import-probe.mjs';
-  const probePath = path.join(projectDir, probe);
-  await writeTextFile(
-    probePath,
-    [
-      "import { createRoot } from 'react-dom/client';",
-      "import * as goatdb from '@goatdb/goatdb';",
-      'console.log(JSON.stringify({',
-      '  createRoot: typeof createRoot,',
-      '  goatdbExports: Object.keys(goatdb).length,',
-      '}));',
-    ].join('\n'),
-  );
-  const { result, exitCode } = runtime === 'deno'
-    ? await cli('deno', 'run', '-A', probe, {
-      cwd: projectDir,
-      timeout: 120_000,
-    })
-    : await cli('node', probe, { cwd: projectDir, timeout: 120_000 });
-  assertEquals(exitCode, 0, `import probe failed:\n${result}`);
-  const line = result.trim().split('\n').at(-1)!;
-  const parsed = JSON.parse(line) as {
-    createRoot: string;
-    goatdbExports: number;
-  };
-  assertEquals(
-    parsed.createRoot,
-    'function',
-    'react-dom/client export missing',
-  );
-  assertTrue(parsed.goatdbExports > 0, 'GoatDB exports missing');
+  return parseDenoInfo(result);
 }
 
 /** Reads a JSON file and returns undefined when it does not exist. */
-export async function readJson<T>(file: string): Promise<T | undefined> {
+export async function readJson<T>(
+  file: path.PosixPath,
+): Promise<T | undefined> {
   const text = await readTextFile(file);
   return text === undefined ? undefined : JSON.parse(text) as T;
 }

@@ -51,6 +51,8 @@ export interface CliOptions {
   cwd?: string;
   /** Timeout in milliseconds. Process is killed if it exceeds this. */
   timeout?: number;
+  /** Environment variables to add or override for the command. */
+  env?: Record<string, string>;
 }
 
 function isCliOptions(arg: unknown): arg is CliOptions {
@@ -100,6 +102,7 @@ export async function cli(
       stdout: 'piped',
       stderr: 'piped',
       cwd: options.cwd,
+      env: options.env && { ...Deno.env.toObject(), ...options.env },
       signal: ac?.signal,
     });
     try {
@@ -129,6 +132,9 @@ export async function cli(
       const onWindows = isWindows();
       const spawnOptions: Record<string, unknown> = {};
       if (options.cwd) spawnOptions.cwd = options.cwd;
+      if (options.env) {
+        spawnOptions.env = { ...globalThis.process.env, ...options.env };
+      }
       // On Windows, .cmd batch scripts (npm.cmd, deno.cmd) can't be found by
       // name without shell: true. Only safe because all cli() call sites pass
       // hardcoded commands — never user-supplied input.
