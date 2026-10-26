@@ -1,4 +1,4 @@
-import { JSONObject, ReadonlyJSONObject } from '../base/interfaces.ts';
+import type { JSONObject, ReadonlyJSONObject } from '../base/interfaces.ts';
 import { tuple4ToString } from '../base/tuple.ts';
 import { VCurrent } from '../base/version-number.ts';
 
