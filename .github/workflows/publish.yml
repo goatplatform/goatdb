@@ -40,6 +40,12 @@ jobs:
       - name: Build npm artifact
         run: npm run build:npm
 
+      # Publication check: the archive must contain every export, bin, and
+      # template. Source tests validate the checkout; this validates the
+      # release artifact.
+      - name: Verify npm archive contents
+        run: deno task verify:npm-archive
+
       # Extract version once from deno.json; reused across all publish steps (DRY).
       - name: Extract version from deno.json
         id: extract_version
