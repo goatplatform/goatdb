@@ -48,12 +48,13 @@
     "./link": "./cli/link.ts"
   },
   "tasks": {
-    "check": "deno check mod.ts server.ts server-build.ts",
+    "check": "deno check mod.ts server.ts server-build.ts && deno check --node-modules-dir=none base/json-log/json-log-worker.ts",
     "build": "deno run -A system-assets/build-sys-assets.ts",
     "test": "deno run -A tests/run.ts",
     "test:smoke": "deno run -A tests/run.ts --runtime=deno --suite=SecurityBoundaries",
-    "test:registry": "deno run -A tests/run.ts --suite=CLI-Init-Registry",
+    "test:paths": "deno run -A tests/run.ts --runtime=deno --suite=Path",
     "test:package": "deno run -A tests/run.ts --suite=CLI-Package --runtime=node",
+    "verify:npm-archive": "deno run -A scripts/verify-npm-archive.ts",
     "bench": "deno run -A benchmarks/run.ts",
     "bench:json": "deno run -A benchmarks/run.ts --output-json --output-dir=benchmarks/results",
     "bench:update-docs": "deno run -A benchmarks/update-docs.ts --input-dir=benchmarks/results",

@@ -13,7 +13,7 @@
  * to the same source paths. A new public entry therefore needs no edit here.
  */
 import { readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve } from '../base/path.ts';
 
 export interface NpmExportEntry {
   import: string;
@@ -24,6 +24,11 @@ export interface NpmManifest {
   version?: string;
   exports?: Record<string, string | NpmExportEntry>;
   [key: string]: unknown;
+}
+
+/** Manifest returned by {@link productionManifest}; every export is built. */
+export interface ProductionManifest extends NpmManifest {
+  exports: Record<string, NpmExportEntry>;
 }
 
 const kSourcePrefix = './';
@@ -66,11 +71,11 @@ function distExports(manifest: NpmManifest): Record<string, NpmExportEntry> {
 export function productionManifest(
   manifest: NpmManifest,
   version: string,
-): NpmManifest {
+): ProductionManifest {
   return { ...manifest, version, exports: distExports(manifest) };
 }
 
-async function readJson<T>(file: string): Promise<T> {
+export async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(await readFile(file, 'utf8')) as T;
 }
 
