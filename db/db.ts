@@ -1095,19 +1095,15 @@ export class GoatDB<US extends Schema = Schema>
    * method when you must ensure all previously known commits are written to the
    * local disk.
    *
-   * @param path Path to the desired repository.
+   * @param repoPath Path to the desired repository.
    * @returns    A promise that resolves after all commits have been flushed to
    *             disk.
    */
-  async flush(path: string): Promise<void> {
-    const repoId = itemPathGetRepoId(itemPathNormalize(path));
-    path = repoId;
-    if (!path.endsWith('/')) {
-      path = path + '/';
-    }
+  async flush(repoPath: string): Promise<void> {
+    const repoId = itemPathGetRepoId(itemPathNormalize(repoPath));
     const promises: Promise<void>[] = [];
     for (const [itemPath, item] of this._items) {
-      if (itemPath.startsWith(path)) {
+      if (itemPath !== repoId && path.isWithin(repoId, itemPath)) {
         promises.push(item.commit());
       }
     }

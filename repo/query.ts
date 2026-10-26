@@ -21,6 +21,7 @@ import { coreValueCompare } from '../base/core-types/comparable.ts';
 import { coreValueEquals } from '../base/core-types/equals.ts';
 import type { CoreValue } from '../base/core-types/base.ts';
 import { log } from '../logging/log.ts';
+import { isWithin } from '../base/path.ts';
 
 /**
  * A tuple representing a query result entry, containing a path and an item.
@@ -270,7 +271,7 @@ export class Query<
   private _liveListenerCleanup?: () => void;
   private _liveUpdates: boolean;
   private _resultsGeneration: number = 0;
-  private _repoPrefix: string | undefined;
+  private _repoScope?: (child: string) => boolean;
   /** @internal Closed flag -- public so lifecycle code can check without casts. */
   _closed = false;
   /** @internal One-shot idle close timer. */
@@ -935,8 +936,8 @@ export class Query<
       return;
     }
     // Only handle items in this query's repository
-    if (!this._repoPrefix) this._repoPrefix = this.repo.path + '/';
-    if (!path.startsWith(this._repoPrefix)) {
+    this._repoScope ??= (child) => isWithin(this.repo.path, child);
+    if (!this._repoScope(path)) {
       return;
     }
     const wasIncluded = this.has(path);

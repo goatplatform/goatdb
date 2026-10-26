@@ -63,7 +63,7 @@ async function addFile(
   value: Fixture,
   name: string,
   contents: string,
-): Promise<string> {
+): Promise<path.PosixPath> {
   const filePath = path.join(value.dir, name);
   await writeTextFile(filePath, contents);
   return filePath;
@@ -193,7 +193,7 @@ function staticCssLoader(cssPath: string, contents: string): Plugin {
   return cssLoader(cssPath, async () => contents);
 }
 
-async function requiredTextFile(filePath: string): Promise<string> {
+async function requiredTextFile(filePath: path.PosixPath): Promise<string> {
   const contents = await readTextFile(filePath);
   if (contents === undefined) {
     throw new Error(`Missing plugin input: ${filePath}`);
@@ -201,7 +201,10 @@ async function requiredTextFile(filePath: string): Promise<string> {
   return contents;
 }
 
-function watchedCssLoader(cssPath: string, inputPath: string): Plugin {
+function watchedCssLoader(
+  cssPath: path.PosixPath,
+  inputPath: path.PosixPath,
+): Plugin {
   return cssLoader(cssPath, () => requiredTextFile(inputPath), [inputPath]);
 }
 

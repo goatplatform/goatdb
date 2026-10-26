@@ -25,7 +25,7 @@ import { templateTargetPath } from './template-manifest.ts';
  * Returns the path to the templates directory.
  * Uses import.meta.url with fallback for bundled environments.
  */
-async function getTemplateDir(): Promise<string> {
+async function getTemplateDir(): Promise<path.PosixPath> {
   // Primary: relative to module (works for direct Deno/Node ESM execution)
   const primaryPath = path.join(
     path.dirname(path.fromFileUrl(import.meta.url)),
@@ -297,14 +297,9 @@ if (isNode() && process.argv[1]) {
     import('node:path'),
     import('node:fs'),
   ]).then(([{ fileURLToPath }, { resolve }, { realpathSync }]) => {
-    let thisFile: string = realpathSync(fileURLToPath(import.meta.url));
-    let resolved: string = realpathSync(resolve(process.argv[1]!));
-    // NTFS is case-insensitive; normalize before comparing on Windows
-    if (process.platform === 'win32') {
-      thisFile = thisFile.toLowerCase();
-      resolved = resolved.toLowerCase();
-    }
-    if (thisFile === resolved) {
+    const thisFile = realpathSync(fileURLToPath(import.meta.url));
+    const resolved = realpathSync(resolve(process.argv[1]!));
+    if (path.equals(thisFile, resolved)) {
       return runCLI(process.argv.slice(2));
     }
   }).catch(async (err) => {

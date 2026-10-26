@@ -153,11 +153,46 @@ export interface BenchmarkStatistics {
 export type RunFunc = (ctx: Suite) => Promise<void> | void;
 
 /**
+ * Owns a suite's temporary directory.
+ *
+ * WHY: tests and benchmarks share one PosixPath contract. A raw string copy
+ * drifts from the branded FileImpl API and breaks type checking.
+ */
+export class SuiteTempDir {
+  private _root: path.PosixPath | undefined;
+
+  /** Returns the suite root (or a sub-path under it), creating it on demand. */
+  async path(suiteName: string, subPath?: string): Promise<path.PosixPath> {
+    const fileImpl = await FileImplGet();
+    if (this._root === undefined) {
+      this._root = path.join(await fileImpl.getTempDir(), 'test-' + suiteName);
+    }
+    const finalPath = subPath ? path.join(this._root, subPath) : this._root;
+    await fileImpl.mkdir(finalPath);
+    return finalPath;
+  }
+
+  /** Removes the suite root. A failed removal is reported, never silent. */
+  async remove(): Promise<void> {
+    if (this._root === undefined) return;
+    const removed = await (await FileImplGet()).remove(this._root);
+    if (!removed) {
+      log({
+        severity: 'WARNING',
+        error: 'StorageError',
+        message: `Failed to remove temp dir: ${this._root}`,
+      });
+    }
+    this._root = undefined;
+  }
+}
+
+/**
  * Generic Suite class for running tests or benchmarks.
  * Provides context utilities like temp directories and database creation.
  */
 export class Suite {
-  private _tempDir: string | undefined;
+  private readonly _tempDir = new SuiteTempDir();
   private readonly results: RunResult[] = [];
   private readonly _dbs = new Map<string, GoatDB<Schema>>();
   private _customTiming: { start?: number; duration?: number } = {};
@@ -227,17 +262,7 @@ export class Suite {
       await sleep(cleanupDelayMs);
     }
 
-    if (this._tempDir) {
-      const removed = await (await FileImplGet()).remove(this._tempDir);
-      if (!removed) {
-        log({
-          severity: 'WARNING',
-          error: 'StorageError',
-          message: `Failed to remove temp dir: ${this._tempDir}`,
-        });
-      }
-      this._tempDir = undefined;
-    }
+    await this._tempDir.remove();
   }
 
   /**
@@ -246,21 +271,8 @@ export class Suite {
    * @param subPath - Optional subpath to append to the temp directory
    * @returns The full path to the temporary directory or subdirectory
    */
-  async tempDir(subPath?: string): Promise<string> {
-    if (!this._tempDir) {
-      const fileImpl = await FileImplGet();
-      const systemTempDir = await fileImpl.getTempDir();
-      this._tempDir = path.join(systemTempDir, 'test-' + this.name);
-    }
-    const finalPath = subPath
-      ? path.join(this._tempDir, subPath)
-      : this._tempDir;
-
-    // Ensure the directory exists
-    const fileImpl = await FileImplGet();
-    await fileImpl.mkdir(finalPath);
-
-    return finalPath;
+  async tempDir(subPath?: string): Promise<path.PosixPath> {
+    return await this._tempDir.path(this.name, subPath);
   }
 
   /**

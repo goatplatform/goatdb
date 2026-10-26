@@ -6,6 +6,7 @@ import {
   expectToContain,
 } from './asserts.ts';
 import { TEST } from './mod.ts';
+import * as path from '../base/path.ts';
 import { isBrowser } from '../base/common.ts';
 import type { GoatDB } from '../db/db.ts';
 import { Query } from '../repo/query.ts';
@@ -38,15 +39,16 @@ export default function setup(): void {
 
     try {
       // Test environment-appropriate properties
+      const testPath = await ctx.tempDir('db-init');
       if (isBrowser()) {
         // Browser: Client mode properties
-        assertTrue(db.path.includes('/temp/test-Trusted/db-init')); // OPFS temp path
+        assertTrue(path.isWithin(testPath, db.path)); // OPFS temp path
         assertEquals(db.mode, 'client');
       } else {
         // Server: Standalone mode properties
         assertEquals(db.orgId, 'test-org');
         assertEquals(db.mode, 'server');
-        assertTrue(db.path.includes('test-Trusted')); // tempDir path
+        assertTrue(path.isWithin(testPath, db.path)); // tempDir path
       }
 
       // Common properties for both environments

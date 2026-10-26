@@ -296,6 +296,39 @@ export default function setupJsonLogFormats() {
     );
   }
 
+  // ── Group 1.1: Path ingress ───────────────────────────────────────────────
+  TEST(
+    'JsonLogFormats',
+    'native separator path normalizes at worker ingress',
+    async (ctx) => {
+      const dir = await ctx.tempDir('jlf-native-path');
+      const filePath = path.join(dir, 'data.jsonl');
+      // The brand is compile-time only and is lost across the worker clone
+      // boundary. Simulate an untyped sender using native Windows separators.
+      const nativePath = filePath.replace(
+        /\//g,
+        '\\',
+      ) as unknown as path.PosixPath;
+
+      let file = await JSONLogFileOpen(nativePath, true);
+      try {
+        await JSONLogFileAppend(file, [makeEntry('jsonl', 'native-1')]);
+        await JSONLogFileFlush(file);
+      } finally {
+        await JSONLogFileClose(file);
+      }
+
+      file = await JSONLogFileOpen(filePath, false);
+      try {
+        const results = await scanAll(file);
+        assertEquals(results.length, 1);
+        assertEquals(decodeEntry('jsonl', results[0]).id, 'native-1');
+      } finally {
+        await JSONLogFileClose(file);
+      }
+    },
+  );
+
   // ── Group 2: Batch Boundaries ─────────────────────────────────────────────
   for (const format of ['goat', 'jsonl'] as const) {
     TEST(

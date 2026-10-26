@@ -71,11 +71,14 @@ async function assertStoreRejected(
   }
 }
 
-function markerPath(storePath: string): string {
+function markerPath(storePath: path.PosixPath): path.PosixPath {
   return path.join(storePath, kStorageFormatMarkerFile);
 }
 
-async function writeMarker(storePath: string, epoch: string): Promise<void> {
+async function writeMarker(
+  storePath: path.PosixPath,
+  epoch: string,
+): Promise<void> {
   await writeFile(markerPath(storePath), gTextEncoder.encode(epoch + '\n'));
 }
 
@@ -158,6 +161,10 @@ function isOpfsPlatformError(msg: string): boolean {
   return msg.includes('OPFS') || msg.includes('Access Handle') ||
     msg.includes('Access Handles') || msg.includes('another open') ||
     msg.includes('Writable stream') || msg.includes('InternalError');
+}
+
+async function readMarkerText(storePath: path.PosixPath): Promise<string> {
+  return new TextDecoder().decode(await readFile(markerPath(storePath)));
 }
 
 export default function setup() {

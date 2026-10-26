@@ -10,6 +10,7 @@ import * as ArrayUtils from '../base/array.ts';
 import { filterIterable, mapIterable } from '../base/common.ts';
 import { coreValueCompare } from '../base/core-types/index.ts';
 import { assert } from '../base/error.ts';
+import { isWithin } from '../base/path.ts';
 import * as SetUtils from '../base/set.ts';
 import { Edit } from '../cfds/base/edit.ts';
 import { Code, ServerError, serviceUnavailable } from '../cfds/base/errors.ts';
@@ -232,7 +233,7 @@ export class Repository<
    * auto-close.
    */
   static isSystemRepo(path: string): boolean {
-    return path === '/sys' || path.startsWith('/sys/');
+    return isWithin('/sys', path);
   }
 
   /**

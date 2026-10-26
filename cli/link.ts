@@ -46,7 +46,7 @@ import { exit } from '../base/process.ts';
 import type { JSONValue } from '../base/interfaces.ts';
 
 async function writeTextFileOrThrow(
-  filePath: string,
+  filePath: path.PosixPath,
   text: string,
 ): Promise<void> {
   if (!await writeTextFile(filePath, text)) {

@@ -13,6 +13,7 @@ import type {
 import type { OperatingSystem } from '../../os.ts';
 import type { FileImpl } from '../../json-log/file-impl-interface.ts';
 import { notReached } from '../../error.ts';
+import { parsePath } from '../../path.ts';
 
 /**
  * Browser-specific RuntimeAdapter implementation.
@@ -81,15 +82,15 @@ export const BrowserAdapter: RuntimeAdapter = {
     return info;
   },
 
-  getCWD(): string {
-    // Browser doesn't have a working directory concept
-    // Return root for OPFS paths
-    return '/';
+  getCWD() {
+    // Browser doesn't have a working directory concept.
+    // Return root for OPFS paths.
+    return parsePath('/');
   },
 
-  async getTempDir(): Promise<string> {
+  async getTempDir() {
     // Return a standard temp location in OPFS
-    return '/temp';
+    return parsePath('/temp');
   },
 
   getExecPath(): string {
@@ -104,11 +105,13 @@ export const BrowserAdapter: RuntimeAdapter = {
         ? (navigator as any).userAgentData?.platform
         : undefined;
       if (uaPlatform) {
-        const p = uaPlatform.toLowerCase();
-        if (p.includes('win')) return 'windows';
-        if (p === 'macos' || p.includes('mac')) return 'darwin';
-        if (p.includes('android')) return 'android';
-        if (p.includes('linux')) return 'linux';
+        const platformId = uaPlatform.toLowerCase();
+        if (platformId.includes('win')) return 'windows';
+        if (platformId === 'macos' || platformId.includes('mac')) {
+          return 'darwin';
+        }
+        if (platformId.includes('android')) return 'android';
+        if (platformId.includes('linux')) return 'linux';
       }
 
       // Tier 2: navigator.platform (deprecated but universally supported)

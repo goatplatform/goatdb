@@ -1,19 +1,24 @@
 import type { DirEntry } from './file-impl-interface.ts';
+import type { PosixPath } from '../path.ts';
 
 /** Strict file operations run in the worker, where OPFS sync handles exist. */
 export type WorkerReadFileReq = {
   type: 'readFile';
   id: number;
-  path: string;
+  path: PosixPath;
 };
 export type WorkerWriteFileReq = {
   type: 'writeFile';
   id: number;
-  path: string;
+  path: PosixPath;
   bytes: Uint8Array;
 };
-export type WorkerMkdirReq = { type: 'mkdir'; id: number; path: string };
-export type WorkerReadDirReq = { type: 'readDir'; id: number; path: string };
+export type WorkerMkdirReq = { type: 'mkdir'; id: number; path: PosixPath };
+export type WorkerReadDirReq = {
+  type: 'readDir';
+  id: number;
+  path: PosixPath;
+};
 
 export type WorkerReadFileResp = {
   type: 'readFile';
@@ -37,7 +42,7 @@ export type WorkerReadDirResp = {
 export type WorkerFileReqOpen = {
   type: 'open';
   id: number;
-  path: string;
+  path: PosixPath;
   write?: boolean;
 };
 
@@ -117,7 +122,7 @@ export type WorkerFileReqAppend = {
 export type WorkerReadTextFileReq = {
   type: 'readTextFile';
   id: number;
-  path: string;
+  path: PosixPath;
 };
 
 /**
@@ -130,7 +135,7 @@ export type WorkerReadTextFileReq = {
 export type WorkerWriteTextFileReq = {
   type: 'writeTextFile';
   id: number;
-  path: string;
+  path: PosixPath;
   text: string;
 };
 
@@ -142,7 +147,7 @@ export type WorkerWriteTextFileReq = {
 export type WorkerRemoveReq = {
   type: 'remove';
   id: number;
-  path: string;
+  path: PosixPath;
 };
 
 /**

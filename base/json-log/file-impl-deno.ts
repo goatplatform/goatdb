@@ -77,11 +77,11 @@ export const FileImplDeno: FileImpl<Deno.FsFile> = {
   },
 
   getCWD() {
-    return Deno.cwd();
+    return path.parsePath(Deno.cwd());
   },
 
-  getTempDir() {
-    return Deno.makeTempDir();
+  async getTempDir() {
+    return path.parsePath(await Deno.makeTempDir());
   },
 
   // Throw on failure like the Node and OPFS impls. Swallowing the error made

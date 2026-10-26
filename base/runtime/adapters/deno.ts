@@ -12,6 +12,7 @@ import type {
 } from '../index.ts';
 import type { OperatingSystem } from '../../os.ts';
 import type { FileImpl } from '../../json-log/file-impl-interface.ts';
+import { parsePath } from '../../path.ts';
 
 /**
  * Deno-specific RuntimeAdapter implementation.
@@ -84,18 +85,18 @@ export const DenoAdapter: RuntimeAdapter = {
     };
   },
 
-  getCWD(): string {
-    return Deno.cwd();
+  getCWD() {
+    return parsePath(Deno.cwd());
   },
 
-  async getTempDir(): Promise<string> {
+  async getTempDir() {
     // Deno.makeTempDir would create a new dir each time
     // Instead return the system temp directory
     const tempDir = Deno.env.get('TMPDIR') ||
       Deno.env.get('TMP') ||
       Deno.env.get('TEMP') ||
       '/tmp';
-    return tempDir;
+    return parsePath(tempDir);
   },
 
   getExecPath(): string {

@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import * as path from '../base/path.ts';
+import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 
 async function readConfig(root: string, name: string) {
-  const text = await readFile(resolve(root, name), 'utf8');
+  const text = await readFile(path.resolve(root, name), 'utf8');
   const result = ts.parseConfigFileTextToJson(name, text);
   if (result.error) {
     throw new Error(
@@ -35,7 +35,7 @@ async function publicEntries(root: string): Promise<string[]> {
   const manifest = await readConfig(root, 'package.json');
   return [
     ...Object.values(manifest.exports as Record<string, string>)
-      .map((entry) => entry.replace(/^\.\//, '')),
+      .map((entry) => path.normalize(entry)),
     ...Object.values(manifest.bin as Record<string, string>).map(binSource),
   ];
 }
@@ -43,7 +43,7 @@ async function publicEntries(root: string): Promise<string[]> {
 export async function checkNpmEntrypoints(root: string): Promise<void> {
   const expected = await publicEntries(root);
   const { default: build } = await import(
-    pathToFileURL(resolve(root, 'tsup.config.ts')).href
+    pathToFileURL(path.resolve(root, 'tsup.config.ts')).href
   );
   const config = await readConfig(root, 'tsconfig.npm.json');
   assertEntries('tsup', expected, Object.values(build.entry));
@@ -60,9 +60,10 @@ export async function checkNpmEntrypoints(root: string): Promise<void> {
 }
 
 const invokedPath = process.argv[1];
+// equals normalizes separators on both sides; native comparison misses Windows.
 if (
   invokedPath &&
-  resolve(invokedPath) === fileURLToPath(import.meta.url)
+  path.equals(path.resolve(invokedPath), path.fromFileUrl(import.meta.url))
 ) {
-  await checkNpmEntrypoints(resolve(process.argv[2] ?? '.'));
+  await checkNpmEntrypoints(path.resolve(process.argv[2] ?? '.'));
 }
