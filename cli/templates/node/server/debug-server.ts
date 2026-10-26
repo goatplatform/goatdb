@@ -35,7 +35,7 @@ async function main(): Promise<void> {
 
   // Create development server
   const server = new Server({
-    path: 'server-data',
+    path: resolve('server-data'),
     buildInfo,
     domain,
     port: PORT,

@@ -190,7 +190,7 @@ When using [`startDebugServer`](/api/GoatDB/Server/Build/functions/startDebugSer
 import { startDebugServer } from '@goatdb/goatdb/server/build';
 
 await startDebugServer({
-  path: 'server-data',
+  path: `${import.meta.dirname}/server-data`,
   buildDir: 'build',
   jsPath: 'client/main.tsx',
   setup(server) {

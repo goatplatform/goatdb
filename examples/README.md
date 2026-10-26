@@ -39,7 +39,7 @@ const schema = {
 DataRegistry.default.registerSchema(schema);
 
 // 3. Initialize database
-const db = new GoatDB({ path: './data' });
+const db = new GoatDB({ path: `${import.meta.dirname}/data` });
 await db.readyPromise();
 
 // 4. Create items

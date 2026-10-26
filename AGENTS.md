@@ -60,7 +60,8 @@ db.item('data/todos/task-123'); // FAILS - not absolute
 Database operations MUST await readiness:
 
 ```typescript
-const db = new GoatDB({ path: './data' });
+// path MUST be absolute and non-root; relative paths throw at construction.
+const db = new GoatDB({ path: `${Deno.cwd()}/data` });
 await db.readyPromise(); // MANDATORY - always
 // ... operations ...
 await db.flushAll();

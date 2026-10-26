@@ -16,6 +16,13 @@ The following behaviors are intentional artifacts of the current implementation 
 
 ### Breaking Changes
 
+- **Store path must be absolute and non-root.** `DBInstanceConfig.path` now
+  throws `DBInstanceConfig.path must be an absolute, non-root path` for
+  relative paths, the empty string, and filesystem roots such as `/`. Resolve
+  the path at the call site: `new GoatDB({ path: `${Deno.cwd()}/data` })`
+  instead of `{ path: './data' }`. Paths are normalized on ingress, and the
+  check keeps `logout()` from recursively removing the process working
+  directory.
 - **Unified `Date` wire format and redefined commit checksum.** Dates in typed
   fields now encode as `{ "__t": "D", "__v": <epoch-seconds> }` instead of a
   bare number, and a `Date` is tagged uniformly in every checksum position

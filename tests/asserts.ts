@@ -143,7 +143,7 @@ export function assertThrows(
  */
 export function assertThrowsInstanceOf(
   fn: () => unknown | Promise<unknown>,
-  errorCtor: new (...args: unknown[]) => unknown,
+  errorCtor: abstract new (...args: never[]) => unknown,
   message?: string,
 ): void | Promise<void> {
   const logStreams = getGlobalLoggerStreams();
@@ -188,6 +188,28 @@ export function assertThrowsInstanceOf(
         `Expected error to be instance of ${errorCtor.name}, got ${caughtError?.constructor?.name ?? typeof caughtError}`,
     );
   }
+}
+
+/**
+ * Asserts a callback throws an Error whose message contains `text`.
+ * @param fn - The function expected to throw
+ * @param text - The substring the error message must contain
+ * @throws {AssertionError} If no Error is thrown or the message lacks `text`
+ */
+export function assertThrowsWithMessage(
+  fn: () => unknown,
+  text: string,
+): void {
+  try {
+    fn();
+  } catch (e) {
+    assertTrue(
+      e instanceof Error && e.message.includes(text),
+      `Expected error containing "${text}", got: ${e}`,
+    );
+    return;
+  }
+  throw new AssertionError(`Expected an error containing: ${text}`);
 }
 
 /**
