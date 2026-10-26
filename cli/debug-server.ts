@@ -159,7 +159,7 @@ export async function debugConfigPaths(
     (await pathExists(localDenoConfigPath) ? localDenoConfigPath : undefined);
   const buildInfoConfigPath = options.denoJson || options.packageJson ||
     denoConfigPath || path.join(cwd, 'package.json');
-  if (!await pathExists(buildInfoConfigPath)) {
+  if (!await pathExists(path.parsePath(buildInfoConfigPath))) {
     throw new Error(
       `No config file found. Expected deno.json or package.json in "${cwd}".`,
     );
@@ -262,7 +262,8 @@ export async function startDebugServer<US extends Schema>(
   }
 
   {
-    watcher = await watchDirectory(path.resolve(options.watchDir ?? cwd));
+    const watchRoot = path.resolve(options.watchDir ?? cwd);
+    watcher = await watchDirectory(watchRoot);
 
     rebuildTimer = new SimpleTimer(300, false, async () => {
       console.log('Bundling client code...');
@@ -299,9 +300,10 @@ export async function startDebugServer<US extends Schema>(
 
     for await (const event of watcher) {
       for (const p of event.paths) {
-        const relativePath = p.startsWith(cwd)
-          ? p.substring(cwd.length + 1)
-          : p;
+        const eventPath = path.parsePath(p);
+        const relativePath = path.isWithin(watchRoot, eventPath)
+          ? path.relative(watchRoot, eventPath)
+          : eventPath;
         if (filterFunc(relativePath)) {
           console.log(`Detected change at ${relativePath}`);
           rebuildTimer.schedule();

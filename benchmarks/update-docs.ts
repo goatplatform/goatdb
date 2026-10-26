@@ -12,7 +12,7 @@
 
 import type { RunResult, RunSummary } from '../shared/runner.ts';
 import { OPERATION_ORDER } from './mod.ts';
-import * as path from '@std/path';
+import * as path from '../base/path.ts';
 
 type Runtime = 'deno' | 'node' | 'browser';
 type Results = Map<Runtime, RunSummary>;
@@ -350,13 +350,13 @@ async function main() {
   for (let i = 0; i < Deno.args.length; i++) {
     const arg = Deno.args[i];
     if (arg.startsWith('--input-dir=')) {
-      inputDir = arg.slice('--input-dir='.length);
+      inputDir = path.parsePath(arg.slice('--input-dir='.length));
     } else if (arg === '--input-dir') {
-      inputDir = Deno.args[++i];
+      inputDir = path.parsePath(Deno.args[++i]);
     } else if (arg.startsWith('--docs-path=')) {
-      docsPath = arg.slice('--docs-path='.length);
+      docsPath = path.parsePath(arg.slice('--docs-path='.length));
     } else if (arg === '--docs-path') {
-      docsPath = Deno.args[++i];
+      docsPath = path.parsePath(Deno.args[++i]);
     } else if (arg === '--dry-run') {
       dryRun = true;
     } else {

@@ -21,7 +21,7 @@ import { Schema } from '../cfds/base/schema.ts';
  * must declare its epoch, or GoatDB will reject it as an older store.
  */
 async function seedStoreSettings(
-  settingsPath: string,
+  settingsPath: path.PosixPath,
   settingsText: string,
 ): Promise<void> {
   const storeRoot = path.dirname(settingsPath);

@@ -14,6 +14,7 @@ import type { OperatingSystem } from '../../os.ts';
 import { normalizeNodePlatform } from '../../os.ts';
 import type { FileImpl } from '../../json-log/file-impl-interface.ts';
 import { notReached } from '../../error.ts';
+import { parsePath } from '../../path.ts';
 
 /**
  * Node.js-specific RuntimeAdapter implementation.
@@ -96,20 +97,22 @@ export const NodeAdapter: RuntimeAdapter = {
     };
   },
 
-  getCWD(): string {
+  getCWD() {
     // deno-lint-ignore no-explicit-any
-    return (globalThis as any).process?.cwd?.() || '/';
+    return parsePath((globalThis as any).process?.cwd?.() || '/');
   },
 
-  async getTempDir(): Promise<string> {
+  async getTempDir() {
     // deno-lint-ignore no-explicit-any
     const os = (globalThis as any).require?.('node:os');
     if (os?.tmpdir) {
-      return os.tmpdir();
+      return parsePath(os.tmpdir());
     }
     // deno-lint-ignore no-explicit-any
     const proc = (globalThis as any).process;
-    return proc?.env?.TMPDIR || proc?.env?.TMP || proc?.env?.TEMP || '/tmp';
+    return parsePath(
+      proc?.env?.TMPDIR || proc?.env?.TMP || proc?.env?.TEMP || '/tmp',
+    );
   },
 
   getExecPath(): string {

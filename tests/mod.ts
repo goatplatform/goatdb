@@ -16,8 +16,7 @@
  * in the same process, making it easier to debug and ensuring consistent
  * state between tests while maintaining high performance.
  */
-import * as path from '../base/path.ts';
-import { FileImplGet } from '../base/json-log/file-impl.ts';
+import type { PosixPath } from '../base/path.ts';
 import { isBrowser } from '../base/common.ts';
 import { getGoatConfig } from '../base/config.ts';
 import { GoatDB } from '../db/db.ts';
@@ -25,6 +24,7 @@ import type { DBInstanceConfig } from '../db/db.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
+import { SuiteTempDir } from '../shared/runner.ts';
 import { Emitter } from '../base/emitter.ts';
 
 /**
@@ -73,7 +73,7 @@ export interface TestSummary {
  */
 export class TestSuite {
   private readonly _tests: Map<string, TestFunc>;
-  private _tempDir: string | undefined;
+  private readonly _tempDir = new SuiteTempDir();
 
   /**
    * Creates a new test suite with the given name.
@@ -144,10 +144,7 @@ export class TestSuite {
    * when tests are executed directly (e.g., worker runner).
    */
   async cleanup(): Promise<void> {
-    if (this._tempDir) {
-      await (await FileImplGet()).remove(this._tempDir);
-      this._tempDir = undefined;
-    }
+    await this._tempDir.remove();
   }
 
   /**
@@ -156,21 +153,8 @@ export class TestSuite {
    * @param subPath - Optional subpath to append to the temp directory
    * @returns The full path to the temporary directory or subdirectory
    */
-  async tempDir(subPath?: string): Promise<string> {
-    if (!this._tempDir) {
-      const fileImpl = await FileImplGet();
-      const systemTempDir = await fileImpl.getTempDir();
-      this._tempDir = path.join(systemTempDir, 'test-' + this.name);
-    }
-    const finalPath = subPath
-      ? path.join(this._tempDir, subPath)
-      : this._tempDir;
-
-    // Ensure the directory exists
-    const fileImpl = await FileImplGet();
-    await fileImpl.mkdir(finalPath);
-
-    return finalPath;
+  async tempDir(subPath?: string): Promise<PosixPath> {
+    return await this._tempDir.path(this.name, subPath);
   }
 
   /**

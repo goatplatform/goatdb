@@ -2,7 +2,7 @@ import { BENCHMARK } from './mod.ts';
 import { assert } from '../base/error.ts';
 import { uniqueId } from '../base/common.ts';
 import { createSQLiteConfig, getSQLiteWorkerManager } from './sqlite-worker.ts';
-import * as path from '@std/path';
+import * as path from '../base/path.ts';
 
 // Helper to create test data
 function createTestData(count: number) {

@@ -76,6 +76,7 @@ import {
   writeTextFile,
 } from './file-impl.ts';
 import { isNode } from '../common.ts';
+import { parsePath, type PosixPath } from '../path.ts';
 
 const FILE_READ_BUF_SIZE_BYTES = 1024 * 1024;
 const PAGE_SIZE = 1024;
@@ -84,7 +85,7 @@ const NEWLINE_BYTE = 0x0a;
 const gTextDecoder = new TextDecoder();
 
 interface JSONLogFile {
-  readonly path: string;
+  readonly path: PosixPath;
   readonly write: boolean;
   readonly impl: FileImpl<unknown>;
   readonly knownIds: Set<string>;
@@ -94,7 +95,7 @@ interface JSONLogFile {
 }
 
 async function JSONLogFileOpen(
-  path: string,
+  path: PosixPath,
   write = false,
 ): Promise<JSONLogFile> {
   const impl = await FileImplGet();
@@ -651,6 +652,9 @@ async function handleRequest(
   const req = isNode()
     ? (event as WorkerFileReq)
     : (event as MessageEvent<WorkerFileReq>).data;
+  // Structured clone erases the compile-time PosixPath brand. Normalize once
+  // at the worker ingress so native separators cannot reach FileImpl.
+  if ('path' in req) req.path = parsePath(req.path);
   switch (req.type) {
     case 'open': {
       const handle = ++gFileHandleNum;
@@ -901,6 +905,12 @@ export function jsonLogWorkerMain(): void {
     gPostMessage = (msg, transfer) => parentPort.postMessage(msg, transfer);
   } else {
     onmessage = safeHandler;
-    gPostMessage = (msg, transfer) => postMessage(msg, transfer ?? []);
+    // lib.dom types postMessage as a window API; the worker runtime accepts a
+    // transfer list. Cast at the runtime boundary.
+    gPostMessage = (msg, transfer) =>
+      (postMessage as (
+        message: unknown,
+        transfer?: Transferable[],
+      ) => void)(msg, transfer ?? []);
   }
 }

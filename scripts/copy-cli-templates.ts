@@ -10,7 +10,7 @@
  * the build output and ship them in the npm tarball.
  */
 import { cpSync, rmSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve } from '../base/path.ts';
 
 const root = process.cwd();
 const source = resolve(root, 'cli/templates');

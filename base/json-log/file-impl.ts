@@ -54,7 +54,7 @@ export async function FileImplGet(): Promise<FileImpl<unknown>> {
  * @returns Promise<Uint8Array> The contents of the file as a byte array
  * @throws Will throw an error if the file cannot be opened or read
  */
-export async function readFile(path: string): Promise<Uint8Array> {
+export async function readFile(path: path.PosixPath): Promise<Uint8Array> {
   const impl = await FileImplGet();
   const handle = await impl.open(path, false);
   try {
@@ -89,7 +89,9 @@ export async function readFile(path: string): Promise<Uint8Array> {
  * @returns Promise<string | undefined> The contents of the file as a string, or
  *                                     undefined if the file could not be read
  */
-export async function readTextFile(path: string): Promise<string | undefined> {
+export async function readTextFile(
+  path: path.PosixPath,
+): Promise<string | undefined> {
   try {
     const decoder = new TextDecoder();
     return decoder.decode(await readFile(path));
@@ -108,7 +110,10 @@ export async function readTextFile(path: string): Promise<string | undefined> {
  * @returns Promise<void> Resolves when the write is complete
  * @throws Will throw an error if the file cannot be opened or written
  */
-export async function writeFile(path: string, buf: Uint8Array): Promise<void> {
+export async function writeFile(
+  path: path.PosixPath,
+  buf: Uint8Array,
+): Promise<void> {
   const impl = await FileImplGet();
   const handle = await impl.open(path, true);
   try {
@@ -131,7 +136,7 @@ export async function writeFile(path: string, buf: Uint8Array): Promise<void> {
  * @returns Promise<boolean> True if the write succeeded, false if it failed
  */
 export async function writeTextFile(
-  path: string,
+  path: path.PosixPath,
   text: string,
 ): Promise<boolean> {
   try {
@@ -149,7 +154,7 @@ export async function writeTextFile(
  * @param path The path to check
  * @returns Promise<boolean> True if the path exists, false otherwise
  */
-export async function pathExists(path: string): Promise<boolean> {
+export async function pathExists(path: path.PosixPath): Promise<boolean> {
   const impl = await FileImplGet();
   return impl.exists(path);
 }
@@ -163,8 +168,8 @@ export async function pathExists(path: string): Promise<boolean> {
  * @throws Will throw an error if the source file doesn't exist or copy fails
  */
 export async function copyFile(
-  srcPath: string,
-  destPath: string,
+  srcPath: path.PosixPath,
+  destPath: path.PosixPath,
 ): Promise<void> {
   const impl = await FileImplGet();
   await impl.copyFile(srcPath, destPath);
@@ -177,7 +182,7 @@ export async function copyFile(
  * @param path The path where to create the directory
  * @returns Rejects on failure.
  */
-export async function mkdir(path: string): Promise<void> {
+export async function mkdir(path: path.PosixPath): Promise<void> {
   const impl = await FileImplGet();
   await impl.mkdir(path);
 }
@@ -187,7 +192,7 @@ export async function mkdir(path: string): Promise<void> {
  *
  * @returns The current working directory path
  */
-export async function getCWD(): Promise<string> {
+export async function getCWD(): Promise<path.PosixPath> {
   const impl = await FileImplGet();
   return impl.getCWD();
 }
@@ -198,7 +203,7 @@ export async function getCWD(): Promise<string> {
  * @param dirPath The path to the directory
  * @returns Promise<DirEntry[]> Array of directory entries
  */
-export async function readDir(dirPath: string): Promise<DirEntry[]> {
+export async function readDir(dirPath: path.PosixPath): Promise<DirEntry[]> {
   const impl = await FileImplGet();
   return impl.readDir(dirPath);
 }
@@ -221,9 +226,9 @@ export interface WalkOptions {
  * @yields Absolute file paths
  */
 export async function* walkDir(
-  dir: string,
+  dir: path.PosixPath,
   options?: WalkOptions,
-): AsyncGenerator<string> {
+): AsyncGenerator<path.PosixPath> {
   const impl = await FileImplGet();
   yield* walkDirImpl(
     impl,
@@ -236,11 +241,11 @@ export async function* walkDir(
 
 async function* walkDirImpl(
   impl: FileImpl<unknown>,
-  dir: string,
+  dir: path.PosixPath,
   includeDirs: boolean,
   maxDepth: number | undefined,
   currentDepth: number,
-): AsyncGenerator<string> {
+): AsyncGenerator<path.PosixPath> {
   const entries = await impl.readDir(dir);
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);

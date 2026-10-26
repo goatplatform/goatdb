@@ -35,6 +35,7 @@ import type {
   WorkerWriteTextFileReq,
 } from './json-log-worker-req.ts';
 import type { DirEntry } from './file-impl-interface.ts';
+import type { PosixPath } from '../path.ts';
 import { getRuntime } from '../runtime/index.ts';
 import { log } from '../../logging/log.ts';
 import type { LogEntry } from '../../logging/log.ts';
@@ -197,7 +198,7 @@ function handleResponse(resp: WorkerFileResp): void {
  * @returns A {@link JSONLogFile} handle that can be used with other operations
  */
 export async function JSONLogFileOpen(
-  filePath: string,
+  filePath: PosixPath,
   write = false,
 ): Promise<JSONLogFile> {
   return (
@@ -367,7 +368,7 @@ export async function JSONLogFileAppend(
 // Worker-backed file operations (worker owns FileImpl; direct calls break OPFS
 // handle discipline). Rule source: tests/worker-boundary.test.ts.
 /** Reads file bytes in the worker. I/O failures reject without suppression. */
-export async function readFile(path: string): Promise<Uint8Array> {
+export async function readFile(path: PosixPath): Promise<Uint8Array> {
   return (await sendRequest<WorkerReadFileReq>({ type: 'readFile', path }))
     .bytes;
 }
@@ -377,19 +378,19 @@ export async function readFile(path: string): Promise<Uint8Array> {
  * caller's buffer stays attached. Fine for markers. Not for large files.
  */
 export async function writeFile(
-  path: string,
+  path: PosixPath,
   bytes: Uint8Array,
 ): Promise<void> {
   await sendRequest<WorkerWriteFileReq>({ type: 'writeFile', path, bytes });
 }
 
 /** Creates a directory recursively in the worker. I/O failures reject. */
-export async function mkdir(path: string): Promise<void> {
+export async function mkdir(path: PosixPath): Promise<void> {
   await sendRequest<WorkerMkdirReq>({ type: 'mkdir', path });
 }
 
 /** Lists a directory in the worker. I/O failures reject. */
-export async function readDir(path: string): Promise<DirEntry[]> {
+export async function readDir(path: PosixPath): Promise<DirEntry[]> {
   return (await sendRequest<WorkerReadDirReq>({ type: 'readDir', path }))
     .entries;
 }
@@ -401,7 +402,9 @@ export async function readDir(path: string): Promise<DirEntry[]> {
  * @returns The contents of the file as a string, or undefined if the file does
  *          not exist
  */
-export async function readTextFile(path: string): Promise<string | undefined> {
+export async function readTextFile(
+  path: PosixPath,
+): Promise<string | undefined> {
   return (
     await sendRequest<WorkerReadTextFileReq>({
       type: 'readTextFile',
@@ -419,7 +422,7 @@ export async function readTextFile(path: string): Promise<string | undefined> {
  *          successfully, or false if it does not exist
  */
 export async function writeTextFile(
-  path: string,
+  path: PosixPath,
   text: string,
 ): Promise<boolean> {
   return (
@@ -438,7 +441,7 @@ export async function writeTextFile(
  * @returns A promise that resolves to true if the file was removed
  *          successfully, or false if it does not exist or could not be removed
  */
-export async function remove(path: string): Promise<boolean> {
+export async function remove(path: PosixPath): Promise<boolean> {
   return (
     await sendRequest<WorkerRemoveReq>({
       type: 'remove',
