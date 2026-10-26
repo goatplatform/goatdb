@@ -17,10 +17,12 @@ import {
 import * as path from '../base/path.ts';
 import { isBrowser, isNode } from '../base/common.ts';
 import {
+  mkdir,
   pathExists,
   readTextFile,
   writeTextFile,
 } from '../base/json-log/file-impl.ts';
+import { readdir, realpath, symlink } from 'node:fs/promises';
 import {
   bundleServerForSEA,
   denoExecutableName,
@@ -32,9 +34,14 @@ import { goatEntryPoints } from '../cli/link.ts';
 import type { Plugin } from 'esbuild';
 import { getRuntime } from '../base/runtime/index.ts';
 import { cli } from '../base/development.ts';
-import { assertScaffoldTemplates, denoInfo } from './cli-template-utils.ts';
+import {
+  assertImportsWork,
+  assertScaffoldTemplates,
+  type DenoInfo,
+  denoInfo,
+} from './cli-template-utils.ts';
 
-async function readJsonFile<T>(filePath: string): Promise<T> {
+async function readJsonFile<T>(filePath: path.PosixPath): Promise<T> {
   const text = await readTextFile(filePath);
   assertExists(text, `Expected JSON file at ${filePath}`);
   return JSON.parse(text) as T;
@@ -97,6 +104,54 @@ async function assertLocalGoatDB(
 }
 
 /**
+ * Links the checkout's installed dependencies into the generated project.
+ *
+ * WHY: The E2E must resolve the current checkout and its pinned local
+ * dependencies. Running `npm install` here would make the test depend on
+ * registry availability and a published dependency graph.
+ */
+async function linkLocalDependencies(
+  projectDir: string,
+  repoRoot: string,
+): Promise<void> {
+  const sourceRoot = path.join(repoRoot, 'node_modules');
+  const targetRoot = path.join(projectDir, 'node_modules');
+  await mkdir(targetRoot);
+
+  const linkDir = async (source: string, target: string): Promise<void> => {
+    const resolved = await realpath(source);
+    await symlink(
+      resolved,
+      target,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+  };
+
+  for (const entry of await readdir(sourceRoot, { withFileTypes: true })) {
+    if (entry.name.startsWith('.')) continue;
+    const source = path.join(sourceRoot, entry.name);
+    if (entry.name.startsWith('@')) {
+      const targetScope = path.join(targetRoot, entry.name);
+      await mkdir(targetScope);
+      for (const child of await readdir(source, { withFileTypes: true })) {
+        if (child.name.startsWith('.')) continue;
+        // The checkout is linked below, never an installed copy.
+        if (entry.name === '@goatdb' && child.name === 'goatdb') continue;
+        await linkDir(
+          path.join(source, child.name),
+          path.join(targetScope, child.name),
+        );
+      }
+    } else {
+      await linkDir(source, path.join(targetRoot, entry.name));
+    }
+  }
+
+  // The package under test is the checkout, never an installed copy.
+  await linkDir(repoRoot, path.join(targetRoot, '@goatdb/goatdb'));
+}
+
+/**
  * Adds the template-only npm imports that GoatDB does not export. `linkGoatDB`
  * injects the checkout's own import map, so only these two remain external.
  * Specs come from the scaffold's own list, so the E2E resolves the same ranges
@@ -119,6 +174,36 @@ async function addDenoTemplateImports(
   imports['@types/react'] ??= typesReact;
   denoJson.imports = imports;
   await writeTextFile(denoJsonPath, JSON.stringify(denoJson, null, 2) + '\n');
+}
+
+/**
+ * Asserts react and react-dom resolve to one version.
+ *
+ * WHY: cli/init.ts keeps them aligned with matching ranges. A split resolves at
+ * runtime with "Incompatible React versions", and no other source test checks
+ * the generated graph.
+ */
+function assertReactVersionParity(info: DenoInfo): void {
+  const versionOf = (name: string): string => {
+    const versions = new Set(
+      Object.values(info.npmPackages)
+        .filter((pkg) => pkg.name === name)
+        .map((pkg) => pkg.version),
+    );
+    assertEquals(
+      versions.size,
+      1,
+      `Expected exactly one resolved ${name} version, got ${
+        [...versions].join(', ') || 'none'
+      }`,
+    );
+    return [...versions][0];
+  };
+  assertEquals(
+    versionOf('react'),
+    versionOf('react-dom'),
+    'react and react-dom must resolve to one version (cli/init.ts parity)',
+  );
 }
 
 export default function setupCliCompileTests() {
@@ -268,13 +353,12 @@ export default function setupCliCompileTests() {
     },
   );
 
-  // Heavy E2E test — resource-intensive, recommended to run in isolation
+  // Heavy E2E test - resource-intensive, recommended to run in isolation.
   // This test is expensive as it:
   // 1. Bootstraps a full project
-  // 2. Installs dependencies
+  // 2. Links the checkout's installed dependencies
   // 3. Compiles to binary
-  // 4. Starts the server
-  // 5. Verifies HTTP responses
+  // 4. Runs the binary and verifies its CLI surface
   //
   // To run: deno task test --test="should compile executable"
   TEST(
@@ -334,31 +418,33 @@ export default function setupCliCompileTests() {
           initModule.kDenoTemplateNpmDependencies,
         );
       } else {
-        console.log(
-          'Installing template dependencies against the local link...',
-        );
-        const installResult = await cli('npm', 'install', {
-          cwd: testDir,
-          timeout: 180_000,
-        });
-        if (installResult.exitCode !== 0) {
-          throw new Error(
-            `npm install failed with exit code ${installResult.exitCode}:\n${installResult.result}`,
-          );
-        }
+        console.log('Linking local dependencies...');
+        await linkLocalDependencies(testDir, goatdbRoot);
       }
 
       await assertLocalGoatDB(testDir, goatdbRoot);
 
+      // Import execution, not only graph resolution: the generated project
+      // must load React and GoatDB without throwing.
+      await assertImportsWork(
+        testDir,
+        runtime.id === 'deno' ? 'deno' : 'node',
+      );
+
       // Resolve the real graph, not only the config that describes it.
       if (runtime.id === 'deno') {
         const info = await denoInfo(testDir, 'client/index.tsx');
-        // WHY normalize separators: `deno info` reports native paths, so a
-        // POSIX-only containment check silently misses Windows.
-        const inVendor = (local: string | undefined) =>
-          (local ?? '').replaceAll('\\', '/').includes('/vendor/goatdb/');
+        assertReactVersionParity(info);
+        // `deno info` canonicalizes the temp root (e.g. /var -> /private/var
+        // on macOS), so compare against the canonical temp path while keeping
+        // the vendor/goatdb segment under test.
+        const canonicalTestDir = path.parsePath(await Deno.realPath(testDir));
+        const vendorRoot = path.join(canonicalTestDir, 'vendor/goatdb');
         assertTrue(
-          info.modules.some((module) => inVendor(module.local)),
+          info.modules.some((module) =>
+            module.local !== undefined &&
+            path.isWithin(vendorRoot, module.local)
+          ),
           'Generated graph must resolve GoatDB from vendor/goatdb',
         );
         assertTrue(
@@ -408,7 +494,7 @@ export default function setupCliCompileTests() {
       // path (including `.exe` for Windows targets), so the test never
       // re-derives the platform-specific name.
       assertTrue(
-        await pathExists(binaryPath),
+        await pathExists(path.parsePath(binaryPath)),
         `Binary should exist at ${binaryPath}`,
       );
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve } from '../base/path.ts';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -43,6 +43,21 @@ function check(path: string, missing?: string) {
     assert.equal(result.status, 0, result.stderr);
   }
 }
+
+test('npm entrypoint guard runs as a script from its own path', async () => {
+  const path = await mkdtemp(resolve(root, '.npm-entrypoints-'));
+  try {
+    // Empty cwd: only a live main-module guard reaches checkNpmEntrypoints.
+    const result = spawnSync(process.execPath, [guard], {
+      cwd: path,
+      encoding: 'utf8',
+      timeout: 10_000,
+    });
+    assert.equal(result.status, 1, result.stderr);
+  } finally {
+    await rm(path, { recursive: true, force: true });
+  }
+});
 
 test('npm entrypoint guard accepts the real public entrypoints', async () => {
   await fixture(async (path) => check(path));

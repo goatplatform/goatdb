@@ -35,8 +35,12 @@ import setupClusterLatency from './cluster-latency.test.ts';
 import setupCliInitTests from './cli-init.test.ts';
 import setupCliCompileTests from './cli-compile.test.ts';
 import setupCliPackageTests from './cli-package.test.ts';
+import setupNoRegistryDependencyTests from './no-registry-dependency.test.ts';
 import setupCliBuildAssetsTests from './cli-build-assets.test.ts';
 import setupPathTests from './path.test.ts';
+import setupCliPathNormalizationTests from './cli-path-normalization.test.ts';
+import setupPathBoundaryTests from './path-boundaries.test.ts';
+import setupPathPropertyTests from './path-property.test.ts';
 import setupRuntimeTests from './runtime.test.ts';
 import setupCoroutineQueueTests from './coroutine-queue.test.ts';
 import setupCoroutineSchedulerTests from './coroutine-scheduler.test.ts';
@@ -72,6 +76,7 @@ import setupHashMap from './hash-map.test.ts';
 import setupCoreValueCompare from './core-value-compare.test.ts';
 import setupCoreValueSerialization from './core-value-serialization.test.ts';
 import setupStorageFormatEpoch from './storage-format-epoch.test.ts';
+import setupDBConfig from './db-config.test.ts';
 import setupDocsMdxEscape from './docs-mdx-escape.test.ts';
 import setupAutoClose from './auto-close.test.ts';
 
@@ -90,6 +95,9 @@ export async function registerAllTests(): Promise<void> {
   setupOrderstamp(); // Utility functions for distributed timestamps
   setupItemPath(); // Path validation and parsing logic
   setupPathTests(); // Cross-platform path utilities
+  setupCliPathNormalizationTests(); // deno info path normalization (all OSes)
+  setupPathBoundaryTests(); // Path contract static fitness function
+  setupPathPropertyTests(); // Path contract properties and Node oracle
   setupRuntimeTests(); // Runtime abstraction layer invariants
   setupProgressTests(); // TUI progress tracking - Task state machine, aggregation
   setupTestFrameworkSkip(); // Skip vs pass vs failure, and the fail-on-skip gate
@@ -113,6 +121,7 @@ export async function registerAllTests(): Promise<void> {
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
   setupStorageFormatEpoch(); // Store-root storage-format epoch fail-fast
+  setupDBConfig(); // DB store-path config validation and normalization
   setupCoroutineQueueTests(); // Coroutine FIFO execution contract
   setupCoroutineSchedulerTests(); // Coroutine failure isolation contract
   setupBinaryEncoding(); // Binary commit format encoding roundtrip
@@ -121,7 +130,8 @@ export async function registerAllTests(): Promise<void> {
   setupSecurityBoundaries(); // Security boundary invariants (auth, sync, signatures)
   setupGoatRequestTest(); // HTTP request processing
   setupCliInitTests(); // CLI scaffolding functionality
-  setupCliPackageTests(); // npm tarball, bin, and template contract (gated)
+  setupNoRegistryDependencyTests(); // Test-suite registry boundary
+  setupCliPackageTests(); // Built artifact, bin, and template contract
   setupMergeLCA(); // Lowest Common Ancestor / merge base
   setupMergeRecord(); // Record merge and schema upgrade
   setupMergeCorruption(); // Corruption detection via checksums

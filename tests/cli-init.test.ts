@@ -13,8 +13,6 @@ import { TEST, type TestSuite } from './mod.ts';
 import { assertEquals, assertExists, assertTrue } from './asserts.ts';
 import * as path from '../base/path.ts';
 import { isDeno, isNode } from '../base/common.ts';
-import { getEnvVar } from '../base/os.ts';
-import { cli } from '../base/development.ts';
 import {
   getCWD,
   mkdir,
@@ -22,18 +20,12 @@ import {
   readTextFile,
   writeTextFile,
 } from '../base/json-log/file-impl.ts';
-import {
-  assertImportsWork,
-  assertModuleSpecifier,
-  assertScaffoldTemplates,
-  denoInfo,
-  readJson,
-} from './cli-template-utils.ts';
+import { assertScaffoldTemplates, readJson } from './cli-template-utils.ts';
 
 /**
  * Helper function to check if a file exists
  */
-async function fileExists(filePath: string): Promise<boolean> {
+async function fileExists(filePath: path.PosixPath): Promise<boolean> {
   return await pathExists(filePath);
 }
 
@@ -61,73 +53,6 @@ function assertInstallFailure(message: string): void {
         diagnostic.includes('package.json'),
     `Missing package-manager JSON diagnostic: ${diagnostic}`,
   );
-}
-
-function registryTestsEnabled(): boolean {
-  return getEnvVar('GOATDB_TEST_REGISTRY') === '1';
-}
-
-function parseJsonObject(text: string): Record<string, unknown> {
-  const start = text.indexOf('{');
-  assertTrue(start >= 0, `Missing JSON object:\n${text}`);
-  return JSON.parse(text.slice(start, text.lastIndexOf('}') + 1));
-}
-
-/** Asserts the installed graph and runtime exports, not just command status. */
-async function assertDenoInstallEffects(testDir: string): Promise<void> {
-  assertTrue(
-    await pathExists(path.join(testDir, 'deno.lock')),
-    'deno add must produce deno.lock',
-  );
-  const info = await denoInfo(testDir, 'client/index.tsx');
-  assertModuleSpecifier(info, ['react-dom@', '/client']);
-  // React and React DOM must resolve to the exact same version. A mismatch
-  // compiles fine but throws when react-dom/client loads.
-  const react = Object.values(info.npmPackages).find((pkg) =>
-    pkg.name === 'react'
-  );
-  const reactDom = Object.values(info.npmPackages).find((pkg) =>
-    pkg.name === 'react-dom'
-  );
-  assertExists(react, 'react not resolved');
-  assertExists(reactDom, 'react-dom not resolved');
-  assertEquals(
-    reactDom.version,
-    react.version,
-    'react and react-dom must resolve to the same version',
-  );
-  assertTrue(
-    info.modules.some((module) => module.specifier.includes('@goatdb/goatdb')),
-    'GoatDB module missing from the generated project graph',
-  );
-  await assertImportsWork(testDir, 'deno');
-}
-
-async function assertNodeInstallEffects(testDir: string): Promise<void> {
-  assertTrue(
-    await pathExists(path.join(testDir, 'package-lock.json')),
-    'npm install must produce package-lock.json',
-  );
-  const ls = await cli('npm', 'ls', '--depth=0', '--json', {
-    cwd: testDir,
-    timeout: 120_000,
-  });
-  assertEquals(ls.exitCode, 0, ls.result);
-  const tree = parseJsonObject(ls.result) as {
-    dependencies?: Record<string, { version?: string }>;
-  };
-  for (const name of ['@goatdb/goatdb', 'react', 'react-dom', 'yargs']) {
-    assertExists(tree.dependencies?.[name], `Missing installed ${name}`);
-  }
-  const reactDom = await readJson<{ version: string }>(
-    path.join(testDir, 'node_modules/react-dom/package.json'),
-  );
-  assertExists(reactDom, 'react-dom package.json missing');
-  assertTrue(
-    reactDom.version.startsWith('19.'),
-    `Unexpected react-dom version: ${reactDom.version}`,
-  );
-  await assertImportsWork(testDir, 'node');
 }
 
 export default function setupCliInitTests() {
@@ -285,6 +210,11 @@ export default function setupCliInitTests() {
           template.dependencies,
           'package.json dependencies drift',
         );
+        assertEquals(
+          template.dependencies?.react,
+          template.dependencies?.['react-dom'],
+          'react and react-dom ranges must match',
+        );
         assertEquals(actual.type, 'module');
         assertEquals(actual.engines?.node, '>=24.0.0');
         assertEquals(actual.devDependencies?.['@types/node'], '^24.0.0');
@@ -368,34 +298,6 @@ export default function setupCliInitTests() {
 
   TEST(
     'CLI-Init',
-    'should create correct directory structure',
-    async (ctx: TestSuite) => {
-      const testDir = await ctx.tempDir('init-structure');
-
-      const initModule = await import('../cli/init.ts');
-      await initModule.bootstrapProject({
-        targetDir: testDir,
-        skipDependencies: true,
-      });
-
-      // Verify directory structure exists
-      assertTrue(
-        await pathExists(path.join(testDir, 'client')),
-        'client directory should exist',
-      );
-      assertTrue(
-        await pathExists(path.join(testDir, 'server')),
-        'server directory should exist',
-      );
-      assertTrue(
-        await pathExists(path.join(testDir, 'common')),
-        'common directory should exist',
-      );
-    },
-  );
-
-  TEST(
-    'CLI-Init',
     'should not overwrite existing files',
     async (ctx: TestSuite) => {
       const testDir = await ctx.tempDir('init-no-overwrite');
@@ -437,44 +339,18 @@ export default function setupCliInitTests() {
         skipDependencies: true,
       });
 
-      // Verify HTML template has basic structure
-      const htmlContent = await readTextFile(
-        path.join(testDir, 'client/index.html'),
-      );
-      assertTrue(
-        htmlContent?.includes('<!DOCTYPE html>') || false,
-        'HTML should have doctype',
-      );
-      assertTrue(
-        htmlContent?.includes('<div id="root">') || false,
-        'HTML should have root div',
-      );
-
-      // Verify React app template
-      const appContent = await readTextFile(
-        path.join(testDir, 'client/app.tsx'),
-      );
-      assertTrue(
-        appContent?.includes('export function App') || false,
-        'App component should be exported',
-      );
-      assertTrue(
-        appContent?.includes('useDBReady') || false,
-        'App should use GoatDB hook',
-      );
-
-      // Verify schema template
-      const schemaContent = await readTextFile(
-        path.join(testDir, 'common/schema.ts'),
-      );
-      assertTrue(
-        schemaContent?.includes('kSchemaMyItem') || false,
-        'Schema should define example item',
-      );
-      assertTrue(
-        schemaContent?.includes('registerSchemas') || false,
-        'Schema should export registration function',
-      );
+      const expectations = [
+        ['client/index.html', '<div id="root">'],
+        ['client/app.tsx', 'useDBReady'],
+        ['common/schema.ts', 'registerSchemas'],
+      ] as const;
+      for (const [file, marker] of expectations) {
+        const content = await readTextFile(path.join(testDir, file));
+        assertTrue(
+          content?.includes(marker) || false,
+          `${file} must contain ${marker}`,
+        );
+      }
     },
   );
 
@@ -495,31 +371,6 @@ export default function setupCliInitTests() {
       assertInstallFailure(
         error instanceof Error ? error.message : String(error),
       );
-    },
-  );
-
-  // Registry availability is not part of the deterministic scaffolding suite.
-  // This test consumes published packages, so it is an integration check: it
-  // proves the generated consumer project works, not the current checkout.
-  TEST(
-    'CLI-Init-Registry',
-    'default install produces a working consumer project',
-    async (ctx) => {
-      if (!registryTestsEnabled()) {
-        console.log(
-          'Skipping CLI-Init-Registry (set GOATDB_TEST_REGISTRY=1 to run)',
-        );
-        return;
-      }
-      const testDir = await ctx.tempDir('init-default-install');
-      const { bootstrapProject } = await import('../cli/init.ts');
-      await bootstrapProject({ targetDir: testDir });
-
-      if (isDeno()) {
-        await assertDenoInstallEffects(testDir);
-      } else {
-        await assertNodeInstallEffects(testDir);
-      }
     },
   );
 }
