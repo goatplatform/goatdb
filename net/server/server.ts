@@ -35,6 +35,7 @@ import {
   type ServeHandlerInfo,
   serviceUnavailableResponse,
   StartStopGate,
+  validateStopTimeout,
 } from './http-compat.ts';
 import { generateSelfSignedCertificate } from './crypto-utils.ts';
 
@@ -743,6 +744,13 @@ export class Server<US extends Schema> {
    * still observe the primary stop result.
    */
   stop(options?: HttpServerStopOptions): Promise<void> {
+    // WHY: validate before escalating or clearing state, so a rejected budget
+    // leaves the server and its databases untouched.
+    try {
+      validateStopTimeout(options);
+    } catch (error) {
+      return Promise.reject(error);
+    }
     // WHY: the lifecycle gate may queue this stop behind a restart, so force
     // must interrupt the active teardown now; the queued stop still closes the
     // restarted listener.

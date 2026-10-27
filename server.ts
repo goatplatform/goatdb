@@ -27,6 +27,7 @@ export type {
 export {
   createHttpServer,
   DEFAULT_STOP_TIMEOUT_MS,
+  MAX_STOP_TIMEOUT_MS,
 } from './net/server/http-compat.ts';
 export type {
   GoatHeaders,

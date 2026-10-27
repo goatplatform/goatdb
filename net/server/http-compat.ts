@@ -488,6 +488,32 @@ export function serviceUnavailableResponse(): Response {
 /** Default graceful drain budget for {@link MinimalHttpServer.stop}. */
 export const DEFAULT_STOP_TIMEOUT_MS = 10_000;
 
+/**
+ * Largest delay `setTimeout` honors. Larger values overflow the internal
+ * 32-bit timer and fire after about 1 ms, which would turn a long drain budget
+ * into an immediate force-close.
+ */
+export const MAX_STOP_TIMEOUT_MS = 2_147_483_647;
+
+/**
+ * Rejects a drain budget the timers cannot honor: a non-integer, a negative
+ * value, or one above {@link MAX_STOP_TIMEOUT_MS}. Callers validate before
+ * touching any state, so a rejected stop leaves the server running.
+ */
+export function validateStopTimeout(options?: HttpServerStopOptions): void {
+  const timeoutMs = options?.timeoutMs;
+  if (timeoutMs === undefined) return;
+  if (
+    !Number.isInteger(timeoutMs) || timeoutMs < 0 ||
+    timeoutMs > MAX_STOP_TIMEOUT_MS
+  ) {
+    throw new RangeError(
+      `timeoutMs must be an integer between 0 and ${MAX_STOP_TIMEOUT_MS}, ` +
+        `got ${timeoutMs}`,
+    );
+  }
+}
+
 /** Options for {@link MinimalHttpServer.stop}. */
 export interface HttpServerStopOptions {
   /**
@@ -813,6 +839,13 @@ export abstract class BaseHttpServer<L> implements MinimalHttpServer {
   }
 
   stop(options: HttpServerStopOptions = {}): Promise<void> {
+    // WHY: validate before escalating or clearing state, so a rejected budget
+    // leaves the listener untouched.
+    try {
+      validateStopTimeout(options);
+    } catch (error) {
+      return Promise.reject(error);
+    }
     // WHY: the lifecycle gate may queue this stop behind a restart, so force
     // must interrupt the active teardown now; the queued stop still closes the
     // restarted listener.

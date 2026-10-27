@@ -1,5 +1,9 @@
 /** Real-socket shutdown contract for both server runtimes. */
-import { DEFAULT_STOP_TIMEOUT_MS, Server } from '../server.ts';
+import {
+  DEFAULT_STOP_TIMEOUT_MS,
+  MAX_STOP_TIMEOUT_MS,
+  Server,
+} from '../server.ts';
 import {
   awaitPendingStop,
   createHttpServer,
@@ -1147,6 +1151,129 @@ export default function setupHttpServerStop() {
       assertEquals(outcome, 'rejected', 'the failing op must report its error');
       await next;
       assertTrue(ran, 'a rejected op must not block the queue');
+    },
+  );
+
+  TEST(
+    'HttpServerStop',
+    'invalid drain budgets are rejected and leave the listener bound',
+    async () => {
+      const server = createHttpServer();
+      try {
+        await server.start(() => Promise.resolve(new Response('ok')), 0);
+        const port = requirePort(server);
+        const invalid = [
+          MAX_STOP_TIMEOUT_MS + 1,
+          -1,
+          Number.NaN,
+          1.5,
+          Number.POSITIVE_INFINITY,
+        ];
+        for (const timeoutMs of invalid) {
+          const outcome = await server.stop({ timeoutMs }).then(
+            () => 'resolved',
+            (error: unknown) => error,
+          );
+          assertTrue(
+            outcome instanceof RangeError,
+            `timeoutMs ${timeoutMs} must reject with a RangeError`,
+          );
+        }
+        assertEquals(
+          server.port,
+          port,
+          'a rejected budget must leave the listener bound',
+        );
+        const response = await bounded(request(server));
+        assertEquals(await response.text(), 'ok', 'server must still serve');
+      } finally {
+        await server.stop({ force: true });
+      }
+    },
+  );
+
+  TEST(
+    'HttpServerStop',
+    'the maximum drain budget still waits for an active request',
+    async () => {
+      const server = createHttpServer();
+      const started = deferred();
+      const release = deferred();
+      try {
+        await server.start(async () => {
+          started.resolve();
+          await release.promise;
+          return new Response('ok');
+        }, 0);
+        const pending = request(server);
+        void pending.catch(() => {});
+        await bounded(started.promise);
+        // WHY the max budget: a 32-bit timer overflow would fire in about a
+        // millisecond and cut this request instead of waiting for it.
+        const stopping = server.stop({ timeoutMs: MAX_STOP_TIMEOUT_MS });
+        release.resolve();
+        const response = await bounded(pending);
+        assertEquals(await response.text(), 'ok');
+        await bounded(stopping);
+        assertEquals(server.port, undefined, 'stop must close the listener');
+      } finally {
+        release.resolve();
+        await server.stop({ force: true });
+      }
+    },
+  );
+
+  TEST('HttpServerStop', 'a zero drain budget is valid', async () => {
+    const server = createHttpServer();
+    try {
+      await server.start(() => Promise.resolve(new Response('ok')), 0);
+      await bounded(server.stop({ timeoutMs: 0 }));
+      assertEquals(server.port, undefined, 'stop must close the listener');
+    } finally {
+      await server.stop({ force: true });
+    }
+  });
+
+  TEST(
+    'HttpServerStop',
+    'Server.stop rejects an invalid drain budget before touching state',
+    async (ctx) => {
+      const serverPath = await ctx.tempDir('server-stop-budget');
+      let actualPort = 0;
+      const server = await createStopTestServer(
+        serverPath,
+        new DataRegistry(),
+        () => actualPort,
+      );
+      server.registerEndpoint({
+        filter: () => true,
+        processRequest: () => Promise.resolve(new Response('ok')),
+      });
+      try {
+        await server.start();
+        actualPort = requirePort(server);
+        const outcome = await server.stop({ timeoutMs: -1 }).then(
+          () => 'resolved',
+          (error: unknown) => error,
+        );
+        assertTrue(
+          outcome instanceof RangeError,
+          'an invalid budget must reject with a RangeError',
+        );
+        assertEquals(
+          server.port,
+          actualPort,
+          'a rejected budget must leave the server bound',
+        );
+        const response = await bounded(fetch(
+          `http://127.0.0.1:${actualPort}/x`,
+          { headers: { connection: 'close' } },
+        ));
+        assertEquals(response.status, 200, 'server must still serve');
+        await response.text();
+      } finally {
+        await server.stop({ force: true });
+      }
     },
   );
 }
