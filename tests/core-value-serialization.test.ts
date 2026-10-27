@@ -30,6 +30,7 @@ import {
 } from '../cfds/base/object.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import { getTypeOperations, type ValueType } from '../cfds/base/types/index.ts';
+import { kValueTypeCoreTypes } from '../cfds/base/types/index.ts';
 import { Item, kChecksumSerOptions } from '../cfds/base/item.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { SyncMessage } from '../net/message.ts';
@@ -638,6 +639,35 @@ export default function setup(): void {
       assertEquals([...set], [1, 2]);
       assertEquals((decoder.get('d') as Date).getTime(), 5000);
       decoder.finalize();
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'nested Encodable decodes cyclical refs through get()',
+    () => {
+      // WHY: a nested Encodable must be created by the parent's decoder class.
+      // A plain JSONDecoder child loses the __r/__d context and returns the
+      // raw ref wrappers instead of the referenced values.
+      const shared = { id: 'shared', n: 1 };
+      const inner = new JSONCyclicalEncoder();
+      inner.set('x', { first: shared, second: shared });
+      const innerEncoded = inner.getOutput();
+      const base = decoderOutstandingCount();
+      {
+        using outer = JSONCyclicalDecoder.get({
+          nested: { __t: 'E', __v: innerEncoded },
+        } as unknown as Record<string, never>);
+        const nested = outer.get('nested') as JSONDecoder;
+        const decoded = nested.get('x') as {
+          first: unknown;
+          second: unknown;
+        };
+        assertEquals(decoded.first, { id: 'shared', n: 1 });
+        assertTrue(decoded.first === decoded.second);
+      }
+      // The parent dispose cascades to the pooled child.
+      assertEquals(decoderOutstandingCount(), base);
     },
   );
 
@@ -1744,22 +1774,113 @@ export default function setup(): void {
     'CoreValueSerialization',
     'kTypeOperations is frozen and exhaustive',
     () => {
-      // WHY: the cfds table is module-private, so getTypeOperations is the
-      // test surface. `kTypeOperations` satisfies Record<ValueType, ...>, so
-      // resolving every ValueType proves the table is exhaustive.
-      const valueTypes: ValueType[] = [
-        'string',
-        'number',
-        'boolean',
-        'date',
-        'set',
-        'map',
-        'richtext',
-      ];
-      for (const t of valueTypes) {
+      // WHY: `kValueTypeCoreTypes` satisfies Record<ValueType, CoreType>, so
+      // deriving the key list from it keeps this test honest when a new
+      // ValueType is added. A missing operation makes the lookup fail.
+      for (const t of Object.keys(kValueTypeCoreTypes) as ValueType[]) {
         const ops = getTypeOperations(t);
         assertExists(ops, `getTypeOperations missing for: ${t}`);
+        assertEquals(ops.valueType, t);
       }
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'ValueType to CoreType map is total and bijective',
+    () => {
+      const reps: Record<ValueType, CoreValue> = {
+        string: 's',
+        number: 1,
+        boolean: true,
+        date: new Date(0),
+        set: new Set([1]),
+        map: mkDict([['k', 1]]),
+        richtext: { root: { tagName: 'div', children: [] } } as never,
+      };
+      const valueTypes = Object.keys(kValueTypeCoreTypes) as ValueType[];
+      // A shared CoreType would make the reverse lookup ambiguous.
+      assertEquals(
+        new Set(Object.values(kValueTypeCoreTypes)).size,
+        valueTypes.length,
+      );
+      for (const t of valueTypes) {
+        assertEquals(getCoreType(reps[t]), kValueTypeCoreTypes[t]);
+        assertTrue(getTypeOperations(t).validate(reps[t]));
+      }
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'dictionary values use the shared value encoder',
+    () => {
+      // WHY: a raw dictToPrimitive copy skipped Date/Set/Encodable tagging, so
+      // a Date in a map landed as an ISO string while the checksum tagged it
+      // as a Date. Wire form must match the top-level Date form.
+      const dict = mkDict([
+        ['when', new Date(1_700_000_000_000)],
+        ['nested', { d: new Date(1000) }],
+      ]);
+      const encoded = new JSONEncoder().convertValue(dict as never);
+      assertEquals(
+        JSON.stringify(encoded),
+        '{"when":{"__t":"D","__v":1700000000},"nested":{"d":{"__t":"D","__v":1}}}',
+      );
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'dictionary Date round-trips without changing the checksum',
+    () => {
+      const date = new Date(1_700_000_000_000);
+      const dict = mkDict([['when', date]]);
+      const encoded = new JSONEncoder().convertValue(dict as never);
+      using decoder = JSONDecoder.get(encoded as never);
+      const decodedDate = decoder.get('when') as Date;
+      assertEquals(decodedDate instanceof Date, true);
+      assertEquals(decodedDate.getTime(), date.getTime());
+      const reloaded = mkDict([['when', decodedDate]]);
+      assertEquals(
+        new Murmur3Checksum({ typeSafe: true }).checksumForValue(
+          reloaded as never,
+        ),
+        new Murmur3Checksum({ typeSafe: true }).checksumForValue(dict as never),
+      );
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'typed map Date survives encode/decode with a matching Item checksum',
+    () => {
+      // Mirrors the delta-commit corruption path: the restored item is rebuilt
+      // from decoded data and its recomputed checksum must equal the original,
+      // otherwise repo/repo.ts marks the commit corrupted.
+      const schema: Schema = {
+        ns: 'core-value-serialization-map-date',
+        version: 1,
+        fields: { m: { type: 'map' } },
+      };
+      const registry = new DataRegistry();
+      registry.registerSchema(schema);
+      const date = new Date(1_700_000_000_000);
+      const item = new Item(
+        { schema, data: { m: mkDict([['when', date]]) } as never },
+        registry,
+      );
+      const js = JSON.parse(JSON.stringify(item.toJS()));
+      using dec = JSONCyclicalDecoder.get(js);
+      const restored = new Item({ decoder: dec }, registry);
+      const restoredMap = restored.get('m') as Map<string, Date>;
+      assertEquals(restoredMap.get('when') instanceof Date, true);
+      assertEquals(restoredMap.get('when')!.getTime(), date.getTime());
+      const rebuilt = new Item(
+        { schema, data: restored.dataUnsafe() as never },
+        registry,
+      );
+      assertEquals(rebuilt.checksum, item.checksum);
     },
   );
 

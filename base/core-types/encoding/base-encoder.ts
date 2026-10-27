@@ -8,11 +8,7 @@ import type {
   ReadonlyJSONValue,
 } from '../../interfaces.ts';
 import { serializeDate } from '../../date.ts';
-import {
-  type Dictionary,
-  dictToPrimitive,
-  isDictionary,
-} from '../../collections/dict.ts';
+import { type Dictionary, isDictionary } from '../../collections/dict.ts';
 import {
   type CoreKey,
   type CoreOptions,
@@ -322,9 +318,17 @@ export abstract class JSONBaseEncoder<
 
   convertDictionary(
     value: Dictionary<CoreKey, CoreValue>,
-    _options?: OT,
-  ) {
-    return dictToPrimitive(value);
+    options?: OT,
+  ): JSONObject {
+    // WHY: every dictionary value must pass through the shared value encoder.
+    // Copying raw values (dictToPrimitive) skipped Date/Set/Encodable tagging,
+    // so a Date in a map field landed as an ISO string while its checksum
+    // tagged it as a Date, marking the commit corrupted on reload.
+    const result: JSONObject = {};
+    for (const [k, v] of value) {
+      result[this.convertKey(k)] = this.convertValue(v, options);
+    }
+    return result;
   }
 
   convertGenerator(g: Generator<CoreValue>, options?: OT) {
