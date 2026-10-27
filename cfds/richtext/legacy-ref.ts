@@ -39,7 +39,8 @@ function assertNodeIsNotLegacyRef(node: unknown): void {
   if (!isLegacyRefNode(node)) return;
   throw new Error(
     'Legacy rich text ref is not supported (RefMarker/RefNode): ' +
-      `${JSON.stringify(node)}. Delete the store and re-sync it.`,
+      `${JSON.stringify(node)}. Back up the store, then migrate the document ` +
+      'with an older release or delete and re-sync it.',
   );
 }
 
