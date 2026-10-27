@@ -19,22 +19,33 @@ import type { StaticAssets } from '../system-assets/system-assets.ts';
 import type { Plugin } from 'esbuild';
 import { AnyMap, originalPositionFor } from '@jridgewell/trace-mapping';
 import { assertEquals, assertExists, assertTrue } from './asserts.ts';
-import { TEST, type TestFunc, type TestSuite } from './mod.ts';
+import { skipTest, TEST, type TestFunc, type TestSuite } from './mod.ts';
 
 const kSuite = 'CLI-BuildAssets';
 
 type Fixture = { dir: string; config: AppConfig };
 
+// WHY skipTest instead of a bare return: a test that silently passes without
+// running hides lost coverage, and `--fail-on-skip` cannot see it.
 function serverTest(test: (ctx: TestSuite) => Promise<void> | void): TestFunc {
-  return (ctx) => isBrowser() ? undefined : test(ctx);
+  return (ctx) => {
+    if (isBrowser()) skipTest('requires a server filesystem');
+    return test(ctx);
+  };
 }
 
 function denoTest(test: (ctx: TestSuite) => Promise<void> | void): TestFunc {
-  return (ctx) => isDeno() ? test(ctx) : undefined;
+  return (ctx) => {
+    if (!isDeno()) skipTest('requires the deno runtime');
+    return test(ctx);
+  };
 }
 
 function nodeTest(test: (ctx: TestSuite) => Promise<void> | void): TestFunc {
-  return (ctx) => isNode() ? test(ctx) : undefined;
+  return (ctx) => {
+    if (!isNode()) skipTest('requires the node runtime');
+    return test(ctx);
+  };
 }
 
 async function fixture(

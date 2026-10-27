@@ -41,6 +41,7 @@ import setupRuntimeTests from './runtime.test.ts';
 import setupCoroutineQueueTests from './coroutine-queue.test.ts';
 import setupCoroutineSchedulerTests from './coroutine-scheduler.test.ts';
 import setupProgressTests from './progress.test.ts';
+import setupTestFrameworkSkip from './test-framework-skip.test.ts';
 import setupWorkerTimeoutOverrideTests, {
   setupWorkerTimeoutHangTests,
 } from './worker-timeout.test.ts';
@@ -91,6 +92,7 @@ export async function registerAllTests(): Promise<void> {
   setupPathTests(); // Cross-platform path utilities
   setupRuntimeTests(); // Runtime abstraction layer invariants
   setupProgressTests(); // TUI progress tracking - Task state machine, aggregation
+  setupTestFrameworkSkip(); // Skip vs pass vs failure, and the fail-on-skip gate
   setupWorkerTimeoutOverrideTests(); // GOATDB_TEST_TIMEOUT_MS range contract + CLI guard
   // The hang suite exists only for the timeout diagnostic test. Registering
   // it unconditionally would stall every normal run for a worker timeout.

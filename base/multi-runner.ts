@@ -2,7 +2,7 @@ import { compileForNodeWithEsbuild, nodeRun } from './node-runner.ts';
 import { runBrowserTests } from './browser-runner.ts';
 import { parseWorkerTimeoutMs } from './worker-timeout.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
-import { TestsRunner, type TestSummary } from '../tests/mod.ts';
+import { failureCount, TestsRunner, type TestSummary } from '../tests/mod.ts';
 
 /**
  * Worker message types for Deno test execution.
@@ -37,6 +37,7 @@ interface WorkerTestCompleteMessage {
     suiteName: string;
     testName: string;
     passed: boolean;
+    skipped: boolean;
     duration: number;
     error?: { name: string; message: string; stack?: string };
   };
@@ -176,7 +177,8 @@ async function runDenoWithWorker(
 
         case 'testComplete': {
           // Test completed
-          const { suiteName, testName, passed, duration, error } = payload;
+          const { suiteName, testName, passed, skipped, duration, error } =
+            payload;
           const testKey = `${suiteName}::${testName}`;
           const testId = testTaskIds.get(testKey);
 
@@ -192,7 +194,7 @@ async function runDenoWithWorker(
           completedTests++;
           if (passed) {
             passedCount++;
-          } else {
+          } else if (!skipped) {
             failedCount++;
           }
 
@@ -357,7 +359,8 @@ export async function runAcrossPlatforms(
         );
         denoElapsed = result.elapsed;
         TestsRunner.printSummary(result.summary);
-        denoFailed = result.summary.failed;
+        // Honors GOATDB_FAIL_ON_SKIP: a skip counts as a failure when set.
+        denoFailed = failureCount(result.summary);
 
         if (denoFailed > 0) {
           console.log(`=== 🦖 Deno: ${denoFailed} failed ===`);
@@ -503,7 +506,7 @@ export async function runAcrossPlatforms(
 
       // Handle both test and benchmark result formats
       const browserSummary = summary.summary ?? summary;
-      const failed = browserSummary.failed ?? 0;
+      const failed = failureCount(browserSummary as TestSummary);
       const passed = browserSummary.passed ?? 0;
 
       TestsRunner.printSummary(browserSummary);

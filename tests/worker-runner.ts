@@ -13,11 +13,17 @@
  *     { type: 'ready', payload: { suiteCount, testCount } }
  *     { type: 'testStart', payload: { suiteName, testName, current, total } }
  *     { type: 'heartbeat', payload: { suiteName, testName, elapsedMs } }
- *     { type: 'testComplete', payload: { suiteName, testName, passed, duration, error? } }
+ *     { type: 'testComplete', payload: { suiteName, testName, passed, skipped, duration, error? } }
  *     { type: 'done', payload: { exitCode, summary } }
  */
 
-import { type TestResult, TestsRunner, type TestSummary } from './mod.ts';
+import {
+  runTestCase,
+  summaryExitCode,
+  type TestResult,
+  TestsRunner,
+  type TestSummary,
+} from './mod.ts';
 import { registerAllTests } from './test-registry.ts';
 
 /**
@@ -64,6 +70,7 @@ interface TestCompleteMessage {
     suiteName: string;
     testName: string;
     passed: boolean;
+    skipped: boolean;
     duration: number;
     error?: {
       name: string;
@@ -166,9 +173,6 @@ async function runTests(
       );
 
       const start = performance.now();
-      let passed = true;
-      let error: Error | undefined;
-
       const heartbeat = setInterval(() => {
         self.postMessage(
           {
@@ -182,25 +186,12 @@ async function runTests(
         );
       }, kHeartbeatIntervalMs);
 
+      let result: TestResult;
       try {
-        // Execute the test with suite context
-        await testFn(suite);
-      } catch (e) {
-        passed = false;
-        error = e instanceof Error ? e : new Error(String(e));
+        result = await runTestCase(suite, tName, testFn);
       } finally {
         clearInterval(heartbeat);
       }
-
-      const duration = performance.now() - start;
-
-      const result: TestResult = {
-        suiteName: name,
-        testName: tName,
-        passed,
-        duration,
-        error,
-      };
       allResults.push(result);
 
       // Notify main thread: test complete
@@ -210,9 +201,10 @@ async function runTests(
           payload: {
             suiteName: name,
             testName: tName,
-            passed,
-            duration,
-            error: error ? serializeError(error) : undefined,
+            passed: result.passed,
+            skipped: result.skipped,
+            duration: result.duration,
+            error: result.error ? serializeError(result.error) : undefined,
           },
         } satisfies TestCompleteMessage,
       );
@@ -224,11 +216,13 @@ async function runTests(
 
   const totalDuration = performance.now() - runStart;
   const passed = allResults.filter((r) => r.passed).length;
-  const failed = allResults.length - passed;
+  const skipped = allResults.filter((r) => r.skipped).length;
+  const failed = allResults.length - passed - skipped;
 
   return {
     totalTests: allResults.length,
     passed,
+    skipped,
     failed,
     duration: totalDuration,
     results: allResults,
@@ -262,7 +256,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
     const summary = await runTests(payload.suiteName, payload.testName);
 
     // Notify main thread: all done
-    const exitCode = summary.failed > 0 ? 1 : 0;
+    const exitCode = summaryExitCode(summary);
     self.postMessage(
       {
         type: 'done',

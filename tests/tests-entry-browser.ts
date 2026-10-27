@@ -12,7 +12,7 @@
  */
 
 import { isBrowser } from '../base/common.ts';
-import { TestsRunner, type TestSummary } from './mod.ts';
+import { summaryExitCode, TestsRunner, type TestSummary } from './mod.ts';
 import { exit } from '../base/process.ts';
 import {
   type LogEntry,
@@ -39,6 +39,7 @@ import setupHealthCheckEndpoint from './health-check-endpoint.test.ts';
 import setupLiveQuery from './live-query.test.ts';
 import setupHashMap from './hash-map.test.ts';
 import setupCoreValueCompare from './core-value-compare.test.ts';
+import setupTestFrameworkSkip from './test-framework-skip.test.ts';
 import setupCoreValueSerialization from './core-value-serialization.test.ts';
 import setupStorageFormatEpoch from './storage-format-epoch.test.ts';
 import setupJsonLogWorkerIO from './json-log-worker-io.test.ts';
@@ -85,6 +86,7 @@ async function main(): Promise<void> {
   setupHealthCheckEndpoint(); // Simple HTTP endpoint check
   setupHashMap(); // HashSet and HashMap collision-safe cardinality
   setupCoreValueCompare(); // Core-value ordering invariants
+  setupTestFrameworkSkip(); // Skip vs pass vs failure, and the fail-on-skip gate
   setupCoreValueSerialization(); // Serializer and core-type characterization goldens
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
@@ -138,8 +140,7 @@ async function main(): Promise<void> {
   }
 
   // Exit with appropriate code (handles browser signaling)
-  const exitCode = summary.failed > 0 ? 1 : 0;
-  exit(exitCode);
+  exit(summaryExitCode(summary));
 }
 
 // Auto-run when used as entry point or in browser

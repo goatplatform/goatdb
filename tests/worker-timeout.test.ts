@@ -7,7 +7,7 @@
  * accepted range, the explicit rejection message, and the real CLI behavior.
  */
 
-import { TEST, type TestFunc } from './mod.ts';
+import { skipTest, TEST, type TestFunc } from './mod.ts';
 import { assertEquals, assertTrue } from './asserts.ts';
 import { isDeno } from '../base/common.ts';
 import { parseWorkerTimeoutMs } from '../base/worker-timeout.ts';
@@ -39,7 +39,10 @@ function rejectionMessage(raw: string): string {
 
 /** Skips on runtimes without the `deno` binary used to launch the CLI. */
 function denoTest(test: TestFunc): TestFunc {
-  return (ctx) => isDeno() ? test(ctx) : undefined;
+  return (ctx) => {
+    if (!isDeno()) skipTest('requires the deno binary');
+    return test(ctx);
+  };
 }
 
 interface CliOptions {
