@@ -119,6 +119,11 @@ export async function clientBuildOptions(
     jsx: 'automatic',
     // Client code is always for browser
     platform: 'browser',
+    // Browser floor: ES2022 (Object.hasOwn). Newer syntax (`using`/
+    // Symbol.dispose) is lowered with helpers by esbuild, so the bundle is
+    // self-contained. Chromium floor is enforced by the Playwright pin
+    // (playwright@^1.51.0 in deno.json and CI browser tests).
+    target: 'es2022',
     // Relative url() references in bundled CSS are emitted under assets/ so
     // the URLs esbuild rewrites stay valid when CSS is served from /index.css.
     loader: kClientLoaders,
