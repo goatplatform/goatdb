@@ -845,6 +845,12 @@ export function jsonLogWorkerMain(): void {
     gPostMessage = (msg, transfer) => parentPort.postMessage(msg, transfer);
   } else {
     onmessage = safeHandler;
-    gPostMessage = (msg, transfer) => postMessage(msg, transfer ?? []);
+    // lib.dom types postMessage as a window API; the worker runtime accepts a
+    // transfer list. Cast at the runtime boundary.
+    gPostMessage = (msg, transfer) =>
+      (postMessage as (
+        message: unknown,
+        transfer?: Transferable[],
+      ) => void)(msg, transfer ?? []);
   }
 }
