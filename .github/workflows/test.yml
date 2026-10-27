@@ -3,7 +3,9 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # Temporary: run CI for PRs stacked on pr/66-* branches while #66 is split.
+    # Revert to [main] after the stack lands.
+    branches: [main, 'pr/66-*']
 
 jobs:
   test:
