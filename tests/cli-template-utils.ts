@@ -24,6 +24,7 @@ export type CliTemplateRuntime = 'deno' | 'node';
 
 /** Deno info JSON shape for the fields used by these assertions. */
 export interface DenoInfo {
+  roots: string[];
   modules: Array<{
     specifier: string;
     npmPackage?: string;
@@ -129,7 +130,9 @@ export async function assertTemplateTree(
  *
  * WHY: `deno info` emits native `PathBuf` values. On Windows those contain
  * backslashes, so consumers must parse them into the POSIX path contract
- * before comparing paths.
+ * before comparing paths. `roots` and `local` keep the process cwd spelling;
+ * never compare them with `Deno.realPath` output, which expands Windows 8.3
+ * aliases (RUNNER~1 -> runneradmin).
  */
 export function parseDenoInfo(text: string): DenoInfo {
   const start = text.indexOf('{');
@@ -138,6 +141,7 @@ export function parseDenoInfo(text: string): DenoInfo {
     throw new Error(`deno info produced no JSON:\n${text}`);
   }
   const raw = JSON.parse(text.slice(start, end + 1)) as {
+    roots: string[];
     modules: Array<{ specifier: string; npmPackage?: string; local?: string }>;
     npmPackages: DenoInfo['npmPackages'];
   };
@@ -150,6 +154,26 @@ export function parseDenoInfo(text: string): DenoInfo {
         : path.parsePath(module.local),
     })),
   };
+}
+
+/**
+ * Returns the generated project root from the graph's own entry path.
+ *
+ * WHY: `deno info` keeps the process cwd spelling. Deriving the root from the
+ * graph avoids mixing it with `Deno.realPath`, which expands Windows 8.3
+ * aliases (RUNNER~1 -> runneradmin).
+ */
+export function denoInfoProjectRoot(
+  info: DenoInfo,
+  entry: string,
+): path.PosixPath {
+  const entryPath = path.fromFileUrl(info.roots[0]);
+  const suffix = `/${path.parsePath(entry)}`;
+  assertTrue(
+    entryPath.endsWith(suffix),
+    `Graph root ${entryPath} must end with ${suffix}`,
+  );
+  return path.parsePath(entryPath.slice(0, -suffix.length));
 }
 
 /**
