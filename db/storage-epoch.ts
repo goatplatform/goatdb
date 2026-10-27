@@ -4,7 +4,7 @@ import {
   readDir,
   readFile,
   writeFile,
-} from '../base/json-log/file-impl.ts';
+} from '../base/json-log/json-log.ts';
 import { log } from '../logging/log.ts';
 
 /**

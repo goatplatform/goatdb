@@ -33,7 +33,7 @@ import {
   readDir,
   readTextFile,
   writeFile,
-} from '../base/json-log/file-impl.ts';
+} from '../base/json-log/json-log.ts';
 
 const gTextEncoder = new TextEncoder();
 /** Marker message fragment shared by every rejection path. */
