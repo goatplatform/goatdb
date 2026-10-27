@@ -33,6 +33,7 @@ import {
   type HttpServerStopOptions,
   logStopFailure,
   type ServeHandlerInfo,
+  serviceUnavailableResponse,
   StartStopGate,
 } from './http-compat.ts';
 import { generateSelfSignedCertificate } from './crypto-utils.ts';
@@ -558,7 +559,7 @@ export class Server<US extends Schema> {
     info: ServeHandlerInfo,
   ): Promise<Response> {
     if (this._stopping) {
-      return new Response(null, { status: 503 });
+      return serviceUnavailableResponse();
     }
     if (isAlbHealthCheck(goatReq.url)) {
       return new Response(null, { status: 200 });

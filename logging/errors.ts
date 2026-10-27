@@ -12,13 +12,17 @@ import type { EmailType } from './metrics.ts';
  *               impossible
  * - FailedAssertion: Used when an assertion check fails
  * - UncaughtServerError: Used for unhandled exceptions on the server
+ * - HttpServerError: Emitted by a listening HTTP server after it started
+ * - ServerStartFailed: Emitted when a server start aborts and rolls back
  * - MissingConfiguration: Used when required configuration options are missing
  */
 export type DeveloperError =
   | 'NotImplemented'
   | 'NotReached'
   | 'FailedAssertion'
-  | 'UncaughtServerError';
+  | 'UncaughtServerError'
+  | 'HttpServerError'
+  | 'ServerStartFailed';
 
 /**
  * Base interface for all error log entries. Extends BaseLogEntry with an
