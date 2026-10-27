@@ -6,6 +6,7 @@ import {
   GoatRequest,
   type HttpServerStopOptions,
   type MinimalHttpServer,
+  StartStopGate,
 } from '../net/server/http-compat.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { TEST } from './mod.ts';
@@ -1101,6 +1102,51 @@ export default function setupHttpServerStop() {
       } finally {
         await server.stop({ force: true });
       }
+    },
+  );
+
+  TEST(
+    'HttpServerStop',
+    'lifecycle gate runs ops in call order',
+    async () => {
+      const gate = new StartStopGate();
+      const order: string[] = [];
+      const releaseStop = deferred();
+      const started = gate.start(async () => {
+        order.push('start');
+      });
+      const stopping = gate.stop(async () => {
+        order.push('stop:begin');
+        await releaseStop.promise;
+        order.push('stop:end');
+      });
+      await started;
+      // WHY: this start lands while the stop is pending. It must wait for the
+      // teardown, otherwise it binds a listener the pending stop never sees.
+      const restarting = gate.start(async () => {
+        order.push('restart');
+      });
+      releaseStop.resolve();
+      await Promise.all([stopping, restarting]);
+      assertEquals(order.join(','), 'start,stop:begin,stop:end,restart');
+    },
+  );
+
+  TEST(
+    'HttpServerStop',
+    'lifecycle gate runs the next op after a rejection',
+    async () => {
+      const gate = new StartStopGate();
+      const failure = new Error('teardown failed');
+      let ran = false;
+      const failing = gate.stop(() => Promise.reject(failure));
+      const next = gate.stop(async () => {
+        ran = true;
+      });
+      const outcome = await failing.then(() => 'resolved', () => 'rejected');
+      assertEquals(outcome, 'rejected', 'the failing op must report its error');
+      await next;
+      assertTrue(ran, 'a rejected op must not block the queue');
     },
   );
 }

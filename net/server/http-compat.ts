@@ -673,41 +673,77 @@ function escalatePendingStop(
 }
 
 /**
- * Single-flight start gate shared by the server lifecycle classes.
+ * FIFO lifecycle gate shared by the server classes.
  *
- * WHY: stop() racing an in-flight start() must not observe a not-yet-started
- * server and return early. The caller would then believe the server is closed
- * while start() goes on to bind the listener.
+ * WHY: every start and stop must run alone, in call order. A stop() that
+ * skipped ahead of a queued start would observe a not-yet-started server,
+ * return early, and leave the caller believing the listener is closed while
+ * the start goes on to bind it. Concurrent start() calls still share one bind,
+ * because a second bind would only fail on the port.
+ *
+ * The first op of an idle gate runs synchronously, so callers observe the
+ * state change (for example the cleared port) before stop() returns.
  */
 export class StartStopGate {
+  /** Non-rejecting tail of the queue. Undefined when no op is pending. */
+  private _tail?: Promise<void>;
+  /** Identifies the newest chain, so only it may clear the tail. */
+  private _chain = 0;
+  /** The in-flight start, shared by concurrent start() callers. */
   private _starting?: Promise<void>;
 
   /** Runs `start` once; concurrent callers share the in-flight promise. */
   start(start: () => Promise<void>): Promise<void> {
     const inFlight = this._starting;
     if (inFlight) return inFlight;
-    const starting = start();
-    this._starting = starting;
-    // WHY: registered before any stop() continuation, so the slot is clear by
-    // the time a chained stop runs and cannot re-chain recursively.
-    const clear = () => this._clear(starting);
-    void starting.then(clear, clear);
-    return starting;
-  }
-
-  /** Runs `stop` after any in-flight start settles, success or failure. */
-  stop(stop: () => Promise<void>): Promise<void> {
-    const starting = this._starting;
-    if (!starting) return stop();
-    const settle = () => {
-      this._clear(starting);
-      return stop();
+    const started = this._push(start);
+    this._starting = started;
+    const clear = () => {
+      if (this._starting === started) this._starting = undefined;
     };
-    return starting.then(settle, settle);
+    void started.then(clear, clear);
+    return started;
   }
 
-  private _clear(starting: Promise<void>): void {
-    if (this._starting === starting) this._starting = undefined;
+  /** Runs `stop` after every earlier op settled, success or failure. */
+  stop(stop: () => Promise<void>): Promise<void> {
+    return this._push(stop);
+  }
+
+  /** Queues one op behind the current tail, or runs it now when idle. */
+  private _push(op: () => Promise<void>): Promise<void> {
+    const previous = this._tail;
+    if (!previous) {
+      let run: Promise<void>;
+      try {
+        run = op();
+      } catch (error) {
+        run = Promise.reject(error);
+      }
+      this._track(run);
+      return run;
+    }
+    // WHY the rejection handler: a failed op must not block the ops behind it,
+    // while its own caller must still see the failure.
+    const run = previous.then(op, op);
+    this._track(run);
+    return run;
+  }
+
+  private _track(run: Promise<void>): void {
+    // WHY released in the settle callback itself: the slot must read idle by
+    // the time the op's own caller resumes, so its next stop() runs at once
+    // instead of queuing a microtask behind an already finished chain.
+    const chain = ++this._chain;
+    this._tail = run.then(
+      () => this._release(chain),
+      () => this._release(chain),
+    );
+  }
+
+  private _release(chain: number): void {
+    // A later op may already own the slot; only the newest chain clears it.
+    if (this._chain === chain) this._tail = undefined;
   }
 }
 
