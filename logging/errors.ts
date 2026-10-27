@@ -14,6 +14,7 @@ import type { EmailType } from './metrics.ts';
  * - UncaughtServerError: Used for unhandled exceptions on the server
  * - HttpServerError: Emitted by a listening HTTP server after it started
  * - ServerStartFailed: Emitted when a server start aborts and rolls back
+ * - JsonLogWorkerError: Used when the JSON log worker fails or dies
  * - MissingConfiguration: Used when required configuration options are missing
  */
 export type DeveloperError =
@@ -22,8 +23,8 @@ export type DeveloperError =
   | 'FailedAssertion'
   | 'UncaughtServerError'
   | 'HttpServerError'
-  | 'ServerStartFailed';
-
+  | 'ServerStartFailed'
+  | 'JsonLogWorkerError';
 /**
  * Base interface for all error log entries. Extends BaseLogEntry with an
  * optional stack trace field.
@@ -77,6 +78,7 @@ export type OperationalError =
   | 'ServerStopFailed'
   | 'StorageError'
   | 'StopTimeout'
+  | 'UnknownWorkerResponse'
   | 'ValidationError';
 
 /**
