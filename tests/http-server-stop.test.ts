@@ -99,28 +99,35 @@ function request(server: MinimalHttpServer, signal?: AbortSignal) {
   });
 }
 
+/** True when a bind failed because another listener holds the port. */
+function isAddressInUse(error: unknown): boolean {
+  return error instanceof Error &&
+    /address already in use|AddrInUse|EADDRINUSE/i.test(String(error));
+}
+
+/** Starts `server` on `port`, retrying while the old listener drains. */
+async function startWhenFree(
+  server: MinimalHttpServer,
+  port: number,
+): Promise<void> {
+  await bounded((async () => {
+    while (true) {
+      try {
+        await server.start(() => Promise.resolve(new Response('ok')), port);
+        return;
+      } catch (error) {
+        if (!isAddressInUse(error)) throw error;
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+    }
+  })());
+}
+
 /** Starts a server on a fixed port, retrying while the old listener drains. */
 async function rebind(port: number): Promise<MinimalHttpServer> {
   const server = createHttpServer();
   try {
-    await bounded((async () => {
-      while (true) {
-        try {
-          await server.start(() => Promise.resolve(new Response('ok')), port);
-          return;
-        } catch (error) {
-          if (
-            !(error instanceof Error) ||
-            !/address already in use|AddrInUse|EADDRINUSE/i.test(
-              String(error),
-            )
-          ) {
-            throw error;
-          }
-          await new Promise<void>((resolve) => setTimeout(resolve, 0));
-        }
-      }
-    })());
+    await startWhenFree(server, port);
     return server;
   } catch (error) {
     await server.stop({ force: true });
@@ -203,6 +210,7 @@ async function createStopTestServer(
   registry: DataRegistry,
   getPort: () => number,
   resolveDomain: (url: string) => string = () => 'localhost',
+  port = 0,
 ) {
   const buildInfo = await generateBuildInfo(
     path.join(getRuntime().getCWD(), 'deno.json'),
@@ -210,7 +218,7 @@ async function createStopTestServer(
   return new Server({
     registry,
     path: serverPath,
-    port: 0,
+    port,
     buildInfo,
     disableDefaultEndpoints: true,
     // WHY: port 0 needs a custom domain. The default resolveOrg captures the
@@ -1273,6 +1281,105 @@ export default function setupHttpServerStop() {
         await response.text();
       } finally {
         await server.stop({ force: true });
+      }
+    },
+  );
+
+  TEST(
+    'HttpServerStop',
+    'a bind failure reports the error and leaves the port free to retry',
+    async () => {
+      const holder = createHttpServer();
+      const contender = createHttpServer();
+      const ok = () => Promise.resolve(new Response('ok'));
+      try {
+        await holder.start(ok, 0);
+        const port = requirePort(holder);
+        const outcome = await contender.start(ok, port).then(
+          () => 'resolved',
+          (error: unknown) => error,
+        );
+        assertTrue(
+          isAddressInUse(outcome),
+          `the second bind must reject with a busy-port error, got ${outcome}`,
+        );
+        assertEquals(
+          contender.port,
+          undefined,
+          'a failed bind must expose no port',
+        );
+        assertEquals(
+          contender.address,
+          undefined,
+          'a failed bind must expose no address',
+        );
+
+        await holder.stop({ force: true });
+        // WHY: retry on the same instance proves the failed bind left no
+        // half-open listener or stale error handler behind.
+        await startWhenFree(contender, port);
+        assertEquals(contender.port, port, 'the retry must bind the port');
+        const response = await bounded(request(contender));
+        assertEquals(await response.text(), 'ok');
+      } finally {
+        await holder.stop({ force: true });
+        await contender.stop({ force: true });
+      }
+    },
+  );
+
+  TEST(
+    'HttpServerStop',
+    'Server.start rolls back when the listener cannot bind',
+    async (ctx) => {
+      const holderPath = await ctx.tempDir('server-start-rollback-holder');
+      const contenderPath = await ctx.tempDir('server-start-rollback');
+      const holder = createHttpServer();
+      let contenderPort = 0;
+      await holder.start(() => Promise.resolve(new Response('busy')), 0);
+      const port = requirePort(holder);
+      // WHY: constructed on the busy port, so start() hits the real bind path.
+      const contender = await createStopTestServer(
+        contenderPath,
+        new DataRegistry(),
+        () => contenderPort,
+        () => 'localhost',
+        port,
+      );
+      contenderPort = port;
+      contender.registerEndpoint({
+        filter: () => true,
+        processRequest: () => Promise.resolve(new Response('ok')),
+      });
+      try {
+        const outcome = await contender.start().then(
+          () => 'resolved',
+          (error: unknown) => error,
+        );
+        assertTrue(
+          isAddressInUse(outcome),
+          `start must surface the bind error, got ${outcome}`,
+        );
+        assertEquals(
+          contender.port,
+          undefined,
+          'a failed start must expose no port',
+        );
+
+        await holder.stop({ force: true });
+        // WHY: a half-committed start used to make this retry a no-op, so the
+        // server reported success while nothing listened.
+        await contender.start();
+        const bound = requirePort(contender);
+        const response = await bounded(fetch(
+          `http://127.0.0.1:${bound}/x`,
+          { headers: { connection: 'close' } },
+        ));
+        assertEquals(response.status, 200, 'the retry must serve');
+        await response.text();
+      } finally {
+        await holder.stop({ force: true });
+        await contender.stop({ force: true });
       }
     },
   );

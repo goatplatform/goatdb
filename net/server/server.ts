@@ -682,30 +682,69 @@ export class Server<US extends Schema> {
       this._httpServer = createHttpServer({ https: cert });
     }
 
-    // Start all services for each org
-    for (const services of this._servicesByOrg.values()) {
-      for (const v of Object.values(services)) {
-        if (v instanceof BaseService) {
-          await v.start();
+    const controller = new AbortController();
+    const started: BaseService<unknown>[] = [];
+    try {
+      // Start all services for each org
+      for (const services of this._servicesByOrg.values()) {
+        for (const v of Object.values(services)) {
+          if (v instanceof BaseService) {
+            // WHY: recorded before start settles, so a throwing start is
+            // rolled back too and its partial work cannot leak.
+            started.push(v as BaseService<unknown>);
+            await v.start();
+          }
         }
       }
+      await this._httpServer!.start(
+        this.processRequest.bind(this),
+        this._baseOptions.port!,
+        controller.signal,
+      );
+    } catch (error) {
+      this._rollbackStart(started);
+      log({
+        severity: 'ERROR',
+        error: 'ServerStartFailed',
+        message: `Server start failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        trace: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
     }
-
-    // Log server start metric
+    // WHY: committed only after everything succeeded. processRequest() and
+    // stop() read the controller as "running", and a half-started server must
+    // not look ready. A stop() that raced this start is queued behind it and
+    // still closes the listener.
+    this._abortController = controller;
     log({
       severity: 'METRIC',
       name: 'ServerStarted',
       value: 1,
       unit: 'Count',
     });
+  }
 
-    // Initialize abort controller and start HTTP server
-    this._abortController = new AbortController();
-    return this._httpServer!.start(
-      this.processRequest.bind(this),
-      this._baseOptions.port!,
-      this._abortController.signal,
-    );
+  /** Stops the services a failed start() began, in reverse order. */
+  private _rollbackStart(started: readonly BaseService<unknown>[]): void {
+    // WHY: a failed start must leave no service active, and must not block a
+    // retry, so the flag is cleared even when a stop throws.
+    this._stopping = false;
+    for (const service of started.toReversed()) {
+      try {
+        service.stop();
+      } catch (error) {
+        log({
+          severity: 'ERROR',
+          error: 'ServerStopFailed',
+          message: `Rolling back a failed start could not stop a service: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          trace: error instanceof Error ? error.stack : undefined,
+        });
+      }
+    }
   }
 
   /**
