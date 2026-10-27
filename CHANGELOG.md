@@ -8,6 +8,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Known Quirks
+
+The following behaviors are intentional artifacts of the current implementation and are pinned by characterization tests:
+
+- **iterableFilter is not applied during ref collection.** The Object branch drops options when recursing, so the filter never runs during ref collection. The filter is re-applied during final JSON encode, which can produce counterintuitive `__r`/`__d` wrappers. Pinned intentionally; see TODO(#58-followup) in `base/core-types/type-ops.ts`. Tests: `refs matrix: array iterableFilter is not applied during ref collection`, `refs matrix: set iterableFilter is not applied during ref collection`.
+
+### Breaking Changes
+
+- **Unified `Date` wire format and redefined commit checksum.** Dates in typed
+  fields now encode as `{ "__t": "D", "__v": <epoch-seconds> }` instead of a
+  bare number, and a `Date` is tagged uniformly in every checksum position
+  (a typed date-field checksum changes from `416277608` to `1391363808`). A
+  store written by an earlier version is rejected on open with a clear
+  "older GoatDB - delete and re-sync" error, rather than silently mis-decoding
+  or marking every commit as corrupted. Mixed-version fleets are unsupported.
+- `coreValueHash` alias removed. Use `encodableValueHash`.
+- Mixed-version sync unsupported. Bare-number dates from old peers throw
+  on typed-field deserialize and the commit is skipped. Epoch guards protect
+  local store only.
+- Checksum limit: a non-`typeSafe` string can collide with a tagged `Date`
+  (e.g. `"41700000000"`). Use `typeSafe` checksums where untrusted input
+  matters.
+- Stray ref marker: a sole-key `{ "__rId": <number> }` object outside a
+  `__r`/`__d` wrapper now throws at decode instead of passing through as user
+  data. Wider objects containing `__rId` among other keys are unaffected.
+- Clone aliasing: `coreValueClone`/`coreObjectClone` now preserve shared-ref
+  aliasing across array/set siblings (they previously produced distinct
+  copies). Alias identity within an object's fields was already preserved.
+
 ### Added
 
 - `DBInstanceConfig.repoInactivityTimeoutMs` and
@@ -21,6 +50,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   and do not start loading. A fresh unobserved query reports `loading === false`
   and, when `queryInactivityTimeoutMs` is set, is eligible for auto-close. A
   closed query is replaced by calling `db.query()` again.
+
+### Fixed
+
+- `coreValueEquals` is now symmetric for objects when `objectFilterFields`
+  inspects the object; previously the second comparison loop passed the wrong
+  object to the filter.
 
 ## [0.6.1] - 2026-09-01
 

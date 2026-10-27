@@ -1,5 +1,4 @@
 import { PrimitiveTypeOperations } from './primitive-type.ts';
-import { CoreType } from '../../../base/core-types/index.ts';
 import type { DecodedValue } from '../../../base/core-types/encoding/index.ts';
 import { assert } from '../../../base/error.ts';
 
@@ -12,7 +11,7 @@ import { assert } from '../../../base/error.ts';
  */
 export class DateTypeOperations extends PrimitiveTypeOperations<Date> {
   constructor() {
-    super(CoreType.Date, 'date');
+    super('date');
   }
 
   /**
