@@ -69,8 +69,21 @@ and are pinned by characterization tests:
   and, when `queryInactivityTimeoutMs` is set, is eligible for auto-close. A
   closed query is replaced by calling `db.query()` again.
 
+### Breaking Changes
+
+- `HttpServerInstance.stop()` and `Server.stop()` now return `Promise<void>`
+  and must be awaited. The promise resolves only after the listener is closed
+  and the port is free. A caller that ignores it can return before in-flight
+  requests finish, and a restart can fail to bind the port.
+
 ### Changed
 
+- `stop()` is graceful by default: in-flight requests and responses finish,
+  new requests receive `503 Service Unavailable` with `connection: close`, and
+  the listener closes when the drain ends. `force: true` closes immediately
+  and `timeoutMs` bounds the drain (default 10s, an integer from 0 to
+  2147483647; other values reject and leave the server running). Neither
+  cancels application handlers.
 - HTTP health checks from the `awsalb` host now accept `http` and `https`
   URLs on any port and ignore the query string; the path must be exactly
   `/healthy`. The comparison is now case-sensitive, so a mixed-case probe such
