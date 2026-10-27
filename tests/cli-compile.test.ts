@@ -39,6 +39,7 @@ import {
   assertScaffoldTemplates,
   type DenoInfo,
   denoInfo,
+  denoInfoProjectRoot,
 } from './cli-template-utils.ts';
 
 async function readJsonFile<T>(filePath: path.PosixPath): Promise<T> {
@@ -433,13 +434,18 @@ export default function setupCliCompileTests() {
 
       // Resolve the real graph, not only the config that describes it.
       if (runtime.id === 'deno') {
-        const info = await denoInfo(testDir, 'client/index.tsx');
+        const entry = 'client/index.tsx';
+        const info = await denoInfo(testDir, entry);
         assertReactVersionParity(info);
-        // `deno info` canonicalizes the temp root (e.g. /var -> /private/var
-        // on macOS), so compare against the canonical temp path while keeping
-        // the vendor/goatdb segment under test.
-        const canonicalTestDir = path.parsePath(await Deno.realPath(testDir));
-        const vendorRoot = path.join(canonicalTestDir, 'vendor/goatdb');
+        // WHY: `deno info` reports paths in its own cwd spelling. Do not
+        // canonicalize the temp root with `Deno.realPath` here: Windows
+        // expands 8.3 aliases (RUNNER~1 -> runneradmin) while `deno info`
+        // keeps the short spelling.
+        assertEquals(info.roots.length, 1, 'deno info must report one root');
+        const vendorRoot = path.join(
+          denoInfoProjectRoot(info, entry),
+          'vendor/goatdb',
+        );
         assertTrue(
           info.modules.some((module) =>
             module.local !== undefined &&
