@@ -12,7 +12,6 @@
  * code to work seamlessly in both environments.
  */
 import { kStaticAssetsSystem } from '../../system-assets/system-assets.ts';
-import { assert } from '../error.ts';
 import type {
   WorkerErrorResp,
   WorkerFileReq,
@@ -41,23 +40,16 @@ import type { LogEntry } from '../../logging/log.ts';
 
 let gWorker: Worker | NodeWorker | undefined;
 
-type NodeWorker =
-  & NodeWorkerOnError
-  & NodeWorkerOnMessage
-  & NodeWorkerPostMessage;
-
-type NodeWorkerOnMessage = {
-  on: (
-    event: 'message',
-    handler: (event: WorkerFileResp) => void,
-  ) => void;
-};
-type NodeWorkerOnError = {
-  on: (event: 'error', handler: (error: unknown) => void) => void;
-};
-
-type NodeWorkerPostMessage = {
-  postMessage: (message: unknown) => void;
+/**
+ * Minimal Node worker surface used here. Node's Worker is an EventEmitter with
+ * these events, while a browser Worker exposes properties instead.
+ */
+type NodeWorker = {
+  on(event: 'message', handler: (event: WorkerFileResp) => void): void;
+  on(event: 'error', handler: (error: unknown) => void): void;
+  on(event: 'exit', handler: (code: number) => void): void;
+  postMessage(message: unknown): void;
+  terminate(): void;
 };
 
 /**
@@ -74,27 +66,98 @@ type NodeWorkerPostMessage = {
 export async function startJSONLogWorkerIfNeeded(): Promise<
   Worker | NodeWorker
 > {
-  if (gWorker === undefined) {
-    const workerJs = new TextDecoder().decode(
-      kStaticAssetsSystem['/system-assets/json-log-worker.js'].data,
-    );
-    gWorker = getRuntime().createWorker(workerJs) as Worker | NodeWorker;
+  if (gWorker !== undefined) return gWorker;
+  const workerJs = new TextDecoder().decode(
+    kStaticAssetsSystem['/system-assets/json-log-worker.js'].data,
+  );
+  const worker = getRuntime().createWorker(workerJs) as Worker | NodeWorker;
+  // WHY publish after wiring: an unwatched worker would hang every request it
+  // owns if it failed.
+  watchWorker(worker);
+  gWorker = worker;
+  return worker;
+}
 
-    if (getRuntime().id === 'node') {
-      (gWorker as NodeWorker).on('message', handleResponse);
-      (gWorker as NodeWorker).on('error', (error: unknown) => {
-        console.error(error);
-      });
-    } else {
-      (gWorker as Worker).onmessage = (
-        event: MessageEvent<WorkerFileResp>,
-      ) => handleResponse(event.data);
-      (gWorker as Worker).onmessageerror = (event) => {
-        console.error(event);
-      };
-    }
+/**
+ * Fails every in-flight request and drops the worker, so the next call spawns
+ * a fresh one.
+ *
+ * WHY: a dead worker never answers. Without this, a request would wait forever
+ * and a DB open would never settle. Rejecting with the cause keeps the failure
+ * visible; clearing the handle lets a later request recover instead of talking
+ * to a corpse.
+ */
+function failWorker(error: Error): void {
+  const worker = gWorker;
+  gWorker = undefined;
+  const pending = [...gPendingResolveFuncs.values()];
+  gPendingResolveFuncs.clear();
+  for (const entry of pending) entry.reject(error);
+  // Handles and cursors belong to the dead worker; the next open recreates them.
+  gPendingFileOperations.clear();
+  gPendingScanPromise.clear();
+  gCursorToFile.clear();
+  if (worker === undefined) return;
+  try {
+    worker.terminate();
+  } catch {
+    // WHY best effort: termination is cleanup, not the error path.
   }
-  return gWorker;
+}
+
+/** Logs a worker failure and returns the error pending requests receive. */
+function workerFailure(kind: string, cause: unknown): Error {
+  const error = cause instanceof Error
+    ? cause
+    : new Error(describeCause(cause));
+  log({
+    severity: 'ERROR',
+    error: 'JsonLogWorkerError',
+    message: `JSON log worker ${kind}: ${error.message}`,
+    trace: error.stack,
+  });
+  return error;
+}
+
+/** Extracts text from Errors, ErrorEvents, and plain values. */
+function describeCause(cause: unknown): string {
+  const message = (cause as { message?: unknown } | undefined)?.message;
+  return typeof message === 'string' && message !== ''
+    ? message
+    : String(cause);
+}
+
+/** Attaches the fatal-failure wiring for the worker kind in use. */
+function watchWorker(worker: Worker | NodeWorker): void {
+  // WHY ignore stale workers: terminating a worker emits its error/exit events
+  // asynchronously, after a replacement may already be serving requests.
+  // Failing then would kill the healthy worker and reject its requests.
+  const fail = (kind: string, cause: unknown) => {
+    if (gWorker !== worker) return;
+    failWorker(workerFailure(kind, cause));
+  };
+  if (getRuntime().id === 'node') {
+    const node = worker as NodeWorker;
+    node.on('message', (resp) => handleResponse(resp));
+    node.on('error', (cause) => fail('error', cause));
+    // WHY exit too: a worker that dies silently emits only 'exit', and its
+    // pending requests would otherwise never settle.
+    node.on(
+      'exit',
+      (code) => fail('exit', new Error(`exited with code ${code}`)),
+    );
+    return;
+  }
+  const web = worker as Worker;
+  web.onmessage = (event: MessageEvent<WorkerFileResp>) =>
+    handleResponse(event.data);
+  web.onerror = (cause) => fail('error', cause);
+  web.onmessageerror = (cause) => fail('messageerror', cause);
+}
+
+/** Simulates a fatal worker failure. Test-only hook. @internal */
+export function failJSONLogWorkerForTests(error: Error): void {
+  failWorker(error);
 }
 
 /**
@@ -150,11 +213,21 @@ async function sendRequest<T extends WorkerFileReq>(
     resolve,
     reject,
   });
-  const worker = await startJSONLogWorkerIfNeeded();
-  worker.postMessage({
-    ...req,
-    id,
-  });
+  try {
+    const worker = await startJSONLogWorkerIfNeeded();
+    worker.postMessage({
+      ...req,
+      id,
+    });
+  } catch (cause) {
+    // WHY: a worker that cannot start, or a message that cannot be cloned,
+    // must reject this request; the caller would otherwise wait forever.
+    const entry = gPendingResolveFuncs.get(id);
+    if (entry !== undefined) {
+      gPendingResolveFuncs.delete(id);
+      entry.reject(workerFailure('send', cause));
+    }
+  }
   return promise as Promise<WorkerFileRespForReq<T>>;
 }
 
@@ -179,7 +252,17 @@ function handleResponse(resp: WorkerFileResp): void {
     }
   }
   const entry = gPendingResolveFuncs.get(resp.id);
-  assert(entry !== undefined, 'Received unknown response from worker');
+  if (entry === undefined) {
+    // WHY warn and drop: a response can arrive after its request was failed by
+    // a worker restart. Asserting here would turn a recoverable race into a
+    // crash of the whole process.
+    log({
+      severity: 'WARNING',
+      error: 'UnknownWorkerResponse',
+      message: `Ignoring response ${resp.id} for an unknown request`,
+    });
+    return;
+  }
   gPendingResolveFuncs.delete(resp.id);
   if (resp.type === 'error') {
     entry.reject(workerResponseError(resp));

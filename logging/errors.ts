@@ -12,13 +12,15 @@ import type { EmailType } from './metrics.ts';
  *               impossible
  * - FailedAssertion: Used when an assertion check fails
  * - UncaughtServerError: Used for unhandled exceptions on the server
+ * - JsonLogWorkerError: Used when the JSON log worker fails or dies
  * - MissingConfiguration: Used when required configuration options are missing
  */
 export type DeveloperError =
   | 'NotImplemented'
   | 'NotReached'
   | 'FailedAssertion'
-  | 'UncaughtServerError';
+  | 'UncaughtServerError'
+  | 'JsonLogWorkerError';
 
 /**
  * Base interface for all error log entries. Extends BaseLogEntry with an
@@ -69,6 +71,7 @@ export type OperationalError =
   | 'EmailSendFailed'
   | 'MissingConfiguration'
   | 'StorageError'
+  | 'UnknownWorkerResponse'
   | 'ValidationError';
 
 /**

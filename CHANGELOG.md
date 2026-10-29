@@ -41,6 +41,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   its checksum tagged it as a `Date`, marking the delta commit as corrupted on
   reload. Commits written by earlier builds with such values stay corrupted and
   must be re-created.
+- Reading a directory now fails with `EISDIR` on Deno, Node.js, and the
+  browser instead of returning empty bytes on Windows.
 - JSON decoders use a disposable lifetime. Parent disposal releases owned
   children and preserves children acquired by another owner. Disposed decoders
   reject reads until acquired again. `finalize()` remains a disposal alias.
