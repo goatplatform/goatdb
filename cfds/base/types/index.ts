@@ -8,21 +8,11 @@ import { MapTypeOperations } from './map-type.ts';
 import { PrimitiveTypeOperations } from './primitive-type.ts';
 import { SetTypeOperations } from './set-type.ts';
 import { RichText3TypeOperations } from './richtext3-type.ts';
-import {
-  CoreType,
-  type CoreValue,
-  type Encoder,
-} from '../../../base/core-types/index.ts';
+import type { CoreValue, Encoder } from '../../../base/core-types/index.ts';
 import { DateTypeOperations } from './date-type.ts';
 
-export type ValueType =
-  | 'string'
-  | 'number'
-  | 'boolean'
-  | 'date'
-  | 'set'
-  | 'map'
-  | 'richtext';
+export { kValueTypeCoreTypes, type ValueType } from './value-type.ts';
+import type { ValueType } from './value-type.ts';
 
 /**
  * Options common to value-type operations. `local`/`byCharacter` describe
@@ -101,9 +91,9 @@ export interface IValueTypeOperations<T extends CoreValue = CoreValue> {
 /** Every `ValueType` has exactly one op set. `satisfies` + `Object.freeze`
  * make this exhaustive and immutable at compile time. */
 const kTypeOperations = Object.freeze({
-  string: new PrimitiveTypeOperations(CoreType.String, 'string'),
-  number: new PrimitiveTypeOperations(CoreType.Number, 'number'),
-  boolean: new PrimitiveTypeOperations(CoreType.Boolean, 'boolean'),
+  string: new PrimitiveTypeOperations('string'),
+  number: new PrimitiveTypeOperations('number'),
+  boolean: new PrimitiveTypeOperations('boolean'),
   date: new DateTypeOperations(),
   set: new SetTypeOperations('set'),
   map: new MapTypeOperations('map'),

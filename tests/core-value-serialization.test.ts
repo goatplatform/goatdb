@@ -1,6 +1,10 @@
 import { deserialize } from '../cfds/base/object.ts';
 import { kChecksumSerOptions } from '../cfds/base/item.ts';
-import { getTypeOperations } from '../cfds/base/types/index.ts';
+import {
+  getTypeOperations,
+  kValueTypeCoreTypes,
+  type ValueType,
+} from '../cfds/base/types/index.ts';
 import { assertNoLegacyRefs } from '../cfds/richtext/legacy-ref.ts';
 import { kTypeOps } from '../base/core-types/type-ops.ts';
 import { CoreType } from '../base/core-types/base.ts';
@@ -95,6 +99,47 @@ function assertLegacyIngress(doc: RichText): void {
 }
 
 export default function setup(): void {
+  TEST(
+    'CoreValueSerialization',
+    'kTypeOperations is frozen and exhaustive',
+    () => {
+      // WHY: `kValueTypeCoreTypes` satisfies Record<ValueType, CoreType>, so
+      // deriving the key list from it keeps this test honest when a new
+      // ValueType is added. A missing operation makes the lookup fail.
+      for (const t of Object.keys(kValueTypeCoreTypes) as ValueType[]) {
+        const ops = getTypeOperations(t);
+        assertExists(ops, `getTypeOperations missing for: ${t}`);
+        assertEquals(ops.valueType, t);
+      }
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'ValueType to CoreType map is total and bijective',
+    () => {
+      const reps: Record<ValueType, CoreValue> = {
+        string: 's',
+        number: 1,
+        boolean: true,
+        date: new Date(0),
+        set: new Set([1]),
+        map: mkDict([['k', 1]]),
+        richtext: { root: { tagName: 'div', children: [] } } as never,
+      };
+      const valueTypes = Object.keys(kValueTypeCoreTypes) as ValueType[];
+      // A shared CoreType would make the reverse lookup ambiguous.
+      assertEquals(
+        new Set(Object.values(kValueTypeCoreTypes)).size,
+        valueTypes.length,
+      );
+      for (const t of valueTypes) {
+        assertEquals(getCoreType(reps[t]), kValueTypeCoreTypes[t]);
+        assertTrue(getTypeOperations(t).validate(reps[t]));
+      }
+    },
+  );
+
   TEST(
     'CoreValueSerialization',
     'rejects legacy refs in pointers without stripping',

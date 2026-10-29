@@ -11,7 +11,6 @@ import { FieldChange, FieldOperation } from '../../change/field-change.ts';
 import {
   type ConcreteCoreValue,
   type CoreKey,
-  CoreType,
   coreValueEquals,
 } from '../../../base/core-types/index.ts';
 
@@ -19,7 +18,7 @@ export class MapTypeOperations extends CoreTypeOperations<
   Dictionary<CoreKey, ConcreteCoreValue>
 > {
   constructor(valueType: ValueType) {
-    super(CoreType.Dictionary, valueType);
+    super(valueType);
   }
 
   patch(
