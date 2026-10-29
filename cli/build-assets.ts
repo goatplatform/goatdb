@@ -238,7 +238,7 @@ async function htmlStaticAsset(htmlPath: string): Promise<StaticAssets> {
   try {
     return {
       '/index.html': {
-        data: await readFile(htmlPath),
+        data: await readFile(path.parsePath(htmlPath)),
         contentType: 'text/html',
       },
     };
@@ -274,10 +274,11 @@ export async function compileAssetsDirectory(
   prefix?: string,
 ): Promise<Record<string, Asset>> {
   const result: Record<string, Asset> = {};
-  if (!(await pathExists(dir))) {
+  const root = path.parsePath(dir);
+  if (!(await pathExists(root))) {
     return result;
   }
-  for await (const filePath of walkDir(dir, { includeDirs: false })) {
+  for await (const filePath of walkDir(root, { includeDirs: false })) {
     if (filter && !filter(filePath)) {
       continue;
     }
@@ -286,7 +287,7 @@ export async function compileAssetsDirectory(
     if (ext === 'ts') {
       ext = 'js';
     }
-    let key = filePath.substring(dir.length).toLowerCase();
+    let key = filePath.substring(root.length).toLowerCase();
     // Rewrite extension to match
     key = key.substring(0, key.length - origExt.length) + '.' + ext;
     if (prefix) {

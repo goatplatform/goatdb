@@ -53,6 +53,7 @@
     "@types/node": "^24.0.0",
     "@types/nodemailer": "^6.4.17",
     "@types/react": "^19.0.0",
+    "fast-check": "4.10.2",
     "tsup": "^8.0.0",
     "typescript": "^5.9.3"
   }

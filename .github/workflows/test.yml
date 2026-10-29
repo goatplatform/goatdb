@@ -26,15 +26,22 @@ jobs:
         with:
           node-version: '24.x'
 
+      - name: Path contract pre-check
+        run: deno task test:paths
+        env:
+          FC_SEED: 42
+
       - name: Run Deno tests
         run: deno task test --runtime=deno
         env:
           CI: true
+          FC_SEED: 42
 
       - name: Run Node.js tests
         run: deno task test --runtime=node
         env:
           CI: true
+          FC_SEED: 42
 
   docs-build:
     name: Docs Build
@@ -111,3 +118,4 @@ jobs:
         run: deno task test --runtime=browser
         env:
           CI: true
+          FC_SEED: 42

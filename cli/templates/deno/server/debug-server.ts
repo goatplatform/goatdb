@@ -1,6 +1,7 @@
 // Development server with hot reload
 // See https://goatdb.dev/docs/server-logic for custom endpoints and middleware
 import { Server } from '@goatdb/goatdb/server';
+import * as path from '@std/path';
 import { registerSchemas } from '../common/schema.ts';
 
 async function main(): Promise<void> {
@@ -28,7 +29,7 @@ async function main(): Promise<void> {
 
   // Create development server
   const server = new Server({
-    path: 'server-data',
+    path: path.join(Deno.cwd(), 'server-data'),
     buildInfo,
     domain,
     port: 8080,

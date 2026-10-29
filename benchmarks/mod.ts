@@ -13,7 +13,7 @@ import { getEnvVar } from '../base/os.ts';
 import { ProgressBar } from '../shared/progress.ts';
 import { writeTextFile } from '../base/json-log/file-impl.ts';
 import { Emitter } from '../base/emitter.ts';
-import * as path from '@std/path';
+import * as path from '../base/path.ts';
 
 /** Canonical operation ordering for comparison tables. */
 export const OPERATION_ORDER = [

@@ -8,6 +8,7 @@
  */
 import { isDeno, isNode } from './common.ts';
 import { notReached } from './error.ts';
+import * as path from './path.ts';
 
 /**
  * Represents a file system change event.
@@ -47,7 +48,7 @@ export function shouldRebuildAfterPathChange(
     return false;
   }
   // Ignore paths where any of the components start with '.' or are in ignored list
-  const components = p.split(/[/\\]/);
+  const components = path.parsePath(p).split('/');
   for (const comp of components) {
     if (comp.startsWith('.') || ignored.includes(comp)) {
       return false;

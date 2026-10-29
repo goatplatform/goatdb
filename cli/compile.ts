@@ -195,9 +195,13 @@ async function bundleClientAssets(
   const bundlingStart = performance.now();
   const entryPoints = appEntryPoints(options);
   const minify = options.minify !== false;
-  const configPath = runtime === 'node'
-    ? (options.packageJson || path.join(getRuntime().getCWD(), 'package.json'))
-    : (options.denoJson || path.join(getRuntime().getCWD(), 'deno.json'));
+  const configPath = path.parsePath(
+    runtime === 'node'
+      ? (options.packageJson ||
+        path.join(getRuntime().getCWD(), 'package.json'))
+      : (options.denoJson ||
+        path.join(getRuntime().getCWD(), 'deno.json')),
+  );
   if (!await pathExists(configPath)) {
     throw new Error(
       `Config file not found at "${configPath}". ` +
@@ -609,7 +613,7 @@ async function signExecutable(
   const runtime = getRuntime();
   const osName = runtime.getOS();
 
-  if (!await pathExists(execPath)) {
+  if (!await pathExists(path.parsePath(execPath))) {
     throw new Error(`Executable not found at "${execPath}". Cannot sign.`);
   }
 
@@ -633,7 +637,7 @@ async function signExecutable(
       args.push('-o', 'runtime');
     }
     if (options.entitlements) {
-      if (!await pathExists(options.entitlements)) {
+      if (!await pathExists(path.parsePath(options.entitlements))) {
         throw new Error(
           `Entitlements file not found at "${options.entitlements}".`,
         );
@@ -701,7 +705,7 @@ async function signExecutable(
       }
     } else if (windowsOpts?.certFile) {
       // File-based signing
-      if (!await pathExists(windowsOpts.certFile)) {
+      if (!await pathExists(path.parsePath(windowsOpts.certFile))) {
         throw new Error(
           `Certificate file not found at "${windowsOpts.certFile}".`,
         );

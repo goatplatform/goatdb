@@ -1,4 +1,5 @@
 import type { LogEntry, LogStream } from './log.ts';
+import { parsePath, type PosixPath } from '../base/path.ts';
 import {
   type JSONLogFile,
   JSONLogFileAppend,
@@ -19,6 +20,8 @@ const TEXT_ENCODER = new TextEncoder();
  * @group Logging
  */
 export class JSONLogStream implements LogStream {
+  /** Normalized path to the underlying JSON log file. */
+  readonly path: PosixPath;
   /** Promise resolving to the underlying JSON log file */
   private _log?: JSONLogFile;
   private _closeTimer: SimpleTimer;
@@ -30,14 +33,16 @@ export class JSONLogStream implements LogStream {
    *                     will be written. Default is 1 (no throttling).
    */
   constructor(
-    readonly path: string,
+    path: string,
     readonly throttleRate: number = 1,
   ) {
+    // The public constructor accepts raw paths; normalize them once here.
+    this.path = parsePath(path);
     this._closeTimer = new SimpleTimer(
       kMinuteMs,
       false,
       () => this.close(),
-      `JSONLogStream-${path}`,
+      `JSONLogStream-${this.path}`,
     );
   }
 

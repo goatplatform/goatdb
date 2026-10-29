@@ -86,7 +86,7 @@ export type StorageFormat = 'jsonl' | 'goat';
 /** @group Database */
 export interface DBInstanceConfig {
   /**
-   * Absolute path to the directory that'll store the DB's data.
+   * Absolute, non-root path to the directory that'll store the DB's data.
    */
   path: string;
   /**
@@ -250,7 +250,7 @@ export class GoatDB<US extends Schema = Schema>
   readonly debug: boolean;
   readonly mode: DBMode;
   readonly storageFormat: StorageFormat;
-  private readonly _basePath: string;
+  private readonly _basePath: path.PosixPath;
   private readonly _repositories: Map<string, Repository>;
   private readonly _openPromises: Map<string, Promise<Repository>>;
   private readonly _files: Map<string, JSONLogFile>;
@@ -285,7 +285,7 @@ export class GoatDB<US extends Schema = Schema>
   private readonly _closePromises = new Map<string, Promise<void>>();
   /** Mutex guard against concurrent manual closeRepo() calls for the same repo. */
   private readonly _closeLocks = new Set<string>();
-  private _path: string | undefined;
+  private _path: path.PosixPath | undefined;
   private _settingsProvider: DBSettingsProvider | undefined;
   queryPersistence?: QueryPersistence;
   private _trustPool: TrustPool | undefined;
@@ -300,7 +300,15 @@ export class GoatDB<US extends Schema = Schema>
 
   constructor(config: DBInstanceConfig) {
     super();
-    this._basePath = config.path;
+    // WHY: '' normalizes to '.', and roots such as "/" or "C:/" pass
+    // isAbsolute. logout() recursively removes _basePath, so reject both at
+    // ingress; the branded type then carries the normalized contract.
+    this._basePath = path.parsePath(config.path);
+    if (!path.isAbsoluteNonRoot(this._basePath)) {
+      throw new Error(
+        `DBInstanceConfig.path must be an absolute, non-root path, got: "${config.path}"`,
+      );
+    }
     this.mode = config.mode || (isBrowser() ? 'client' : 'server');
     this.registry = config.registry || DataRegistry.default;
     this.orgId = config?.orgId || getGoatConfig().orgId;
@@ -354,7 +362,7 @@ export class GoatDB<US extends Schema = Schema>
    * Returns the directory under which this DB instance stores all data.
    * Repositories are sub-directories within this directory.
    */
-  get path(): string {
+  get path(): path.PosixPath {
     return this._path || this._basePath;
   }
 
@@ -1095,19 +1103,15 @@ export class GoatDB<US extends Schema = Schema>
    * method when you must ensure all previously known commits are written to the
    * local disk.
    *
-   * @param path Path to the desired repository.
+   * @param repoPath Path to the desired repository.
    * @returns    A promise that resolves after all commits have been flushed to
    *             disk.
    */
-  async flush(path: string): Promise<void> {
-    const repoId = itemPathGetRepoId(itemPathNormalize(path));
-    path = repoId;
-    if (!path.endsWith('/')) {
-      path = path + '/';
-    }
+  async flush(repoPath: string): Promise<void> {
+    const repoId = itemPathGetRepoId(itemPathNormalize(repoPath));
     const promises: Promise<void>[] = [];
     for (const [itemPath, item] of this._items) {
-      if (itemPath.startsWith(path)) {
+      if (itemPath !== repoId && path.isWithin(repoId, itemPath)) {
         promises.push(item.commit());
       }
     }

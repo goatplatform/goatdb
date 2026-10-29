@@ -4,6 +4,8 @@
  * - 'start': Seek relative to the beginning of the file
  * - 'end': Seek relative to the end of the file
  */
+import type { PosixPath } from '../path.ts';
+
 export type SeekFrom = 'current' | 'start' | 'end';
 
 /**
@@ -29,6 +31,11 @@ export interface DirEntry {
  * minimal set of operations required by GoatDB's persistence layer, focusing on
  * the core file operations needed for the database.
  *
+ * Path arguments and returned working/temp directories are {@link PosixPath}
+ * values: normalize native paths (backslashes, drive casing) once at the
+ * boundary with `parsePath`, then keep them POSIX internally. Use
+ * `equals`/`isWithin` for comparisons, never string search.
+ *
  * The generic type parameter T represents the platform-specific file handle type.
  */
 export interface FileImpl<T> {
@@ -42,7 +49,7 @@ export interface FileImpl<T> {
    *         the size-driven read loop would return empty bytes. A write open
    *         surfaces the platform error unchanged (Windows may reject earlier).
    */
-  open(path: string, write: boolean): Promise<T>;
+  open(path: PosixPath, write: boolean): Promise<T>;
 
   /**
    * Moves the file cursor to a new position.
@@ -97,19 +104,19 @@ export interface FileImpl<T> {
    * @param path The path to the file
    * @returns A promise that resolves to true if the file was removed, false otherwise
    */
-  remove(path: string): Promise<boolean>;
+  remove(path: PosixPath): Promise<boolean>;
 
   /**
    * Gets the current working directory.
    * @returns The current working directory path
    */
-  getCWD(): string;
+  getCWD(): PosixPath;
 
   /**
    * Gets the path to a temporary directory.
    * @returns The path to a temporary directory
    */
-  getTempDir(): Promise<string>;
+  getTempDir(): Promise<PosixPath>;
 
   /**
    * Creates a directory at the specified path.
@@ -122,7 +129,7 @@ export interface FileImpl<T> {
    * @returns Resolves on success and rejects on failure. All impls (Deno,
    *          Node, OPFS) behave the same.
    */
-  mkdir(path: string): Promise<void>;
+  mkdir(path: PosixPath): Promise<void>;
 
   /**
    * Checks if a file or directory exists at the specified path.
@@ -130,7 +137,7 @@ export interface FileImpl<T> {
    * @param path The path to check
    * @returns A promise that resolves to true if the path exists, false otherwise
    */
-  exists(path: string): Promise<boolean>;
+  exists(path: PosixPath): Promise<boolean>;
 
   /**
    * Copies a file from source to destination path.
@@ -142,7 +149,7 @@ export interface FileImpl<T> {
    * @throws In browser environments, files larger than 50MB cannot be copied
    *         due to memory constraints.
    */
-  copyFile(srcPath: string, destPath: string): Promise<void>;
+  copyFile(srcPath: PosixPath, destPath: PosixPath): Promise<void>;
 
   /**
    * Reads the contents of a directory.
@@ -151,5 +158,5 @@ export interface FileImpl<T> {
    * @returns A promise that resolves to an array of directory entries
    * @throws Will throw an error if the directory doesn't exist or cannot be read
    */
-  readDir(path: string): Promise<DirEntry[]>;
+  readDir(path: PosixPath): Promise<DirEntry[]>;
 }

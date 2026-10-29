@@ -16,6 +16,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Breaking Changes
 
+- **Store path must be absolute and non-root.** `DBInstanceConfig.path` now
+  throws `DBInstanceConfig.path must be an absolute, non-root path` for
+  relative paths, the empty string, and filesystem roots such as `/`. Resolve
+  the path at the call site: `new GoatDB({ path: `${Deno.cwd()}/data` })`
+  instead of `{ path: './data' }`. Paths are normalized on ingress, and the
+  check keeps `logout()` from recursively removing the process working
+  directory.
 - Unified `Date` wire format and commit checksum (0.7.0). Typed fields now
   encode as `{ "__t": "D", "__v": <epoch-seconds> }`, not a bare number.
   Dates carry their tag in every checksum position. The typed-field checksum

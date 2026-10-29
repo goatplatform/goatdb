@@ -71,11 +71,14 @@ async function assertStoreRejected(
   }
 }
 
-function markerPath(storePath: string): string {
+function markerPath(storePath: path.PosixPath): path.PosixPath {
   return path.join(storePath, kStorageFormatMarkerFile);
 }
 
-async function writeMarker(storePath: string, epoch: string): Promise<void> {
+async function writeMarker(
+  storePath: path.PosixPath,
+  epoch: string,
+): Promise<void> {
   await writeFile(markerPath(storePath), gTextEncoder.encode(epoch + '\n'));
 }
 

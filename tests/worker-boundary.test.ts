@@ -6,7 +6,7 @@
  * wrappers in base/json-log/json-log.ts instead: direct calls bypass the
  * worker queue and break OPFS handle discipline.
  *
- * This test scans every repo .ts file for import specifiers resolving to
+ * This test scans every repo .ts/.tsx file for import specifiers resolving to
  * file-impl.ts and fails on any importer missing from the allowlist below.
  * The allowlist holds the worker plus pre-discipline importers that are
  * grandfathered (migrate them to the json-log.ts wrappers, do not extend).
@@ -19,7 +19,8 @@ import { TEST } from './mod.ts';
 import { assertTrue } from './asserts.ts';
 import * as path from '../base/path.ts';
 import { getRuntime } from '../base/runtime/index.ts';
-import { readDir, readTextFile } from '../base/json-log/json-log.ts';
+import { readTextFile } from '../base/json-log/json-log.ts';
+import { walkFiles } from './file-walk.ts';
 
 // Desired end-state: only base/json-log/json-log-worker.ts imports
 // file-impl.ts directly. Every other entry predates the worker-owned FS
@@ -54,17 +55,6 @@ const kAllowedDirectImporters: ReadonlySet<string> = new Set([
   'tests/server-architecture.test.ts',
 ]);
 
-// Dot directories (.git, .chunkhound, .pi, ...) hold caches and tooling, not
-// source. The named entries are gitignored build/output directories.
-const kSkippedDirs: ReadonlySet<string> = new Set([
-  'node_modules',
-  'build',
-  'dist',
-  'coverage',
-  '_site',
-  'test_data',
-]);
-
 // Static, dynamic, re-export, and side-effect import specifiers. Basename
 // equality keeps the interface and per-runtime variants (deno/node/opfs) out
 // of scope.
@@ -79,27 +69,15 @@ function specifierUsesFileImpl(spec: string): boolean {
   return spec.split('/').pop() === 'file-impl.ts';
 }
 
-async function collectTsFiles(dir: string, out: string[]): Promise<void> {
-  for (const entry of await readDir(dir)) {
-    if (entry.name.startsWith('.') || kSkippedDirs.has(entry.name)) continue;
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory) {
-      await collectTsFiles(full, out);
-    } else if (entry.isFile && entry.name.endsWith('.ts')) {
-      out.push(full);
-    }
-  }
-}
-
 export default function setupWorkerBoundary() {
   if (getRuntime().id === 'browser') return;
   TEST('WorkerBoundary', 'no new direct file-impl importers', async () => {
     const root = getRuntime().getCWD();
-    const files: string[] = [];
-    await collectTsFiles(root, files);
+    const files: path.PosixPath[] = [];
+    for await (const file of walkFiles(root)) files.push(file);
     assertTrue(
       files.length > 50,
-      `Expected a repo tree at ${root}, found ${files.length} .ts files`,
+      `Expected a repo tree at ${root}, found ${files.length} source files`,
     );
     const violators: string[] = [];
     for (const file of files) {
@@ -112,7 +90,7 @@ export default function setupWorkerBoundary() {
       );
       for (const match of code.matchAll(kSpecifierPattern)) {
         if (specifierUsesFileImpl(match[1])) {
-          const rel = file.slice(root.length + 1).replace(/\\/g, '/');
+          const rel = path.relative(root, file);
           if (!kAllowedDirectImporters.has(rel)) violators.push(rel);
           break;
         }

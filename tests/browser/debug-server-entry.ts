@@ -28,6 +28,7 @@ async function browserTestsServerMain() {
       testMode: true,
       suite: getEnvVar('GOATDB_SUITE'),
       test: getEnvVar('GOATDB_TEST'),
+      fc_seed: getEnvVar('FC_SEED'),
     };
 
     const { server, setPort } = createTestServer({

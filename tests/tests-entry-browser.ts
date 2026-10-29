@@ -42,6 +42,11 @@ import setupCoreValueCompare from './core-value-compare.test.ts';
 import setupCoreValueSerialization from './core-value-serialization.test.ts';
 import setupDecoderPool from './decoder-pool.test.ts';
 import setupStorageFormatEpoch from './storage-format-epoch.test.ts';
+import setupDBConfig from './db-config.test.ts';
+import setupPathTests from './path.test.ts';
+import setupCliPathNormalizationTests from './cli-path-normalization.test.ts';
+import setupPathBoundaryTests from './path-boundaries.test.ts';
+import setupPathPropertyTests from './path-property.test.ts';
 import setupJsonLogWorkerIO from './json-log-worker-io.test.ts';
 import setupAutoClose from './auto-close.test.ts';
 import { getEnvVar } from '../base/os.ts';
@@ -83,6 +88,10 @@ async function main(): Promise<void> {
   // FAST UNIT TESTS (0-1ms each) - Pure logic, no I/O
   setupOrderstamp(); // Utility functions for distributed timestamps
   setupItemPath(); // Path validation and parsing logic
+  setupPathTests();
+  setupCliPathNormalizationTests();
+  setupPathBoundaryTests();
+  setupPathPropertyTests();
   setupHealthCheckEndpoint(); // Simple HTTP endpoint check
   setupHashMap(); // HashSet and HashMap collision-safe cardinality
   setupCoreValueCompare(); // Core-value ordering invariants
@@ -91,6 +100,7 @@ async function main(): Promise<void> {
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
   setupStorageFormatEpoch(); // Storage epoch fail-fast on every runtime
+  setupDBConfig(); // DB store-path config validation and normalization
   setupJsonLogWorkerIO(); // Worker-backed strict file I/O
   setupCoroutineQueueTests(); // Coroutine FIFO execution contract
   setupCoroutineSchedulerTests(); // Coroutine failure isolation contract
