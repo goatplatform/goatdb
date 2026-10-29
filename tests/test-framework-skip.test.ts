@@ -18,6 +18,10 @@ import {
 import { assertEquals, assertTrue } from './asserts.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 import { getEnvVar } from '../base/os.ts';
+import {
+  assertBrowserDisplay,
+  assertCliDisplay,
+} from './test-framework-display.ts';
 
 /** Sets the skip gate for the current runtime. */
 function setFailOnSkip(value: string | undefined): void {
@@ -140,6 +144,7 @@ export default function setupTestFrameworkSkip(): void {
     'TestFramework',
     'a skip is reported separately from a pass and a failure',
     async () => {
+      if (getRuntime().id === 'browser') await assertBrowserDisplay();
       const outcome = await runMixedSuite();
       assertEquals(outcome.skipped, true);
       assertEquals(outcome.skippedPassed, false);
@@ -219,6 +224,7 @@ export default function setupTestFrameworkSkip(): void {
       if (getRuntime().id !== 'deno') {
         skipTest('spawns the deno test CLI');
       }
+      await assertCliDisplay();
       // A Node-only test skips when the Deno entry runs it. Pin the real exit
       // code and the printed summary, not just the in-process helpers.
       const env: Record<string, string> = {
@@ -229,7 +235,15 @@ export default function setupTestFrameworkSkip(): void {
       delete env.GOATDB_FAIL_ON_SKIP;
       const run = async (failOnSkip: boolean) => {
         const result = await new Deno.Command('deno', {
-          args: ['run', '-A', 'tests/tests-entry-server.ts'],
+          args: [
+            'run',
+            '-A',
+            'tests/run.ts',
+            '--runtime=deno',
+            `--suite=${env.GOATDB_SUITE}`,
+            `--test=${env.GOATDB_TEST}`,
+            ...(failOnSkip ? ['--fail-on-skip'] : []),
+          ],
           env: failOnSkip ? { ...env, GOATDB_FAIL_ON_SKIP: '1' } : env,
           stdout: 'piped',
           stderr: 'piped',
@@ -247,12 +261,16 @@ export default function setupTestFrameworkSkip(): void {
         0,
         `a skip must not fail the run by default:\n${tolerated.stdout}${tolerated.stderr}`,
       );
+      assertTrue(!tolerated.stdout.includes('[FAIL]'), tolerated.stdout);
+      assertTrue(tolerated.stdout.includes('[SKIP]'), tolerated.stdout);
       assertTrue(
         tolerated.stdout.includes('Skipped: 1'),
         `the summary must print the skip:\n${tolerated.stdout}`,
       );
 
       const strict = await run(true);
+      assertTrue(!strict.stdout.includes('[FAIL]'), strict.stdout);
+      assertTrue(strict.stdout.includes('[SKIP]'), strict.stdout);
       assertEquals(
         strict.code,
         1,

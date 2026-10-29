@@ -2,7 +2,12 @@ import { compileForNodeWithEsbuild, nodeRun } from './node-runner.ts';
 import { runBrowserTests } from './browser-runner.ts';
 import { parseWorkerTimeoutMs } from './worker-timeout.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
-import { failureCount, TestsRunner, type TestSummary } from '../tests/mod.ts';
+import {
+  completeTestProgress,
+  failureCount,
+  TestsRunner,
+  type TestSummary,
+} from '../tests/mod.ts';
 
 /**
  * Worker message types for Deno test execution.
@@ -183,7 +188,7 @@ async function runDenoWithWorker(
           const testId = testTaskIds.get(testKey);
 
           if (testId) {
-            pm.complete(testId, passed ? 'done' : 'failed');
+            completeTestProgress(pm, testId, payload);
           }
 
           activeSuite = undefined;

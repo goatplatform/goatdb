@@ -3,7 +3,7 @@
  * Zero dependencies, cross-platform.
  *
  * Provides:
- * - Task: Individual task with state machine (pending → running → done/failed)
+ * - Task: Individual task with state machine (pending → running → done/failed/skipped)
  * - ProgressManager: Task registry with hierarchy management
  * - InteractiveRenderer: ANSI multi-line display for TTY
  * - SimpleRenderer: Plain text output for CI/non-TTY
@@ -24,7 +24,8 @@ import {
 export type TaskId = string;
 
 /** Task status in the state machine */
-export type TaskStatus = 'pending' | 'running' | 'done' | 'failed';
+export type TaskStatus = 'pending' | 'running' | CompletionStatus;
+export type CompletionStatus = 'done' | 'failed' | 'skipped';
 
 // ============================================================================
 // Task Class
@@ -35,7 +36,7 @@ export type TaskStatus = 'pending' | 'running' | 'done' | 'failed';
  *
  * State transitions:
  *   pending → running (on first update)
- *   running → done | failed (on complete)
+ *   running → done | failed | skipped (on complete)
  *
  * Invariants:
  *   - depth === 0 iff parentId === null
@@ -116,10 +117,10 @@ export class Task {
   /**
    * Complete the task with given status.
    */
-  complete(status: 'done' | 'failed' = 'done'): void {
+  complete(status: CompletionStatus = 'done'): void {
     this._status = status;
     // Set current to total on completion if determinate
-    if (status === 'done' && this._total !== null) {
+    if (status !== 'failed' && this._total !== null) {
       this._current = this._total;
     }
   }
@@ -151,7 +152,7 @@ export class Task {
       const child = tasks.get(childId);
       if (!child) continue;
 
-      if (child.status === 'done' || child.status === 'failed') {
+      if (child.status !== 'pending' && child.status !== 'running') {
         completedChildren++;
       }
 
@@ -213,6 +214,7 @@ const STATUS_SYMBOLS: Record<TaskStatus, string> = {
   running: '⠋',
   done: '✓',
   failed: '✗',
+  skipped: 'SKIP',
 };
 
 /**
@@ -508,6 +510,7 @@ export class CompactRenderer implements Renderer {
     // Count passed, failed, and find running tests
     let passed = 0;
     let failed = 0;
+    let skipped = 0;
     let total = 0;
     const runningTests: Task[] = [];
     let rootTask: Task | undefined;
@@ -524,6 +527,7 @@ export class CompactRenderer implements Renderer {
         total++;
         if (task.status === 'done') passed++;
         else if (task.status === 'failed') failed++;
+        else if (task.status === 'skipped') skipped++;
         else if (task.status === 'running') runningTests.push(task);
       }
     }
@@ -547,15 +551,18 @@ export class CompactRenderer implements Renderer {
 
     // Summary header line
     const spinner = this.getSpinner();
-    const progress = total > 0 ? (passed + failed) / total : 0;
+    const completed = passed + failed + skipped;
+    const progress = total > 0 ? completed / total : 0;
     const bar = this.formatBar(progress);
     const rootTitle = rootTask?.title ?? 'Running';
 
-    let header = `${spinner} ${rootTitle} [${bar}] ${passed + failed}/${total}`;
+    let header = `${spinner} ${rootTitle} [${bar}] ${completed}/${total}`;
     header += ` | ✓ ${passed}`;
     if (failed > 0) {
       header += ` | ✗ ${failed}`;
     }
+
+    if (skipped > 0) header += ` | SKIP ${skipped}`;
 
     if (header.length > this.cols) {
       header = header.slice(0, this.cols - 1) + '…';
@@ -629,6 +636,7 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
   running: 'RUN',
   done: 'DONE',
   failed: 'FAIL',
+  skipped: 'SKIP',
 };
 
 /**
@@ -664,7 +672,8 @@ export class SimpleRenderer implements Renderer {
       const progress = task.total !== null
         ? ` (${task.current}/${task.total})`
         : '';
-      const line = `[${label}] ${indent}${task.title}${progress}\n`;
+      const reason = task.status === 'skipped' ? ` ${task.message}` : '';
+      const line = `[${label}] ${indent}${task.title}${progress}${reason}\n`;
 
       try {
         this.writeFn(line);
@@ -953,7 +962,7 @@ export class ProgressManager {
   /**
    * Complete a task.
    */
-  complete(id: TaskId, status: 'done' | 'failed' = 'done'): void {
+  complete(id: TaskId, status: CompletionStatus = 'done'): void {
     const task = this.tasks.get(id);
     if (!task) {
       throw new Error(`Task ${id} not found`);

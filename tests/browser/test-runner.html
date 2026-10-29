@@ -100,6 +100,14 @@
         border-left-color: var(--error);
       }
 
+      .result-item.skipped {
+        border-left-color: var(--warning);
+      }
+
+      .skip-reason {
+        color: var(--warning);
+      }
+
       .result-item.running {
         border-left-color: var(--warning);
         animation: pulse 1s infinite;
@@ -336,25 +344,30 @@
           `test-${testResults.length - 1}`,
         );
         if (resultDiv) {
-          resultDiv.className = `result-item ${
-            result.passed ? 'passed' : 'failed'
-          }`;
+          // The real-renderer contract checks all three states against CLI output.
+          const outcome = result.skipped
+            ? 'skipped'
+            : result.passed ? 'passed' : 'failed';
+          resultDiv.className = `result-item ${outcome}`;
 
           let errorHtml = '';
           if (result.error) {
-            errorHtml =
-              `<div class="error-message">${result.error.message}</div>`;
+            const messageClass = result.skipped ? 'skip-reason' : 'error-message';
+            errorHtml = `<div class="${messageClass}"></div>`;
           }
 
           resultDiv.innerHTML = `
                     <div class="result-header">
                         <span class="result-name">${result.suiteName} / ${result.testName}</span>
                         <span class="result-duration">${
-            Math.round(result.duration)
-          }ms</span>
+            outcome.toUpperCase()
+          } · ${Math.round(result.duration)}ms</span>
                     </div>
                     ${errorHtml}
                 `;
+          if (result.error) {
+            resultDiv.lastElementChild.textContent = result.error.message;
+          }
         }
       });
 
@@ -375,6 +388,7 @@
         summaryDiv.innerHTML = `
                 <h3 style="color: var(--accent); margin-bottom: 0.5rem;">Test Summary</h3>
                 <p><strong>Passed:</strong> ${results.passed}</p>
+                <p><strong>Skipped:</strong> ${results.skipped}</p>
                 <p><strong>Failed:</strong> ${results.failed}</p>
                 <p><strong>Duration:</strong> ${
           (results.duration / 1000).toFixed(2)
@@ -382,7 +396,7 @@
                 <p style="color: ${
           success ? 'var(--success)' : 'var(--error)'
         };">${
-          success ? '✓ All tests passed' : '✗ Some tests failed'
+          success ? '✓ Tests completed without failures' : '✗ Some tests failed'
         }</p>
             `;
 

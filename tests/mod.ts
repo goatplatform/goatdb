@@ -73,6 +73,21 @@ export interface TestResult {
   readonly error?: Error;
 }
 
+/** Completes progress without treating an unavailable test as a failure. */
+export function completeTestProgress(
+  pm: ProgressManager,
+  id: TaskId,
+  result: Pick<TestResult, 'passed' | 'skipped'> & {
+    error?: Pick<Error, 'message'>;
+  },
+): void {
+  if (result.skipped) pm.update(id, 0, result.error!.message);
+  pm.complete(
+    id,
+    result.skipped ? 'skipped' : result.passed ? 'done' : 'failed',
+  );
+}
+
 /**
  * Summary of all test execution results.
  */
@@ -391,7 +406,7 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
           });
 
           const result = await runTestCase(suite, testName, test);
-          pm.complete(testId, result.passed ? 'done' : 'failed');
+          completeTestProgress(pm, testId, result);
           allResults.push(result);
           this.emit('testComplete', result);
           pm.complete(suiteId);
@@ -460,7 +475,7 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
       });
 
       const result = await runTestCase(suite, name, test);
-      pm.complete(testId, result.passed ? 'done' : 'failed');
+      completeTestProgress(pm, testId, result);
       results.push(result);
       this.emit('testComplete', result);
     }
