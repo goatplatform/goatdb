@@ -3,7 +3,8 @@
  *
  * Verifies that file operations (open, read, write, seek, truncate, remove,
  * copy, mkdir) work correctly on both Deno and Node.js runtimes.
- * Browser (OPFS) has separate coverage and is skipped here.
+ * Browser (OPFS) is skipped here; its EISDIR identity is covered through the
+ * worker-boundary suite (tests/json-log-worker-io.test.ts).
  */
 
 import { TEST } from './mod.ts';
@@ -237,4 +238,51 @@ export default function setupFileImplTests() {
     const names = entries.map((e) => e.name).sort();
     assertEquals(names, ['a.txt', 'b.txt'], 'entry names should match');
   });
+
+  /** Captures a rejection so tests can assert the error identity. */
+  async function rejectionOf(
+    operation: () => Promise<unknown>,
+  ): Promise<Error & { code?: string } | undefined> {
+    try {
+      await operation();
+      return undefined;
+    } catch (e: unknown) {
+      return e as Error & { code?: string };
+    }
+  }
+
+  // Regression: a directory reports length 0 on Windows, so the size-driven
+  // read loop never fires and readFile() used to resolve with empty bytes. The
+  // boundary must reject directories by type, not by length.
+  TEST('FileImpl', 'open rejects a directory', async (ctx) => {
+    if (isBrowser()) return;
+    const dir = await ctx.tempDir('file-impl-open-dir');
+    const impl = await FileImplGet();
+    const error = await rejectionOf(() => impl.open(dir, false));
+    assertTrue(error !== undefined, 'opening a directory must reject');
+    assertEquals(error?.code, 'EISDIR', 'directory open must surface EISDIR');
+  });
+
+  TEST('FileImpl', 'readFile rejects a directory', async (ctx) => {
+    if (isBrowser()) return;
+    const dir = await ctx.tempDir('file-impl-read-dir');
+    const error = await rejectionOf(() => readFile(dir));
+    assertTrue(error !== undefined, 'reading a directory must reject');
+    assertEquals(error?.code, 'EISDIR', 'directory read must surface EISDIR');
+  });
+
+  TEST(
+    'FileImpl',
+    'readFile of an empty file returns empty bytes',
+    async (ctx) => {
+      if (isBrowser()) return;
+      const dir = await ctx.tempDir('file-impl-empty');
+      const impl = await FileImplGet();
+      const filePath = path.join(dir, 'empty.bin');
+      const handle = await impl.open(filePath, true);
+      await impl.close(handle);
+      const buf = await readFile(filePath);
+      assertEquals(buf.length, 0, 'an empty file must read as zero bytes');
+    },
+  );
 }
