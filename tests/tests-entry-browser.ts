@@ -39,6 +39,7 @@ import setupHealthCheckEndpoint from './health-check-endpoint.test.ts';
 import setupLiveQuery from './live-query.test.ts';
 import setupHashMap from './hash-map.test.ts';
 import setupCoreValueCompare from './core-value-compare.test.ts';
+import setupCoreValueSerialization from './core-value-serialization.test.ts';
 import setupAutoClose from './auto-close.test.ts';
 import { getEnvVar } from '../base/os.ts';
 import { notReached } from '../base/error.ts';
@@ -80,6 +81,7 @@ async function main(): Promise<void> {
   setupHealthCheckEndpoint(); // Simple HTTP endpoint check
   setupHashMap(); // HashSet and HashMap collision-safe cardinality
   setupCoreValueCompare(); // Core-value ordering invariants
+  setupCoreValueSerialization(); // Core serializer contract goldens
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
   setupCoroutineQueueTests(); // Coroutine FIFO execution contract
