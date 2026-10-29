@@ -14,6 +14,14 @@ import { assertEquals, assertExists, assertTrue } from './asserts.ts';
 import * as path from '../base/path.ts';
 import type { GoatDB } from '../db/db.ts';
 import { JSONDecoder } from '../base/core-types/encoding/json.ts';
+import { JSONCyclicalEncoder } from '../base/core-types/encoding/json.ts';
+import {
+  MD5Checksum,
+  Murmur3Checksum,
+} from '../base/core-types/encoding/checksum.ts';
+import type { CoreValue } from '../base/core-types/base.ts';
+import { Item } from '../cfds/base/item.ts';
+import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { deserialize } from '../cfds/base/object.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import {
@@ -73,6 +81,73 @@ async function writeMarker(storePath: string, epoch: string): Promise<void> {
 
 function rejectionMessage(r: PromiseRejectedResult): string {
   return r.reason instanceof Error ? r.reason.message : String(r.reason);
+}
+
+/**
+ * Expected codec fingerprint per storage epoch.
+ *
+ * WHY: `kStorageFormatEpoch` used to depend on a "BUMP THIS" comment only, so
+ * a codec/checksum change could ship without a bump and old stores would
+ * mis-decode instead of failing fast. A codec change now fails this test until
+ * the author bumps the epoch and records the new fingerprint.
+ */
+const kEpochFingerprints: Readonly<Record<number, string>> = {
+  1: 'aca89293fe85f54d4e3e3f65fb80d41a',
+};
+
+const kFingerprintSchema: Schema = {
+  ns: 'epoch-fingerprint',
+  version: 1,
+  fields: {
+    d: { type: 'date' },
+    s: { type: 'set' },
+    m: { type: 'map' },
+  },
+};
+const kFingerprintRegistry = new DataRegistry();
+kFingerprintRegistry.registerSchema(kFingerprintSchema);
+
+const kMapDateSchema: Schema = {
+  ns: 'epoch-map-date',
+  version: 1,
+  fields: { m: { type: 'map' } },
+};
+const kMapDateRegistry = new DataRegistry();
+kMapDateRegistry.registerSchema(kMapDateSchema);
+
+/**
+ * Deterministic fingerprint over the wire formats the epoch protects.
+ * Covers core values (Date, Set, Map with a Date, shared refs) and the
+ * authoritative Item checksum.
+ */
+function codecFingerprint(): string {
+  const date = new Date(1_700_000_000_000);
+  const shared = { id: 'shared', when: date };
+  const fixtures: CoreValue[] = [
+    date,
+    new Set<CoreValue>([date, 'x', 2]),
+    new Map<string, CoreValue>([['when', date], ['n', 1]]),
+    { first: shared, second: shared } as CoreValue,
+  ];
+  const parts = fixtures.map((value) => {
+    const encoder = new JSONCyclicalEncoder();
+    encoder.set('v', value);
+    return JSON.stringify(encoder.getOutput()) + '|' +
+      new Murmur3Checksum({ typeSafe: true }).checksumForValue(value);
+  });
+  const item = new Item(
+    {
+      schema: kFingerprintSchema,
+      data: {
+        d: date,
+        s: new Set([date]),
+        m: new Map([['when', date]]),
+      } as never,
+    },
+    kFingerprintRegistry,
+  );
+  parts.push(JSON.stringify(item.toJS()) + '|' + item.checksum);
+  return new MD5Checksum().checksumForValue(parts.join('\n'));
 }
 
 /**
@@ -175,6 +250,46 @@ export default function setup() {
 
   TEST(
     'StorageFormatEpoch',
+    'a Date inside a map survives a store reopen and keeps its checksum',
+    async (ctx) => {
+      // Regression for the raw dictToPrimitive copy: the Date was stored as an
+      // ISO string while the checksum tagged it as a Date, so the delta commit
+      // was marked corrupted after reload.
+      const date = new Date(1_700_000_000_000);
+      const first = await ctx.createDB('map-date', {
+        registry: kMapDateRegistry,
+      });
+      try {
+        await first.readyPromise();
+        await first.create('/data/maps/m1', kMapDateSchema, {
+          m: new Map([['when', date]]),
+        }).commit();
+        await first.flushAll();
+      } finally {
+        await first.close();
+      }
+
+      const second = await ctx.createDB('map-date', {
+        registry: kMapDateRegistry,
+      });
+      try {
+        await second.readyPromise();
+        await second.open('/data/maps');
+        const map = second.item('/data/maps/m1').get('m') as Map<
+          string,
+          Date
+        >;
+        assertTrue(map.get('when') instanceof Date);
+        assertEquals(map.get('when')!.getTime(), date.getTime());
+      } finally {
+        await second.flushAll();
+        await second.close();
+      }
+    },
+  );
+
+  TEST(
+    'StorageFormatEpoch',
     'a non-empty store without a marker is rejected',
     async (ctx) => {
       const storePath = await ctx.tempDir('legacy');
@@ -231,6 +346,26 @@ export default function setup() {
       const db = await ctx.createDB('nested-artifact');
       await assertStoreRejected(db, 'data/items.goat', true);
       await db.close();
+    },
+  );
+
+  TEST(
+    'StorageFormatEpoch',
+    'codec fingerprint matches the pinned epoch',
+    () => {
+      const expected = kEpochFingerprints[kStorageFormatEpoch];
+      assertExists(
+        expected,
+        `No codec fingerprint for storage epoch ${kStorageFormatEpoch}. ` +
+          'A codec change requires bumping kStorageFormatEpoch and adding its ' +
+          'fingerprint to kEpochFingerprints.',
+      );
+      assertEquals(
+        codecFingerprint(),
+        expected,
+        `Codec bytes changed. If intentional, bump kStorageFormatEpoch ` +
+          `(currently ${kStorageFormatEpoch}) and add the new fingerprint.`,
+      );
     },
   );
 

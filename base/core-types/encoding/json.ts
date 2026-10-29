@@ -225,9 +225,23 @@ export class JSONDecoder implements Decoder {
       return decoded;
     }
     // Non-Encodable: wrap the raw value so the child decodes lazily.
-    const child = new JSONDecoder(value as ReadonlyJSONObject | undefined);
-    child._acquire();
+    const child = this.createChildDecoder(
+      value as ReadonlyJSONObject | undefined,
+    );
     this._addChild(child);
+    return child;
+  }
+
+  /**
+   * Creates an acquired child decoder for nested data. Subclasses override the
+   * factory so a cyclical parent yields cyclical children; a plain
+   * `new JSONDecoder` would drop the `__r`/`__d` context.
+   */
+  protected createChildDecoder(
+    data: ReadonlyJSONObject | undefined,
+  ): OwnedDecoder<string, ReadonlyJSONValue> {
+    const child = new JSONDecoder(data);
+    child._acquire();
     return child;
   }
 
@@ -259,8 +273,9 @@ export class JSONDecoder implements Decoder {
       // child is tracked on _children so the parent's dispose releases it even
       // when the consumer never disposes the child directly (e.g. when it is
       // reached inside a decoded array via get()).
-      const nested = new JSONDecoder(value.__v as ReadonlyJSONObject);
-      nested._acquire();
+      const nested = this.createChildDecoder(
+        value.__v as ReadonlyJSONObject,
+      );
       this._addChild(nested);
       return nested;
     }
@@ -378,6 +393,13 @@ export class JSONCyclicalDecoder extends JSONDecoder {
       return refs[jsonObj.__rId as number];
     }
     return super.decodeObject(jsonObj);
+  }
+
+  protected override createChildDecoder(
+    data: ReadonlyJSONObject | undefined,
+  ): OwnedDecoder<string, ReadonlyJSONValue> {
+    // Pooled factory already acquires and resets `_tempRefs`.
+    return JSONCyclicalDecoder.get(data);
   }
 
   override getDecoder(
