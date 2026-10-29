@@ -26,6 +26,7 @@ import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
 import { SuiteTempDir } from '../shared/runner.ts';
 import { Emitter } from '../base/emitter.ts';
+import { getEnvVar } from '../base/os.ts';
 
 /**
  * A test function that takes a TestSuite context and returns either void or a
@@ -40,14 +41,51 @@ import { Emitter } from '../base/emitter.ts';
 export type TestFunc = (ctx: TestSuite) => Promise<void> | void;
 
 /**
+ * Signals that a test cannot run in the current environment.
+ *
+ * WHY a sentinel instead of a silent return: a test that quietly passes
+ * without running hides lost coverage. The runner reports skips separately and
+ * can fail the whole run on them (`--fail-on-skip`).
+ */
+export class TestSkipped extends Error {
+  constructor(readonly reason: string = 'no reason given') {
+    super(reason);
+    this.name = 'TestSkipped';
+  }
+}
+
+/** Skips the current test with a reason. Never returns. */
+export function skipTest(reason?: string): never {
+  throw new TestSkipped(reason);
+}
+
+/**
  * Result of a single test execution.
  */
 export interface TestResult {
   readonly suiteName: string;
   readonly testName: string;
+  /** True only when the test ran to completion. A skip is not a pass. */
   readonly passed: boolean;
+  /** True when the test signalled a skip instead of running. */
+  readonly skipped: boolean;
   readonly duration: number;
   readonly error?: Error;
+}
+
+/** Completes progress without treating an unavailable test as a failure. */
+export function completeTestProgress(
+  pm: ProgressManager,
+  id: TaskId,
+  result: Pick<TestResult, 'passed' | 'skipped'> & {
+    error?: Pick<Error, 'message'>;
+  },
+): void {
+  if (result.skipped) pm.update(id, 0, result.error!.message);
+  pm.complete(
+    id,
+    result.skipped ? 'skipped' : result.passed ? 'done' : 'failed',
+  );
 }
 
 /**
@@ -56,9 +94,77 @@ export interface TestResult {
 export interface TestSummary {
   readonly totalTests: number;
   readonly passed: number;
+  readonly skipped: number;
   readonly failed: number;
   readonly duration: number;
   readonly results: TestResult[];
+}
+
+/**
+ * Runs one test and classifies its outcome: passed, skipped, or failed.
+ *
+ * WHY shared: the suite runner, the single-test path and the worker runner all
+ * report the same three outcomes. Duplicating the classification let them
+ * drift (for example, counting a skip as a pass).
+ */
+export async function runTestCase(
+  suite: TestSuite,
+  testName: string,
+  test: TestFunc,
+): Promise<TestResult> {
+  const start = performance.now();
+  try {
+    await test(suite);
+    return {
+      suiteName: suite.name,
+      testName,
+      passed: true,
+      skipped: false,
+      duration: performance.now() - start,
+    };
+  } catch (error) {
+    const duration = performance.now() - start;
+    if (error instanceof TestSkipped) {
+      return {
+        suiteName: suite.name,
+        testName,
+        passed: false,
+        skipped: true,
+        duration,
+        error,
+      };
+    }
+    return {
+      suiteName: suite.name,
+      testName,
+      passed: false,
+      skipped: false,
+      duration,
+      error: error instanceof Error
+        ? error
+        : new Error(error ? String(error) : 'Unknown error'),
+    };
+  }
+}
+
+/**
+ * True when a skip must fail the run. `--fail-on-skip` sets
+ * GOATDB_FAIL_ON_SKIP; every runtime reads it through `getEnvVar` (the browser
+ * receives it through the injected config).
+ */
+export function failOnSkipEnabled(): boolean {
+  const raw = getEnvVar('GOATDB_FAIL_ON_SKIP');
+  return raw === '1' || raw?.toLowerCase() === 'true';
+}
+
+/** Counts the results that must fail the run, honoring `--fail-on-skip`. */
+export function failureCount(summary: TestSummary): number {
+  return summary.failed + (failOnSkipEnabled() ? summary.skipped : 0);
+}
+
+/** Process exit code for a run summary. */
+export function summaryExitCode(summary: TestSummary): 0 | 1 {
+  return failureCount(summary) > 0 ? 1 : 0;
 }
 
 /**
@@ -111,26 +217,7 @@ export class TestSuite {
     const results: TestResult[] = [];
 
     for (const [name, test] of this._tests.entries()) {
-      const start = performance.now();
-      try {
-        await test(this);
-        results.push({
-          suiteName: this.name,
-          testName: name,
-          passed: true,
-          duration: performance.now() - start,
-        });
-      } catch (error) {
-        results.push({
-          suiteName: this.name,
-          testName: name,
-          passed: false,
-          duration: performance.now() - start,
-          error: error instanceof Error
-            ? error
-            : new Error(error ? String(error) : 'Unknown error'),
-        });
-      }
+      results.push(await runTestCase(this, name, test));
     }
 
     await this.cleanup();
@@ -318,32 +405,10 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
             total: totalTests,
           });
 
-          const start = performance.now();
-          try {
-            await test(suite);
-            pm.complete(testId, 'done');
-            const result = {
-              suiteName: suite.name,
-              testName,
-              passed: true,
-              duration: performance.now() - start,
-            };
-            allResults.push(result);
-            this.emit('testComplete', result);
-          } catch (error) {
-            pm.complete(testId, 'failed');
-            const result = {
-              suiteName: suite.name,
-              testName,
-              passed: false,
-              duration: performance.now() - start,
-              error: error instanceof Error
-                ? error
-                : new Error(error ? String(error) : 'Unknown error'),
-            };
-            allResults.push(result);
-            this.emit('testComplete', result);
-          }
+          const result = await runTestCase(suite, testName, test);
+          completeTestProgress(pm, testId, result);
+          allResults.push(result);
+          this.emit('testComplete', result);
           pm.complete(suiteId);
           completedSuites++;
           pm.update(rootId, completedSuites);
@@ -409,32 +474,10 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
         total: totalTests,
       });
 
-      const start = performance.now();
-      try {
-        await test(suite);
-        pm.complete(testId, 'done');
-        const result = {
-          suiteName: suite.name,
-          testName: name,
-          passed: true,
-          duration: performance.now() - start,
-        };
-        results.push(result);
-        this.emit('testComplete', result);
-      } catch (error) {
-        pm.complete(testId, 'failed');
-        const result = {
-          suiteName: suite.name,
-          testName: name,
-          passed: false,
-          duration: performance.now() - start,
-          error: error instanceof Error
-            ? error
-            : new Error(error ? String(error) : 'Unknown error'),
-        };
-        results.push(result);
-        this.emit('testComplete', result);
-      }
+      const result = await runTestCase(suite, name, test);
+      completeTestProgress(pm, testId, result);
+      results.push(result);
+      this.emit('testComplete', result);
     }
 
     // Complete the suite
@@ -453,11 +496,14 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
    */
   private createSummary(results: TestResult[], duration: number): TestSummary {
     const passed = results.filter((r) => r.passed).length;
-    const failed = results.length - passed;
+    const skipped = results.filter((r) => r.skipped).length;
+    // WHY subtract skipped: a skip is neither a pass nor a failure.
+    const failed = results.length - passed - skipped;
 
     return {
       totalTests: results.length,
       passed,
+      skipped,
       failed,
       duration,
       results,
@@ -475,11 +521,24 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
     console.log('=== Test Summary ===');
     console.log(`Total: ${summary.totalTests} tests`);
     console.log(`Passed: ${summary.passed}`);
+    if (summary.skipped > 0) {
+      console.log(`Skipped: ${summary.skipped}`);
+      for (const result of summary.results) {
+        if (!result.skipped) continue;
+        console.log(
+          `   ${result.suiteName}/${result.testName}${
+            result.error?.message ? ` (${result.error.message})` : ''
+          }`,
+        );
+      }
+    }
     if (summary.failed > 0) {
       console.log(`Failed: ${summary.failed}`);
       console.log();
       console.log('Failed tests:');
-      const failures = summary.results.filter((r) => !r.passed);
+      // WHY exclude skips: a skip is listed in its own section, never as a
+      // failure, so this list stays a list of real failures.
+      const failures = summary.results.filter((r) => !r.passed && !r.skipped);
       for (let i = 0; i < failures.length; i++) {
         const result = failures[i];
         console.log(

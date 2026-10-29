@@ -17,7 +17,7 @@ jobs:
 
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
 
       - uses: actions/setup-node@v4
         with:
@@ -29,6 +29,13 @@ jobs:
 
       - name: Install npm dependencies
         run: rm -rf node_modules && npm install
+
+      - name: Type check and runtime floor probe
+        run: |
+          deno task check
+          deno eval 'using x = { [Symbol.dispose]() {} };'
+          # deno eval defaults to TypeScript; --ext=js guards the native JS path.
+          deno eval --ext=js 'using x = { [Symbol.dispose]() {} };'
 
       - name: Build npm artifact
         run: npm run build:npm

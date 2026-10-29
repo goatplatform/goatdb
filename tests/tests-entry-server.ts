@@ -20,7 +20,7 @@
  * browser tests, see `tests-entry-browser.ts`.
  */
 
-import { TestsRunner, type TestSummary } from './mod.ts';
+import { summaryExitCode, TestsRunner, type TestSummary } from './mod.ts';
 import { registerAllTests } from './test-registry.ts';
 import { exit } from '../base/process.ts';
 import { getEnvVar } from '../base/os.ts';
@@ -71,9 +71,8 @@ async function main(): Promise<void> {
   // Print summary
   TestsRunner.printSummary(summary);
 
-  // Exit with code 1 if any tests failed, 0 if all passed
-  const exitCode = summary.failed > 0 ? 1 : 0;
-  await exit(exitCode);
+  // Exit non-zero on failures, and on skips when `--fail-on-skip` is set.
+  await exit(summaryExitCode(summary));
 }
 
 assert(

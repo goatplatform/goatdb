@@ -29,6 +29,8 @@ async function browserTestsServerMain() {
       suite: getEnvVar('GOATDB_SUITE'),
       test: getEnvVar('GOATDB_TEST'),
       fc_seed: getEnvVar('FC_SEED'),
+      // WHY: the page cannot read env vars; GoatDBConfig is its only channel.
+      fail_on_skip: getEnvVar('GOATDB_FAIL_ON_SKIP'),
     };
 
     const { server, setPort } = createTestServer({

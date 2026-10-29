@@ -12,7 +12,7 @@
  */
 
 import { isBrowser } from '../base/common.ts';
-import { TestsRunner, type TestSummary } from './mod.ts';
+import { summaryExitCode, TestsRunner, type TestSummary } from './mod.ts';
 import { exit } from '../base/process.ts';
 import {
   type LogEntry,
@@ -49,6 +49,7 @@ import setupPathBoundaryTests from './path-boundaries.test.ts';
 import setupNoRegistryDependencyTests from './no-registry-dependency.test.ts';
 import setupPathPropertyTests from './path-property.test.ts';
 import setupJsonLogWorkerIO from './json-log-worker-io.test.ts';
+import setupTestFrameworkSkip from './test-framework-skip.test.ts';
 import setupAutoClose from './auto-close.test.ts';
 import { getEnvVar } from '../base/os.ts';
 import { notReached } from '../base/error.ts';
@@ -99,6 +100,7 @@ async function main(): Promise<void> {
   setupCoreValueCompare(); // Core-value ordering invariants
   setupCoreValueSerialization();
   setupDecoderPool(); // Core serializer contract goldens
+  setupTestFrameworkSkip(); // Skip vs pass vs failure, and the fail-on-skip gate
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
   setupStorageFormatEpoch(); // Storage epoch fail-fast on every runtime
@@ -152,8 +154,7 @@ async function main(): Promise<void> {
   }
 
   // Exit with appropriate code (handles browser signaling)
-  const exitCode = summary.failed > 0 ? 1 : 0;
-  exit(exitCode);
+  exit(summaryExitCode(summary));
 }
 
 // Auto-run when used as entry point or in browser

@@ -10,6 +10,7 @@ import { sourceMapDecoder } from './browser/sourcemap-decoder.ts';
  * --suite=<name> or -suite <name>: Run specific test suite
  * --test=<name> or -test <name>: Run specific test
  * --runtime=<deno|node|browser> or -runtime <deno|node|browser>: Run in specific runtime only
+ * --fail-on-skip: Fail the run when any test is skipped (env GOATDB_FAIL_ON_SKIP)
  *
  * @returns Promise that resolves when all tests complete
  */
@@ -29,6 +30,13 @@ async function runTests(): Promise<void> {
       arg === '--deno-inspect-brk' || arg === '--node-inspect-brk' ||
       arg === '--debug'
     ) continue;
+
+    // WHY an env var: the flag must reach the Deno and Node child processes
+    // and the browser page, and env is the one channel all three share.
+    if (arg === '--fail-on-skip') {
+      Deno.env.set('GOATDB_FAIL_ON_SKIP', '1');
+      continue;
+    }
 
     // Parse suite name argument
     if (arg.startsWith('--suite=')) {
@@ -67,7 +75,7 @@ async function runTests(): Promise<void> {
     console.error(
       'Unknown argument:',
       arg,
-      '\nUsage: deno task test [--deno-inspect-brk] [--node-inspect-brk] [-suite <suite>] [--suite=<suite>] [-test <test>] [--test=<test>] [-runtime <deno|node|browser>] [--debug]',
+      '\nUsage: deno task test [--deno-inspect-brk] [--node-inspect-brk] [-suite <suite>] [--suite=<suite>] [-test <test>] [--test=<test>] [-runtime <deno|node|browser>] [--fail-on-skip] [--debug]',
     );
     Deno.exit(1);
   }

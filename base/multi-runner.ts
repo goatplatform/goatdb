@@ -1,7 +1,13 @@
 import { compileForNodeWithEsbuild, nodeRun } from './node-runner.ts';
 import { runBrowserTests } from './browser-runner.ts';
+import { parseWorkerTimeoutMs } from './worker-timeout.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
-import { TestsRunner, type TestSummary } from '../tests/mod.ts';
+import {
+  completeTestProgress,
+  failureCount,
+  TestsRunner,
+  type TestSummary,
+} from '../tests/mod.ts';
 
 /**
  * Worker message types for Deno test execution.
@@ -21,12 +27,22 @@ interface WorkerTestStartMessage {
   };
 }
 
+interface WorkerHeartbeatMessage {
+  type: 'heartbeat';
+  payload: {
+    suiteName: string;
+    testName: string;
+    elapsedMs: number;
+  };
+}
+
 interface WorkerTestCompleteMessage {
   type: 'testComplete';
   payload: {
     suiteName: string;
     testName: string;
     passed: boolean;
+    skipped: boolean;
     duration: number;
     error?: { name: string; message: string; stack?: string };
   };
@@ -40,17 +56,16 @@ interface WorkerDoneMessage {
 type WorkerOutgoingMessage =
   | WorkerReadyMessage
   | WorkerTestStartMessage
+  | WorkerHeartbeatMessage
   | WorkerTestCompleteMessage
   | WorkerDoneMessage;
-
-/** Worker execution timeout (5 minutes) */
-const WORKER_TIMEOUT_MS = 5 * 60 * 1000;
 
 /**
  * Runs Deno tests using a Web Worker for responsive TUI.
  * The main thread handles TUI rendering while the Worker executes tests.
  */
 async function runDenoWithWorker(
+  timeoutMs: number,
   suite?: string,
   test?: string,
 ): Promise<{ elapsed: number; summary: TestSummary }> {
@@ -75,6 +90,10 @@ async function runDenoWithWorker(
     let failedCount = 0;
     let passedCount = 0;
     let testSummary: TestSummary | undefined;
+    let activeSuite: string | undefined;
+    let activeTest: string | undefined;
+    let activeTestElapsedMs: number | undefined;
+    let lastHeartbeatAt: number | undefined;
 
     // Start animation interval for spinner updates (100ms)
     animationInterval = setInterval(() => {
@@ -84,8 +103,20 @@ async function runDenoWithWorker(
       }
     }, 100);
 
-    // Set up worker timeout to prevent indefinite hangs
+    // Set up worker timeout to prevent indefinite hangs. The diagnostic is
+    // deliberately explicit: a bare duration cannot distinguish a slow suite
+    // from a single blocked test.
     timeoutId = setTimeout(() => {
+      const heartbeatAge = lastHeartbeatAt === undefined
+        ? 'never received'
+        : `${((performance.now() - lastHeartbeatAt) / 1000).toFixed(1)}s ago`;
+      const active = activeTest === undefined
+        ? 'none (between tests or during suite cleanup)'
+        : `${activeSuite} > ${activeTest}`;
+      const testElapsed = activeTestElapsedMs === undefined
+        ? 'unknown'
+        : `${(activeTestElapsedMs / 1000).toFixed(1)}s`;
+
       if (animationInterval) {
         clearInterval(animationInterval);
       }
@@ -93,10 +124,12 @@ async function runDenoWithWorker(
       worker.terminate();
       reject(
         new Error(
-          `Worker timeout after ${WORKER_TIMEOUT_MS / 1000 / 60} minutes`,
+          `Worker timeout after ${(timeoutMs / 60000).toFixed(1)} minutes. ` +
+            `Active test: ${active}. Active test elapsed: ${testElapsed}. ` +
+            `Last heartbeat: ${heartbeatAge}.`,
         ),
       );
-    }, WORKER_TIMEOUT_MS) as unknown as number;
+    }, timeoutMs) as ReturnType<typeof setTimeout>;
 
     // Handle Worker messages
     worker.onmessage = (event: MessageEvent<WorkerOutgoingMessage>) => {
@@ -130,23 +163,43 @@ async function runDenoWithWorker(
           const testId = pm.create(testName, 1, suiteId);
           testTaskIds.set(testKey, testId);
           pm.update(testId, 0, 'running');
+
+          activeSuite = suiteName;
+          activeTest = testName;
+          activeTestElapsedMs = 0;
+          lastHeartbeatAt = performance.now();
+          break;
+        }
+
+        case 'heartbeat': {
+          const { suiteName, testName, elapsedMs } = payload;
+          if (suiteName === activeSuite && testName === activeTest) {
+            activeTestElapsedMs = elapsedMs;
+            lastHeartbeatAt = performance.now();
+          }
           break;
         }
 
         case 'testComplete': {
           // Test completed
-          const { suiteName, testName, passed, duration, error } = payload;
+          const { suiteName, testName, passed, skipped, duration, error } =
+            payload;
           const testKey = `${suiteName}::${testName}`;
           const testId = testTaskIds.get(testKey);
 
           if (testId) {
-            pm.complete(testId, passed ? 'done' : 'failed');
+            completeTestProgress(pm, testId, payload);
           }
+
+          activeSuite = undefined;
+          activeTest = undefined;
+          activeTestElapsedMs = undefined;
+          lastHeartbeatAt = undefined;
 
           completedTests++;
           if (passed) {
             passedCount++;
-          } else {
+          } else if (!skipped) {
             failedCount++;
           }
 
@@ -282,6 +335,14 @@ export async function runAcrossPlatforms(
   let nodeElapsed = 0;
   let esbuildElapsed = 0;
   let browserElapsed = 0;
+  const runtimeFailures: string[] = [];
+
+  // Parse once for every runtime path: debug/benchmark subprocesses, Node and
+  // browser never arm the worker timer, so a bad override must fail here
+  // instead of being silently ignored.
+  const workerTimeoutMs = parseWorkerTimeoutMs(
+    Deno.env.get('GOATDB_TEST_TIMEOUT_MS'),
+  );
 
   const runDeno = config.runtimes.includes('deno');
   const runNode = config.runtimes.includes('node');
@@ -294,22 +355,33 @@ export async function runAcrossPlatforms(
     // Use Worker for responsive TUI, unless debugging (debugger needs main process)
     if (!config.denoInspectBrk && config.mode === 'test') {
       // Worker-based execution for tests
+      let denoFailed = 0;
       try {
-        const result = await runDenoWithWorker(config.suite, config.test);
+        const result = await runDenoWithWorker(
+          workerTimeoutMs,
+          config.suite,
+          config.test,
+        );
         denoElapsed = result.elapsed;
         TestsRunner.printSummary(result.summary);
+        // Honors GOATDB_FAIL_ON_SKIP: a skip counts as a failure when set.
+        denoFailed = failureCount(result.summary);
 
-        if (result.summary.failed > 0) {
-          console.log(
-            `=== 🦖 Deno: ${result.summary.failed} failed ===`,
-          );
+        if (denoFailed > 0) {
+          console.log(`=== 🦖 Deno: ${denoFailed} failed ===`);
         } else {
           console.log(`=== 🦖 Deno: all passed ===`);
         }
       } catch (error) {
         console.error('=== 🦖 Deno Worker execution failed ===');
-        console.error('Error:', (error as Error).message);
-        throw error;
+        const message = (error as Error).message;
+        console.error('Error:', message);
+        // Record the failure and keep going: a red Deno run must not hide Node
+        // or browser results. The aggregate throw below still fails the process.
+        runtimeFailures.push(`Deno worker execution failed: ${message}`);
+      }
+      if (denoFailed > 0) {
+        runtimeFailures.push(`Deno tests failed: ${denoFailed}`);
       }
     } else {
       // Subprocess execution for debugging or benchmarks
@@ -341,7 +413,16 @@ export async function runAcrossPlatforms(
         stderr: 'inherit',
         env: denoEnv,
       });
-      await denoCmd.output();
+      // Debug/benchmark runs bypass the worker summary, so this status is the
+      // only failure signal. Inherited stdio keeps the output visible.
+      const denoResult = await denoCmd.output();
+      if (!denoResult.success) {
+        runtimeFailures.push(
+          `Deno execution failed (exit code ${denoResult.code}${
+            denoResult.signal ? `, signal ${denoResult.signal}` : ''
+          })`,
+        );
+      }
 
       const denoEnd = performance.now();
       denoElapsed = (denoEnd - denoStart) / 1000;
@@ -368,28 +449,44 @@ export async function runAcrossPlatforms(
     const outName = 'cross-platform-entry';
     console.log('🛠️ Bundling with esbuild for Node.js...');
     const esbuildStart = performance.now();
-    const esbuildResult = await compileForNodeWithEsbuild(
-      config.entryPointServer,
-      outName,
-    );
-    const esbuildEnd = performance.now();
-    esbuildElapsed = (esbuildEnd - esbuildStart) / 1000;
-    console.log(
-      `🛠️ esbuild bundling completed in ${esbuildElapsed.toFixed(2)}s`,
-    );
-
-    const nodeStart = performance.now();
-    // Execute Node.js (timing only the Node.js phase)
-    const success = await nodeRun(
-      esbuildResult,
-      config.nodeInspectBrk,
-      nodeEnv,
-    );
-    if (!success) {
-      throw new Error('Node.js execution failed');
+    let esbuildResult:
+      | Awaited<ReturnType<typeof compileForNodeWithEsbuild>>
+      | undefined;
+    try {
+      esbuildResult = await compileForNodeWithEsbuild(
+        config.entryPointServer,
+        outName,
+      );
+      const esbuildEnd = performance.now();
+      esbuildElapsed = (esbuildEnd - esbuildStart) / 1000;
+      console.log(
+        `🛠️ esbuild bundling completed in ${esbuildElapsed.toFixed(2)}s`,
+      );
+    } catch (error) {
+      console.error('=== ⚡️ Node.js bundling failed ===');
+      const message = (error as Error).message;
+      console.error('Error:', message);
+      // Record the failure and keep going: a red Deno run and the browser phase
+      // must stay visible. The aggregate throw below still fails the process.
+      runtimeFailures.push(`Node.js bundling failed: ${message}`);
     }
-    const nodeEnd = performance.now();
-    nodeElapsed = (nodeEnd - nodeStart) / 1000;
+
+    if (esbuildResult !== undefined) {
+      const nodeStart = performance.now();
+      // Execute Node.js (timing only the Node.js phase)
+      const nodeResult = await nodeRun(
+        esbuildResult,
+        config.nodeInspectBrk,
+        nodeEnv,
+      );
+      if (!nodeResult.success) {
+        runtimeFailures.push(
+          `Node.js execution failed (exit code ${nodeResult.code})`,
+        );
+      }
+      const nodeEnd = performance.now();
+      nodeElapsed = (nodeEnd - nodeStart) / 1000;
+    }
   }
 
   // Run in Browser if configured
@@ -414,12 +511,15 @@ export async function runAcrossPlatforms(
 
       // Handle both test and benchmark result formats
       const browserSummary = summary.summary ?? summary;
-      const failed = browserSummary.failed ?? 0;
+      const failed = failureCount(browserSummary as TestSummary);
       const passed = browserSummary.passed ?? 0;
 
       TestsRunner.printSummary(browserSummary);
 
       if (failed > 0) {
+        runtimeFailures.push(
+          `Browser tests failed: ${failed} (${passed} passed)`,
+        );
         console.log(
           `=== 🌐 Browser: ${passed} passed, ${failed} failed ===`,
         );
@@ -430,8 +530,11 @@ export async function runAcrossPlatforms(
       }
     } catch (error) {
       console.error('=== 🌐 Browser execution failed ===');
-      console.error('Error:', (error as Error).message);
-      throw error;
+      const message = (error as Error).message;
+      console.error('Error:', message);
+      // Keep Node and any collected failures visible; the aggregate throw below
+      // still fails the process.
+      runtimeFailures.push(`Browser execution failed: ${message}`);
     }
   }
 
@@ -452,6 +555,10 @@ export async function runAcrossPlatforms(
   }
   summary += ` | Total: ${totalElapsed.toFixed(2)}s ===`;
   console.log(summary);
+
+  if (runtimeFailures.length > 0) {
+    throw new Error(runtimeFailures.join('; '));
+  }
 
   return {
     denoElapsed,
