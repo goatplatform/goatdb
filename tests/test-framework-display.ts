@@ -122,7 +122,7 @@ async function runBrowserDisplay(frame: HTMLIFrameElement, name?: Outcome) {
   const runner = displayRunner();
   const target = frame.contentWindow!;
   for (const event of ['testStart', 'testComplete'] as const) {
-    runner.attach(event, (detail) => {
+    runner.attach(event, (detail: unknown) => {
       target.dispatchEvent(new CustomEvent(event, { detail }));
     });
   }
