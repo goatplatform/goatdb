@@ -10,10 +10,16 @@ import { TEST } from './mod.ts';
 import { assertEquals, assertExists, assertTrue } from './asserts.ts';
 import { isNode } from '../base/common.ts';
 import {
-  GoatRequest,
+  type GoatRequest,
   NodeHttpServer,
   type ServeHandlerInfo,
 } from '../net/server/http-compat.ts';
+
+import { clientOrigin } from './http-test-utils.ts';
+
+function responseHandler(body: string, init?: ResponseInit) {
+  return () => Promise.resolve(new Response(body, init));
+}
 
 export default function setupNodeHttpServerTests() {
   TEST('NodeHttpServer', 'GET request returns response body', async () => {
@@ -21,17 +27,15 @@ export default function setupNodeHttpServerTests() {
     const server = new NodeHttpServer();
     try {
       await server.start(
-        async (_req: GoatRequest, _info: ServeHandlerInfo) =>
-          new Response('hello', { status: 200 }),
+        responseHandler('hello', { status: 200 }),
         0,
       );
-      const url = `http://localhost:${server.port}`;
-      const res = await fetch(url);
+      const res = await fetch(clientOrigin(server));
       assertEquals(res.status, 200, 'status should be 200');
       const body = await res.text();
       assertEquals(body, 'hello', 'body should match');
     } finally {
-      server.stop();
+      await server.stop();
     }
   });
 
@@ -46,15 +50,14 @@ export default function setupNodeHttpServerTests() {
         },
         0,
       );
-      const url = `http://localhost:${server.port}`;
-      const res = await fetch(url, {
+      const res = await fetch(clientOrigin(server), {
         method: 'POST',
         body: 'echo this',
       });
       const text = await res.text();
       assertEquals(text, 'echo this', 'echoed body should match sent body');
     } finally {
-      server.stop();
+      await server.stop();
     }
   });
 
@@ -63,15 +66,13 @@ export default function setupNodeHttpServerTests() {
     const server = new NodeHttpServer();
     try {
       await server.start(
-        async (_req: GoatRequest, _info: ServeHandlerInfo) =>
-          new Response('ok', {
-            status: 200,
-            headers: { 'x-custom': 'test-value' },
-          }),
+        responseHandler('ok', {
+          status: 200,
+          headers: { 'x-custom': 'test-value' },
+        }),
         0,
       );
-      const url = `http://localhost:${server.port}`;
-      const res = await fetch(url);
+      const res = await fetch(clientOrigin(server));
       await res.text();
       assertEquals(
         res.headers.get('x-custom'),
@@ -79,7 +80,7 @@ export default function setupNodeHttpServerTests() {
         'custom response header should be present',
       );
     } finally {
-      server.stop();
+      await server.stop();
     }
   });
 
@@ -88,16 +89,14 @@ export default function setupNodeHttpServerTests() {
     const server = new NodeHttpServer();
     try {
       await server.start(
-        async (_req: GoatRequest, _info: ServeHandlerInfo) =>
-          new Response('not found', { status: 404 }),
+        responseHandler('not found', { status: 404 }),
         0,
       );
-      const url = `http://localhost:${server.port}`;
-      const res = await fetch(url);
+      const res = await fetch(clientOrigin(server));
       await res.text();
       assertEquals(res.status, 404, 'status should be 404');
     } finally {
-      server.stop();
+      await server.stop();
     }
   });
 
@@ -107,8 +106,7 @@ export default function setupNodeHttpServerTests() {
     const ac = new AbortController();
     try {
       await server.start(
-        async (_req: GoatRequest, _info: ServeHandlerInfo) =>
-          new Response('alive'),
+        responseHandler('alive'),
         0,
         ac.signal,
       );
@@ -125,7 +123,7 @@ export default function setupNodeHttpServerTests() {
         'server.port must be undefined after abort',
       );
     } finally {
-      server.stop(); // idempotent safety cleanup
+      await server.stop(); // idempotent safety cleanup
     }
   });
 
@@ -134,8 +132,7 @@ export default function setupNodeHttpServerTests() {
     const server = new NodeHttpServer();
     try {
       await server.start(
-        async (_req: GoatRequest, _info: ServeHandlerInfo) =>
-          new Response('ok'),
+        responseHandler('ok'),
         0,
       );
       const addr = server.address;
@@ -143,7 +140,7 @@ export default function setupNodeHttpServerTests() {
       assertTrue(addr.port > 0, 'port should be positive');
       assertExists(addr.hostname, 'hostname should be defined');
     } finally {
-      server.stop();
+      await server.stop();
     }
   });
 }

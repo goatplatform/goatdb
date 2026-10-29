@@ -24,12 +24,17 @@ export type {
   ServerServices,
 } from './net/server/server.ts';
 
-export { createHttpServer } from './net/server/http-compat.ts';
+export {
+  createHttpServer,
+  DEFAULT_STOP_TIMEOUT_MS,
+  MAX_STOP_TIMEOUT_MS,
+} from './net/server/http-compat.ts';
 export type {
   GoatHeaders,
   GoatRequest,
   HttpServerInstance,
   HttpServerOptions,
+  HttpServerStopOptions,
   ServeHandlerInfo,
 } from './net/server/http-compat.ts';
 
