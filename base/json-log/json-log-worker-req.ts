@@ -1,3 +1,33 @@
+import type { DirEntry } from './file-impl-interface.ts';
+
+/** Strict file operations run in the worker, where OPFS sync handles exist. */
+export type WorkerReadFileReq = {
+  type: 'readFile';
+  id: number;
+  path: string;
+};
+export type WorkerWriteFileReq = {
+  type: 'writeFile';
+  id: number;
+  path: string;
+  bytes: Uint8Array;
+};
+export type WorkerMkdirReq = { type: 'mkdir'; id: number; path: string };
+export type WorkerReadDirReq = { type: 'readDir'; id: number; path: string };
+
+export type WorkerReadFileResp = {
+  type: 'readFile';
+  id: number;
+  bytes: Uint8Array;
+};
+export type WorkerWriteFileResp = { type: 'writeFile'; id: number };
+export type WorkerMkdirResp = { type: 'mkdir'; id: number };
+export type WorkerReadDirResp = {
+  type: 'readDir';
+  id: number;
+  entries: DirEntry[];
+};
+
 /**
  * A request to open a JSON log file.
  *
@@ -130,7 +160,11 @@ export type WorkerFileReq =
   | WorkerFileReqAppend
   | WorkerReadTextFileReq
   | WorkerWriteTextFileReq
-  | WorkerRemoveReq;
+  | WorkerRemoveReq
+  | WorkerReadFileReq
+  | WorkerWriteFileReq
+  | WorkerMkdirReq
+  | WorkerReadDirReq;
 
 /**
  * A response to a request to open a JSON log file.
@@ -272,7 +306,19 @@ export type WorkerErrorResp = {
   type: 'error';
   id: number;
   error: WorkerErrorType;
+  // Explicit fields preserve filesystem codes and DOMException names on clone.
+  details?: { message: string; name: string; code?: string | number };
 };
+
+/** Unknown-worker-command details. Shared so the worker and tests agree. */
+export function unknownCommandDetails(type: string): {
+  name: string;
+  message: string;
+} {
+  // WHY: include the command so a stale worker bundle (one that predates a
+  // request type) is diagnosable instead of an opaque "UnknownCommand".
+  return { name: 'Error', message: `Unknown worker command: ${type}` };
+}
 
 export type WorkerFileResp =
   | WorkerFileRespOpen
@@ -284,6 +330,10 @@ export type WorkerFileResp =
   | WorkerReadTextFileResp
   | WorkerWriteTextFileResp
   | WorkerRemoveResp
+  | WorkerReadFileResp
+  | WorkerWriteFileResp
+  | WorkerMkdirResp
+  | WorkerReadDirResp
   | WorkerErrorResp;
 
 export type WorkerFileRespForReq<T extends WorkerFileReq = WorkerFileReq> =
@@ -296,5 +346,9 @@ export type WorkerFileRespForReq<T extends WorkerFileReq = WorkerFileReq> =
     : T['type'] extends 'readTextFile' ? WorkerReadTextFileResp
     : T['type'] extends 'writeTextFile' ? WorkerWriteTextFileResp
     : T['type'] extends 'remove' ? WorkerRemoveResp
+    : T['type'] extends 'readFile' ? WorkerReadFileResp
+    : T['type'] extends 'writeFile' ? WorkerWriteFileResp
+    : T['type'] extends 'mkdir' ? WorkerMkdirResp
+    : T['type'] extends 'readDir' ? WorkerReadDirResp
     : T['type'] extends 'error' ? WorkerErrorResp
     : WorkerFileResp;

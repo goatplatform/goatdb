@@ -1,3 +1,5 @@
+import { deserialize } from '../cfds/base/object.ts';
+import { kChecksumSerOptions } from '../cfds/base/item.ts';
 import { getTypeOperations } from '../cfds/base/types/index.ts';
 import { assertNoLegacyRefs } from '../cfds/richtext/legacy-ref.ts';
 import { kTypeOps } from '../base/core-types/type-ops.ts';
@@ -114,23 +116,26 @@ export default function setup(): void {
       const date = new Date(1700000000000);
       assertEquals(
         new MD5Checksum().checksumForValue(date),
-        '24920decf83f6960b80f737a28eeafc1',
+        '07c0a91883c9558fe3b8789a16e8dbed',
       );
       assertEquals(
         new MD5Checksum({ typeSafe: true }).checksumForValue(date),
         '07c0a91883c9558fe3b8789a16e8dbed',
       );
-      assertEquals(new Murmur3Checksum().checksumForValue(date), '1670916500');
+      assertEquals(new Murmur3Checksum().checksumForValue(date), '3491704779');
       assertEquals(
         new Murmur3Checksum({ typeSafe: true }).checksumForValue(date),
         '3491704779',
       );
       const checksum = new Murmur3Checksum();
       serialize(checksum, kDateSchema, { when: date } as never);
-      assertEquals(checksum.getOutput(), '416277608');
+      assertEquals(checksum.getOutput(), '1391363808');
       const encoder = new JSONEncoder();
       serialize(encoder, kDateSchema, { when: date } as never);
-      assertEquals(JSON.stringify(encoder.getOutput()), '{"when":1700000000}');
+      assertEquals(
+        JSON.stringify(encoder.getOutput()),
+        '{"when":{"__t":"D","__v":1700000000}}',
+      );
     },
   );
   TEST('CoreValueSerialization', 'clone passes primitives through', () => {
@@ -843,8 +848,8 @@ export default function setup(): void {
       assertEquals(encodableValueHash(null), '2733564389');
       assertEquals(encodableValueHash(undefined), '2376305704');
       assertEquals(encodableValueHash(true), '2165269852');
-      // Plain Date hash before the unified Date contract.
-      assertEquals(encodableValueHash(new Date(1700000000000)), '1670916500');
+      // Unified Date tag changes the plain hash; the typed hash is unchanged.
+      assertEquals(encodableValueHash(new Date(1700000000000)), '3491704779');
       assertEquals(encodableValueHash(new Set([3, 1, 2])), '2802134913');
     },
   );
@@ -1238,6 +1243,155 @@ export default function setup(): void {
         },
       } as unknown as RichText;
       assertNoLegacyRefs(doc);
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'typed date field carries the Date tag in checksum',
+    () => {
+      const schema: Schema = {
+        ns: 'core-value-serialization-date',
+        version: 1,
+        fields: { when: { type: 'date' } },
+      };
+      const date = new Date(1700000000000);
+      const typed = new Murmur3Checksum();
+      serialize(typed, schema, { when: date } as never, kChecksumSerOptions);
+      const nested = new Murmur3Checksum({ typeSafe: true });
+      // A typed date field now hashes through the unified Date form, so the
+      // top-level typed-field checksum changed 416277608 -> 1391363808 (#58 §5).
+      // The nested-object Date golden is unchanged: it was already tagged.
+      assertEquals(typed.getOutput(), '1391363808');
+      assertEquals(
+        nested.checksumForValue({ when: date }),
+        '1994935183',
+      );
+      assertTrue(typed.getOutput() !== nested.checksumForValue({ when: date }));
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'date checksum tag is independent of the typeSafe option',
+    () => {
+      const date = new Date(1700000000000);
+      const plain = new Murmur3Checksum();
+      const typeSafe = new Murmur3Checksum({ typeSafe: true });
+      // The Date wrapper form is inherently typed, so Date hashes the same in a
+      // typeSafe and a non-typeSafe position: tag "4" + serialized seconds.
+      assertEquals(plain.convertValue(date), typeSafe.convertValue(date));
+      assertEquals(plain.convertValue(date), '41700000000');
+      // A Number of the same value stays untagged, so Date != Number.
+      assertEquals(plain.convertValue(1700000000), '1700000000');
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'typeSafe checksum separates colliding string from Date',
+    () => {
+      const date = new Date(1700000000000);
+      const colliding = '41700000000';
+      // Non-typeSafe positions collide: the string passes through untagged.
+      const plain = new Murmur3Checksum();
+      assertEquals(plain.convertValue(colliding), plain.convertValue(date));
+      // typeSafe prefixes each value with its CoreType tag, so they differ.
+      const typeSafe = new Murmur3Checksum({ typeSafe: true });
+      assertTrue(
+        typeSafe.convertValue(colliding) !== typeSafe.convertValue(date),
+      );
+      assertTrue(
+        typeSafe.checksumForValue(colliding) !==
+          typeSafe.checksumForValue(date),
+      );
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'typed date field encodes as the unified EncodedDate wrapper',
+    () => {
+      const schema: Schema = {
+        ns: 'core-value-serialization-date',
+        version: 1,
+        fields: { when: { type: 'date' } },
+      };
+      const date = new Date(1700000000000);
+      const typed = new JSONEncoder();
+      serialize(typed, schema, { when: date } as never);
+      // Same wrapper a Date gets in a generic/nested position; the old bare
+      // number is gone.
+      assertEquals(
+        JSON.stringify(typed.getOutput()),
+        '{"when":{"__t":"D","__v":1700000000}}',
+      );
+      const nested = new JSONEncoder();
+      nested.set('when', date);
+      assertEquals(typed.getOutput(), nested.getOutput());
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'typed date round-trips through the JSON decoder',
+    () => {
+      const schema: Schema = {
+        ns: 'core-value-serialization-date',
+        version: 1,
+        fields: { when: { type: 'date' } },
+      };
+      const date = new Date(1700000000000);
+      const typed = new JSONEncoder();
+      serialize(typed, schema, { when: date } as never);
+      const decoded = deserialize(
+        new JSONDecoder(typed.getOutput() as never),
+        schema,
+      ) as unknown as { when: Date };
+      assertTrue(decoded.when instanceof Date);
+      assertEquals(decoded.when.getTime(), date.getTime());
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'legacy bare-number date field is rejected loudly',
+    () => {
+      const schema: Schema = {
+        ns: 'core-value-serialization-date',
+        version: 1,
+        fields: { when: { type: 'date' } },
+      };
+      // WHY: the raw decoder cannot tell a bare number from a Number, so the
+      // date type rejects it at the field boundary instead of letting it land
+      // silently in a `date` field (pre-0.7 store or peer, issue #58 §5).
+      assertThrows(() =>
+        deserialize(new JSONDecoder({ when: 1700000000 } as never), schema)
+      );
+      // The decoder itself is unchanged; only the typed field guards.
+      assertEquals(
+        new JSONDecoder({ when: 1700000000 }).get('when'),
+        1700000000,
+      );
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'checksum: MD5 Date golden is stable',
+    () => {
+      // WHY: pins the Date encoding for checksums. Any change to Date
+      // serialization must update this golden in a reviewed diff. The Date
+      // wrapper is inherently typed, so the plain form agrees.
+      const date = new Date(1700000000000);
+      assertEquals(
+        new MD5Checksum({ typeSafe: true }).checksumForValue(date),
+        '07c0a91883c9558fe3b8789a16e8dbed',
+      );
+      assertEquals(
+        new MD5Checksum().checksumForValue(date),
+        '07c0a91883c9558fe3b8789a16e8dbed',
+      );
     },
   );
 }
