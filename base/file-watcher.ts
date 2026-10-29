@@ -158,7 +158,7 @@ function createQueuedWatcher(
 }
 
 function createChokidarWatcher(
-  chokidar: typeof import('chokidar'),
+  chokidar: { watch: typeof import('chokidar').watch },
   dir: string,
 ): FileWatcher {
   const underlying = chokidar.watch(dir, {

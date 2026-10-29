@@ -33,6 +33,12 @@ jobs:
       - name: Build npm artifact
         run: npm run build:npm
 
+      # Publication check: the archive must contain every export, bin, and
+      # template. Source tests validate the checkout; this validates the
+      # release artifact.
+      - name: Verify npm archive contents
+        run: deno task verify:npm-archive
+
       # Extract version once from deno.json; reused across all publish steps (DRY).
       - name: Extract version from deno.json
         id: extract_version
@@ -41,23 +47,13 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
       # Rewrite package.json version + exports for npm publish.
-      # In the repo, exports point to .ts source (for local dev/tests). Here we switch to dist/.
+      # In the repo, exports point to .ts source (for local dev/tests). The shared
+      # transform in scripts/npm-manifest.ts switches them to dist/. The package
+      # contract test applies the same transform, so a shipped-manifest
+      # regression fails the gate rather than the release.
       # This runs AFTER npm install + build so the lockfile matches during install.
       - name: Sync version and exports from deno.json → package.json
-        run: |
-          deno eval --node-modules-dir=none "
-            import pkg from './package.json' with {type:'json'};
-            import cfg from './deno.json' with {type:'json'};
-            pkg.version = cfg.version;
-            pkg.exports = {
-              '.':              { import: './dist/mod.js',          types: './dist/mod.d.ts' },
-              './react':        { import: './dist/react/hooks.js',  types: './dist/react/hooks.d.ts' },
-              './server':       { import: './dist/server.js',       types: './dist/server.d.ts' },
-              './server/build': { import: './dist/server-build.js', types: './dist/server-build.d.ts' },
-              './link':         { import: './dist/cli/link.js',     types: './dist/cli/link.d.ts' },
-            };
-            await Deno.writeTextFile('./package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
+        run: deno run -A scripts/npm-manifest.ts
 
       - name: Publish to JSR
         run: |

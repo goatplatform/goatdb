@@ -32,6 +32,7 @@ import setupE2ELatency from './e2e-latency.test.ts';
 import setupClusterLatency from './cluster-latency.test.ts';
 import setupCliInitTests from './cli-init.test.ts';
 import setupCliCompileTests from './cli-compile.test.ts';
+import setupCliPackageTests from './cli-package.test.ts';
 import setupCliBuildAssetsTests from './cli-build-assets.test.ts';
 import setupPathTests from './path.test.ts';
 import setupCliPathNormalizationTests from './cli-path-normalization.test.ts';
@@ -117,6 +118,7 @@ export async function registerAllTests(): Promise<void> {
   setupSecurityBoundaries(); // Security boundary invariants (auth, sync, signatures)
   setupGoatRequestTest(); // HTTP request processing
   setupCliInitTests(); // CLI scaffolding functionality
+  setupCliPackageTests(); // Built artifact, bin, and template contract
   setupMergeLCA(); // Lowest Common Ancestor / merge base
   setupMergeRecord(); // Record merge and schema upgrade
   setupMergeCorruption(); // Corruption detection via checksums

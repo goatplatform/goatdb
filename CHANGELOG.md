@@ -42,6 +42,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- `goatdb init` now scaffolds `.gitignore` and `.npmrc` again when run from the
+  published npm package. `npm pack` drops dotfile sources, so the templates use
+  plain names (`gitignore`, `npmrc`) that `init` maps back to their dotted
+  targets.
+- `goatdb init` now exits non-zero when dependency installation fails, reporting
+  the command, its exit code and its output. Previously a failed `npm install`
+  only warned, so a broken scaffold looked successful.
+- `deno compile` output names now include `.exe` for Windows targets, so
+  `compile()` returns and logs the path that the compiler actually writes.
 - A `Date` inside a `map` field now uses the tagged
   `{ "__t": "D", "__v": <epoch-seconds> }` wire form, the same as every other
   position. It was copied raw before, so it round-tripped as an ISO string while
@@ -77,6 +86,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   and do not start loading. A fresh unobserved query reports `loading === false`
   and, when `queryInactivityTimeoutMs` is set, is eligible for auto-close. A
   closed query is replaced by calling `db.query()` again.
+- `compile()` now resolves to the path of the compiled executable
+  (`Promise<string>`). Callers that ignore the value need no change.
+
+### Changed
+
+- `goatdb init` on Deno now requests `react`, `react-dom`, `yargs` and
+  `@types/react` as `^` ranges and installs all dependencies in one `deno add`
+  call, bounded by a 180s timeout. Exact pins let a transitive peer resolve a
+  newer `react` than `react-dom`, which crashes at runtime with "Incompatible
+  React versions".
 
 ## [0.6.1] - 2026-09-01
 
