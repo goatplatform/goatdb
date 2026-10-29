@@ -1,39 +1,40 @@
-import { isRefMarker } from '../../richtext/model.ts';
+import type { SerializeValueTypeOptions, ValueTypeOptions } from './index.ts';
+import type { Change, EncodedChange } from '../../change/index.ts';
+import type { RichTextChange } from '../../change/richtext-change.ts';
 import {
-  SerializeValueTypeOptions,
-  ValueType,
-  ValueTypeOptions,
-} from './index.ts';
-import { Change, EncodedChange } from '../../change/index.ts';
-import { RichTextChange } from '../../change/richtext-change.ts';
-import {
-  CoreOptions,
+  type CoreOptions,
   CoreType,
+  type CoreValue,
   coreValueClone,
   coreValueEquals,
-  Encoder,
+  type Encoder,
 } from '../../../base/core-types/index.ts';
-import { DecodedValue } from '../../../base/core-types/encoding/index.ts';
+import type { DecodedValue } from '../../../base/core-types/encoding/index.ts';
 import { diff, patch } from '../../richtext/diff-patch.ts';
 import { flattenRichText } from '../../richtext/flat-rep.ts';
 import { normalizeRichText } from '../../richtext/normalize/index.ts';
 import {
-  dfs,
   initRichText,
-  isExpiredPointer,
   isRichText,
   onlyNoneLocal,
-  purgeExpiredPointers,
-  RichText,
+  type RichText,
   treeAtomKeyFilterIgnoreText,
 } from '../../richtext/tree.ts';
+import { assertNoLegacyRefs } from '../../richtext/legacy-ref.ts';
 import { CoreTypeOperations } from './core-type.ts';
 
 const kCoreValueOpts: CoreOptions = {
   objectFilterFields: treeAtomKeyFilterIgnoreText,
 };
 
-const expiredPointersBuffer = 1000 * 60 * 10; //10 minutes
+/**
+ * Richtext-layer serialization options. `local`/`byCharacter` are inherited
+ * from the single source of truth in `ValueTypeOptions`; only checksum-specific
+ * `flatRep` is added here.
+ */
+export interface RichTextSerializeOptions extends SerializeValueTypeOptions {
+  flatRep?: boolean;
+}
 
 export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
   constructor() {
@@ -47,8 +48,10 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
     if (curValue === undefined) {
       curValue = initRichText();
     }
+    assertNoLegacyRefs(curValue);
 
     const newValue = patch(curValue, changes as RichTextChange[], true);
+    assertNoLegacyRefs(newValue);
 
     return newValue;
   }
@@ -57,11 +60,7 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
     return normalizeRichText(val);
   }
 
-  getRefOperation() {
-    return undefined;
-  }
-
-  override validate(value: any): boolean {
+  override validate(value: CoreValue): boolean {
     return isRichText(value);
   }
 
@@ -69,8 +68,9 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
     key: string,
     value: RichText,
     encoder: Encoder,
-    options?: SerializeValueTypeOptions,
+    options?: RichTextSerializeOptions,
   ): void {
+    assertNoLegacyRefs(value);
     const local = options?.local === true; //default false
 
     if (options?.flatRep === true) {
@@ -91,10 +91,13 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
   }
 
   override deserialize(value: DecodedValue, options?: ValueTypeOptions) {
-    return value as RichText;
+    const decoded = value as RichText;
+    assertNoLegacyRefs(decoded);
+    return decoded;
   }
 
   override valueAddedDiff(value2: RichText, options?: ValueTypeOptions) {
+    assertNoLegacyRefs(value2);
     const local = options?.local === true; //Default is false
 
     const empty = initRichText();
@@ -106,6 +109,7 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
     value1: RichText,
     options?: ValueTypeOptions,
   ): Change<EncodedChange> | Change<EncodedChange>[] | undefined {
+    assertNoLegacyRefs(value1);
     const local = options?.local === true; //Default is false
 
     const empty = initRichText();
@@ -118,6 +122,8 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
     value2: RichText,
     options?: ValueTypeOptions,
   ) {
+    assertNoLegacyRefs(value1);
+    assertNoLegacyRefs(value2);
     return diff(
       value1,
       value2,
@@ -145,46 +151,5 @@ export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
 
   override clone(value: RichText) {
     return coreValueClone(value);
-  }
-
-  override needGC(value: RichText): boolean {
-    if (value.pointers) {
-      for (const pointer of value.pointers) {
-        if (isExpiredPointer(pointer, expiredPointersBuffer)) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  override gc(value: RichText): RichText | undefined {
-    return purgeExpiredPointers(value, expiredPointersBuffer);
-  }
-
-  override fillRefs(refs: Set<string>, value: RichText): void {
-    for (const [node] of dfs(value.root)) {
-      if (isRefMarker(node)) {
-        refs.add(node.ref);
-      }
-    }
-  }
-
-  override rewriteRefs(
-    keyMapping: Map<string, string>,
-    value: RichText,
-    deleteRefs?: Set<string>,
-  ): RichText {
-    for (const [node, _depth, path] of dfs(value.root, true)) {
-      if (isRefMarker(node)) {
-        if (deleteRefs?.has(node.ref)) {
-          const children = path[path.length - 1].children!;
-          children.splice(children.indexOf(node), 1);
-        } else {
-          node.ref = keyMapping.get(node.ref) || node.ref;
-        }
-      }
-    }
-    return value;
   }
 }

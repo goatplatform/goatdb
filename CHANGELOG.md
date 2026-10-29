@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Breaking Changes
 
+- Legacy rich-text refs (`RefMarker` leaves or `RefNode` elements) now throw
+  on read, normalize, and serialize instead of being silently stripped. Back up
+  the store first. Use a release that supports legacy refs to migrate affected
+  data, or remove that data and re-sync it from a peer.
 - `coreValueHash` alias removed. Use `encodableValueHash`.
 - Clone aliasing: `coreValueClone`/`coreObjectClone` now preserve shared-ref
   aliasing across array/set siblings. Aliases within object fields were already

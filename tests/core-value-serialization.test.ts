@@ -1,3 +1,5 @@
+import { getTypeOperations } from '../cfds/base/types/index.ts';
+import { assertNoLegacyRefs } from '../cfds/richtext/legacy-ref.ts';
 import { kTypeOps } from '../base/core-types/type-ops.ts';
 import { CoreType } from '../base/core-types/base.ts';
 import { assertExists } from './asserts.ts';
@@ -69,7 +71,42 @@ const kDateSchema: Schema = {
   fields: { when: { type: 'date' } },
 };
 
+function assertLegacyIngress(doc: RichText): void {
+  const op = getTypeOperations<RichText>('richtext');
+  const before = JSON.stringify(doc);
+  for (
+    const ingress of [
+      () => op.patch(doc, []),
+      () => op.deserialize(doc as never),
+      () => op.normalize(doc),
+      () => normalizeRichText(doc),
+      () => op.serialize('body', doc, new JSONEncoder()),
+      () => op.valueAddedDiff(doc),
+      () => op.valueRemovedDiff(doc),
+      () => op.valueChangedDiff(doc, kRichTextDoc),
+      () => op.valueChangedDiff(kRichTextDoc, doc),
+    ]
+  ) {
+    assertThrows(ingress, 'Legacy rich text ref');
+    assertEquals(JSON.stringify(doc), before);
+  }
+}
+
 export default function setup(): void {
+  TEST(
+    'CoreValueSerialization',
+    'rejects legacy refs in pointers without stripping',
+    () => {
+      const marker = { ref: 'r1', type: 'link' };
+      for (const pointer of [marker, { node: marker }]) {
+        for (const pointers of [[pointer], new Set([pointer])]) {
+          assertLegacyIngress(
+            { ...kRichTextDoc, pointers } as unknown as RichText,
+          );
+        }
+      }
+    },
+  );
   TEST(
     'CoreValueSerialization',
     'Date checksum and wire literal goldens',
@@ -1091,4 +1128,116 @@ export default function setup(): void {
       assertExists(ops.childrenOf);
     }
   });
+
+  // ---------------- legacy richtext ref rejection ----------------
+
+  // Legacy RefMarker: a leaf carrying ref/type.
+  const kLegacyRefMarkerDoc = {
+    root: {
+      children: [
+        { tagName: 'p', children: [{ ref: 'r1', type: 'link' }] },
+      ],
+    },
+  } as unknown as RichText;
+
+  // Legacy RefNode: an element with tagName 'ref' wrapping its target.
+  const kLegacyRefNodeDoc = {
+    root: {
+      children: [
+        {
+          tagName: 'p',
+          children: [
+            {
+              tagName: 'ref',
+              ref: 'r1',
+              type: 'link',
+              children: [{ text: 'x' }],
+            },
+          ],
+        },
+      ],
+    },
+  } as unknown as RichText;
+
+  TEST(
+    'CoreValueSerialization',
+    'rejects a legacy RefMarker leaf at every richtext ingress',
+    () => {
+      assertLegacyIngress(kLegacyRefMarkerDoc);
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'rejects a legacy RefNode element at every richtext ingress',
+    () => {
+      assertLegacyIngress(kLegacyRefNodeDoc);
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'rejects a root-level legacy ref node',
+    () => {
+      // WHY: dfs yields only descendants, so a legacy ref placed at `root`
+      // itself needs the explicit check added to assertNoLegacyRefs.
+      const legacyRoot = {
+        root: { tagName: 'ref', ref: 'r1', type: 'link', children: [] },
+      } as unknown as RichText;
+      assertThrows(
+        () => assertNoLegacyRefs(legacyRoot),
+        'Legacy rich text ref',
+      );
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'legacy inline-task ref throws instead of moving to sibling below',
+    () => {
+      // WHY: assertNoLegacyRefs runs first in normalizeRichText, so an
+      // inline-task carrying legacy ref/type strings fails loudly instead
+      // of being relocated by the widened {tag:'inline-task'} rule.
+      const doc = {
+        root: {
+          children: [
+            {
+              tagName: 'p',
+              children: [
+                {
+                  tagName: 'inline-task',
+                  ref: 'r1',
+                  type: 'link',
+                  children: [{ text: 'task' }],
+                },
+              ],
+            },
+          ],
+        },
+      } as unknown as RichText;
+      assertThrows(() => normalizeRichText(doc));
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'valid nodes carrying only ref or only type pass the legacy guard',
+    () => {
+      // WHY: the detector requires both string fields (or tagName 'ref'),
+      // so a TextNode with a lone `ref` and an element with a lone `type`
+      // are ordinary content and must not trip assertNoLegacyRefs.
+      const doc = {
+        root: {
+          children: [
+            {
+              tagName: 'p',
+              type: 'link',
+              children: [{ text: 'x', ref: 'r1' }],
+            },
+          ],
+        },
+      } as unknown as RichText;
+      assertNoLegacyRefs(doc);
+    },
+  );
 }
