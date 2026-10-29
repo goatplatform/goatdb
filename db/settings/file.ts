@@ -43,7 +43,7 @@ export class FileSettings implements DBSettingsProvider {
     );
     if (text) {
       try {
-        const decoder = new JSONDecoder(JSON.parse(text));
+        using decoder = JSONDecoder.get(JSON.parse(text));
         const encodedSession = decoder.get('currentSession') as
           | EncodedSession
           | undefined;

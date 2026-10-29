@@ -8,7 +8,7 @@
     "strict": false,
     "skipLibCheck": true,
     "downlevelIteration": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": ["ES2020", "DOM", "DOM.Iterable", "ESNext.Disposable"],
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,

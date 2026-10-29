@@ -2,6 +2,9 @@
   "name": "@goatdb/goatdb",
   "version": "0.0.0-dev",
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "files": [
     "dist"
   ],

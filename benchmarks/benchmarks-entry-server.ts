@@ -9,6 +9,7 @@ import { isBrowser } from '../base/common.ts';
 
 // Import benchmark setup functions
 import setupGoatDB from './goatdb.bench.ts';
+import setupCoreValue from './core-value.bench.ts';
 import setupSQLite from './sqlite.bench.ts';
 import setupSQLiteFastUnsafe from './sqlite-fast-unsafe.bench.ts';
 import setupSQLiteBrowser from './sqlite-browser.bench.ts';
@@ -16,6 +17,7 @@ import setupSQLiteBrowser from './sqlite-browser.bench.ts';
 async function main(): Promise<void> {
   // Register all benchmarks
   setupGoatDB();
+  setupCoreValue();
 
   // Register platform-specific SQLite benchmarks
   if (isBrowser()) {

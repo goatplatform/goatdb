@@ -17,7 +17,7 @@ import { kSyncConfigServer, syncConfigGetCycles } from '../sync-scheduler.ts';
 import { requireSignedUser } from './auth.ts';
 import type { Endpoint, ServerServices } from './server.ts';
 import { getRequestPath } from './utils.ts';
-import { GoatRequest } from './http-compat.ts';
+import type { GoatRequest } from './http-compat.ts';
 import type { Schema } from '../../cfds/base/schema.ts';
 import type { ServeHandlerInfo } from './http-compat.ts';
 
@@ -117,7 +117,7 @@ export class SyncEndpoint<US extends Schema> implements Endpoint<US> {
     replicas: Iterable<RepoClient> | undefined,
     includeMissing: boolean,
   ): Promise<ReadonlyJSONObject> {
-    const decoder = JSONCyclicalDecoder.get(msgJSON);
+    using decoder = JSONCyclicalDecoder.get(msgJSON);
     const msg = new SyncMessage(
       {
         decoder,
@@ -125,7 +125,6 @@ export class SyncEndpoint<US extends Schema> implements Endpoint<US> {
       },
       services.db.registry,
     );
-    decoder.finalize();
     let syncCycles = syncConfigGetCycles(kSyncConfigServer);
     if (msg.values.length > 0) {
       if ((await persistCommits(msg.values)) > 0) {

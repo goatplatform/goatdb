@@ -4,6 +4,7 @@ export type {
   DecodableKey,
   DecodedValue,
   Decoder,
+  OwnedDecoder,
   ReadonlyDecodedArray,
   ReadonlyDecodedObject,
 } from './types.ts';
