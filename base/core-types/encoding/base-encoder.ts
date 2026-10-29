@@ -1,5 +1,5 @@
 import { isGenerator, isObject } from '../../comparisons.ts';
-import {
+import type {
   JSONArray,
   JSONObject,
   JSONValue,
@@ -9,23 +9,24 @@ import {
 } from '../../interfaces.ts';
 import { serializeDate } from '../../date.ts';
 import {
-  Dictionary,
+  type Dictionary,
   dictToPrimitive,
   isDictionary,
 } from '../../collections/dict.ts';
 import {
-  CoreKey,
-  CoreOptions,
+  type CoreKey,
+  type CoreOptions,
   CoreType,
-  CoreValue,
-  Encodable,
-  Encoder,
-  IterableFilterFunc,
-  ObjFieldsFilterFunc,
-  ReadonlyCoreArray,
-  ReadonlyCoreObject,
+  type CoreValue,
+  type Encodable,
+  type Encoder,
+  type IterableFilterFunc,
+  type ObjFieldsFilterFunc,
+  type ReadonlyCoreArray,
+  type ReadonlyCoreObject,
 } from '../base.ts';
 import { getCoreType, isEncodable } from '../utils.ts';
+import { kTypeOps } from '../type-ops.ts';
 
 export abstract class BaseEncoder<
   PT extends CoreValue,
@@ -68,78 +69,30 @@ export abstract class BaseEncoder<
       return value as PT;
     }
 
-    const type = getCoreType(value);
-
-    switch (type) {
-      case CoreType.String:
-        return this.convertString(value as string, options);
-
-      case CoreType.Number:
-        return this.convertNumber(value as number, options);
-
-      case CoreType.Boolean:
-        return this.convertBoolean(value as boolean, options);
-
-      case CoreType.Null:
-        return this.convertNull(options);
-
-      case CoreType.Undefined:
-        return this.convertUndefined(options);
-
-      case CoreType.Date:
-        return this.convertDate(value as Date, options);
-
-      case CoreType.Array:
-        return this.convertArray(value as ReadonlyCoreArray, options);
-
-      case CoreType.Set:
-        return this.convertSet(value as Set<CoreValue>, options);
-
-      case CoreType.Object:
-        return this.convertObject(value as ReadonlyCoreObject, options);
-
-      case CoreType.ClassObject:
-        if (isEncodable(value)) {
-          return this.convertEncodable(
-            value as Encodable<CoreKey, CoreValue>,
-            options,
-          );
-        }
-        throw new Error(`${value?.constructor.name} must implement Encodable`);
-
-      case CoreType.Dictionary:
-        return this.convertDictionary(
-          value as Dictionary<CoreKey, CoreValue>,
-          options,
-        );
-
-      case CoreType.Generator:
-        return this.convertGenerator(value as Generator<CoreValue>, options);
-    }
+    return kTypeOps[getCoreType(value)].encode(this, value, options) as PT;
   }
 
-  protected abstract convertString(str: string, options?: OT): PT;
-  protected abstract convertNumber(n: number, options?: OT): PT;
-  protected abstract convertBoolean(b: boolean, options?: OT): PT;
-  protected abstract convertNull(options?: OT): PT;
-  protected abstract convertUndefined(options?: OT): PT;
-  protected abstract convertDate(date: Date, options?: OT): PT;
-  protected abstract convertArray(arr: ReadonlyCoreArray, options?: OT): PT;
-  protected abstract convertSet(set: Set<CoreValue>, options?: OT): PT;
-  protected abstract convertObject(obj: ReadonlyCoreObject, options?: OT): PT;
-  protected abstract convertEncodable(
+  // Public: the dispatch table (type-ops.ts) is a caller. Subclasses still
+  // override these to define encoding behavior.
+  abstract convertString(str: string, options?: OT): PT;
+  abstract convertNumber(n: number, options?: OT): PT;
+  abstract convertBoolean(b: boolean, options?: OT): PT;
+  abstract convertNull(options?: OT): PT;
+  abstract convertUndefined(options?: OT): PT;
+  abstract convertDate(date: Date, options?: OT): PT;
+  abstract convertArray(arr: ReadonlyCoreArray, options?: OT): PT;
+  abstract convertSet(set: Set<CoreValue>, options?: OT): PT;
+  abstract convertObject(obj: ReadonlyCoreObject, options?: OT): PT;
+  abstract convertEncodable(
     value: Encodable<string, CoreValue>,
     options?: OT,
   ): PT;
-  protected abstract convertDictionary(
+  abstract convertDictionary(
     value: Dictionary<CoreKey, CoreValue>,
     options?: OT,
   ): PT;
 
-  protected abstract convertGenerator(
-    g: Generator<CoreValue>,
-    options?: OT,
-  ): PT;
+  abstract convertGenerator(g: Generator<CoreValue>, options?: OT): PT;
 }
 
 export interface EncodedSet extends ReadonlyJSONObject {
@@ -204,19 +157,6 @@ export abstract class JSONBaseEncoder<
     options?: OT,
   ): void;
 
-  override set(key: string, value: CoreValue, options?: OT): void {
-    if (value === undefined) {
-      return;
-    }
-    this.setPrimitive(
-      key,
-      this.isNativeValue(value, options)
-        ? value
-        : this.convertValue(value, options),
-      options,
-    );
-  }
-
   protected isNativeValue(
     value: CoreValue,
     options?: OT,
@@ -253,7 +193,7 @@ export abstract class JSONBaseEncoder<
 
       const keyFilter = options?.objectFilterFields || this.objectFilterFields;
       for (const k in obj) {
-        if (obj.hasOwnProperty(k)) {
+        if (Object.hasOwn(obj, k)) {
           if (keyFilter && !keyFilter(k, obj)) {
             return false;
           }
@@ -269,7 +209,7 @@ export abstract class JSONBaseEncoder<
     return true;
   }
 
-  protected convertEncodable(
+  convertEncodable(
     value: Encodable<string, CoreValue>,
     options?: OT,
   ): EncodedEncodable {
@@ -295,7 +235,7 @@ export abstract class JSONBaseEncoder<
     return result;
   }
 
-  protected convertArray(
+  convertArray(
     arr: ReadonlyCoreArray,
     options?: OT,
   ): ReadonlyJSONValue {
@@ -315,7 +255,7 @@ export abstract class JSONBaseEncoder<
   }
 
   // Default implementation returns EncodedSet
-  protected convertSet(set: Set<CoreValue>, options?: OT): EncodedSet {
+  convertSet(set: Set<CoreValue>, options?: OT): EncodedSet {
     const iterableFilter = options?.iterableFilter || this.iterableFilter;
     if (iterableFilter) {
       const arr = this.convertIterableWithFilter(set, iterableFilter, options);
@@ -339,7 +279,7 @@ export abstract class JSONBaseEncoder<
     };
   }
 
-  protected convertObject(
+  convertObject(
     obj: ReadonlyCoreObject,
     options?: OT,
   ): ReadonlyJSONObject {
@@ -353,41 +293,41 @@ export abstract class JSONBaseEncoder<
     return result;
   }
 
-  protected convertNumber(n: number, _options?: OT): ReadonlyJSONValue {
+  convertNumber(n: number, _options?: OT): ReadonlyJSONValue {
     return n;
   }
 
-  protected convertString(str: string, _options?: OT): ReadonlyJSONValue {
+  convertString(str: string, _options?: OT): ReadonlyJSONValue {
     return str;
   }
 
-  protected convertBoolean(b: boolean, _options?: OT): ReadonlyJSONValue {
+  convertBoolean(b: boolean, _options?: OT): ReadonlyJSONValue {
     return b;
   }
 
-  protected convertNull(_options?: OT): ReadonlyJSONValue {
+  convertNull(_options?: OT): ReadonlyJSONValue {
     return null;
   }
 
-  protected convertUndefined(_options?: OT): ReadonlyJSONValue {
+  convertUndefined(_options?: OT): ReadonlyJSONValue {
     return null;
   }
 
-  protected convertDate(date: Date, _options?: OT): EncodedDate {
+  convertDate(date: Date, _options?: OT): EncodedDate {
     return {
       __t: 'D',
       __v: serializeDate(date),
     };
   }
 
-  protected convertDictionary(
+  convertDictionary(
     value: Dictionary<CoreKey, CoreValue>,
     _options?: OT,
   ) {
     return dictToPrimitive(value);
   }
 
-  protected convertGenerator(g: Generator<CoreValue>, options?: OT) {
+  convertGenerator(g: Generator<CoreValue>, options?: OT) {
     const iterableFilter = options?.iterableFilter || this.iterableFilter;
     if (iterableFilter) {
       return this.convertIterableWithFilter(g, iterableFilter, options);

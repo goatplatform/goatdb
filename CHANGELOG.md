@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Known Quirks
+
+- `iterableFilter` is not applied during ref collection. See
+  `TODO(#58-followup)` in `base/core-types/type-ops.ts` and the refs matrix
+  characterization tests. Final JSON encoding still applies the filter.
+
+### Breaking Changes
+
+- `coreValueHash` alias removed. Use `encodableValueHash`.
+- Clone aliasing: `coreValueClone`/`coreObjectClone` now preserve shared-ref
+  aliasing across array/set siblings. Aliases within object fields were already
+  preserved.
+
+### Fixed
+
+- `coreValueEquals` is symmetric when `objectFilterFields` inspects its object.
+  The second comparison loop previously passed the wrong object to the filter.
+
 ### Added
 
 - `DBInstanceConfig.repoInactivityTimeoutMs` and
