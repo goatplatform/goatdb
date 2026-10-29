@@ -726,7 +726,11 @@ export class NodeHttpServer implements MinimalHttpServer {
     await new Promise<void>((resolve, reject) => {
       this._server!.on('error', reject);
       this._server!.listen(port, () => {
-        this._server!.removeListener('error', reject);
+        // HTTPS extends HTTP; Deno's floor types cannot call their overload union.
+        (this._server! as import('node:http').Server).removeListener(
+          'error',
+          reject,
+        );
         this._server!.on('error', (err: Error) => {
           console.error('HTTP server error:', err);
         });
