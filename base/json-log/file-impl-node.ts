@@ -111,7 +111,6 @@ export const FileImplNode: FileImpl<NodeFsFile> = {
 
   async mkdir(path: string) {
     await fs.mkdir(path, { recursive: true });
-    return true;
   },
 
   async exists(path: string): Promise<boolean> {

@@ -3,7 +3,8 @@
  *
  * This module consolidates test imports and registration order in a single
  * location, eliminating duplication between tests-entry-server.ts and
- * worker-runner.ts.
+ * worker-runner.ts. tests/tests-entry-browser.ts stays a manual subset by
+ * capability (no Node-only or repo-scan tests); add new tests in both places.
  *
  * Test execution order is optimized for developer feedback speed:
  * Run fast tests first so developers get immediate pass/fail results,
@@ -21,6 +22,8 @@ import setupBinaryEncoding from './binary-encoding.test.ts';
 import setupServerArchitectureTest from './server-architecture.test.ts';
 import setupStaticAssetsEndpointTest from './static-assets-endpoint.test.ts';
 import setupFileImplTests from './file-impl.test.ts';
+import setupWorkerBoundary from './worker-boundary.test.ts';
+import setupJsonLogWorkerIO from './json-log-worker-io.test.ts';
 import setupJsonLogFormats from './json-log-formats.test.ts';
 import setupNodeHttpServerTests from './node-http-server.test.ts';
 import setupHealthCheckEndpointTest from './health-check-endpoint.test.ts';
@@ -61,6 +64,7 @@ import setupQueryId from './query-id.test.ts';
 import setupHashMap from './hash-map.test.ts';
 import setupCoreValueCompare from './core-value-compare.test.ts';
 import setupCoreValueSerialization from './core-value-serialization.test.ts';
+import setupStorageFormatEpoch from './storage-format-epoch.test.ts';
 import setupDocsMdxEscape from './docs-mdx-escape.test.ts';
 import setupAutoClose from './auto-close.test.ts';
 
@@ -94,6 +98,7 @@ export async function registerAllTests(): Promise<void> {
   setupCoreValueSerialization(); // Core serializer contract goldens
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
+  setupStorageFormatEpoch(); // Storage epoch fail-fast on every runtime
   setupCoroutineQueueTests(); // Coroutine FIFO execution contract
   setupCoroutineSchedulerTests(); // Coroutine failure isolation contract
   setupBinaryEncoding(); // Binary commit format encoding roundtrip
@@ -114,6 +119,8 @@ export async function registerAllTests(): Promise<void> {
   setupSyncMessageMissing(); // SyncMessage missing-commit detection
   setupSyncConvergence(); // Multi-round sync convergence simulation
   setupFileImplTests(); // FileImpl abstraction (Deno + Node.js)
+  setupWorkerBoundary(); // Worker-owned FS boundary (no new file-impl importers)
+  setupJsonLogWorkerIO(); // Worker-backed file I/O contract (readFile/writeFile/mkdir/readDir)
   setupJsonLogFormats(); // JSONLog storage format (GOAT binary + JSONL)
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O

@@ -77,13 +77,10 @@ export const FileImplDeno: FileImpl<Deno.FsFile> = {
     return Deno.makeTempDir();
   },
 
+  // Throw on failure like the Node and OPFS impls. Swallowing the error made
+  // the contract runtime-dependent and hid the cause from callers.
   async mkdir(path: string) {
-    try {
-      await Deno.mkdir(path, { recursive: true });
-      return true;
-    } catch (_: unknown) {
-      return false;
-    }
+    await Deno.mkdir(path, { recursive: true });
   },
 
   async exists(path: string): Promise<boolean> {

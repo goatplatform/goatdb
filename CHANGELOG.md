@@ -16,6 +16,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Breaking Changes
 
+- Unified `Date` wire format and commit checksum (0.7.0). Typed fields now
+  encode as `{ "__t": "D", "__v": <epoch-seconds> }`, not a bare number.
+  Dates carry their tag in every checksum position. The typed-field checksum
+  changes from `416277608` to `1391363808`. Older stores fail fast on open.
+  Back up the store before removal or re-sync. Mixed-version fleets are not
+  supported; typed-field decode rejects bare-number dates from older peers.
+- Non-`typeSafe` strings can collide with tagged Dates (for example,
+  `"41700000000"`). Use `typeSafe` checksums for untrusted input.
 - Legacy rich-text refs (`RefMarker` leaves or `RefNode` elements) now throw
   on read, normalize, and serialize instead of being silently stripped. Back up
   the store first. Use a release that supports legacy refs to migrate affected
@@ -27,6 +35,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Store initialization ignores unrelated files. Missing markers reject only
+  known GoatDB artifacts, name the artifact, and require a backup before removal.
+- Storage epoch file operations run through the worker so browser OPFS opens
+  succeed. Strict file operations preserve filesystem error names and codes.
+- Recursive `mkdir` now rejects on failure in every runtime instead of returning
+  a runtime-dependent boolean.
 - `coreValueEquals` is symmetric when `objectFilterFields` inspects its object.
   The second comparison loop previously passed the wrong object to the filter.
 

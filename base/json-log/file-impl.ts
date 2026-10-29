@@ -21,6 +21,9 @@ import { getRuntime } from '../runtime/index.ts';
 import * as path from '../path.ts';
 import type { DirEntry, FileImpl } from './file-impl-interface.ts';
 
+// Worker-only. Main-thread callers use json-log.ts wrappers (OPFS handles
+// exist only in the worker). Rule source: tests/worker-boundary.test.ts.
+
 export type { DirEntry } from './file-impl-interface.ts';
 
 let gFileImpl: FileImpl<unknown> | undefined;
@@ -172,11 +175,11 @@ export async function copyFile(
  * This operation is always recursive.
  *
  * @param path The path where to create the directory
- * @returns Promise<boolean> True if the directory was created, false otherwise
+ * @returns Rejects on failure.
  */
-export async function mkdir(path: string): Promise<boolean> {
+export async function mkdir(path: string): Promise<void> {
   const impl = await FileImplGet();
-  return impl.mkdir(path);
+  await impl.mkdir(path);
 }
 
 /**
