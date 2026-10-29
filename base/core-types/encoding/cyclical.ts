@@ -1,21 +1,8 @@
-import {
-  JSONObject,
-  JSONValue,
-  ReadonlyJSONObject,
-  ReadonlyJSONValue,
-} from '../../interfaces.ts';
+import type { JSONValue } from '../../interfaces.ts';
 import { isObject } from '../../comparisons.ts';
-import { Dictionary } from '../../collections/dict.ts';
+import { kTypeOps } from '../type-ops.ts';
 import { coreValueClone } from '../clone.ts';
-import {
-  CoreKey,
-  CoreOptions,
-  CoreType,
-  CoreValue,
-  Encoder,
-  ReadonlyCoreArray,
-  ReadonlyCoreObject,
-} from '../base.ts';
+import type { CoreOptions, CoreValue, Encoder } from '../base.ts';
 import { getCoreType } from '../utils.ts';
 
 class RefSet {
@@ -83,32 +70,15 @@ export abstract class BaseCyclicalEncoder<
     this.encoder.set(key, value, options);
   }
 
-  private fillRefs(set: RefSet, value: CoreValue, options?: OT) {
-    const type = getCoreType(value);
-    switch (type) {
-      case CoreType.Array:
-      case CoreType.Set:
-        for (const item of value as ReadonlyCoreArray) {
-          const iterableFilter = options && options.iterableFilter;
-          if (iterableFilter) {
-            if (!iterableFilter(item)) continue;
-          }
-          this.fillRefs(set, item, options);
-        }
-        break;
-      case CoreType.Dictionary:
-        for (const [_, v] of value as Dictionary<CoreKey, CoreValue>) {
-          this.fillRefs(set, v);
-        }
-        break;
-      case CoreType.Object:
-        if (!isEncodedRef(value as ReadonlyJSONValue)) {
-          set.set(value);
-          for (const [k, v] of Object.entries(value as ReadonlyCoreObject)) {
-            this.fillRefs(set, v);
-          }
-        }
-        break;
+  private fillRefs(set: RefSet, value: CoreValue, options?: CoreOptions) {
+    const { children, recurseOptions, ref } = kTypeOps[
+      getCoreType(value)
+    ].childrenOf(value, options);
+    // Ref marking happens before children are visited, matching the original
+    // `fillRefs` Object branch order.
+    if (ref) set.set(value);
+    for (const child of children) {
+      this.fillRefs(set, child, recurseOptions);
     }
   }
 
@@ -124,36 +94,11 @@ export abstract class BaseCyclicalEncoder<
   abstract newEncoder(): Encoder<string, CoreValue, T, OT>;
 }
 
-export interface EncodedRef extends ReadonlyJSONObject {
-  readonly __rId: number;
-}
-
-export function isEncodedRef(v: CoreValue): v is EncodedRef {
-  if (getCoreType(v) === CoreType.Object) {
-    const obj = v as ReadonlyJSONObject;
-    if (typeof obj.__rId === 'number') {
-      return true;
-    }
-  }
-  return false;
-}
-
-export interface EncodedRefObject extends ReadonlyJSONObject {
-  readonly __r: JSONObject[];
-  readonly __d: JSONObject;
-}
-
-export function isEncodedRefObject(
-  v: ReadonlyJSONValue,
-): v is EncodedRefObject {
-  if (getCoreType(v) === CoreType.Object) {
-    const obj = v as ReadonlyJSONObject;
-    if (
-      getCoreType(obj.__r) === CoreType.Array &&
-      getCoreType(obj.__d) === CoreType.Object
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
+// Re-exported from the dependency-free leaf so this module's public surface is
+// unchanged while the runtime cycle with `type-ops.ts` stays broken.
+export {
+  type EncodedRef,
+  type EncodedRefObject,
+  isEncodedRef,
+  isEncodedRefObject,
+} from './encoded-ref.ts';

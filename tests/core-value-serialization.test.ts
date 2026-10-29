@@ -1,5 +1,13 @@
+import { kTypeOps } from '../base/core-types/type-ops.ts';
+import { CoreType } from '../base/core-types/base.ts';
+import { assertExists } from './asserts.ts';
 import { HashMap } from '../base/collections/hash-map.ts';
-import type { CoreValue, Encodable, Encoder } from '../base/core-types/base.ts';
+import type {
+  CoreObject,
+  CoreValue,
+  Encodable,
+  Encoder,
+} from '../base/core-types/base.ts';
 import { coreValueClone } from '../base/core-types/clone.ts';
 import { getCoreType } from '../base/core-types/index.ts';
 import {
@@ -1025,4 +1033,62 @@ export default function setup(): void {
       assertThrows(() => coreValueClone(new Box(42) as unknown as CoreValue));
     },
   );
+
+  TEST(
+    'CoreValueSerialization',
+    'clone aliases sibling array elements',
+    () => {
+      const inner = { a: 1 };
+      const cloned = coreValueClone([inner, inner] as CoreValue) as unknown[];
+      // WHY: one shared cache per top-level clone keeps alias identity across
+      // array siblings and object fields alike. New behavior, declared in
+      // CHANGELOG (pre-table code only preserved aliases within one object
+      // subtree).
+      assertTrue(cloned[0] === cloned[1]);
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'equals with objectFilterFields is symmetric',
+    () => {
+      // WHY: the second loop must pass the second object (b) to the filter,
+      // not the first (a), otherwise equals(a, b) !== equals(b, a) for
+      // asymmetric inputs.
+      const filter = (k: string, o: CoreValue) =>
+        Object.hasOwn(o as CoreObject, k);
+      assertEquals(
+        coreValueEquals({ a: 1 }, { a: 1, b: 2 }, {
+          objectFilterFields: filter,
+        }),
+        false,
+      );
+      assertEquals(
+        coreValueEquals({ a: 1, b: 2 }, { a: 1 }, {
+          objectFilterFields: filter,
+        }),
+        false,
+      );
+      assertEquals(
+        coreValueEquals({ a: 1 }, { a: 1 }, { objectFilterFields: filter }),
+        true,
+      );
+    },
+  );
+
+  TEST('CoreValueSerialization', 'kTypeOps is frozen and exhaustive', () => {
+    // WHY: kTypeOps is the base-level dispatch table
+    // (clone/equals/encode/childrenOf). Freezing plus per-CoreType coverage
+    // turns a missed type into a loud failure instead of silent mishandling.
+    assertTrue(Object.isFrozen(kTypeOps));
+    for (const type of Object.values(CoreType)) {
+      if (typeof type !== 'number') continue;
+      const ops = kTypeOps[type as CoreType];
+      assertExists(ops, `kTypeOps missing entry for CoreType ${type}`);
+      assertExists(ops.clone);
+      assertExists(ops.equals);
+      assertExists(ops.encode);
+      assertExists(ops.childrenOf);
+    }
+  });
 }

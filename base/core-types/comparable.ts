@@ -1,8 +1,7 @@
 import { notReached } from '../error.ts';
 import { compareStrings } from '../string.ts';
-import { CoreOptions, CoreType, CoreValue } from './base.ts';
+import { type CoreOptions, CoreType, type CoreValue } from './base.ts';
 import { encodableValueHash } from './encoding/hash.ts';
-import { Comparable } from './index.ts';
 import { getCoreType, isComparable, isEquatable } from './utils.ts';
 
 export const MinComparableValue = {};

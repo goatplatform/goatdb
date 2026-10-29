@@ -1,9 +1,8 @@
-import { randomInt } from '../../math.ts';
-import { newInstance, uniqueId } from '../../common.ts';
+import { uniqueId } from '../../common.ts';
 import { MurmurHash3 } from '../../hash.ts';
 import { serializeDate } from '../../date.ts';
 import { BaseEncoder } from './base-encoder.ts';
-import {
+import type {
   CoreDictionary,
   CoreOptions,
   CoreValue,
@@ -11,10 +10,11 @@ import {
   ReadonlyCoreArray,
   ReadonlyCoreObject,
 } from '../base.ts';
-import { getCoreType, getCoreTypeOrUndef } from '../utils.ts';
+import { getCoreTypeOrUndef } from '../utils.ts';
 import * as StreamMD5 from '../../../external/md5.ts';
 
 export interface ChecksumEncoderOpts extends CoreOptions {
+  // Require `typeSafe: true` where checksums must distinguish value types.
   typeSafe?: boolean;
   flatRep?: boolean;
   local?: boolean;
@@ -38,7 +38,25 @@ export abstract class ChecksumEncoder<
   }
 
   newEncoder() {
-    return newInstance<ChecksumEncoder<ST, OT>>(this);
+    return this.newEncoderInstance();
+  }
+
+  /** Same concrete class, no ctor args (Murmur3 seed MUST reset). WHY: the
+   * pre-table `newInstance(this)` also passed no args, so nested encoders
+   * always restart from the default seed. Preserving a custom seed here
+   * would change checksums and break goldens. `convertObject` is the only
+   * path that forwards opts (via `newEncoderWithOpts`). */
+  private newEncoderInstance(): ChecksumEncoder<ST, OT> {
+    return new (this.constructor as new () => ChecksumEncoder<ST, OT>)();
+  }
+
+  /** Same concrete class with a single opts arg. */
+  private newEncoderWithOpts(
+    opts: ChecksumEncoderOpts,
+  ): ChecksumEncoder<ST, OT> {
+    return new (this.constructor as new (
+      opts: ChecksumEncoderOpts,
+    ) => ChecksumEncoder<ST, OT>)(opts);
   }
 
   getOutput(): string {
@@ -89,7 +107,7 @@ export abstract class ChecksumEncoder<
     return typeSafe ? String(type) + converted : converted;
   }
 
-  protected convertEncodable(
+  convertEncodable(
     value: Encodable<string, CoreValue>,
     options?: OT,
   ): string {
@@ -98,7 +116,7 @@ export abstract class ChecksumEncoder<
     return encoder.getOutput();
   }
 
-  protected convertSet(set: Set<CoreValue>, options?: OT): string {
+  convertSet(set: Set<CoreValue>, options?: OT): string {
     const checksums: string[] = [];
 
     const iterableFilter = options?.iterableFilter || this.iterableFilter;
@@ -111,7 +129,7 @@ export abstract class ChecksumEncoder<
     return this.convertArray(checksums);
   }
 
-  protected convertArray(arr: ReadonlyCoreArray, options?: OT): string {
+  convertArray(arr: ReadonlyCoreArray, options?: OT): string {
     const state = this.newState();
     const iterableFilter = options?.iterableFilter || this.iterableFilter;
 
@@ -123,7 +141,7 @@ export abstract class ChecksumEncoder<
     return this.finalizeState(state);
   }
 
-  protected convertGenerator(g: Generator<CoreValue>, options?: OT): string {
+  convertGenerator(g: Generator<CoreValue>, options?: OT): string {
     const state = this.newState();
     const iterableFilter = options?.iterableFilter || this.iterableFilter;
     for (const v of g) {
@@ -134,8 +152,8 @@ export abstract class ChecksumEncoder<
     return this.finalizeState(state);
   }
 
-  protected convertObject(obj: ReadonlyCoreObject, options?: OT): string {
-    const encoder = newInstance<ChecksumEncoder<ST, OT>>(this, {
+  convertObject(obj: ReadonlyCoreObject, options?: OT): string {
+    const encoder = this.newEncoderWithOpts({
       ...this.getDefaultOpts(),
       ...options,
     });
@@ -150,32 +168,32 @@ export abstract class ChecksumEncoder<
     return encoder.getOutput();
   }
 
-  protected convertNumber(n: number, _options?: OT): string {
+  convertNumber(n: number, _options?: OT): string {
     return String(n);
   }
 
-  protected convertBoolean(b: boolean, _options?: OT): string {
+  convertBoolean(b: boolean, _options?: OT): string {
     return b ? 'true' : 'false';
   }
 
-  protected convertString(str: string, _options?: OT): string {
+  convertString(str: string, _options?: OT): string {
     return str;
   }
 
-  protected convertNull(_options?: OT): string {
+  convertNull(_options?: OT): string {
     return 'null';
   }
 
-  protected convertUndefined(_options?: OT): string {
+  convertUndefined(_options?: OT): string {
     return 'undefined';
   }
 
-  protected convertDate(date: Date, _options?: OT): string {
+  convertDate(date: Date, _options?: OT): string {
     return String(serializeDate(date));
   }
 
-  protected convertDictionary(value: CoreDictionary, _options?: OT) {
-    const encoder = newInstance<ChecksumEncoder<ST, OT>>(this);
+  convertDictionary(value: CoreDictionary, _options?: OT) {
+    const encoder = this.newEncoder();
     for (const [k, v] of value) {
       encoder.set(k, v);
     }
@@ -224,7 +242,6 @@ export class Murmur3Checksum extends ChecksumEncoder<MurmurHash3, Murmur3Opts> {
     if (options.seed === undefined) {
       // By default, start with the same seed for everyone
       options.seed = 3172939476544195;
-      // options.seed = randomInt(0, Number.MAX_SAFE_INTEGER);
     }
     super(options);
     this._seed = options.seed;
