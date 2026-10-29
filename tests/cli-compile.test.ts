@@ -193,7 +193,9 @@ export default function setupCliCompileTests() {
       const initModule = await import('../cli/init.ts');
       await initModule.bootstrapProject({
         targetDir: testDir,
-        skipDependencies: false, // Need deps for compilation
+        // Compile local sources, not a published GoatDB artifact. Linking below
+        // supplies its import map before external app dependencies are installed.
+        skipDependencies: true,
       });
 
       // Verify project was created
@@ -213,6 +215,17 @@ export default function setupCliCompileTests() {
       const goatdbRoot = runtime.getCWD();
 
       await linkModule.linkGoatDB(goatdbRoot, testDir);
+      if (runtime.id === 'deno') {
+        const install = await cli(
+          'deno',
+          'add',
+          'npm:react-dom@19.0.0/client',
+          {
+            cwd: testDir,
+          },
+        );
+        assertEquals(install.exitCode, 0, install.result);
+      }
 
       // For Node.js, reinstall to update node_modules with local link
       if (runtime.id === 'node') {
