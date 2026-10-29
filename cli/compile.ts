@@ -148,12 +148,12 @@ export type CompileOptions =
  * - Node.js: Uses Single Executable Application (SEA) process
  *
  * @param options Configuration options for the compilation process
- * @returns A Promise that resolves when compilation is complete
+ * @returns A Promise that resolves to the path of the compiled executable
  * @group Compilation
  *
  * @example
  * ```typescript
- * await compile({
+ * const binaryPath = await compile({
  *   serverEntry: "./server/main.ts",
  *   outputName: "my-app",
  *   os: "linux",
@@ -164,7 +164,7 @@ export type CompileOptions =
  * });
  * ```
  */
-export async function compile(options: CompileOptions): Promise<void> {
+export async function compile(options: CompileOptions): Promise<string> {
   if (!options.buildDir) {
     throw new Error('buildDir is required for compilation');
   }
@@ -180,6 +180,7 @@ export async function compile(options: CompileOptions): Promise<void> {
   if (options.signing) {
     await signExecutable(outputFile, options.signing);
   }
+  return outputFile;
 }
 
 /**
@@ -270,7 +271,7 @@ async function compileDeno(options: CompileOptions): Promise<string> {
   const buildInfoJsonPath = path.join(buildDir, 'buildInfo.json');
   const outputFile = path.join(
     buildDir,
-    `${options.outputName || 'app'}-${targetOsArch}`,
+    denoExecutableName(options.outputName || 'app', targetOsArch),
   );
   let success = false;
   try {
@@ -783,6 +784,22 @@ export function targetFromOSArch(os?: TargetOS, arch?: CPUArch): OSArchTarget {
     }
   }
   return `${os}-${arch}`;
+}
+
+/**
+ * Returns the executable file name that `deno compile` produces for a target.
+ *
+ * Deno appends `.exe` when the *target* OS is Windows, regardless of the host
+ * OS (see deno's `get_os_specific_filepath`). The suffix therefore applies to
+ * cross-compiled Windows binaries too; without it the returned/logged path and
+ * the failure cleanup point at a file the compiler never creates.
+ */
+export function denoExecutableName(
+  outputName: string,
+  target: OSArchTarget,
+): string {
+  const ext = target.startsWith('windows-') ? '.exe' : '';
+  return `${outputName}-${target}${ext}`;
 }
 
 /**

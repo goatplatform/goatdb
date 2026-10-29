@@ -20,6 +20,7 @@ import {
   readTextFile,
   writeTextFile,
 } from '../base/json-log/file-impl.ts';
+import { assertScaffoldTemplates, readJson } from './cli-template-utils.ts';
 
 /**
  * Helper function to check if a file exists
@@ -28,11 +29,37 @@ async function fileExists(filePath: path.PosixPath): Promise<boolean> {
   return await pathExists(filePath);
 }
 
+async function invalidInstallProject(ctx: TestSuite): Promise<string> {
+  const testDir = await ctx.tempDir('install-failure');
+  const configName = isDeno() ? 'deno.json' : 'package.json';
+  // Invalid JSON fails before registry access, with a real manager diagnostic.
+  await writeTextFile(path.join(testDir, configName), '{ invalid json');
+  return testDir;
+}
+
+function assertInstallFailure(message: string): void {
+  const command = isDeno() ? 'deno add' : 'npm install';
+  const failure = message.match(
+    /failed with exit code ([1-9]\d*):\s*([\s\S]+)/,
+  );
+  assertTrue(message.includes(command), `Missing command: ${message}`);
+  assertExists(failure, `Missing numeric nonzero exit or output: ${message}`);
+  const diagnostic = failure[2];
+  assertTrue(
+    isDeno()
+      ? /parse|syntax|expected/i.test(diagnostic) &&
+        diagnostic.includes('deno.json')
+      : diagnostic.includes('EJSONPARSE') &&
+        diagnostic.includes('package.json'),
+    `Missing package-manager JSON diagnostic: ${diagnostic}`,
+  );
+}
+
 export default function setupCliInitTests() {
   TEST(
     'CLI-Init',
     'should detect runtime correctly',
-    async (ctx: TestSuite) => {
+    () => {
       // Test runtime detection
       const runtime = isDeno() ? 'deno' : isNode() ? 'node' : 'browser';
       assertTrue(
@@ -122,6 +149,81 @@ export default function setupCliInitTests() {
 
   TEST(
     'CLI-Init',
+    'generated files match runtime templates byte-for-byte',
+    async (ctx: TestSuite) => {
+      const testDir = await ctx.tempDir('init-template-bytes');
+      const initModule = await import('../cli/init.ts');
+      await initModule.bootstrapProject({
+        targetDir: testDir,
+        skipDependencies: true,
+      });
+      await assertScaffoldTemplates(
+        testDir,
+        isDeno() ? 'deno' : 'node',
+        await getCWD(),
+      );
+    },
+  );
+
+  TEST(
+    'CLI-Init',
+    'generated config preserves the template contract',
+    async (ctx: TestSuite) => {
+      const testDir = await ctx.tempDir('init-config-contract');
+      const root = await getCWD();
+      const initModule = await import('../cli/init.ts');
+      await initModule.bootstrapProject({
+        targetDir: testDir,
+        skipDependencies: true,
+      });
+
+      if (isDeno()) {
+        const actual = await readJson<Record<string, unknown>>(
+          path.join(testDir, 'deno.json'),
+        );
+        const template = await readJson<Record<string, unknown>>(
+          path.join(root, 'cli/templates/deno/deno.json'),
+        );
+        assertExists(actual, 'Generated deno.json missing');
+        assertExists(template, 'Deno template missing');
+        assertEquals(actual.tasks, template.tasks, 'deno.json tasks drift');
+        assertEquals(
+          actual.compilerOptions,
+          template.compilerOptions,
+          'deno.json compilerOptions drift',
+        );
+        assertEquals(actual.version, template.version);
+      } else {
+        const actual = await readJson<{
+          dependencies?: Record<string, string>;
+          devDependencies?: Record<string, string>;
+          engines?: Record<string, string>;
+          type?: string;
+        }>(path.join(testDir, 'package.json'));
+        const template = await readJson<{
+          dependencies?: Record<string, string>;
+        }>(path.join(root, 'cli/templates/node/package.json'));
+        assertExists(actual, 'Generated package.json missing');
+        assertExists(template, 'Node template missing');
+        assertEquals(
+          actual.dependencies,
+          template.dependencies,
+          'package.json dependencies drift',
+        );
+        assertEquals(
+          template.dependencies?.react,
+          template.dependencies?.['react-dom'],
+          'react and react-dom ranges must match',
+        );
+        assertEquals(actual.type, 'module');
+        assertEquals(actual.engines?.node, '>=24.0.0');
+        assertEquals(actual.devDependencies?.['@types/node'], '^24.0.0');
+      }
+    },
+  );
+
+  TEST(
+    'CLI-Init',
     'should use correct import extensions',
     async (ctx: TestSuite) => {
       const testDir = await ctx.tempDir('init-imports');
@@ -161,34 +263,6 @@ export default function setupCliInitTests() {
       } else {
         assertTrue(false, 'Failed to read index.tsx file');
       }
-    },
-  );
-
-  TEST(
-    'CLI-Init',
-    'should create correct directory structure',
-    async (ctx: TestSuite) => {
-      const testDir = await ctx.tempDir('init-structure');
-
-      const initModule = await import('../cli/init.ts');
-      await initModule.bootstrapProject({
-        targetDir: testDir,
-        skipDependencies: true,
-      });
-
-      // Verify directory structure exists
-      assertTrue(
-        await pathExists(path.join(testDir, 'client')),
-        'client directory should exist',
-      );
-      assertTrue(
-        await pathExists(path.join(testDir, 'server')),
-        'server directory should exist',
-      );
-      assertTrue(
-        await pathExists(path.join(testDir, 'common')),
-        'common directory should exist',
-      );
     },
   );
 
@@ -235,43 +309,37 @@ export default function setupCliInitTests() {
         skipDependencies: true,
       });
 
-      // Verify HTML template has basic structure
-      const htmlContent = await readTextFile(
-        path.join(testDir, 'client/index.html'),
-      );
-      assertTrue(
-        htmlContent?.includes('<!DOCTYPE html>') || false,
-        'HTML should have doctype',
-      );
-      assertTrue(
-        htmlContent?.includes('<div id="root">') || false,
-        'HTML should have root div',
-      );
+      const expectations = [
+        ['client/index.html', '<div id="root">'],
+        ['client/app.tsx', 'useDBReady'],
+        ['common/schema.ts', 'registerSchemas'],
+      ] as const;
+      for (const [file, marker] of expectations) {
+        const content = await readTextFile(path.join(testDir, file));
+        assertTrue(
+          content?.includes(marker) || false,
+          `${file} must contain ${marker}`,
+        );
+      }
+    },
+  );
 
-      // Verify React app template
-      const appContent = await readTextFile(
-        path.join(testDir, 'client/app.tsx'),
-      );
-      assertTrue(
-        appContent?.includes('export function App') || false,
-        'App component should be exported',
-      );
-      assertTrue(
-        appContent?.includes('useDBReady') || false,
-        'App should use GoatDB hook',
-      );
+  TEST(
+    'CLI-Init',
+    'dependency install failures are explicit',
+    async (ctx: TestSuite) => {
+      const testDir = await invalidInstallProject(ctx);
 
-      // Verify schema template
-      const schemaContent = await readTextFile(
-        path.join(testDir, 'common/schema.ts'),
-      );
-      assertTrue(
-        schemaContent?.includes('kSchemaMyItem') || false,
-        'Schema should define example item',
-      );
-      assertTrue(
-        schemaContent?.includes('registerSchemas') || false,
-        'Schema should export registration function',
+      const initModule = await import('../cli/init.ts');
+      let error: unknown;
+      try {
+        await initModule.bootstrapProject({ targetDir: testDir });
+      } catch (caught) {
+        error = caught;
+      }
+
+      assertInstallFailure(
+        error instanceof Error ? error.message : String(error),
       );
     },
   );

@@ -43,6 +43,23 @@ jobs:
           CI: true
           FC_SEED: 42
 
+  package-validation:
+    name: Package Archive
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
+
+      # Validates the JSR upload set and publish-time specifier rewriting
+      # without publishing. The compile E2E links local source, so it cannot
+      # cover this package-boundary contract.
+      - name: Validate JSR package
+        run: deno publish --dry-run
+
   docs-build:
     name: Docs Build
     runs-on: ubuntu-latest
@@ -76,6 +93,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -84,8 +106,45 @@ jobs:
       - name: Install npm dependencies
         run: npm install
 
+      - name: Type check npm surface
+        run: npm run check:npm-types
+
       - name: Build npm package
         run: npm run build:npm
+
+      # Archive membership is checked on every push, not only at tag time.
+      # Same verifier as publish, so a staging regression fails the PR.
+      - name: Verify npm archive contents
+        run: deno task verify:npm-archive
+
+  build-contract:
+    name: Build Contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      - name: Install npm dependencies
+        run: npm install
+
+      # Builds the current checkout. The suite loads dist in place and must not
+      # install the package or resolve it from a registry. `prefer-offline`
+      # keeps the registry traffic down without failing on a dependency that
+      # the cache does not hold yet.
+      - name: Package contract
+        run: deno task test:package
+        env:
+          GOATDB_TEST_PACKAGE: '1'
+          npm_config_prefer_offline: 'true'
 
   test-browser:
     name: Browser Tests

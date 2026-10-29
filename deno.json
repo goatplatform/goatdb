@@ -14,9 +14,11 @@
       "package.json",
       "tsup.config.ts",
       "tsconfig.node.json",
+      "tsconfig.npm.json",
       ".npmrc",
       ".github/",
       "tests/",
+      "scripts/",
       "benchmarks/",
       "docs/",
       "examples/"
@@ -51,6 +53,8 @@
     "test": "deno run -A tests/run.ts",
     "test:smoke": "deno run -A tests/run.ts --runtime=deno --suite=SecurityBoundaries",
     "test:paths": "deno run -A tests/run.ts --runtime=deno --suite=Path",
+    "test:package": "deno run -A tests/run.ts --suite=CLI-Package --runtime=node",
+    "verify:npm-archive": "deno run -A scripts/verify-npm-archive.ts",
     "bench": "deno run -A benchmarks/run.ts",
     "bench:json": "deno run -A benchmarks/run.ts --output-json --output-dir=benchmarks/results",
     "bench:update-docs": "deno run -A benchmarks/update-docs.ts --input-dir=benchmarks/results",
@@ -78,7 +82,8 @@
     "source-map": "npm:source-map@^0.7.4",
     "sql.js": "npm:sql.js@^1.11.0",
     "postject": "npm:postject@1.0.0-alpha.6",
-    "yargs": "npm:yargs@^17.7.2"
+    "yargs": "npm:yargs@^17.7.2",
+    "react-dom": "npm:react-dom@^19.0.0"
   },
   "nodeModulesDir": "auto"
 }

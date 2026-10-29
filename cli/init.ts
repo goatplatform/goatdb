@@ -19,6 +19,7 @@ import {
 } from '../base/json-log/file-impl.ts';
 import { cli } from '../base/development.ts';
 import { kMinNodeMajor } from './compile.ts';
+import { templateTargetPath } from './template-manifest.ts';
 
 /**
  * Returns the path to the templates directory.
@@ -61,13 +62,48 @@ async function copyTemplateFile(
   await copyFile(srcPath, fullDestPath);
 }
 
-async function installDenoDependency(
-  spec: string,
+/**
+ * Upper bound for dependency installation. A stalled registry must fail with a
+ * diagnosable error instead of hanging `init` or the worker that invoked it.
+ */
+const kDependencyInstallTimeoutMs = 180_000;
+
+function installFailure(
+  command: string,
+  result: { result: string; exitCode: number },
+): Error {
+  // Include the captured output: the child's stderr is the only evidence of
+  // why the registry or package manager refused the install.
+  return new Error(
+    `${command} failed with exit code ${result.exitCode}:\n${result.result}`,
+  );
+}
+
+/**
+ * npm dependencies the Deno scaffold installs, keyed by the import specifier
+ * `deno add` generates. Ranges keep react and react-dom on the same resolved
+ * version; exact pins let a transitive peer pull a newer react than react-dom,
+ * which crashes at runtime with "Incompatible React versions". Exported so the
+ * compile E2E resolves the same specs the scaffold installs.
+ */
+export const kDenoTemplateNpmDependencies = {
+  'react': 'npm:react@^19.0.0',
+  'react-dom/client': 'npm:react-dom@^19.0.0/client',
+  'yargs': 'npm:yargs@^17.7.2',
+  '@types/react': 'npm:@types/react@^19.0.8',
+} as const;
+
+async function installDenoDependencies(
+  specs: readonly string[],
   targetDir: string,
 ): Promise<void> {
-  const result = await cli('deno', 'add', spec, { cwd: targetDir });
+  const command = `deno add ${specs.join(' ')}`;
+  const result = await cli('deno', 'add', ...specs, {
+    cwd: targetDir,
+    timeout: kDependencyInstallTimeoutMs,
+  });
   if (result.exitCode !== 0) {
-    throw new Error(`Failed to install dependency ${spec}`);
+    throw installFailure(command, result);
   }
 }
 
@@ -132,10 +168,12 @@ export async function bootstrapProject(
     'client/index.css',
     projectDir,
   );
+  // Dotfiles are excluded by npm pack, so templates use plain names and the
+  // scaffold restores the leading dot.
   await copyTemplateFile(
     templateDir,
-    'shared/.gitignore',
-    '.gitignore',
+    'shared/gitignore',
+    templateTargetPath('shared/gitignore', runtime),
     projectDir,
   );
 
@@ -196,12 +234,12 @@ export async function bootstrapProject(
       projectDir,
     );
     if (!opts.skipDependencies) {
-      await installDenoDependency('jsr:@goatdb/goatdb', projectDir);
-      await installDenoDependency('jsr:@std/path', projectDir);
-      await installDenoDependency('npm:react@19.0.0', projectDir);
-      await installDenoDependency('npm:react-dom@19.0.0/client', projectDir);
-      await installDenoDependency('npm:yargs@17.7.2', projectDir);
-      await installDenoDependency('npm:@types/react@19.0.8', projectDir);
+      // One command: fewer registry round-trips and one bounded wait.
+      await installDenoDependencies([
+        'jsr:@goatdb/goatdb',
+        'jsr:@std/path',
+        ...Object.values(kDenoTemplateNpmDependencies),
+      ], projectDir);
     }
   } else if (isNode()) {
     await copyNodePackageJson(templateDir, projectDir);
@@ -211,12 +249,20 @@ export async function bootstrapProject(
       'tsconfig.json',
       projectDir,
     );
-    await copyTemplateFile(templateDir, 'node/.npmrc', '.npmrc', projectDir);
+    await copyTemplateFile(
+      templateDir,
+      'node/npmrc',
+      templateTargetPath('node/npmrc', runtime),
+      projectDir,
+    );
 
     if (!opts.skipDependencies) {
-      const result = await cli('npm', 'install', { cwd: projectDir });
+      const result = await cli('npm', 'install', {
+        cwd: projectDir,
+        timeout: kDependencyInstallTimeoutMs,
+      });
       if (result.exitCode !== 0) {
-        console.warn('npm install failed:', result.result);
+        throw installFailure('npm install', result);
       }
     }
   }

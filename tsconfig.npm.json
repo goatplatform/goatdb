@@ -1,0 +1,20 @@
+// scripts/check-npm-entrypoints.ts checks public entrypoint coverage.
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "declaration": true,
+    "emitDeclarationOnly": false,
+    "types": ["node", "deno"]
+  },
+  "include": [
+    "mod.ts",
+    "server.ts",
+    "server-build.ts",
+    "react/hooks.ts",
+    "cli/init.ts",
+    "cli/link.ts",
+    "types/**/*.d.ts"
+  ]
+}
