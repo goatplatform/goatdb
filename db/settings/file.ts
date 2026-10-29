@@ -108,7 +108,7 @@ export class FileSettings implements DBSettingsProvider {
     }
   }
 
-  get filePath(): string {
+  get filePath(): path.PosixPath {
     return path.join(this.dir, 'settings.json');
   }
 

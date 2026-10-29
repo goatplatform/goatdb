@@ -24,7 +24,7 @@ import {
 /**
  * Helper function to check if a file exists
  */
-async function fileExists(filePath: string): Promise<boolean> {
+async function fileExists(filePath: path.PosixPath): Promise<boolean> {
   return await pathExists(filePath);
 }
 

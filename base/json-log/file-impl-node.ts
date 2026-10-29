@@ -106,7 +106,7 @@ export const FileImplNode: FileImpl<NodeFsFile> = {
   },
 
   getCWD() {
-    return process.cwd();
+    return path.parsePath(process.cwd());
   },
 
   getTempDir() {

@@ -86,7 +86,7 @@ function isGoatFile(name: string): boolean {
  * droppings, user documents) must never reject a store the user pointed us at.
  */
 async function findGoatArtifact(
-  storePath: string,
+  storePath: path.PosixPath,
 ): Promise<string | undefined> {
   for (const entry of await readDir(storePath)) {
     if (entry.name === kStorageFormatMarkerFile) continue;
@@ -111,7 +111,9 @@ function isNotFound(e: unknown): boolean {
 }
 
 /** Reads the marker text, or undefined only when the marker does not exist. */
-async function readMarker(markerPath: string): Promise<string | undefined> {
+async function readMarker(
+  markerPath: path.PosixPath,
+): Promise<string | undefined> {
   try {
     return gTextDecoder.decode(await readFile(markerPath));
   } catch (e: unknown) {
@@ -127,7 +129,7 @@ async function readMarker(markerPath: string): Promise<string | undefined> {
  * without this tolerance.
  */
 async function markerMatches(
-  markerPath: string,
+  markerPath: path.PosixPath,
   storePath: string,
 ): Promise<boolean> {
   const recorded = await readMarker(markerPath);
@@ -154,17 +156,20 @@ async function markerMatches(
 export async function ensureStorageFormatEpoch(
   storePath: string,
 ): Promise<void> {
-  const markerPath = path.join(storePath, kStorageFormatMarkerFile);
+  // The store root comes from user config; normalize it once here before it
+  // crosses into the FileImpl POSIX contract.
+  const root = path.parsePath(storePath);
+  const markerPath = path.join(root, kStorageFormatMarkerFile);
   if (await markerMatches(markerPath, storePath)) return;
   // Create the root before checking it. Another opener may have written the
   // marker since our first read, so verify it again before treating files as
   // legacy data.
-  await mkdir(storePath);
+  await mkdir(root);
   if (await markerMatches(markerPath, storePath)) return;
   // Ignore the marker file itself: a concurrent opener may write it between
   // our read above and this listing. Only a known GoatDB artifact makes the
   // directory an unrecognized store; unrelated files are safe to ignore.
-  const artifact = await findGoatArtifact(storePath);
+  const artifact = await findGoatArtifact(root);
   if (artifact !== undefined) {
     throw storageFormatMissingMarkerError(storePath, artifact);
   }

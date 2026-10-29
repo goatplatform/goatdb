@@ -1,6 +1,7 @@
 import { isDeno, isNode } from './common.ts';
 import { cli } from './development.ts';
 import { readTextFile } from './json-log/file-impl.ts';
+import { parsePath } from './path.ts';
 import { isWindows, normalizeNodePlatform } from './os.ts';
 import type { JSONObject } from './interfaces.ts';
 
@@ -132,7 +133,7 @@ export async function generateBuildInfo(
   // App version
   let config: Record<string, unknown> = {};
   try {
-    config = JSON.parse((await readTextFile(configPath)) || '{}');
+    config = JSON.parse((await readTextFile(parsePath(configPath))) || '{}');
   } catch {
     // Malformed config file — proceed without version/name
   }

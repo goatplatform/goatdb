@@ -206,11 +206,11 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
   },
 
   getCWD() {
-    return '/';
+    return path.parsePath('/');
   },
 
   getTempDir() {
-    return Promise.resolve('/temp');
+    return Promise.resolve(path.parsePath('/temp'));
   },
 
   async mkdir(path: string) {
@@ -236,7 +236,7 @@ export const FileImplOPFS: FileImpl<OPFSFile> = {
     }
   },
 
-  async copyFile(srcPath: string, destPath: string): Promise<void> {
+  async copyFile(srcPath, destPath): Promise<void> {
     const MAX_COPY_SIZE = 50 * 1024 * 1024; // 50MB
     const srcHandle = await FileImplOPFS.open(srcPath, false);
     try {

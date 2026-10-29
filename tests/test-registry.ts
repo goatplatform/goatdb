@@ -34,6 +34,10 @@ import setupCliInitTests from './cli-init.test.ts';
 import setupCliCompileTests from './cli-compile.test.ts';
 import setupCliBuildAssetsTests from './cli-build-assets.test.ts';
 import setupPathTests from './path.test.ts';
+import setupCliPathNormalizationTests from './cli-path-normalization.test.ts';
+import setupPathBoundaryTests from './path-boundaries.test.ts';
+import setupPathPropertyTests from './path-property.test.ts';
+import setupDBConfig from './db-config.test.ts';
 import setupRuntimeTests from './runtime.test.ts';
 import setupCoroutineQueueTests from './coroutine-queue.test.ts';
 import setupCoroutineSchedulerTests from './coroutine-scheduler.test.ts';
@@ -84,6 +88,9 @@ export async function registerAllTests(): Promise<void> {
   setupOrderstamp(); // Utility functions for distributed timestamps
   setupItemPath(); // Path validation and parsing logic
   setupPathTests(); // Cross-platform path utilities
+  setupCliPathNormalizationTests();
+  setupPathBoundaryTests();
+  setupPathPropertyTests();
   setupRuntimeTests(); // Runtime abstraction layer invariants
   setupProgressTests(); // TUI progress tracking - Task state machine, aggregation
   setupHealthCheckEndpointTest(); // Simple HTTP endpoint check
@@ -101,6 +108,7 @@ export async function registerAllTests(): Promise<void> {
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
   setupStorageFormatEpoch(); // Storage epoch fail-fast on every runtime
+  setupDBConfig();
   setupCoroutineQueueTests(); // Coroutine FIFO execution contract
   setupCoroutineSchedulerTests(); // Coroutine failure isolation contract
   setupBinaryEncoding(); // Binary commit format encoding roundtrip

@@ -15,6 +15,7 @@
  * ```
  */
 
+import type { PosixPath } from '../path.ts';
 import { notReached } from '../error.ts';
 import type { FileImpl } from '../json-log/file-impl-interface.ts';
 import type { OperatingSystem } from '../os.ts';
@@ -105,13 +106,13 @@ export interface RuntimeAdapter {
    * Gets the current working directory.
    * Browser returns '/' as root.
    */
-  getCWD(): string;
+  getCWD(): PosixPath;
 
   /**
    * Gets a temporary directory path.
    * Browser returns '/temp' in OPFS.
    */
-  getTempDir(): Promise<string>;
+  getTempDir(): Promise<PosixPath>;
 
   /**
    * Gets the path to the current runtime executable.

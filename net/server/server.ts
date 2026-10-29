@@ -80,6 +80,7 @@ export interface ServerOptions<US extends Schema> extends DBInstanceConfig {
   /**
    * The directory under which all server data will be stored.
    * This includes database files, logs, and other persistent data.
+   * Relative paths resolve against the process working directory.
    */
   path: string;
   /**
@@ -362,6 +363,14 @@ export class Server<US extends Schema> {
     }
     if (!options.orgId) {
       options.orgId = 'localhost';
+    }
+    // GoatDB rejects roots: logout() recursively removes the store directory.
+    if (!options.path) throw new Error('Server path must not be empty');
+    options.path = path.resolve(options.path);
+    if (!path.isAbsoluteNonRoot(options.path)) {
+      throw new Error(
+        `ServerOptions.path must resolve to an absolute, non-root path, got: "${options.path}"`,
+      );
     }
     if (!options.domain) {
       if (options.port === 0) {

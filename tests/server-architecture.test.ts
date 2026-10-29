@@ -12,7 +12,12 @@ import {
   type ServeHandlerInfo,
 } from '../net/server/http-compat.ts';
 import { TEST } from './mod.ts';
-import { assertEquals, assertTrue } from './asserts.ts';
+import {
+  assertEquals,
+  assertThrows,
+  assertThrowsWithMessage,
+  assertTrue,
+} from './asserts.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
@@ -47,6 +52,38 @@ export default async function setupServerArchitectureTest() {
     };
     return new Server<Schema>(opts);
   }
+
+  TEST(
+    'ServerArchitecture',
+    'normalizes server data path at ingress',
+    async (ctx) => {
+      assertThrows(() => makeServer(''));
+      const dir = await ctx.tempDir('relative-ingress');
+      const relativeDir = path.relative(
+        (await FileImplGet()).getCWD(),
+        dir,
+      );
+      // Different Windows drives cannot express a relative path.
+      if (path.isAbsolute(relativeDir)) return;
+      const server = makeServer(relativeDir);
+      const services = await server.servicesForOrganization('test-org');
+      try {
+        assertEquals(services.db.path, path.join(dir, 'test-org'));
+      } finally {
+        await services.db.close();
+      }
+    },
+  );
+
+  TEST(
+    'ServerArchitecture',
+    'rejects filesystem-root data paths',
+    () => {
+      for (const root of ['/', 'C:/', '//server/share', '/data/..']) {
+        assertThrowsWithMessage(() => makeServer(root), 'ServerOptions.path');
+      }
+    },
+  );
 
   TEST('ServerArchitecture', 'endpoint order and filter', async (ctx) => {
     const server = makeServer(await ctx.tempDir('endpoint-filter'));
