@@ -1,7 +1,12 @@
-import { HealthCheckEndpoint } from '../net/server/health.ts';
+import { HealthCheckEndpoint, kHealthCheckPath } from '../net/server/health.ts';
 import { TEST } from './mod.ts';
 import { assertEquals, assertTrue } from './asserts.ts';
 import type { Schema } from '../cfds/base/schema.ts';
+import type { ServerServices } from '../net/server/server.ts';
+import {
+  GoatRequest,
+  type ServeHandlerInfo,
+} from '../net/server/http-compat.ts';
 
 export default function setupHealthCheckEndpointTest(): void {
   // Minimal test schema
@@ -11,7 +16,7 @@ export default function setupHealthCheckEndpointTest(): void {
     fields: { foo: { type: 'string', required: true } },
   };
 
-  function makeServices(overrides: any = {}) {
+  function makeServices(): ServerServices<Schema> {
     return {
       orgId: 'test-org',
       domain: {
@@ -25,15 +30,15 @@ export default function setupHealthCheckEndpointTest(): void {
           }
         },
       },
-      ...overrides,
-    };
+      // This endpoint does not read database or service state.
+    } as unknown as ServerServices<Schema>;
   }
 
-  function makeRequest(path: string, method = 'GET') {
-    return { method, url: `http://localhost${path}`, headers: new Headers() };
+  function makeRequest(path: string, method = 'GET'): GoatRequest {
+    return new GoatRequest(new Request(`http://localhost${path}`, { method }));
   }
 
-  function makeInfo() {
+  function makeInfo(): ServeHandlerInfo {
     return {
       remoteAddr: { hostname: 'localhost' },
       completed: Promise.resolve(),
@@ -48,12 +53,8 @@ export default function setupHealthCheckEndpointTest(): void {
       const services = makeServices();
       const req = makeRequest('/healthy', 'GET');
       const info = makeInfo();
-      assertTrue(endpoint.filter(services as any, req as any, info as any));
-      const resp = await endpoint.processRequest(
-        services as any,
-        req as any,
-        info as any,
-      );
+      assertTrue(endpoint.filter(services, req, info));
+      const resp = await endpoint.processRequest(services, req, info);
       assertEquals(resp.status, 200);
       assertEquals(await resp.text(), 'OK');
       assertEquals(resp.headers.get('cache-control'), 'no-store');
@@ -65,9 +66,9 @@ export default function setupHealthCheckEndpointTest(): void {
     const services = makeServices();
     const info = makeInfo();
     const postReq = makeRequest('/healthy', 'POST');
-    assertTrue(!endpoint.filter(services as any, postReq as any, info as any));
+    assertTrue(!endpoint.filter(services, postReq, info));
     const putReq = makeRequest('/healthy', 'PUT');
-    assertTrue(!endpoint.filter(services as any, putReq as any, info as any));
+    assertTrue(!endpoint.filter(services, putReq, info));
   });
 
   TEST('HealthCheckEndpoint', 'filter rejects wrong path', () => {
@@ -75,7 +76,7 @@ export default function setupHealthCheckEndpointTest(): void {
     const services = makeServices();
     const info = makeInfo();
     const req = makeRequest('/not-healthy', 'GET');
-    assertTrue(!endpoint.filter(services as any, req as any, info as any));
+    assertTrue(!endpoint.filter(services, req, info));
   });
 
   TEST('HealthCheckEndpoint', 'filter is case-insensitive for path', () => {
@@ -83,6 +84,18 @@ export default function setupHealthCheckEndpointTest(): void {
     const services = makeServices();
     const info = makeInfo();
     const req = makeRequest('/HeAlThY', 'GET');
-    assertTrue(endpoint.filter(services as any, req as any, info as any));
+    assertTrue(endpoint.filter(services, req, info));
   });
+
+  TEST(
+    'HealthCheckEndpoint',
+    'filter accepts the shared constant regardless of its literal case',
+    () => {
+      const endpoint = new HealthCheckEndpoint<typeof TestSchema>();
+      const services = makeServices();
+      const info = makeInfo();
+      const req = makeRequest(kHealthCheckPath.toUpperCase(), 'GET');
+      assertTrue(endpoint.filter(services, req, info));
+    },
+  );
 }

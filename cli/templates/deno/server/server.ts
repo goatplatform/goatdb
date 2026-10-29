@@ -3,6 +3,7 @@ import * as path from '@std/path';
 import { prettyJSON } from '@goatdb/goatdb';
 import {
   type BuildInfo,
+  DEFAULT_STOP_TIMEOUT_MS,
   Server,
   staticAssetsFromJS,
 } from '@goatdb/goatdb/server';
@@ -76,7 +77,8 @@ async function main(): Promise<void> {
   const shutdown = () => {
     if (stopping) return;
     stopping = true;
-    setTimeout(() => Deno.exit(1), 5000);
+    // The drain budget plus a margin for database flush.
+    setTimeout(() => Deno.exit(1), DEFAULT_STOP_TIMEOUT_MS + 1_000);
     server.stop().then(() => Deno.exit(0)).catch((e) => {
       console.error(e);
       Deno.exit(1);

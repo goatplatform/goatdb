@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Breaking Changes
 
+- `HttpServerInstance.stop()` and `Server.stop()` now return `Promise<void>`
+  and must be awaited. The promise resolves only after the listener is closed
+  and the port is free. A caller that ignores it can return before in-flight
+  requests finish, and a restart can fail to bind the port.
 - **Store path must be absolute and non-root.** `DBInstanceConfig.path` now
   throws `DBInstanceConfig.path must be an absolute, non-root path` for
   relative paths, the empty string, and filesystem roots such as `/`. Resolve
@@ -42,6 +46,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- A server `stop()` that races an in-flight `start()` now waits for that start
+  to settle before closing the listener, instead of returning early and
+  leaving a bound server behind. A `start()` after a failed teardown retries
+  cleanly, and a later `force` stop interrupts an in-progress drain even when
+  the stop is queued behind a restart. Drain-then-close ordering is unchanged,
+  and force or timeout still never cancel application handlers.
 - `goatdb init` now scaffolds `.gitignore` and `.npmrc` again when run from the
   published npm package. `npm pack` drops dotfile sources, so the templates use
   plain names (`gitignore`, `npmrc`) that `init` maps back to their dotted
@@ -96,6 +106,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   call, bounded by a 180s timeout. Exact pins let a transitive peer resolve a
   newer `react` than `react-dom`, which crashes at runtime with "Incompatible
   React versions".
+- `stop()` is graceful by default: in-flight requests and responses finish,
+  new requests receive `503 Service Unavailable` with `connection: close`, and
+  the listener closes when the drain ends. `force: true` closes immediately
+  and `timeoutMs` bounds the drain (default 10s, an integer from 0 to
+  2147483647; other values reject and leave the server running). Neither
+  cancels application handlers.
+- HTTP health checks from the `awsalb` host now accept `http` and `https`
+  URLs on any port and ignore the query string; the path must be exactly
+  `/healthy`. The comparison is now case-sensitive, so a mixed-case probe such
+  as `/HEALTHY` returns 404; the `/healthy` endpoint itself still matches
+  case-insensitively. Keep ALB health-check paths lowercase.
 
 ## [0.6.1] - 2026-09-01
 

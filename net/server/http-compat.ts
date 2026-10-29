@@ -1,5 +1,6 @@
 import { getRuntime } from '../../base/runtime/index.ts';
 import { assert, notReached } from '../../base/error.ts';
+import { log } from '../../logging/log.ts';
 
 /**
  * A minimal interface for Node.js Buffer functionality used in this module.
@@ -301,6 +302,7 @@ export type MinimalNodeServerResponse = {
   on?(event: string, listener: (...args: unknown[]) => void): void;
   once?(event: string, listener: (...args: unknown[]) => void): void;
   end(chunk?: Uint8Array | string): void;
+  destroy(error?: Error): void;
 };
 
 /**
@@ -460,15 +462,322 @@ export type HttpRemoteAddr = { hostname: string };
  */
 export type ServeHandlerInfo = {
   remoteAddr: HttpRemoteAddr;
-  /** Resolves when the response is fully sent. Natively supported in Deno; resolved on `finish`/`close` event in Node.js. */
+  /** Settles when response delivery ends, including a client disconnect. */
   completed: Promise<void>;
 };
+
+/** Status sent for requests rejected while the server drains. */
+export const SERVICE_UNAVAILABLE_STATUS = 503;
+/** Body sent for requests rejected while the server drains. */
+export const SERVICE_UNAVAILABLE_BODY = 'Service Unavailable';
+/** Header telling clients not to reuse a socket that is about to close. */
+export const SERVICE_UNAVAILABLE_CONNECTION = 'close';
+
+/**
+ * The one 503 used by every drain gate: the web handler path and the raw Node
+ * response path. WHY shared: a client must not be able to tell which runtime
+ * rejected the request.
+ */
+export function serviceUnavailableResponse(): Response {
+  return new Response(SERVICE_UNAVAILABLE_BODY, {
+    status: SERVICE_UNAVAILABLE_STATUS,
+    headers: { connection: SERVICE_UNAVAILABLE_CONNECTION },
+  });
+}
+
+/** Default graceful drain budget for {@link MinimalHttpServer.stop}. */
+export const DEFAULT_STOP_TIMEOUT_MS = 10_000;
+
+/**
+ * Largest delay `setTimeout` honors. Larger values overflow the internal
+ * 32-bit timer and fire after about 1 ms, which would turn a long drain budget
+ * into an immediate force-close.
+ */
+export const MAX_STOP_TIMEOUT_MS = 2_147_483_647;
+
+/**
+ * Rejects a drain budget the timers cannot honor: a non-integer, a negative
+ * value, or one above {@link MAX_STOP_TIMEOUT_MS}. Callers validate before
+ * touching any state, so a rejected stop leaves the server running.
+ */
+export function validateStopTimeout(options?: HttpServerStopOptions): void {
+  const timeoutMs = options?.timeoutMs;
+  if (timeoutMs === undefined) return;
+  if (
+    !Number.isInteger(timeoutMs) || timeoutMs < 0 ||
+    timeoutMs > MAX_STOP_TIMEOUT_MS
+  ) {
+    throw new RangeError(
+      `timeoutMs must be an integer between 0 and ${MAX_STOP_TIMEOUT_MS}, ` +
+        `got ${timeoutMs}`,
+    );
+  }
+}
+
+/** Options for {@link MinimalHttpServer.stop}. */
+export interface HttpServerStopOptions {
+  /**
+   * Skip the drain and close open connections immediately. Use on process
+   * termination paths where waiting is not an option. Does not cancel handlers.
+   */
+  readonly force?: boolean;
+  /**
+   * Drain budget, default 10s. Expiry closes connections, not app handlers.
+   * Bounds the drain, not the final listener close.
+   */
+  readonly timeoutMs?: number;
+}
+
+/**
+ * Tracks in-flight requests so stop() can drain them before closing sockets.
+ *
+ * WHY: neither runtime can force-close a listener after starting its native
+ * graceful shutdown (Deno takes the server handle; Node's close() has no
+ * abort). Draining first keeps the force fallback available on both runtimes.
+ * New requests are rejected with 503 once stop begins, so a busy server still
+ * reaches zero in-flight work.
+ */
+class RequestDrain {
+  private _active = 0;
+  private _accepting = true;
+  private _forced = false;
+  private readonly _waiters = new Set<(drained: boolean) => void>();
+
+  get accepting(): boolean {
+    return this._accepting;
+  }
+
+  get forced(): boolean {
+    return this._forced;
+  }
+
+  async track<T>(
+    completed: Promise<void>,
+    handler: () => Promise<T>,
+  ): Promise<T> {
+    ++this._active;
+    // Observe rejection immediately; disconnects must still wait for the handler.
+    const responseDone = completed.then(() => {}, () => {});
+    try {
+      return await handler();
+    } finally {
+      // Capture this tracker so a restart cannot receive an old request's end.
+      void responseDone.then(() => this.end());
+    }
+  }
+
+  private end(): void {
+    if (this._active === 0) return;
+    --this._active;
+    if (this._active > 0) return;
+    for (const waiter of this._waiters) waiter(true);
+  }
+
+  stopAccepting(): void {
+    this._accepting = false;
+  }
+
+  /** Escalates an in-flight graceful stop to the force path. */
+  force(): void {
+    this._forced = true;
+    this._accepting = false;
+    for (const waiter of this._waiters) waiter(false);
+  }
+
+  /** Resolves true when drained, false when the timeout expired first. */
+  wait(timeoutMs: number): Promise<boolean> {
+    if (this._active === 0) return Promise.resolve(true);
+    return new Promise<boolean>((resolve) => {
+      const finish = (drained: boolean) => {
+        clearTimeout(timer);
+        this._waiters.delete(finish);
+        resolve(drained);
+      };
+      this._waiters.add(finish);
+      const timer = setTimeout(() => finish(false), timeoutMs);
+    });
+  }
+}
+
+/** Logs a drain timeout. The caller still force-closes; this is not fatal. */
+function logDrainTimeout(timeoutMs: number): void {
+  log({
+    severity: 'WARNING',
+    error: 'StopTimeout',
+    message: `HTTP server stop drain timed out after ${timeoutMs}ms; ` +
+      'closing remaining connections',
+  });
+}
+
+/** Closes the drain and waits for active requests within the time budget. */
+async function beginDrain(
+  drain: RequestDrain,
+  options: HttpServerStopOptions,
+): Promise<boolean> {
+  drain.stopAccepting();
+  const timeoutMs = options.timeoutMs ?? DEFAULT_STOP_TIMEOUT_MS;
+  const drained = options.force ? false : await drain.wait(timeoutMs);
+  if (!options.force && !drained && !drain.forced) {
+    logDrainTimeout(timeoutMs);
+  }
+  return drained;
+}
+
+/** Surfaces a rejected background stop instead of dropping the promise. */
+export function logStopFailure(error: unknown): void {
+  log({
+    severity: 'ERROR',
+    error: 'ServerStopFailed',
+    message: `HTTP server stop failed: ${
+      error instanceof Error ? error.message : String(error)
+    }`,
+    trace: error instanceof Error ? error.stack : undefined,
+  });
+}
+
+/**
+ * Stops the server when `signal` aborts. Callers must handle a signal that is
+ * already aborted before calling this: firing the stop synchronously would
+ * queue it behind the start that is wiring it.
+ */
+function wireStopSignal(
+  signal: AbortSignal | undefined,
+  isCurrent: () => boolean,
+  stop: () => Promise<void>,
+): void {
+  if (!signal) return;
+  signal.addEventListener('abort', () => {
+    // A restart may own the server now; ignore this signal for that listener.
+    if (isCurrent()) void stop().catch(logStopFailure);
+  }, { once: true });
+}
+
+/**
+ * Awaits a previous teardown, then clears it. WHY: a start must not race the
+ * old teardown. Clears even on rejection so the slot cannot stay poisoned; the
+ * rejection still propagates to this caller.
+ */
+export async function awaitPendingStop(
+  pending: Promise<void> | undefined,
+  clear: () => void,
+): Promise<void> {
+  if (!pending) return;
+  try {
+    await pending;
+  } finally {
+    clear();
+  }
+}
+
+/**
+ * Clears a pending-stop slot when a teardown rejects, then rethrows. WHY: the
+ * stop caller must see the failure, but a later start must be able to retry.
+ */
+export function clearPendingOnReject(
+  pending: Promise<void>,
+  clear: () => void,
+): Promise<void> {
+  return pending.catch((error) => {
+    clear();
+    throw error;
+  });
+}
+
+/**
+ * Interrupts an active drain when a force stop is queued behind a restart.
+ *
+ * WHY: the lifecycle gate defers a stop until the in-flight start settles, so
+ * without this the force waits for the handler or the graceful budget. While a
+ * teardown is pending, the drain field holds that teardown's drain: a start
+ * clears the pending stop before it installs a new drain.
+ */
+function escalatePendingStop(
+  pending: Promise<void> | undefined,
+  drain: RequestDrain,
+): void {
+  if (pending) drain.force();
+}
+
+/**
+ * FIFO lifecycle gate shared by the server classes.
+ *
+ * WHY: every start and stop must run alone, in call order. A stop() that
+ * skipped ahead of a queued start would observe a not-yet-started server,
+ * return early, and leave the caller believing the listener is closed while
+ * the start goes on to bind it. Concurrent start() calls still share one bind,
+ * because a second bind would only fail on the port.
+ *
+ * The first op of an idle gate runs synchronously, so callers observe the
+ * state change (for example the cleared port) before stop() returns.
+ */
+export class StartStopGate {
+  /** Non-rejecting tail of the queue. Undefined when no op is pending. */
+  private _tail?: Promise<void>;
+  /** Identifies the newest chain, so only it may clear the tail. */
+  private _chain = 0;
+  /** The in-flight start, shared by concurrent start() callers. */
+  private _starting?: Promise<void>;
+
+  /** Runs `start` once; concurrent callers share the in-flight promise. */
+  start(start: () => Promise<void>): Promise<void> {
+    const inFlight = this._starting;
+    if (inFlight) return inFlight;
+    const started = this._push(start);
+    this._starting = started;
+    const clear = () => {
+      if (this._starting === started) this._starting = undefined;
+    };
+    void started.then(clear, clear);
+    return started;
+  }
+
+  /** Runs `stop` after every earlier op settled, success or failure. */
+  stop(stop: () => Promise<void>): Promise<void> {
+    return this._push(stop);
+  }
+
+  /** Queues one op behind the current tail, or runs it now when idle. */
+  private _push(op: () => Promise<void>): Promise<void> {
+    const previous = this._tail;
+    if (!previous) {
+      let run: Promise<void>;
+      try {
+        run = op();
+      } catch (error) {
+        run = Promise.reject(error);
+      }
+      this._track(run);
+      return run;
+    }
+    // WHY the rejection handler: a failed op must not block the ops behind it,
+    // while its own caller must still see the failure.
+    const run = previous.then(op, op);
+    this._track(run);
+    return run;
+  }
+
+  private _track(run: Promise<void>): void {
+    // WHY released in the settle callback itself: the slot must read idle by
+    // the time the op's own caller resumes, so its next stop() runs at once
+    // instead of queuing a microtask behind an already finished chain.
+    const chain = ++this._chain;
+    this._tail = run.then(
+      () => this._release(chain),
+      () => this._release(chain),
+    );
+  }
+
+  private _release(chain: number): void {
+    // A later op may already own the slot; only the newest chain clears it.
+    if (this._chain === chain) this._tail = undefined;
+  }
+}
 
 /**
  * Minimal cross-platform HTTP server abstraction for GoatDB.
  *
  * This interface and implementation allow the server to be started and stopped
- * in a platform-agnostic way. Currently, only the Deno implementation is provided.
+ * in a platform-agnostic way.
  */
 export interface MinimalHttpServer {
   start(
@@ -476,124 +785,267 @@ export interface MinimalHttpServer {
     port: number,
     signal?: AbortSignal,
   ): Promise<void>;
-  stop(): void;
+  /**
+   * Stops the server. Idempotent; port and address read as undefined immediately.
+   *
+   * Default is graceful: the listener stays open while in-flight requests run,
+   * new requests receive 503, and open connections close once the drain
+   * finishes. Pass `force: true` to close immediately, or `timeoutMs` to bound
+   * the drain. `timeoutMs` does not bound the final listener close. Repeated
+   * calls share one teardown; a later `force` escalates only while the drain is
+   * pending, while `timeoutMs` is fixed by the first call. A `force` interrupts
+   * a pending drain even when the stop is queued behind a restart. Resolves
+   * once the listener is closed. A stop() racing an in-flight start() resolves only
+   * after that start settles and the listener is closed. Forced or timed-out
+   * stops cannot cancel application handlers; these can continue after stop
+   * resolves.
+   */
+  stop(options?: HttpServerStopOptions): Promise<void>;
   readonly port?: number;
   readonly address?: { hostname: string; port: number };
 }
 
 /**
- * Deno implementation of the MinimalHttpServer abstraction.
+ * Shared start/stop lifecycle for the runtime-specific servers.
+ *
+ * WHY: draining, stop idempotency, the 503 gate and signal wiring do not
+ * depend on the runtime, so one owner keeps Deno and Node shutdown behavior
+ * from drifting. The runtime differences stay behind three hooks: bind a
+ * listener, close it, and report port/address from it.
+ *
+ * The listener handle is opaque here. Clearing it is what makes `port` and
+ * `address` read undefined from the moment `stop()` starts.
  */
-export class DenoHttpServer implements MinimalHttpServer {
-  private _abortController?: AbortController;
-  private _server?: Deno.HttpServer;
-  private _started: boolean = false;
-  private _options: HttpServerOptions;
+export abstract class BaseHttpServer<L> implements MinimalHttpServer {
+  private _listener?: L;
+  private _started = false;
+  /** In-flight stop, so repeated stop() calls share one teardown. */
+  private _stopPromise?: Promise<void>;
+  private readonly _lifecycle = new StartStopGate();
+  /** In-flight request tracker; replaced by each start. */
+  protected _drain: RequestDrain = new RequestDrain();
 
-  constructor(options: HttpServerOptions = {}) {
-    this._options = options;
+  /** The bound listener, or undefined before start and from stop() onward. */
+  protected get listener(): L | undefined {
+    return this._listener;
   }
 
   start(
-    handler: (
-      req: GoatRequest,
-      info: ServeHandlerInfo,
-    ) => Promise<Response>,
+    handler: (req: GoatRequest, info: ServeHandlerInfo) => Promise<Response>,
     port: number,
     signal?: AbortSignal,
   ): Promise<void> {
-    if (this._started) {
-      return Promise.resolve();
-    }
-    this._abortController = new AbortController();
-    if (signal) {
-      signal.addEventListener(
-        'abort',
-        () => this._abortController!.abort(),
-        { once: true },
-      );
-    }
-    const combinedSignal = this._abortController.signal;
-    let resolve: () => void;
-    const started = new Promise<void>((res) => {
-      resolve = res;
-    });
-    // Use HTTPS or HTTP based on configuration
-    const serveOptions: any = {
-      port,
-      onListen() {
-        resolve();
-      },
-      signal: combinedSignal,
-    };
-
-    // Add TLS options if HTTPS is configured
-    if (this._options.https) {
-      serveOptions.key = this._options.https.key;
-      serveOptions.cert = this._options.https.cert;
-    }
-
-    this._server = Deno.serve(
-      serveOptions,
-      (req: Request, info: Deno.ServeHandlerInfo) => {
-        // Map Deno's info to the unified abstraction
-        const remoteAddr: HttpRemoteAddr = {
-          hostname: (info.remoteAddr as any).hostname ?? 'localhost',
-        };
-        return handler(new GoatRequest(req), {
-          remoteAddr,
-          completed: info.completed,
-        });
-      },
-    );
-    this._started = true;
-    return started;
+    return this._lifecycle.start(() => this._start(handler, port, signal));
   }
 
-  stop(): void {
-    this._abortController?.abort();
+  stop(options: HttpServerStopOptions = {}): Promise<void> {
+    // WHY: validate before escalating or clearing state, so a rejected budget
+    // leaves the listener untouched.
+    try {
+      validateStopTimeout(options);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    // WHY: the lifecycle gate may queue this stop behind a restart, so force
+    // must interrupt the active teardown now; the queued stop still closes the
+    // restarted listener.
+    if (options.force) escalatePendingStop(this._stopPromise, this._drain);
+    return this._lifecycle.stop(() => this._requestStop(options));
+  }
+
+  private async _start(
+    handler: (req: GoatRequest, info: ServeHandlerInfo) => Promise<Response>,
+    port: number,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    // WHY: a restart must not bind the port while the old teardown still
+    // drains requests and closes databases.
+    await awaitPendingStop(this._stopPromise, () => {
+      this._stopPromise = undefined;
+    });
+    if (this._started) return;
+    this._drain = new RequestDrain();
+    const listener = await this._bind(handler, port);
+    this._listener = listener;
+    this._started = true;
+    // WHY: a signal that aborted before or during the bind must leave no
+    // listener behind by the time start() resolves, so tear down inline
+    // instead of queuing a stop behind this start.
+    if (signal?.aborted) {
+      await this._requestStop({});
+      return;
+    }
+    wireStopSignal(
+      signal,
+      () => this._listener === listener,
+      () => this.stop(),
+    );
+  }
+
+  private _requestStop(options: HttpServerStopOptions): Promise<void> {
+    const listener = this._listener;
+    if (!listener) {
+      // A later force must be able to escalate the active graceful teardown.
+      if (options.force) this._drain.force();
+      return this._stopPromise ?? Promise.resolve();
+    }
+    this._listener = undefined;
     this._started = false;
+    // Capture the drain. A restart must not swap it under the active teardown.
+    const drain = this._drain;
+    const stopped = clearPendingOnReject(
+      this._closeAfterDrain(listener, drain, options),
+      () => {
+        this._stopPromise = undefined;
+      },
+    );
+    this._stopPromise = stopped;
+    return stopped;
+  }
+
+  private async _closeAfterDrain(
+    listener: L,
+    drain: RequestDrain,
+    options: HttpServerStopOptions,
+  ): Promise<void> {
+    const drained = await beginDrain(drain, options);
+    await this._close(listener, options.force === true || !drained);
+  }
+
+  /** Binds a listener. Must reject on failure and leave nothing behind. */
+  protected abstract _bind(
+    handler: (req: GoatRequest, info: ServeHandlerInfo) => Promise<Response>,
+    port: number,
+  ): Promise<L>;
+
+  /**
+   * Closes the listener. `force` means the drain was skipped or timed out, so
+   * live connections must be cut. Resolves once the port is released.
+   */
+  protected abstract _close(listener: L, force: boolean): Promise<void>;
+}
+
+/** A bound Deno listener and the controller that aborts its connections. */
+type DenoListener = {
+  readonly server: Deno.HttpServer;
+  readonly controller: AbortController;
+};
+
+/**
+ * Deno implementation of the MinimalHttpServer abstraction.
+ */
+export class DenoHttpServer extends BaseHttpServer<DenoListener> {
+  private readonly _options: HttpServerOptions;
+
+  constructor(options: HttpServerOptions = {}) {
+    super();
+    this._options = options;
+  }
+
+  protected async _bind(
+    handler: (req: GoatRequest, info: ServeHandlerInfo) => Promise<Response>,
+    port: number,
+  ): Promise<DenoListener> {
+    const controller = new AbortController();
+    let onListen!: () => void;
+    const listening = new Promise<void>((resolve) => {
+      onListen = resolve;
+    });
+    // WHY no explicit Deno.ServeTcpOptions annotation: the npm build
+    // type-checks against a minimal Deno stub that lacks that member.
+    const serveOptions = {
+      port,
+      onListen,
+      signal: controller.signal,
+    };
+    const onRequest = (req: Request, info: Deno.ServeHandlerInfo) => {
+      if (!this._drain.accepting) {
+        return Promise.resolve(serviceUnavailableResponse());
+      }
+      // Map Deno's info to the unified abstraction. remoteAddr is
+      // NetAddr | UnixAddr; only the network variant has a hostname.
+      const remoteAddr: HttpRemoteAddr = {
+        hostname: 'hostname' in info.remoteAddr
+          ? info.remoteAddr.hostname
+          : 'localhost',
+      };
+      return this._drain.track(
+        info.completed,
+        () =>
+          handler(new GoatRequest(req), {
+            remoteAddr,
+            completed: info.completed,
+          }),
+      );
+    };
+
+    const server = this._options.https
+      ? Deno.serve({ ...serveOptions, ...this._options.https }, onRequest)
+      : Deno.serve(serveOptions, onRequest);
+    try {
+      // WHY: a failed bind (for example a port already in use) never calls
+      // onListen and surfaces only by rejecting `finished`. Without this race
+      // start() would hang instead of reporting the failure.
+      await Promise.race([
+        listening,
+        server.finished.then(() => {
+          throw new Error('HTTP server closed before it started listening');
+        }),
+      ]);
+    } catch (error) {
+      await server.shutdown().catch(() => {});
+      throw error;
+    }
+    return { server, controller };
+  }
+
+  protected async _close(
+    { server, controller }: DenoListener,
+    force: boolean,
+  ): Promise<void> {
+    if (force) {
+      controller.abort();
+    } else {
+      // WHY: shutdown() lets Deno flush responses and close connections
+      // gracefully. abort() would cancel them and can drop a response that
+      // is already queued for the client.
+      await server.shutdown();
+    }
+    // WHY: `finished` resolves after the OS listener socket is dropped, which
+    // is the only point at which the port stops accepting connections.
+    await server.finished;
   }
 
   get port(): number | undefined {
-    if (!this._server) return undefined;
-    const addr = this._server.addr;
+    const addr = this.listener?.server.addr;
     // Handle both network and Unix addresses
-    if ('port' in addr) {
-      return addr.port;
-    }
-    return undefined;
+    return addr && 'port' in addr ? addr.port : undefined;
   }
 
   get address(): { hostname: string; port: number } | undefined {
-    if (!this._server) return undefined;
-    const addr = this._server.addr;
-    // Handle both network and Unix addresses
-    if ('port' in addr && 'hostname' in addr) {
-      return {
-        hostname: addr.hostname,
-        port: addr.port,
-      };
-    }
-    return undefined;
+    const addr = this.listener?.server.addr;
+    if (!addr || !('port' in addr) || !('hostname' in addr)) return undefined;
+    return { hostname: addr.hostname, port: addr.port };
   }
 }
+
+/** A bound Node listener and the error logger attached to it after listen. */
+type NodeListener = {
+  readonly server: import('node:http').Server;
+  readonly onError: (error: Error) => void;
+};
 
 /**
  * Node.js implementation of the MinimalHttpServer abstraction.
  * This class provides a Node.js-specific implementation of the HTTP server.
  */
-export class NodeHttpServer implements MinimalHttpServer {
-  /** The underlying Node.js HTTP/HTTPS server instance */
-  private _server?: import('node:http').Server | import('node:https').Server;
-  /** Whether the server has been started */
-  private _started: boolean = false;
+export class NodeHttpServer extends BaseHttpServer<NodeListener> {
   /** Cached reference to the Node.js Buffer implementation */
   private _Buffer?: typeof import('node:buffer').Buffer;
-  /** HTTPS configuration options */
-  private _options: HttpServerOptions;
+  private readonly _options: HttpServerOptions;
 
   constructor(options: HttpServerOptions = {}) {
+    super();
     this._options = options;
   }
 
@@ -606,6 +1058,10 @@ export class NodeHttpServer implements MinimalHttpServer {
     res: MinimalNodeServerResponse,
     handler: (req: GoatRequest, info: ServeHandlerInfo) => Promise<Response>,
   ): Promise<void> {
+    if (!this._drain.accepting) {
+      writeServiceUnavailable(res);
+      return;
+    }
     try {
       const goatReq = new GoatRequest(req);
       const hostname = req.socket?.remoteAddress ?? '';
@@ -623,7 +1079,10 @@ export class NodeHttpServer implements MinimalHttpServer {
         remoteAddr: { hostname },
         completed,
       };
-      const response = await handler(goatReq, info);
+      const response = await this._drain.track(
+        completed,
+        () => handler(goatReq, info),
+      );
       res.statusCode = response.status;
       response.headers.forEach((value, key) => res.setHeader(key, value));
       if (response.body) {
@@ -653,14 +1112,28 @@ export class NodeHttpServer implements MinimalHttpServer {
       }
     } catch (err) {
       const code = (err as { code?: string })?.code;
-      if (
-        code !== 'ECONNRESET' && code !== 'EPIPE' && code !== 'ECONNABORTED'
-      ) {
-        console.error('Request handling error:', err);
+      const connectionError = code === 'ECONNRESET' || code === 'EPIPE' ||
+        code === 'ECONNABORTED';
+      if (!connectionError) {
+        log({
+          severity: 'ERROR',
+          error: 'UncaughtServerError',
+          message: `Request handling error: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+          trace: err instanceof Error ? err.stack : undefined,
+        });
       }
       try {
         if (res.headersSent) {
-          res.end();
+          // If the client connection was destroyed (force/timeout stop), do
+          // not send a terminating chunk — that would make a truncated
+          // response look complete. Destroy the response instead.
+          if (connectionError) {
+            res.destroy();
+          } else {
+            res.end();
+          }
         } else {
           res.statusCode = 500;
           res.end('Internal Server Error');
@@ -671,110 +1144,110 @@ export class NodeHttpServer implements MinimalHttpServer {
     }
   }
 
-  /**
-   * Starts the HTTP server on the specified port.
-   *
-   * @param handler - The request handler function that processes incoming requests
-   * @param port - The port number to listen on
-   * @param signal - Optional AbortSignal for server shutdown
-   * @returns A promise that resolves when the server is ready to accept connections
-   */
-  async start(
-    handler: (
-      req: GoatRequest,
-      info: ServeHandlerInfo,
-    ) => Promise<Response>,
+  protected async _bind(
+    handler: (req: GoatRequest, info: ServeHandlerInfo) => Promise<Response>,
     port: number,
-    signal?: AbortSignal,
-  ): Promise<void> {
-    if (this._started) {
-      return;
-    }
-
+  ): Promise<NodeListener> {
     // Load required Node.js modules
     const { Buffer } = await getNodeBufferModule();
     this._Buffer = Buffer;
 
-    // Create and configure the HTTP/HTTPS server
+    const onRequest = (
+      req: MinimalNodeIncomingMessage,
+      res: MinimalNodeServerResponse,
+    ) => this._handleRequest(req, res, handler);
+
+    let server: import('node:http').Server;
     if (this._options.https) {
       const https = await import('node:https');
-      this._server = https.createServer(
+      server = https.createServer(
         {
           key: this._options.https.key,
           cert: this._options.https.cert,
         },
         (req, res) =>
-          this._handleRequest(
+          onRequest(
             req as MinimalNodeIncomingMessage,
             res as unknown as MinimalNodeServerResponse,
-            handler,
           ),
       );
     } else {
       const { createServer } = await getNodeHttp();
-      this._server = createServer(
-        (req, res) =>
-          this._handleRequest(
-            req as MinimalNodeIncomingMessage,
-            res as unknown as MinimalNodeServerResponse,
-            handler,
-          ),
+      server = createServer((req, res) =>
+        onRequest(
+          req as MinimalNodeIncomingMessage,
+          res as unknown as MinimalNodeServerResponse,
+        )
       );
     }
 
-    // Start listening on specified port
-    await new Promise<void>((resolve, reject) => {
-      this._server!.on('error', reject);
-      this._server!.listen(port, () => {
-        // HTTPS extends HTTP; Deno's floor types cannot call their overload union.
-        (this._server! as import('node:http').Server).removeListener(
-          'error',
-          reject,
-        );
-        this._server!.on('error', (err: Error) => {
-          console.error('HTTP server error:', err);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const onBindError = (error: Error) => {
+          server.removeListener('error', onBindError);
+          reject(error);
+        };
+        server.on('error', onBindError);
+        server.listen(port, () => {
+          server.removeListener('error', onBindError);
+          resolve();
         });
-        resolve();
       });
-    });
-    this._started = true;
-
-    // Wire abort signal for graceful shutdown
-    if (signal) {
-      if (signal.aborted) {
-        this.stop();
-      } else {
-        signal.addEventListener('abort', () => this.stop(), { once: true });
-      }
+    } catch (error) {
+      // WHY: a failed bind leaves the server object and the request handler
+      // attached. Clear both so a retry starts from a clean state and no
+      // stray listener can log against a discarded server.
+      if (server.listening) server.close();
+      server.removeAllListeners();
+      throw error;
     }
+
+    const onError = (error: Error) => {
+      log({
+        severity: 'ERROR',
+        error: 'HttpServerError',
+        message: `HTTP server error: ${error.message}`,
+        trace: error.stack,
+      });
+    };
+    server.on('error', onError);
+    return { server, onError };
   }
 
-  /**
-   * Stops the HTTP server and cleans up resources.
-   */
-  stop(): void {
-    if (this._server && 'closeAllConnections' in this._server) {
-      (this._server as any).closeAllConnections();
-    }
-    this._server?.close();
-    this._started = false;
+  protected async _close(
+    { server, onError }: NodeListener,
+    force: boolean,
+  ): Promise<void> {
+    server.removeListener('error', onError);
+    const closed = new Promise<void>((resolve) =>
+      server.close(() => resolve())
+    );
+    // Node 24 close() already closes idle keep-alive sockets. Only active
+    // sockets need an explicit destroy on force or timeout.
+    if (force) server.closeAllConnections?.();
+    await closed;
   }
 
   get port(): number | undefined {
-    if (!this._server) return undefined;
-    const addr = (this._server as any).address();
-    return addr ? addr.port : undefined;
+    const addr = this.listener?.server.address();
+    return addr && typeof addr !== 'string' ? addr.port : undefined;
   }
 
   get address(): { hostname: string; port: number } | undefined {
-    if (!this._server) return undefined;
-    const addr = (this._server as any).address();
-    if (!addr) return undefined;
+    const addr = this.listener?.server.address();
+    if (!addr || typeof addr === 'string') return undefined;
     return {
       hostname: addr.address || 'localhost',
       port: addr.port,
     };
   }
+}
+
+/** Writes the shared 503 to a raw Node response. */
+function writeServiceUnavailable(res: MinimalNodeServerResponse): void {
+  res.statusCode = SERVICE_UNAVAILABLE_STATUS;
+  res.setHeader('Connection', SERVICE_UNAVAILABLE_CONNECTION);
+  res.end(SERVICE_UNAVAILABLE_BODY);
 }
 
 /** @group HTTP */

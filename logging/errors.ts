@@ -12,6 +12,8 @@ import type { EmailType } from './metrics.ts';
  *               impossible
  * - FailedAssertion: Used when an assertion check fails
  * - UncaughtServerError: Used for unhandled exceptions on the server
+ * - HttpServerError: Emitted by a listening HTTP server after it started
+ * - ServerStartFailed: Emitted when a server start aborts and rolls back
  * - JsonLogWorkerError: Used when the JSON log worker fails or dies
  * - MissingConfiguration: Used when required configuration options are missing
  */
@@ -20,6 +22,8 @@ export type DeveloperError =
   | 'NotReached'
   | 'FailedAssertion'
   | 'UncaughtServerError'
+  | 'HttpServerError'
+  | 'ServerStartFailed'
   | 'JsonLogWorkerError';
 
 /**
@@ -57,6 +61,8 @@ export interface LogEntryDeveloperError extends BaseErrorLogEntry {
  * - DuplicateFailed: Failed to handle duplicate message
  * - SessionError: Error occurred while handling session
  * - EmailSendFailed: Failed to send email
+ * - ServerStopFailed: HTTP server stop failed
+ * - StopTimeout: HTTP server drain timed out
  */
 export type OperationalError =
   | 'FetchError'
@@ -70,7 +76,9 @@ export type OperationalError =
   | 'SessionError'
   | 'EmailSendFailed'
   | 'MissingConfiguration'
+  | 'ServerStopFailed'
   | 'StorageError'
+  | 'StopTimeout'
   | 'UnknownWorkerResponse'
   | 'ValidationError';
 

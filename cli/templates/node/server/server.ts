@@ -1,5 +1,6 @@
 import {
   type BuildInfo,
+  DEFAULT_STOP_TIMEOUT_MS,
   Server,
   staticAssetsFromJS,
 } from '@goatdb/goatdb/server';
@@ -9,6 +10,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
+import process from 'node:process';
 // These imported files will be automatically generated during compilation
 import encodedStaticAssets from '../build/staticAssets.json' with {
   type: 'json',
@@ -86,7 +88,11 @@ async function main(): Promise<void> {
   const shutdown = () => {
     if (stopping) return;
     stopping = true;
-    const forceExit = setTimeout(() => process.exit(1), 5000);
+    // The drain budget plus a margin for database flush.
+    const forceExit = setTimeout(
+      () => process.exit(1),
+      DEFAULT_STOP_TIMEOUT_MS + 1_000,
+    );
     forceExit.unref();
     server.stop().then(() => process.exit(0)).catch((e) => {
       console.error(e);
