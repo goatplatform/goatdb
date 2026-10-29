@@ -3,22 +3,24 @@ import { coreValueClone } from '../../../base/core-types/index.ts';
 import { flattenRichText, reconstructRichText } from '../flat-rep.ts';
 import {
   dfs,
-  ElementNode,
+  type ElementNode,
   initRichTextRoot,
   isElementNode,
   isNodeSameLocality,
   isTextNode,
   isTrivialTextNode,
-  Pointer,
+  type Pointer,
   pointersForNode,
-  RichText,
-  TextNode,
-  TreeNode,
+  type RichText,
+  type TextNode,
+  type TreeNode,
 } from '../tree.ts';
 import { getRuleActions } from './rules.ts';
 import { inlineElementTags } from './setup.ts';
+import { assertNoLegacyRefs } from '../legacy-ref.ts';
 
 export function normalizeRichText(richText: RichText): RichText {
+  assertNoLegacyRefs(richText);
   // normalizeNodeText(richText, richText.root);
   richText = coreValueClone(richText);
   stripTrivialTextNodes(richText);

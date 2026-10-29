@@ -1,4 +1,4 @@
-import { TreeNode } from '../tree.ts';
+import type { TreeNode } from '../tree.ts';
 
 interface SingleTagCondition {
   tag: string;
@@ -20,10 +20,6 @@ interface IsTextCondition {
   isText: boolean;
 }
 
-interface IsRefMarkerCondition {
-  isRefMarker: boolean;
-}
-
 interface HasTagMarkerCondition {
   hasTag: boolean;
 }
@@ -42,8 +38,7 @@ export type NodeCondition =
   | SingleTagCondition
   | MultipleTagsCondition
   | IsElementCondition
-  | IsTextCondition
-  | IsRefMarkerCondition;
+  | IsTextCondition;
 
 type RuleCondition =
   & { source: ConditionSource }

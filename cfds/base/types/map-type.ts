@@ -1,16 +1,16 @@
-import { ValueType, ValueTypeOptions } from './index.ts';
+import type { ValueType, ValueTypeOptions } from './index.ts';
 import {
   dictFromPrimitive,
-  Dictionary,
-  PrimitiveMap,
+  type Dictionary,
+  type PrimitiveMap,
 } from '../../../base/collections/dict.ts';
-import { DecodedValue } from '../../../base/core-types/encoding/index.ts';
-import { Change, EncodedChange } from '../../change/index.ts';
+import type { DecodedValue } from '../../../base/core-types/encoding/index.ts';
+import type { Change, EncodedChange } from '../../change/index.ts';
 import { CoreTypeOperations } from './core-type.ts';
 import { FieldChange, FieldOperation } from '../../change/field-change.ts';
 import {
-  ConcreteCoreValue,
-  CoreKey,
+  type ConcreteCoreValue,
+  type CoreKey,
   CoreType,
   coreValueEquals,
 } from '../../../base/core-types/index.ts';
@@ -18,7 +18,7 @@ import {
 export class MapTypeOperations extends CoreTypeOperations<
   Dictionary<CoreKey, ConcreteCoreValue>
 > {
-  constructor(readonly isRef: boolean, valueType: ValueType) {
+  constructor(valueType: ValueType) {
     super(CoreType.Dictionary, valueType);
   }
 
@@ -130,48 +130,5 @@ export class MapTypeOperations extends CoreTypeOperations<
 
   private createMap(): Dictionary {
     return new Map();
-  }
-
-  override gc(
-    value: Dictionary<CoreKey, ConcreteCoreValue>,
-  ): Dictionary<CoreKey, ConcreteCoreValue> | undefined {
-    return undefined;
-  }
-
-  override fillRefs(
-    refs: Set<string>,
-    dict: Dictionary<ConcreteCoreValue, ConcreteCoreValue>,
-  ): void {
-    if (this.isRef && dict !== undefined) {
-      for (const [key, value] of dict) {
-        if (typeof key === 'string') {
-          refs.add(key);
-        }
-        if (typeof value === 'string') {
-          refs.add(value);
-        }
-      }
-    }
-  }
-
-  override rewriteRefs(
-    keyMapping: Map<string, string>,
-    dict: Dictionary<string, ConcreteCoreValue>,
-    deleteRefs?: Set<string>,
-  ): Dictionary<string, ConcreteCoreValue> {
-    if (!this.isRef) {
-      return dict;
-    }
-    const result = new Map<string, ConcreteCoreValue>();
-    for (const [key, value] of dict) {
-      if (deleteRefs?.has(key) || deleteRefs?.has(value as string)) {
-        continue;
-      }
-      result.set(
-        keyMapping.get(key as string) || key,
-        keyMapping.get(value as string) || value,
-      );
-    }
-    return result;
   }
 }
