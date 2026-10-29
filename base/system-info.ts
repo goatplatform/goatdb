@@ -27,7 +27,7 @@ export async function getSystemInfo(): Promise<SystemInfo> {
     } catch {
       log({
         severity: 'WARNING',
-        error: 'SchemaValidationError',
+        error: 'ValidationError',
         message: '[GoatDB] Invalid JSON in GOATDB_SYSTEM_HARDWARE, ignoring',
       });
     }

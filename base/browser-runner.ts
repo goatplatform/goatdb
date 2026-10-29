@@ -1,5 +1,6 @@
 import { kMinuteMs, kSecondMs } from './date.ts';
 import { ProcessManager } from './process-manager.ts';
+import { getEnvVar } from './os.ts';
 
 /**
  * Options for running browser-based tests or benchmarks.
@@ -120,6 +121,10 @@ export async function runBrowserTests(
   }
   if (options.benchmark) {
     env['GOATDB_BENCHMARK'] = options.benchmark;
+  }
+  const failOnSkip = getEnvVar('GOATDB_FAIL_ON_SKIP');
+  if (failOnSkip) {
+    env['GOATDB_FAIL_ON_SKIP'] = failOnSkip;
   }
 
   // Start debug server with HTTPS using the appropriate entry point

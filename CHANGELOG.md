@@ -28,11 +28,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   check keeps `logout()` from recursively removing the process working
   directory.
 - Unified `Date` wire format and commit checksum (0.7.0). Typed fields now
-  encode as `{ "__t": "D", "__v": <epoch-seconds> }`, not a bare number.
-  Dates carry their tag in every checksum position. The typed-field checksum
-  changes from `416277608` to `1391363808`. Older stores fail fast on open.
-  Back up the store before removal or re-sync. Mixed-version fleets are not
-  supported; typed-field decode rejects bare-number dates from older peers.
+  encode as `{ "__t": "D", "__v": <epoch-seconds> }`, not a bare number. Dates
+  carry their tag in every checksum position. The typed-field checksum changes
+  from `416277608` to `1391363808`. Older stores fail fast on open. Back up the
+  store before removal or re-sync. Epoch guards protect local stores only.
+  Mixed-version fleets are not supported; typed-field decode rejects bare-number
+  dates from older peers and skips those commits.
 - Non-`typeSafe` strings can collide with tagged Dates (for example,
   `"41700000000"`). Use `typeSafe` checksums for untrusted input.
 - Legacy rich-text refs (`RefMarker` leaves or `RefNode` elements) now throw
@@ -82,6 +83,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   a runtime-dependent boolean.
 - `coreValueEquals` is symmetric when `objectFilterFields` inspects its object.
   The second comparison loop previously passed the wrong object to the filter.
+- The test runner no longer stops at the first failing runtime. Deno, Node and
+  browser results are all collected, and the process exits non-zero with the
+  combined failures.
 
 ### Added
 
@@ -101,6 +105,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- `GOATDB_TEST_TIMEOUT_MS` now sets the whole-worker timeout and is validated
+  strictly: non-integer values and values outside `1` to `2147483647` abort the
+  run with an explicit error instead of silently using the 5-minute default.
+  Workers send a heartbeat every 10 seconds, and a timeout reports the active
+  suite and test, the test's elapsed time and the last heartbeat age.
 - `goatdb init` on Deno now requests `react`, `react-dom`, `yargs` and
   `@types/react` as `^` ranges and installs all dependencies in one `deno add`
   call, bounded by a 180s timeout. Exact pins let a transitive peer resolve a

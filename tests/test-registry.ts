@@ -11,6 +11,7 @@
  * then progressively run slower tests (test pyramid principle).
  */
 
+import { getEnvVar } from '../base/os.ts';
 import setupUntrusted from './db-untrusted.test.ts';
 import setupTrusted from './db-trusted.test.ts';
 import setupItemPath from './item-path.ts';
@@ -45,6 +46,10 @@ import setupRuntimeTests from './runtime.test.ts';
 import setupCoroutineQueueTests from './coroutine-queue.test.ts';
 import setupCoroutineSchedulerTests from './coroutine-scheduler.test.ts';
 import setupProgressTests from './progress.test.ts';
+import setupTestFrameworkSkip from './test-framework-skip.test.ts';
+import setupWorkerTimeoutOverrideTests, {
+  setupWorkerTimeoutHangTests,
+} from './worker-timeout.test.ts';
 import setupMergeAdjList from './merge-adjlist.test.ts';
 import setupMergeBloom from './merge-bloom.test.ts';
 import setupBloomFPR from './bloom-fpr.test.ts';
@@ -96,6 +101,13 @@ export async function registerAllTests(): Promise<void> {
   setupPathPropertyTests();
   setupRuntimeTests(); // Runtime abstraction layer invariants
   setupProgressTests(); // TUI progress tracking - Task state machine, aggregation
+  setupTestFrameworkSkip(); // Skip vs pass vs failure, and the fail-on-skip gate
+  setupWorkerTimeoutOverrideTests(); // GOATDB_TEST_TIMEOUT_MS range contract + CLI guard
+  // The hang suite exists only for the timeout diagnostic test. Registering
+  // it unconditionally would stall every normal run for a worker timeout.
+  if (getEnvVar('GOATDB_TEST_WORKER_HANG') === '1') {
+    setupWorkerTimeoutHangTests();
+  }
   setupHealthCheckEndpointTest(); // Simple HTTP endpoint check
   setupMergeAdjList(); // Adjacency list data structure
   setupDocsMdxEscape(); // MDX escaping for generated docs (pure string transforms)

@@ -19,12 +19,22 @@ jobs:
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24.x'
+
+      - name: Type check
+        run: deno task check
+
+      - name: Runtime floor probe (TypeScript)
+        run: deno eval 'using x = { [Symbol.dispose]() {} };'
+
+      - name: Runtime floor probe (native JavaScript)
+        # deno eval defaults to TypeScript; --ext=js guards the native JS path.
+        run: deno eval --ext=js 'using x = { [Symbol.dispose]() {} };'
 
       - name: Path contract pre-check
         run: deno task test:paths
@@ -60,6 +70,23 @@ jobs:
       - name: Validate JSR package
         run: deno publish --dry-run
 
+  system-assets-check:
+    name: System Assets Freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
+
+      - name: Rebuild system assets
+        run: deno task build
+
+      - name: Verify system assets are fresh
+        run: git diff --exit-code -- system-assets/assets.json
+
   docs-build:
     name: Docs Build
     runs-on: ubuntu-latest
@@ -69,7 +96,7 @@ jobs:
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -155,7 +182,7 @@ jobs:
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: v2.3.3 # floor: native explicit resource management (V8); see denoland/deno#29282
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -171,7 +198,17 @@ jobs:
             playwright-
 
       - name: Install Playwright browsers and system dependencies
-        run: deno run -A npm:playwright@^1.48.0 install --with-deps chromium
+        # Runs under Node, not Deno: Playwright's downloader passes a `lookup`
+        # option that Deno's node:http does not implement. Tests still run on Deno.
+        # Version comes from deno.json so the install and the test runner cannot drift.
+        # deno.json must stay strict JSON (no comments): the probe reads it with require().
+        run: |
+          PLAYWRIGHT_VERSION=$(node -e "console.log(require('./deno.json').imports.playwright.split('@').pop().replace(/^[\^~]/, ''))")
+          if [ -z "$PLAYWRIGHT_VERSION" ]; then
+            echo '::error::Could not parse the playwright version from deno.json imports.playwright (expected e.g. npm:playwright@1.64.1)'
+            exit 1
+          fi
+          npx --yes "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium
 
       - name: Run browser tests
         run: deno task test --runtime=browser
