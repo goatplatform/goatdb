@@ -35,6 +35,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- A `Date` inside a `map` field now uses the tagged
+  `{ "__t": "D", "__v": <epoch-seconds> }` wire form, the same as every other
+  position. It was copied raw before, so it round-tripped as an ISO string while
+  its checksum tagged it as a `Date`, marking the delta commit as corrupted on
+  reload. Commits written by earlier builds with such values stay corrupted and
+  must be re-created.
 - JSON decoders use a disposable lifetime. Parent disposal releases owned
   children and preserves children acquired by another owner. Disposed decoders
   reject reads until acquired again. `finalize()` remains a disposal alias.
