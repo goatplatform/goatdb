@@ -54,7 +54,9 @@ import type { RichText } from '../richtext/tree.ts';
 import type { ValueType } from './types/index.ts';
 
 /**
- * A mapping between a schema type and its native variable type.
+ * A mapping between a schema type and its native variable type. The final
+ * `never` makes an unmapped ValueType a compile error instead of silently
+ * widening the field to `CoreValue`.
  * @group Schema
  */
 export type FieldValue<T extends ValueType> = T extends 'string' ? string
@@ -64,7 +66,7 @@ export type FieldValue<T extends ValueType> = T extends 'string' ? string
   : T extends 'set' ? Set<CoreValue>
   : T extends 'map' ? Dictionary<string, CoreValue>
   : T extends 'richtext' ? RichText
-  : CoreValue;
+  : never;
 
 /**
  * A definition of a single field in a schema.

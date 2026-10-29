@@ -2,17 +2,14 @@ import type { ValueType, ValueTypeOptions } from './index.ts';
 import type { Change, EncodedChange } from '../../change/index.ts';
 import { CoreTypeOperations } from './core-type.ts';
 import { FieldChange, FieldOperation } from '../../change/field-change.ts';
-import {
-  type ConcreteCoreValue,
-  CoreType,
-} from '../../../base/core-types/index.ts';
+import type { ConcreteCoreValue } from '../../../base/core-types/index.ts';
 import * as SetUtils from '../../../base/set.ts';
 
 export class SetTypeOperations extends CoreTypeOperations<
   Set<ConcreteCoreValue>
 > {
   constructor(valueType: ValueType) {
-    super(CoreType.Set, valueType);
+    super(valueType);
   }
 
   patch(

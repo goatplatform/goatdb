@@ -46,6 +46,7 @@
     "./link": "./cli/link.ts"
   },
   "tasks": {
+    "check": "deno check mod.ts server.ts server-build.ts && deno check --node-modules-dir=none base/json-log/json-log-worker.ts",
     "build": "deno run -A system-assets/build-sys-assets.ts",
     "test": "deno run -A tests/run.ts",
     "test:smoke": "deno run -A tests/run.ts --runtime=deno --suite=SecurityBoundaries",

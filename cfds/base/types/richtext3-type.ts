@@ -3,7 +3,6 @@ import type { Change, EncodedChange } from '../../change/index.ts';
 import type { RichTextChange } from '../../change/richtext-change.ts';
 import {
   type CoreOptions,
-  CoreType,
   type CoreValue,
   coreValueClone,
   coreValueEquals,
@@ -38,7 +37,7 @@ export interface RichTextSerializeOptions extends SerializeValueTypeOptions {
 
 export class RichText3TypeOperations extends CoreTypeOperations<RichText> {
   constructor() {
-    super(CoreType.Object, 'richtext');
+    super('richtext');
   }
   patch(
     curValue: RichText | undefined,

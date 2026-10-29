@@ -1,8 +1,5 @@
-import type {
-  IValueTypeOperations,
-  ValueType,
-  ValueTypeOptions,
-} from './index.ts';
+import type { IValueTypeOperations, ValueTypeOptions } from './index.ts';
+import { kValueTypeCoreTypes, type ValueType } from './value-type.ts';
 import type { DecodedValue } from '../../../base/core-types/encoding/index.ts';
 import type { Change, EncodedChange } from '../../change/index.ts';
 import { FieldChange } from '../../change/field-change.ts';
@@ -21,8 +18,8 @@ export abstract class CoreTypeOperations<
   private _coreType: CoreType;
   private _valueType: ValueType;
 
-  constructor(encType: CoreType, valueType: ValueType) {
-    this._coreType = encType;
+  constructor(valueType: ValueType) {
+    this._coreType = kValueTypeCoreTypes[valueType];
     this._valueType = valueType;
   }
 
