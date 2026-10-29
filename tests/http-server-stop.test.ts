@@ -19,6 +19,16 @@ import * as path from '../base/path.ts';
 import { generateBuildInfo } from '../base/build-info.ts';
 import { getRuntime } from '../base/runtime/index.ts';
 
+/**
+ * Loopback client host matching the listener family the runtime binds.
+ * Node's default listen uses the dual-stack IPv6 wildcard, whose IPv4 leg
+ * can be silently overlapped by foreign SO_REUSEADDR wildcard listeners
+ * (macOS), so IPv6 loopback stays reachable. Deno binds the IPv4 wildcard.
+ */
+function clientOrigin(): string {
+  return getRuntime().id === 'node' ? '[::1]' : '127.0.0.1';
+}
+
 function deferred<T = void>(): {
   promise: Promise<T>;
   resolve: (value: T) => void;
@@ -73,7 +83,7 @@ async function startAndRead(
 ): Promise<number> {
   await server.start(() => Promise.resolve(new Response('ok')), listenPort);
   const port = requirePort(server);
-  const response = await fetch(`http://127.0.0.1:${port}`, {
+  const response = await fetch(`http://${clientOrigin()}:${port}`, {
     // WHY: Deno < 2.9 reuses pooled keep-alive sockets across a server
     // restart and fails the next request (denoland/deno#17754). This test
     // checks the shutdown contract, not client-pool recovery.
@@ -93,7 +103,7 @@ async function expectRejected(pending: Promise<Response>): Promise<void> {
 }
 
 function request(server: MinimalHttpServer, signal?: AbortSignal) {
-  return fetch(`http://127.0.0.1:${requirePort(server)}`, {
+  return fetch(`http://${clientOrigin()}:${requirePort(server)}`, {
     headers: { connection: 'close' },
     signal,
   });
@@ -256,9 +266,11 @@ export default function setupHttpServerStop() {
         const stopping = server.stop().then(() => {
           assertTrue(finished, 'stop must wait for the disconnected handler');
         });
-        const arrivals = await bounded(fetch(`http://127.0.0.1:${port}`, {
-          headers: { connection: 'close' },
-        }));
+        const arrivals = await bounded(
+          fetch(`http://${clientOrigin()}:${port}`, {
+            headers: { connection: 'close' },
+          }),
+        );
         assertEquals(arrivals.status, 503);
         await arrivals.text();
         release.resolve();
@@ -284,7 +296,9 @@ export default function setupHttpServerStop() {
         const stopping = server.stop().then(() => {
           stopped = true;
         });
-        const rejected = await bounded(fetch(`http://127.0.0.1:${port}`));
+        const rejected = await bounded(
+          fetch(`http://${clientOrigin()}:${port}`),
+        );
         assertEquals(rejected.status, 503);
         await rejected.text();
         assertEquals(stopped, false, 'stop must wait for the response body');
@@ -350,7 +364,7 @@ export default function setupHttpServerStop() {
           return new Response('ok');
         }, 0);
         const port = requirePort(server);
-        const first = fetch(`http://127.0.0.1:${port}`, {
+        const first = fetch(`http://${clientOrigin()}:${port}`, {
           headers: { connection: 'close' },
         });
         void first.catch(() => {});
@@ -358,7 +372,7 @@ export default function setupHttpServerStop() {
 
         const stopping = server.stop();
 
-        const duringDrain = await fetch(`http://127.0.0.1:${port}`, {
+        const duringDrain = await fetch(`http://${clientOrigin()}:${port}`, {
           headers: { connection: 'close' },
         });
         assertEquals(duringDrain.status, 503, 'new requests must be rejected');
@@ -434,9 +448,11 @@ export default function setupHttpServerStop() {
         void pending.catch(() => {});
         await bounded(started.promise);
         const stopping = server.stop();
-        const rejected = await bounded(fetch(`http://127.0.0.1:${port}`, {
-          headers: { connection: 'close' },
-        }));
+        const rejected = await bounded(
+          fetch(`http://${clientOrigin()}:${port}`, {
+            headers: { connection: 'close' },
+          }),
+        );
         assertEquals(rejected.status, 503);
         assertTrue(
           rejected.headers.get('connection')?.includes('close') ?? false,
@@ -462,7 +478,7 @@ export default function setupHttpServerStop() {
         await server.start(() => Promise.resolve(new Response('ok')), 0);
         const port = requirePort(server);
         // Deliberately keep-alive: stop() must close idle sockets itself.
-        const response = await fetch(`http://127.0.0.1:${port}`);
+        const response = await fetch(`http://${clientOrigin()}:${port}`);
         assertEquals(await response.text(), 'ok');
         // Bound below the drain budget: a pass through the timeout path fails.
         await bounded(server.stop({ timeoutMs: 10_000 }));
@@ -616,7 +632,7 @@ export default function setupHttpServerStop() {
       try {
         await server.start();
         actualPort = requirePort(server);
-        const base = `http://127.0.0.1:${actualPort}/x`;
+        const base = `http://${clientOrigin()}:${actualPort}/x`;
         const inFlight = fetch(base, {
           headers: { connection: 'close' },
         });
@@ -672,7 +688,7 @@ export default function setupHttpServerStop() {
         await restarting;
 
         actualPort = requirePort(server);
-        const after = await fetch(`http://127.0.0.1:${actualPort}/x`, {
+        const after = await fetch(`http://${clientOrigin()}:${actualPort}/x`, {
           headers: { connection: 'close' },
         });
         assertEquals(after.status, 200, 'restarted server must serve');
@@ -791,7 +807,7 @@ export default function setupHttpServerStop() {
       try {
         await server.start();
         actualPort = requirePort(server);
-        const inFlight = fetch(`http://127.0.0.1:${actualPort}/x`, {
+        const inFlight = fetch(`http://${clientOrigin()}:${actualPort}/x`, {
           headers: { connection: 'close' },
         });
         void inFlight.catch(() => {});
@@ -816,7 +832,7 @@ export default function setupHttpServerStop() {
         // The raced restart must not wedge the services for a later start.
         await bounded(server.start());
         actualPort = requirePort(server);
-        const after = await fetch(`http://127.0.0.1:${actualPort}/x`, {
+        const after = await fetch(`http://${clientOrigin()}:${actualPort}/x`, {
           headers: { connection: 'close' },
         });
         assertEquals(after.status, 200, 'server must still start after race');
@@ -854,7 +870,7 @@ export default function setupHttpServerStop() {
       try {
         await server.start();
         actualPort = requirePort(server);
-        const inFlight = fetch(`http://127.0.0.1:${actualPort}/x`, {
+        const inFlight = fetch(`http://${clientOrigin()}:${actualPort}/x`, {
           headers: { connection: 'close' },
         });
         void inFlight.catch(() => {});
@@ -1032,7 +1048,7 @@ export default function setupHttpServerStop() {
       try {
         await server.start();
         actualPort = requirePort(server);
-        const pending = fetch(`http://127.0.0.1:${actualPort}/x`, {
+        const pending = fetch(`http://${clientOrigin()}:${actualPort}/x`, {
           headers: { connection: 'close' },
         });
         void pending.catch(() => {});
@@ -1277,7 +1293,7 @@ export default function setupHttpServerStop() {
           'a rejected budget must leave the server bound',
         );
         const response = await bounded(fetch(
-          `http://127.0.0.1:${actualPort}/x`,
+          `http://${clientOrigin()}:${actualPort}/x`,
           { headers: { connection: 'close' } },
         ));
         assertEquals(response.status, 200, 'server must still serve');
@@ -1374,7 +1390,7 @@ export default function setupHttpServerStop() {
         await contender.start();
         const bound = requirePort(contender);
         const response = await bounded(fetch(
-          `http://127.0.0.1:${bound}/x`,
+          `http://${clientOrigin()}:${bound}/x`,
           { headers: { connection: 'close' } },
         ));
         assertEquals(response.status, 200, 'the retry must serve');
