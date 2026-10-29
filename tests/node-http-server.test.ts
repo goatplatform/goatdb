@@ -15,12 +15,7 @@ import {
   type ServeHandlerInfo,
 } from '../net/server/http-compat.ts';
 
-/**
- * IPv6 loopback client. Node binds the dual-stack IPv6 wildcard whose IPv4
- * leg can be silently overlapped by foreign SO_REUSEADDR listeners on macOS;
- * `[::1]` always reaches our own listener.
- */
-const kLoopbackOrigin = 'http://[::1]';
+import { clientOrigin } from './http-test-utils.ts';
 
 function responseHandler(body: string, init?: ResponseInit) {
   return () => Promise.resolve(new Response(body, init));
@@ -35,8 +30,7 @@ export default function setupNodeHttpServerTests() {
         responseHandler('hello', { status: 200 }),
         0,
       );
-      const url = `${kLoopbackOrigin}:${server.port}`;
-      const res = await fetch(url);
+      const res = await fetch(clientOrigin(server));
       assertEquals(res.status, 200, 'status should be 200');
       const body = await res.text();
       assertEquals(body, 'hello', 'body should match');
@@ -56,8 +50,7 @@ export default function setupNodeHttpServerTests() {
         },
         0,
       );
-      const url = `${kLoopbackOrigin}:${server.port}`;
-      const res = await fetch(url, {
+      const res = await fetch(clientOrigin(server), {
         method: 'POST',
         body: 'echo this',
       });
@@ -79,8 +72,7 @@ export default function setupNodeHttpServerTests() {
         }),
         0,
       );
-      const url = `${kLoopbackOrigin}:${server.port}`;
-      const res = await fetch(url);
+      const res = await fetch(clientOrigin(server));
       await res.text();
       assertEquals(
         res.headers.get('x-custom'),
@@ -100,8 +92,7 @@ export default function setupNodeHttpServerTests() {
         responseHandler('not found', { status: 404 }),
         0,
       );
-      const url = `${kLoopbackOrigin}:${server.port}`;
-      const res = await fetch(url);
+      const res = await fetch(clientOrigin(server));
       await res.text();
       assertEquals(res.status, 404, 'status should be 404');
     } finally {
