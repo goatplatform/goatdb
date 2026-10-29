@@ -46,6 +46,7 @@ import setupDBConfig from './db-config.test.ts';
 import setupPathTests from './path.test.ts';
 import setupCliPathNormalizationTests from './cli-path-normalization.test.ts';
 import setupPathBoundaryTests from './path-boundaries.test.ts';
+import setupNoRegistryDependencyTests from './no-registry-dependency.test.ts';
 import setupPathPropertyTests from './path-property.test.ts';
 import setupJsonLogWorkerIO from './json-log-worker-io.test.ts';
 import setupAutoClose from './auto-close.test.ts';
@@ -91,6 +92,7 @@ async function main(): Promise<void> {
   setupPathTests();
   setupCliPathNormalizationTests();
   setupPathBoundaryTests();
+  setupNoRegistryDependencyTests();
   setupPathPropertyTests();
   setupHealthCheckEndpoint(); // Simple HTTP endpoint check
   setupHashMap(); // HashSet and HashMap collision-safe cardinality
