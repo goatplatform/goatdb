@@ -119,6 +119,9 @@ export async function clientBuildOptions(
     jsx: 'automatic',
     // Client code is always for browser
     platform: 'browser',
+    // Browser floor: ES2022 (Object.hasOwn). esbuild lowers `using` and
+    // Symbol.dispose. Chromium uses the Playwright pin in deno.json.
+    target: 'es2022',
     // Relative url() references in bundled CSS are emitted under assets/ so
     // the URLs esbuild rewrites stay valid when CSS is served from /index.css.
     loader: kClientLoaders,

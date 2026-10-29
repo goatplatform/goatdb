@@ -94,9 +94,6 @@ export class Edit implements Encodable, Equatable, Clonable {
 
   toJS(): JSONValue {
     return JSONCyclicalEncoder.serialize(this);
-    // const encoder = new JSONEncoder();
-    // this.serialize(encoder);
-    // return encoder.getOutput();
   }
 
   serialize(encoder: Encoder): void {
@@ -116,11 +113,8 @@ export class Edit implements Encodable, Equatable, Clonable {
   }
 
   static fromJS(obj: ReadonlyJSONObject): Edit {
-    // const decoder = new JSONDecoder(obj);
-    // return new this({ decoder });
-    const decoder = JSONCyclicalDecoder.get(obj);
+    using decoder = JSONCyclicalDecoder.get(obj);
     const r = new this({ decoder });
-    decoder.finalize();
     return r;
   }
 

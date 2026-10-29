@@ -40,6 +40,7 @@ import setupLiveQuery from './live-query.test.ts';
 import setupHashMap from './hash-map.test.ts';
 import setupCoreValueCompare from './core-value-compare.test.ts';
 import setupCoreValueSerialization from './core-value-serialization.test.ts';
+import setupDecoderPool from './decoder-pool.test.ts';
 import setupStorageFormatEpoch from './storage-format-epoch.test.ts';
 import setupJsonLogWorkerIO from './json-log-worker-io.test.ts';
 import setupAutoClose from './auto-close.test.ts';
@@ -85,7 +86,8 @@ async function main(): Promise<void> {
   setupHealthCheckEndpoint(); // Simple HTTP endpoint check
   setupHashMap(); // HashSet and HashMap collision-safe cardinality
   setupCoreValueCompare(); // Core-value ordering invariants
-  setupCoreValueSerialization(); // Core serializer contract goldens
+  setupCoreValueSerialization();
+  setupDecoderPool(); // Core serializer contract goldens
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
   setupStorageFormatEpoch(); // Storage epoch fail-fast on every runtime

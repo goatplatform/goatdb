@@ -35,6 +35,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- JSON decoders use a disposable lifetime. Parent disposal releases owned
+  children and preserves children acquired by another owner. Disposed decoders
+  reject reads until acquired again. `finalize()` remains a disposal alias.
+- Bare `__rId` references without an enclosing reference table now throw.
+  Objects with additional fields remain user data.
 - Store initialization ignores unrelated files. Missing markers reject only
   known GoatDB artifacts, name the artifact, and require a backup before removal.
 - Storage epoch file operations run through the worker so browser OPFS opens
