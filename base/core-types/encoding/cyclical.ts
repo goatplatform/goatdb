@@ -94,11 +94,5 @@ export abstract class BaseCyclicalEncoder<
   abstract newEncoder(): Encoder<string, CoreValue, T, OT>;
 }
 
-// Re-exported from the dependency-free leaf so this module's public surface is
-// unchanged while the runtime cycle with `type-ops.ts` stays broken.
-export {
-  type EncodedRef,
-  type EncodedRefObject,
-  isEncodedRef,
-  isEncodedRefObject,
-} from './encoded-ref.ts';
+// Encoded-ref guards live in the dependency-free `encoded-ref.ts` leaf.
+// Import them directly from there; this module no longer re-exports them.

@@ -22,6 +22,17 @@ export interface ChecksumEncoderOpts extends CoreOptions {
 
 const gUnknownValuesHashes = new WeakMap<object, string>();
 
+/** Merge instance defaults with per-call overrides. Both sides are the concrete
+ * encoder's own opts type, so the result stays inside `OT` without a cast. */
+function mergeOpts<OT extends ChecksumEncoderOpts>(
+  defaults: OT | undefined,
+  overrides: OT | undefined,
+): OT | undefined {
+  if (defaults === undefined) return overrides;
+  if (overrides === undefined) return defaults;
+  return { ...defaults, ...overrides };
+}
+
 export abstract class ChecksumEncoder<
   ST,
   OT extends ChecksumEncoderOpts = ChecksumEncoderOpts,
@@ -37,27 +48,11 @@ export abstract class ChecksumEncoder<
     this._defaultOpts = opts;
   }
 
-  newEncoder() {
-    return this.newEncoderInstance();
-  }
-
-  /** Same concrete class, no ctor args (Murmur3 seed MUST reset). WHY: the
-   * pre-table `newInstance(this)` also passed no args, so nested encoders
-   * always restart from the default seed. Preserving a custom seed here
-   * would change checksums and break goldens. `convertObject` is the only
-   * path that forwards opts (via `newEncoderWithOpts`). */
-  private newEncoderInstance(): ChecksumEncoder<ST, OT> {
-    return new (this.constructor as new () => ChecksumEncoder<ST, OT>)();
-  }
-
-  /** Same concrete class with a single opts arg. */
-  private newEncoderWithOpts(
-    opts: ChecksumEncoderOpts,
-  ): ChecksumEncoder<ST, OT> {
-    return new (this.constructor as new (
-      opts: ChecksumEncoderOpts,
-    ) => ChecksumEncoder<ST, OT>)(opts);
-  }
+  /** Each concrete encoder names its own class. WHY not `this.constructor`:
+   * it is typed `Function`, and a cast cannot prove that a subclass keeps the
+   * same constructor arity (TypeScript has no `abstract static`). The abstract
+   * method forces every subclass to state its own class explicitly. */
+  abstract override newEncoder(opts?: OT): ChecksumEncoder<ST, OT>;
 
   getOutput(): string {
     const data = this._data;
@@ -111,6 +106,8 @@ export abstract class ChecksumEncoder<
     value: Encodable<string, CoreValue>,
     options?: OT,
   ): string {
+    // No opts: nested encoders restart from the default Murmur3 seed. A
+    // forwarded custom seed would change checksums and break the goldens.
     const encoder = this.newEncoder();
     value.serialize(encoder, options);
     return encoder.getOutput();
@@ -153,10 +150,9 @@ export abstract class ChecksumEncoder<
   }
 
   convertObject(obj: ReadonlyCoreObject, options?: OT): string {
-    const encoder = this.newEncoderWithOpts({
-      ...this.getDefaultOpts(),
-      ...options,
-    });
+    const encoder = this.newEncoder(
+      mergeOpts(this.getDefaultOpts(), options),
+    );
     // We use an inner encoder which sorts the keys and generates a consistent
     // value.
     const keyFilter = options?.objectFilterFields || this.objectFilterFields;
@@ -215,6 +211,10 @@ export abstract class ChecksumEncoder<
 export class MD5Checksum<
   OT extends ChecksumEncoderOpts = ChecksumEncoderOpts,
 > extends ChecksumEncoder<StreamMD5.MD5State, OT> {
+  override newEncoder(opts?: OT) {
+    return new MD5Checksum<OT>(opts);
+  }
+
   protected newState() {
     return StreamMD5.init();
   }
@@ -245,6 +245,10 @@ export class Murmur3Checksum extends ChecksumEncoder<MurmurHash3, Murmur3Opts> {
     }
     super(options);
     this._seed = options.seed;
+  }
+
+  override newEncoder(opts?: Murmur3Opts) {
+    return new Murmur3Checksum(opts);
   }
 
   protected newState(options?: Murmur3Opts): MurmurHash3 {

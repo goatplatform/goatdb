@@ -13,14 +13,13 @@ import {
   isEncodedSet,
   JSONBaseEncoder,
 } from './base-encoder.ts';
+import { BaseCyclicalEncoder } from './cyclical.ts';
 import {
-  BaseCyclicalEncoder,
-  EncodedRef,
+  type EncodedRef,
   isEncodedRef,
   isEncodedRefObject,
-} from './cyclical.ts';
+} from './encoded-ref.ts';
 import { DecodedValue, Decoder } from './types.ts';
-import { newInstance } from '../../common.ts';
 import { deserializeDate } from '../../date.ts';
 import { Encodable } from '../index.ts';
 import { ReadonlyDecodedArray } from './index.ts';
@@ -38,7 +37,9 @@ export class JSONEncoder extends JSONBaseEncoder<ReadonlyJSONValue> {
   }
 
   newEncoder() {
-    return newInstance<JSONEncoder>(this);
+    // WHY: names the concrete class. A stateful subclass must override this;
+    // `this.constructor` is typed `Function` and cannot be `new`-ed safely.
+    return new JSONEncoder();
   }
 
   static toJS(value: CoreValue): ReadonlyJSONValue {
@@ -127,6 +128,15 @@ export class JSONDecoder implements Decoder {
     return this._data.hasOwnProperty(key);
   }
 
+  /** WHY: a factory seam instead of `new this.constructor`. Each subclass
+   * names its own decoder, so a different constructor signature cannot be
+   * reached through a cast. */
+  protected newDecoder(
+    value: ReadonlyJSONObject | undefined,
+  ): JSONDecoder {
+    return new JSONDecoder(value);
+  }
+
   getDecoder(key: string, offset?: number): Decoder<string, ReadonlyJSONValue> {
     let value = this.get(key);
     if (offset !== undefined && value instanceof Array) {
@@ -135,7 +145,7 @@ export class JSONDecoder implements Decoder {
     if (value instanceof JSONDecoder) {
       return value;
     }
-    return newInstance(this, value);
+    return this.newDecoder(value as ReadonlyJSONObject | undefined);
   }
 
   decodeValue(value: ReadonlyJSONValue): DecodedValue {
@@ -161,7 +171,7 @@ export class JSONDecoder implements Decoder {
       return deserializeDate(value.__v);
     }
     if (isEncodedEncodable(value)) {
-      return newInstance<JSONDecoder>(this, value.__v);
+      return this.newDecoder(value.__v as ReadonlyJSONObject);
     }
     if (getCoreType(value) === CoreType.Object) {
       return this.decodeObject(value as ReadonlyJSONObject);
@@ -215,6 +225,14 @@ export class JSONCyclicalDecoder extends JSONDecoder {
 
   finalize(): void {
     gActiveDecoders.push(this);
+  }
+
+  // WHY no pooling here: `getDecoder`/`decodeValue` create throwaway decoders
+  // that never call `finalize()`. Pooling them would leak the pool entry.
+  protected override newDecoder(
+    value: ReadonlyJSONObject | undefined,
+  ): JSONDecoder {
+    return new JSONCyclicalDecoder(value);
   }
 
   // needDecode(value: ReadonlyJSONValue) {

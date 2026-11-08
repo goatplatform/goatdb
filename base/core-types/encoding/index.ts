@@ -10,28 +10,6 @@ export type {
 
 export { isDecoderConfig } from './utils.ts';
 
-// Single barrel for the encoding surface (json/checksum/cyclical/hash).
-export {
-  JSONCyclicalDecoder,
-  JSONCyclicalEncoder,
-  JSONDecoder,
-  JSONEncoder,
-} from './json.ts';
-
-export {
-  ChecksumEncoder,
-  type ChecksumEncoderOpts,
-  MD5Checksum,
-  Murmur3Checksum,
-  type Murmur3Opts,
-} from './checksum.ts';
-
-export {
-  BaseCyclicalEncoder,
-  type EncodedRef,
-  type EncodedRefObject,
-  isEncodedRef,
-  isEncodedRefObject,
-} from './cyclical.ts';
-
+// WHY no encoder re-exports: every consumer imports the concrete module.
+// Re-exporting here would widen the module graph for no caller.
 export { encodableValueHash } from './hash.ts';

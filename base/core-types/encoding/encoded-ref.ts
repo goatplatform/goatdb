@@ -11,8 +11,8 @@ import { getCoreType } from '../utils.ts';
  * imports only `base.ts`, `utils.ts` and `interfaces.ts`, never `type-ops.ts`.
  * WHY: `type-ops.ts` needs `isEncodedRef`, so hosting it here keeps the
  * dependency one-way and breaks the former runtime cycle
- * `type-ops.ts <-> encoding/cyclical.ts`. `cyclical.ts` re-exports these for
- * backward compatibility of its public surface.
+ * `type-ops.ts <-> encoding/cyclical.ts`. Consumers import the guards and
+ * types directly from this leaf.
  */
 
 export interface EncodedRef extends ReadonlyJSONObject {

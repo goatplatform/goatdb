@@ -130,10 +130,6 @@ export function* unionIter<T>(...args: Iterable<T>[]): Iterable<T> {
   }
 }
 
-export function newInstance<T = any>(instance: any, ...args: any[]): T {
-  return new (instance.constructor as any)(...args) as T;
-}
-
 /**
  * Maps values from an iterable to new values using a mapping function.
  *
