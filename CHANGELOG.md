@@ -13,18 +13,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `iterableFilter` is not applied during ref collection. See
   `TODO(#58-followup)` in `base/core-types/type-ops.ts` and the refs matrix
   characterization tests. Final JSON encoding still applies the filter.
+- The final `iterableFilter` pass can drop a referenced object from `__r`
+  while `__d` keeps an `__rId` that points to it. Decoding such an `__rId`
+  yields `undefined` without an error. The wire output is pinned by the refs
+  matrix tests; see `TODO(#58-followup)`.
+- `JSONEncoder` passes non-`Encodable` class instances through unchanged:
+  `isNativeValue` treats them as native, so the `must implement Encodable` error
+  is unreachable from the JSON encode paths for these values. The emitted value
+  can violate the JSON value type. Hash and checksum paths still throw for the
+  same values: `encodableValueHash` raises the error, so the ClassObject encode
+  throw must stay. Alignment is a follow-up outside #58.
 
 ### Breaking Changes
 
 - `coreValueHash` alias removed. Use `encodableValueHash`.
+- `newInstance` removed from `base/common.ts`. Encoders construct their own
+  concrete class through an abstract factory method, so no caller can reach a
+  subclass constructor through a cast.
 - Clone aliasing: `coreValueClone`/`coreObjectClone` now preserve shared-ref
   aliasing across array/set siblings. Aliases within object fields were already
   preserved.
 
+### Changed
+
+- Encoder `convert*` methods (`BaseEncoder`, `JSONBaseEncoder`, `ChecksumEncoder`)
+  are public so the type table can dispatch to them. External subclasses must
+  widen `protected` overrides to public.
+
 ### Fixed
 
-- `coreValueEquals` is symmetric when `objectFilterFields` inspects its object.
-  The second comparison loop previously passed the wrong object to the filter.
+- `coreValueEquals` applies `objectFilterFields` to both objects. A field
+  participates when either object selects it, so equality is symmetric for
+  filters that inspect values. The previous second loop passed the wrong
+  object to the filter.
 
 ### Added
 
