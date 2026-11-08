@@ -13,28 +13,34 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      CI: true
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Deno
+      - &setup-deno
+        name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
 
-      - name: Setup Node.js
+      - &setup-node
+        name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24.x'
 
+      # WHY: deno.json is the Deno-side source of truth; package.json feeds the npm build.
+      # A stale pin (historically esbuild ^0.25.4 vs 0.25.12) silently tests a different compiler than we publish with.
+      - name: Check manifest pin drift
+        run: >-
+          deno eval --no-config 'const read=(f)=>JSON.parse(Deno.readTextFileSync(f));const d=read("deno.json"),p=read("package.json");for(const n of["esbuild","@deno/esbuild-plugin"]){const s=d.imports[n];const want=s.slice(s.lastIndexOf("@")+1);const raw=p.dependencies?.[n]??p.devDependencies?.[n]??"";const got=(raw.includes("@")?raw.slice(raw.lastIndexOf("@")+1):raw).replace(/^[~^]/,"");if(got!==want){console.error(n+" pin drift: deno.json="+want+" package.json="+raw);Deno.exit(1);}}'
+
       - name: Run Deno tests
         run: deno task test --runtime=deno
-        env:
-          CI: true
 
       - name: Run Node.js tests
         run: deno task test --runtime=node
-        env:
-          CI: true
 
   docs-build:
     name: Docs Build
@@ -42,10 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
+      - *setup-deno
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -69,10 +72,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24.x'
+      - *setup-node
 
       - name: Install npm dependencies
         run: npm install
@@ -86,15 +86,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
+      - *setup-deno
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24.x'
+      - *setup-node
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -105,7 +99,9 @@ jobs:
             playwright-
 
       - name: Install Playwright browsers and system dependencies
-        run: deno run -A npm:playwright@^1.48.0 install --with-deps chromium
+        run: |
+          PLAYWRIGHT=$(deno eval --no-config "console.log(JSON.parse(Deno.readTextFileSync('deno.json')).imports.playwright)")
+          deno run -A "$PLAYWRIGHT" install --with-deps chromium
 
       - name: Run browser tests
         run: deno task test --runtime=browser
