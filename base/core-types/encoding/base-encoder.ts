@@ -112,37 +112,24 @@ export interface EncodedEncodable extends ReadonlyJSONObject {
 
 export type EncodedJSONValue = EncodedSet | EncodedDate | EncodedEncodable;
 
-export function isEncodedSet(v: ReadonlyJSONValue): v is EncodedSet {
-  if (getCoreType(v) === CoreType.Object) {
-    const obj = v as ReadonlyJSONObject;
-    if (obj.__t === 'S' && obj.__v instanceof Array) {
-      return true;
-    }
-  }
-  return false;
-}
-
-export function isEncodedDate(v: ReadonlyJSONValue): v is EncodedDate {
-  if (getCoreType(v) === CoreType.Object) {
-    const obj = v as ReadonlyJSONObject;
-    if (obj.__t === 'D' && typeof obj.__v === 'number') {
-      return true;
-    }
-  }
-  return false;
-}
-
-export function isEncodedEncodable(
+function isEncodedTag(
   v: ReadonlyJSONValue,
-): v is EncodedEncodable {
-  if (getCoreType(v) === CoreType.Object) {
-    const obj = v as ReadonlyJSONObject;
-    if (obj.__t === 'E' && getCoreType(obj.__v) === CoreType.Object) {
-      return true;
-    }
-  }
-  return false;
+  tag: 'S' | 'D' | 'E',
+  check: (v: ReadonlyJSONValue) => boolean,
+): boolean {
+  if (getCoreType(v) !== CoreType.Object) return false;
+  const obj = v as ReadonlyJSONObject;
+  return obj.__t === tag && check(obj.__v);
 }
+
+export const isEncodedSet = (v: ReadonlyJSONValue): v is EncodedSet =>
+  isEncodedTag(v, 'S', (x) => x instanceof Array);
+export const isEncodedDate = (v: ReadonlyJSONValue): v is EncodedDate =>
+  isEncodedTag(v, 'D', (x) => typeof x === 'number');
+export const isEncodedEncodable = (
+  v: ReadonlyJSONValue,
+): v is EncodedEncodable =>
+  isEncodedTag(v, 'E', (x) => getCoreType(x) === CoreType.Object);
 
 export abstract class JSONBaseEncoder<
   T extends ReadonlyJSONValue,
@@ -161,52 +148,38 @@ export abstract class JSONBaseEncoder<
     value: CoreValue,
     options?: OT,
   ): value is ReadonlyJSONValue {
-    if (value === undefined || value === null) {
+    if (value === undefined || value === null) return true;
+    if (isEncodable<Encodable<string, CoreValue>>(value)) return false;
+    if (value instanceof Array) {
+      const iterableFilter = options?.iterableFilter || this.iterableFilter;
+      for (const v of value) {
+        if (iterableFilter && !iterableFilter(v)) return false;
+        if (!this.isNativeValue(v, options)) return false;
+      }
       return true;
     }
-
-    const iterableFilter = options?.iterableFilter || this.iterableFilter;
-    if (isEncodable<Encodable<string, CoreValue>>(value)) {
-      // Encodable
-      return false;
-    } else if (value instanceof Array) {
-      // Array
-      for (const v of value) {
-        if (iterableFilter) {
-          if (!iterableFilter(v)) return false;
-        }
-        if (!this.isNativeValue(v, options)) {
-          return false;
-        }
-      }
-    } else if (value instanceof Set) {
-      // Set
-      return false;
-    } else if (value instanceof Date) {
-      // Date
-      return false;
-    } else if (isDictionary(value)) {
-      return false;
-    } else if (isObject(value)) {
-      // Object
-      const obj: ReadonlyCoreObject = value as ReadonlyCoreObject;
-
-      const keyFilter = options?.objectFilterFields || this.objectFilterFields;
-      for (const k in obj) {
-        if (Object.hasOwn(obj, k)) {
-          if (keyFilter && !keyFilter(k, obj)) {
-            return false;
-          }
-          if (!this.isNativeValue(obj[k], options)) {
-            return false;
-          }
-        }
-      }
-    } else if (isGenerator(value)) {
+    if (
+      value instanceof Set ||
+      value instanceof Date ||
+      isDictionary(value)
+    ) {
       return false;
     }
-    // Everything else
-    return true;
+    if (isObject(value)) {
+      const obj: ReadonlyCoreObject = value as ReadonlyCoreObject;
+      const keyFilter = options?.objectFilterFields || this.objectFilterFields;
+      for (const k in obj) {
+        if (!Object.hasOwn(obj, k)) continue;
+        if (keyFilter && !keyFilter(k, obj)) return false;
+        if (!this.isNativeValue(obj[k], options)) return false;
+      }
+      return true;
+    }
+    // Non-Encodable class instances pass through unchanged. JSON encode paths
+    // never reach the ClassObject "must implement Encodable" throw;
+    // encodableValueHash/checksum paths still do. Do not delete that throw.
+    // See CHANGELOG Known Quirks.
+    return !isGenerator(value);
   }
 
   convertEncodable(
