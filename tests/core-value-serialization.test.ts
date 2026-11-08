@@ -1,12 +1,12 @@
-import { kTypeOps } from '../base/core-types/type-ops.ts';
 import { CoreType } from '../base/core-types/base.ts';
-import { assertExists } from './asserts.ts';
 import { HashMap } from '../base/collections/hash-map.ts';
 import type {
+  Clonable,
   CoreObject,
   CoreValue,
   Encodable,
   Encoder,
+  Equatable,
 } from '../base/core-types/base.ts';
 import { coreValueClone } from '../base/core-types/clone.ts';
 import { getCoreType } from '../base/core-types/index.ts';
@@ -36,6 +36,18 @@ class Box implements Encodable {
   }
 }
 
+// Same wire shape as Box, with the clone/equals hooks the ClassObject entries
+// delegate to. Keeps the CoreType coverage test uniform.
+class ClonableBox extends Box
+  implements Clonable<ClonableBox>, Equatable<ClonableBox> {
+  clone(): ClonableBox {
+    return new ClonableBox(this.v);
+  }
+  isEqual(other: ClonableBox): boolean {
+    return other instanceof ClonableBox && other.v === this.v;
+  }
+}
+
 // Minimal Dictionary implementation (HashMap) with string keys.
 function mkDict(entries: [string, unknown][]): HashMap<string, CoreValue> {
   const dict = new HashMap<string, CoreValue>(
@@ -47,6 +59,16 @@ function mkDict(entries: [string, unknown][]): HashMap<string, CoreValue> {
   }
   return dict;
 }
+// WHY: cv() keeps runtime-valid-but-type-rejected CoreValue casts on one line.
+function cv(v: unknown): CoreValue {
+  return v as unknown as CoreValue;
+}
+
+function* genSeq(n: number): Generator<number> {
+  yield 1;
+  yield n;
+}
+
 const kDateSchema: Schema = {
   ns: 'core-value-serialization-date',
   version: 1,
@@ -143,9 +165,7 @@ export default function setup(): void {
       class NotClonable {
         x = 1;
       }
-      assertThrows(() =>
-        coreValueClone(new NotClonable() as unknown as CoreValue)
-      );
+      assertThrows(() => coreValueClone(cv(new NotClonable())));
     },
   );
 
@@ -386,11 +406,26 @@ export default function setup(): void {
     'CoreValueSerialization',
     'JSONEncoder encodes Generator as array',
     () => {
-      function* gen() {
-        yield 1;
-        yield 2;
-      }
-      assertEquals(JSONEncoder.toJS(gen()), [1, 2]);
+      assertEquals(JSONEncoder.toJS(genSeq(2)), [1, 2]);
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'Generator clone and equals cover filters and sequence changes',
+    () => {
+      assertEquals(coreValueClone(cv(genSeq(2))), [1, 2]);
+      assertEquals(
+        coreValueClone(cv(genSeq(2)), { iterableFilter: (v) => v !== 1 }),
+        [2],
+      );
+      assertTrue(coreValueEquals(cv(genSeq(2)), cv(genSeq(2))));
+      assertTrue(!coreValueEquals(cv(genSeq(2)), cv(genSeq(3))));
+      assertTrue(
+        coreValueEquals(cv(genSeq(2)), cv(genSeq(2)), {
+          iterableFilter: (v) => v !== 2,
+        }),
+      );
     },
   );
 
@@ -424,11 +459,11 @@ export default function setup(): void {
         x = 1;
       }
       const value = new NotEncodable();
-      // WHY: JSONBaseEncoder.isNativeValue falls through to true for
-      // ClassObjects that are not Encodable, so the "must implement
-      // Encodable" throw in BaseEncoder.convertValue is unreachable through
-      // the public toJS/set paths. The instance is emitted unchanged instead
-      // of throwing.
+      // WHY: `JSONBaseEncoder.isNativeValue` falls through to true for
+      // non-Encodable class instances because `isObject` only accepts plain
+      // objects. The dispatch table's ClassObject encode throw is therefore
+      // unreachable through the public toJS/set paths. The instance is emitted
+      // unchanged instead of throwing.
       assertTrue(
         (JSONEncoder.toJS(value as unknown as CoreValue) as unknown) === value,
       );
@@ -602,7 +637,7 @@ export default function setup(): void {
   // These goldens pin the exact `__r`/`__d` bytes produced by ref collection
   // (`BaseCyclicalEncoder.fillRefs`) combined with the final JSON encode.
   // They were captured from the pre-table implementation and must survive the
-  // `kTypeOps[type].childrenOf` refactor unchanged.
+  // table-backed `childrenOf` refactor unchanged.
 
   TEST(
     'CoreValueSerialization',
@@ -674,6 +709,19 @@ export default function setup(): void {
         JSON.stringify(enc.getOutput()),
         '{"root":{"__r":[],"__d":{"dict":{"arr":[1,2],"direct":{"__rId":0}}}}}',
       );
+      const decoder = JSONCyclicalDecoder.get(
+        enc.getOutput() as Record<string, never>,
+      );
+      try {
+        const root = decoder.get('root') as {
+          dict: { arr: number[]; direct?: unknown };
+        };
+        assertEquals(root.dict.arr, [1, 2]);
+        assertTrue(Object.hasOwn(root.dict, 'direct'));
+        assertEquals(root.dict.direct, undefined);
+      } finally {
+        decoder.finalize();
+      }
     },
   );
 
@@ -969,45 +1017,144 @@ export default function setup(): void {
 
   TEST(
     'CoreValueSerialization',
-    'equals with objectFilterFields is symmetric',
+    'clone aliases shared values across set siblings and mixed shapes',
     () => {
-      // WHY: the second loop must pass the second object (b) to the filter,
-      // not the first (a), otherwise equals(a, b) !== equals(b, a) for
-      // asymmetric inputs.
-      const filter = (k: string, o: CoreValue) =>
+      const shared = { a: 1 };
+      // WHY: pre-table clones allocated one cache per object subtree, so both
+      // shapes below cloned `shared` twice. One top-level context keeps a
+      // single clone, and a mutation must be visible from both places.
+      const set = coreValueClone(
+        new Set([{ f: shared }, { f: shared }]) as CoreValue,
+      ) as Set<{ f: unknown }>;
+      const [s1, s2] = [...set];
+      assertTrue(s1.f === s2.f);
+
+      const mixed = coreValueClone(
+        [{ f: shared }, [shared]] as CoreValue,
+      ) as unknown as [{ f: unknown }, unknown[]];
+      assertTrue(mixed[0].f === mixed[1][0]);
+    },
+  );
+
+  TEST(
+    'CoreValueSerialization',
+    'equals with objectFilterFields is symmetric for value filters',
+    () => {
+      // WHY: the union-key rule evaluates the filter on both objects. A key
+      // participates when either side selects it, then both presence and value
+      // are compared. This keeps equality symmetric for filters that inspect
+      // values, not only key membership.
+      const keyFilter = (k: string, o: CoreValue) =>
         Object.hasOwn(o as CoreObject, k);
       assertEquals(
         coreValueEquals({ a: 1 }, { a: 1, b: 2 }, {
-          objectFilterFields: filter,
+          objectFilterFields: keyFilter,
         }),
         false,
       );
       assertEquals(
         coreValueEquals({ a: 1, b: 2 }, { a: 1 }, {
-          objectFilterFields: filter,
+          objectFilterFields: keyFilter,
         }),
         false,
       );
       assertEquals(
-        coreValueEquals({ a: 1 }, { a: 1 }, { objectFilterFields: filter }),
+        coreValueEquals({ a: 1 }, { a: 1 }, {
+          objectFilterFields: keyFilter,
+        }),
         true,
+      );
+
+      const skip = Symbol('skip');
+      const valueFilter = (k: string, o: CoreValue) =>
+        (o as unknown as Record<string, unknown>)[k] !== skip;
+      assertEquals(
+        coreValueEquals(
+          { x: 1 } as unknown as CoreValue,
+          { x: skip } as unknown as CoreValue,
+          { objectFilterFields: valueFilter },
+        ),
+        false,
+      );
+      assertEquals(
+        coreValueEquals(
+          { x: skip } as unknown as CoreValue,
+          { x: 1 } as unknown as CoreValue,
+          { objectFilterFields: valueFilter },
+        ),
+        false,
+      );
+
+      const selectsOne = (k: string, o: CoreValue) =>
+        k === 'x' &&
+        (o as unknown as Record<string, unknown>)[k] === 1;
+      assertEquals(
+        coreValueEquals(
+          { x: 1 } as unknown as CoreValue,
+          { x: 2 } as unknown as CoreValue,
+          { objectFilterFields: selectsOne },
+        ),
+        false,
+      );
+      assertEquals(
+        coreValueEquals(
+          { x: 2 } as unknown as CoreValue,
+          { x: 1 } as unknown as CoreValue,
+          { objectFilterFields: selectsOne },
+        ),
+        false,
       );
     },
   );
 
-  TEST('CoreValueSerialization', 'kTypeOps is frozen and exhaustive', () => {
-    // WHY: kTypeOps is the base-level dispatch table
-    // (clone/equals/encode/childrenOf). Freezing plus per-CoreType coverage
-    // turns a missed type into a loud failure instead of silent mishandling.
-    assertTrue(Object.isFrozen(kTypeOps));
-    for (const type of Object.values(CoreType)) {
-      if (typeof type !== 'number') continue;
-      const ops = kTypeOps[type as CoreType];
-      assertExists(ops, `kTypeOps missing entry for CoreType ${type}`);
-      assertExists(ops.clone);
-      assertExists(ops.equals);
-      assertExists(ops.encode);
-      assertExists(ops.childrenOf);
-    }
-  });
+  TEST(
+    'CoreValueSerialization',
+    'every CoreType answers through public clone, equals and encode',
+    () => {
+      // WHY enumerate CoreType, not the dispatch table: the table is internal.
+      // CI runs no `deno check`, so this is the only place a missing entry
+      // becomes a loud runtime failure instead of silent mishandling.
+      const samples: Record<CoreType, () => CoreValue> = {
+        [CoreType.String]: () => 'a',
+        [CoreType.Number]: () => 1,
+        [CoreType.Boolean]: () => true,
+        [CoreType.Null]: () => null,
+        [CoreType.Undefined]: () => undefined,
+        [CoreType.Date]: () => new Date(1000),
+        [CoreType.Array]: () => [1, 'a'],
+        [CoreType.Object]: () => ({ a: 1 }),
+        [CoreType.Set]: () => new Set<CoreValue>([1, 'a']),
+        [CoreType.Dictionary]: () => mkDict([['a', 1]]),
+        [CoreType.Generator]: () => genSeq(2),
+        [CoreType.ClassObject]: () => new ClonableBox(7),
+      };
+      for (const type of Object.values(CoreType)) {
+        if (typeof type !== 'number') continue;
+        const make = samples[type as CoreType];
+        assertTrue(
+          make !== undefined,
+          `missing CoreValue sample for CoreType ${type}`,
+        );
+        assertTrue(
+          coreValueEquals(make(), make()),
+          `equals dispatch failed for CoreType ${type}`,
+        );
+        assertEquals(
+          JSONEncoder.toJS(make()),
+          JSONEncoder.toJS(make()),
+          `encode dispatch failed for CoreType ${type}`,
+        );
+        const cloned = coreValueClone(make());
+        if (type === CoreType.Generator) {
+          // WHY: a Generator clones to an Array.
+          assertEquals(cloned, [1, 2]);
+        } else {
+          assertTrue(
+            coreValueEquals(cloned, make()),
+            `clone dispatch failed for CoreType ${type}`,
+          );
+        }
+      }
+    },
+  );
 }
