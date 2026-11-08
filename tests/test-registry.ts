@@ -61,6 +61,7 @@ import setupQueryId from './query-id.test.ts';
 import setupHashMap from './hash-map.test.ts';
 import setupCoreValueCompare from './core-value-compare.test.ts';
 import setupCoreValueSerialization from './core-value-serialization.test.ts';
+import setupRichTextSerialization from './richtext-characterization.test.ts';
 import setupDocsMdxEscape from './docs-mdx-escape.test.ts';
 import setupAutoClose from './auto-close.test.ts';
 
@@ -92,6 +93,7 @@ export async function registerAllTests(): Promise<void> {
   setupHashMap(); // HashSet and HashMap collision-safe cardinality
   setupCoreValueCompare(); // Core-value ordering invariants
   setupCoreValueSerialization(); // Core serializer contract goldens
+  setupRichTextSerialization(); // Rich-text normalize/flat-rep/StringRep goldens
 
   // COMPONENT TESTS (0-50ms each) - Single components with minimal dependencies
   setupCoroutineQueueTests(); // Coroutine FIFO execution contract
