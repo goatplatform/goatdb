@@ -1,5 +1,6 @@
 /**
- * Single frozen dispatch table for per-CoreType operations (issue #58 §1).
+ * Single, recursively frozen dispatch table for per-CoreType operations
+ * (issue #58 §1).
  *
  * Before this file, CoreType knowledge was duplicated across three switches in
  * clone.ts, equals.ts and base-encoder.ts. Adding a CoreType meant editing all
@@ -104,8 +105,11 @@ export interface CoreTypeOps {
   ): CoreValue;
   // TODO(#58-followup): iterableFilter is not applied during ref collection.
   // The Object/Dictionary branches drop options when recursing, so the
-  // filter never runs there. Pinned intentionally by refs-matrix tests; no
-  // behavior change without a reviewed diff.
+  // filter never runs there. Final JSON encoding applies it to the synthetic
+  // __r table too, so a referenced object can be dropped from __r while __d
+  // keeps an __rId that points to it (decode yields undefined). Pinned
+  // intentionally by refs-matrix tests; no behavior change without a
+  // reviewed diff.
   childrenOf(value: CoreValue | object, opts?: CoreOptions): CoreChildren;
 }
 
@@ -210,6 +214,25 @@ function setLongMatch(
 const kNoChildren: CoreChildren = Object.freeze({ children: [] });
 
 /**
+ * A field participates in object equality when `objectFilterFields` selects it
+ * on either side. Evaluating both sides keeps equality symmetric for filters
+ * that inspect values, not only key membership.
+ */
+function objectFieldSelected(
+  key: string,
+  a: ReadonlyCoreObject,
+  b: ReadonlyCoreObject,
+  opts?: CoreOptions,
+): boolean {
+  const filter = opts?.objectFilterFields;
+  if (filter === undefined) return true;
+  // Call the filter only on objects that own the key; a value-inspecting
+  // filter must never see a key that is absent from its own object.
+  return (Object.hasOwn(a, key) && filter(key, a)) ||
+    (Object.hasOwn(b, key) && filter(key, b));
+}
+
+/**
  * Array/Set enumeration: `fillRefs` forwards the same options to every child,
  * so an `iterableFilter` applies here and to nested Array/Set. A filtered-out
  * child is dropped and never recursed into.
@@ -251,7 +274,18 @@ function objectChildren(value: ReadonlyCoreObject): CoreChildren {
   return { children, ref: true };
 }
 
-export const kTypeOps: Readonly<Record<CoreType, CoreTypeOps>> = Object.freeze(
+// Guards: `satisfies` (shape and exhaustiveness) and a deep freeze (runtime).
+// Intentionally not asserted through the external-contract suite: the public
+// contract is clone/equals/encode behavior, not the table's shape.
+function freezeTypeOps(
+  table: Record<CoreType, CoreTypeOps>,
+): Readonly<Record<CoreType, CoreTypeOps>> {
+  // Freeze each entry: a mutable op would silently invalidate every caller.
+  for (const ops of Object.values(table)) Object.freeze(ops);
+  return Object.freeze(table);
+}
+
+export const kTypeOps: Readonly<Record<CoreType, CoreTypeOps>> = freezeTypeOps(
   {
     [CoreType.String]: {
       clone: (value: string) => value,
@@ -462,27 +496,25 @@ export const kTypeOps: Readonly<Record<CoreType, CoreTypeOps>> = Object.freeze(
         b: ReadonlyCoreObject,
         opts?: CoreOptions,
       ) => {
+        // Two own-key loops allocate no Set. A field participates when the
+        // filter selects it on either side, so both loops consult
+        // objectFieldSelected; with no filter every own key participates.
+        const filter = opts?.objectFilterFields;
         for (const k in a) {
-          if (
-            Object.hasOwn(a, k) &&
-            (opts === undefined ||
-              opts.objectFilterFields === undefined ||
-              opts.objectFilterFields(k, a)) &&
-            (!Object.hasOwn(b, k) || !coreValueEquals(a[k], b[k], opts))
-          ) {
+          if (!Object.hasOwn(a, k)) continue;
+          if (filter !== undefined && !objectFieldSelected(k, a, b, opts)) {
+            continue;
+          }
+          if (!Object.hasOwn(b, k) || !coreValueEquals(a[k], b[k], opts)) {
             return false;
           }
         }
         for (const k in b) {
-          if (
-            Object.hasOwn(b, k) &&
-            (opts === undefined ||
-              opts.objectFilterFields === undefined ||
-              opts.objectFilterFields(k, b)) &&
-            !Object.hasOwn(a, k)
-          ) {
-            return false;
+          if (!Object.hasOwn(b, k) || Object.hasOwn(a, k)) continue;
+          if (filter !== undefined && !objectFieldSelected(k, a, b, opts)) {
+            continue;
           }
+          return false;
         }
         return true;
       },
