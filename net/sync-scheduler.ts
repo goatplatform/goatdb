@@ -77,6 +77,7 @@ export enum SyncPriority {
 export class SyncScheduler {
   private readonly _syncFreqAvg: MovingAverage;
   private _pendingRequests: Map<SyncPriority, PendingSyncRequest[]>;
+  private _inFlightRequests = new Set<PendingSyncRequest>();
   private _intervalId: ReturnType<typeof setInterval> | undefined;
   private _fetchInProgress = false;
   private _closed = false;
@@ -114,6 +115,10 @@ export class SyncScheduler {
       }
     }
     this._pendingRequests.clear();
+    for (const req of this._inFlightRequests) {
+      req.reject(serviceUnavailable());
+    }
+    this._inFlightRequests.clear();
   }
 
   send(
@@ -163,92 +168,132 @@ export class SyncScheduler {
     if (!pendingRequests.length) {
       return;
     }
-    const reqArr = pendingRequests.map((p) => ({
-      ...p.req,
-      msg: JSONCyclicalEncoder.serialize(p.req.msg),
-    }));
 
-    let respText: string | undefined;
-    try {
-      this._fetchInProgress = true;
-      const start = performance.now();
-      const resp = await sendJSONToURL(
-        this.url + '/batch-sync',
-        this.trustPool.currentSession,
-        reqArr,
-        this.orgId,
-        this.syncConfig.timeoutMs,
-      );
-      respText = resp.status === 200 ? await resp.text() : undefined;
-
-      const syncDurationMs = performance.now() - start;
-      this._syncFreqAvg.addValue(syncDurationMs);
-      if (randomInt(0, 20) === 0) {
-        log({
-          severity: 'METRIC',
-          name: 'PeerResponseTime',
-          value: syncDurationMs,
-          unit: 'Milliseconds',
-          url: this.url,
-        });
-      }
-    } catch (e: unknown) {
-      log({
-        severity: 'INFO',
-        error: 'FetchError',
-        message: (e as Error).message,
-        trace: (e as Error).stack,
-        url: this.url,
-      });
-      this._fetchInProgress = false;
+    this._fetchInProgress = true;
+    for (const req of pendingRequests) {
+      this._inFlightRequests.add(req);
     }
 
-    if (!respText) {
-      this._fetchInProgress = false;
-      pendingRequests.forEach((r) => r.reject(serviceUnavailable()));
-      return;
-    }
     try {
-      const json = JSON.parse(respText) as ReadonlyJSONArray;
-      assert(json instanceof Array && json.length === pendingRequests.length);
-      for (const req of pendingRequests) {
-        let found = false;
-        for (const resp of json as ReadonlyJSONObject[]) {
-          if (resp.path === req.req.path) {
-            const decoder = JSONCyclicalDecoder.get(
-              resp.res as ReadonlyJSONObject,
-            );
-            const syncResp = await SyncMessage.decodeAsync(
-              {
-                decoder: decoder,
-                orgId: this.orgId,
-              },
-              this.registry,
-            );
-            decoder.finalize();
-            req.resolve(syncResp);
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          req.reject(serviceUnavailable());
-        }
-        await sleep(5);
-      }
-    } catch (e: unknown) {
-      if (!(e instanceof ServerError && e.code === Code.ServiceUnavailable)) {
+      let reqArr: ReadonlyJSONObject[];
+      try {
+        reqArr = pendingRequests.map((p) => ({
+          ...p.req,
+          msg: JSONCyclicalEncoder.serialize(p.req.msg),
+        }));
+      } catch (e: unknown) {
         log({
           severity: 'INFO',
           error: 'SerializeError',
-          value: respText,
           message: (e as Error).message,
           trace: (e as Error).stack,
         });
+        pendingRequests.forEach((r) => r.reject(serviceUnavailable()));
+        return;
       }
+
+      let respText: string | undefined;
+      try {
+        const start = performance.now();
+        const resp = await sendJSONToURL(
+          this.url + '/batch-sync',
+          this.trustPool.currentSession,
+          reqArr,
+          this.orgId,
+          this.syncConfig.timeoutMs,
+        );
+        respText = resp.status === 200 ? await resp.text() : undefined;
+
+        const syncDurationMs = performance.now() - start;
+        this._syncFreqAvg.addValue(syncDurationMs);
+        if (randomInt(0, 20) === 0) {
+          log({
+            severity: 'METRIC',
+            name: 'PeerResponseTime',
+            value: syncDurationMs,
+            unit: 'Milliseconds',
+            url: this.url,
+          });
+        }
+      } catch (e: unknown) {
+        log({
+          severity: 'INFO',
+          error: 'FetchError',
+          message: (e as Error).message,
+          trace: (e as Error).stack,
+          url: this.url,
+        });
+      }
+
+      if (!respText) {
+        pendingRequests.forEach((r) => r.reject(serviceUnavailable()));
+        return;
+      }
+
+      try {
+        const json = JSON.parse(respText) as ReadonlyJSONArray;
+        assert(json instanceof Array && json.length === pendingRequests.length);
+        for (const req of pendingRequests) {
+          let found = false;
+          try {
+            for (const resp of json as ReadonlyJSONObject[]) {
+              if (resp.path === req.req.path) {
+                const decoder = JSONCyclicalDecoder.get(
+                  resp.res as ReadonlyJSONObject,
+                );
+                const syncResp = await SyncMessage.decodeAsync(
+                  {
+                    decoder: decoder,
+                    orgId: this.orgId,
+                  },
+                  this.registry,
+                );
+                decoder.finalize();
+                req.resolve(syncResp);
+                found = true;
+                break;
+              }
+            }
+            if (!found) {
+              req.reject(serviceUnavailable());
+            }
+          } catch (e: unknown) {
+            if (
+              !(e instanceof ServerError && e.code === Code.ServiceUnavailable)
+            ) {
+              log({
+                severity: 'INFO',
+                error: 'SerializeError',
+                value: respText,
+                message: (e as Error).message,
+                trace: (e as Error).stack,
+              });
+            }
+            req.reject(serviceUnavailable());
+          }
+          await sleep(5);
+        }
+      } catch (e: unknown) {
+        if (
+          !(e instanceof ServerError && e.code === Code.ServiceUnavailable)
+        ) {
+          log({
+            severity: 'INFO',
+            error: 'SerializeError',
+            value: respText,
+            message: (e as Error).message,
+            trace: (e as Error).stack,
+          });
+        }
+        pendingRequests.forEach((r) => r.reject(serviceUnavailable()));
+        return;
+      }
+    } catch (e: unknown) {
       pendingRequests.forEach((r) => r.reject(serviceUnavailable()));
-      return;
     } finally {
+      for (const req of pendingRequests) {
+        this._inFlightRequests.delete(req);
+      }
       this._fetchInProgress = false;
     }
   }
