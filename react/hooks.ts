@@ -15,11 +15,14 @@ import type { ReadonlyJSONValue } from '../base/interfaces.ts';
 import type { Query, QueryConfig } from '../repo/query.ts';
 import { getBaseURL } from '../net/rest-api.ts';
 
-type GoatDBCtxProps = {
+export type GoatDBCtxProps = {
   db?: GoatDB;
 };
 
-const GoatDBContext = React.createContext<GoatDBCtxProps>({});
+/** Exported so tests and hosts can inject a specific DB instance. */
+export const GoatDBContext: React.Context<GoatDBCtxProps> = React.createContext<
+  GoatDBCtxProps
+>({});
 
 /**
  * Opens a local DB, creating it if necessary. Once opened, the DB is available
@@ -320,37 +323,19 @@ export type DBReadyState = 'loading' | 'ready' | 'error';
  */
 export function useDBReady(): DBReadyState {
   const db = useDB();
-  let error = false;
+  // GoatDB logs bootstrap failures; do not add a second readyPromise() consumer.
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
-      if (!db.ready) {
-        let cancelled = false;
-        db.readyPromise()
-          .then(() => {
-            if (!cancelled) {
-              onStoreChange();
-            }
-          })
-          .catch((err) => {
-            console.error(err);
-            error = true;
-            if (!cancelled) {
-              onStoreChange();
-            }
-          });
-        return () => {
-          cancelled = true;
-        };
-      }
-      return () => {};
+      // Return detach so useSyncExternalStore unsubscribes.
+      return db.attach('LifecycleChanged', onStoreChange);
     },
     [db],
   );
   const getSnapshot = useCallback(() => {
-    if (error) {
+    if (db.state === 'closed' || db.state === 'failed') {
       return 'error';
     }
-    return db.ready ? 'ready' : 'loading';
+    return db.state === 'ready' ? 'ready' : 'loading';
   }, [db]);
   return useSyncExternalStore(subscribe, getSnapshot);
 }

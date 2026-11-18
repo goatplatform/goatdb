@@ -54,7 +54,9 @@ export type {
 };
 export type {
   DBInstanceConfig,
+  DBState,
   EventItemChanged,
+  EventLifecycleChanged,
   EventWriteFailure,
   StorageFormat,
   WriteFailureDetail,

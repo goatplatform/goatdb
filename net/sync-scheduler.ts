@@ -80,6 +80,9 @@ export class SyncScheduler {
   private _intervalId: ReturnType<typeof setInterval> | undefined;
   private _fetchInProgress = false;
   private _closed = false;
+  // Aborts the in-flight batch-sync fetch so close() cannot wait on the
+  // network timeout (db close must not inherit peer stall latency).
+  private readonly _abortController = new AbortController();
 
   constructor(
     readonly url: string,
@@ -99,11 +102,17 @@ export class SyncScheduler {
     return syncConfigGetCycles(this.syncConfig, this._syncFreqAvg.currentValue);
   }
 
+  /** @internal True after close(): pending work is cancelled, not failing. */
+  get isClosed(): boolean {
+    return this._closed;
+  }
+
   close(): void {
     if (this._closed) {
       return;
     }
     this._closed = true;
+    this._abortController.abort();
     if (this._intervalId !== undefined) {
       clearInterval(this._intervalId);
       this._intervalId = undefined;
@@ -178,8 +187,9 @@ export class SyncScheduler {
         reqArr,
         this.orgId,
         this.syncConfig.timeoutMs,
+        this._abortController.signal,
       );
-      respText = resp.status === 200 ? await resp.text() : undefined;
+      respText = resp.status === 200 ? resp.body : undefined;
 
       const syncDurationMs = performance.now() - start;
       this._syncFreqAvg.addValue(syncDurationMs);
@@ -193,13 +203,17 @@ export class SyncScheduler {
         });
       }
     } catch (e: unknown) {
-      log({
-        severity: 'INFO',
-        error: 'FetchError',
-        message: (e as Error).message,
-        trace: (e as Error).stack,
-        url: this.url,
-      });
+      // A close() aborts the in-flight fetch; that is cancellation, not a peer
+      // fault, so it must not be logged as a sync error.
+      if (!this._closed) {
+        log({
+          severity: 'INFO',
+          error: 'FetchError',
+          message: (e as Error).message,
+          trace: (e as Error).stack,
+          url: this.url,
+        });
+      }
       this._fetchInProgress = false;
     }
 

@@ -132,6 +132,11 @@ export function serviceUnavailable(): ServerError {
   return new ServerError(Code.ServiceUnavailable);
 }
 
+/** @internal Throws serviceUnavailable unless the owning DB instance is open. */
+export function assertOpen(isOpen: boolean): void {
+  if (!isOpen) throw serviceUnavailable();
+}
+
 export function incompatibleCFDSVersion(
   serverVersion: string,
   clientVersion: string,

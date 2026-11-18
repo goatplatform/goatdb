@@ -142,6 +142,8 @@ export class Repository<
    * before transitioning; combined with _closePromises in GoatDB for
    * await-based serialization of Open -> Closing -> Closed. */
   _closeState: 'open' | 'closing' | 'closed' = 'open';
+  /** @internal True once teardown detached listeners; re-committing is unsafe. */
+  _teardownDetached = false;
   /** @internal Active idle leases (e.g. in-flight item commits via acquireRepo). */
   _idleLeaseCount = 0;
   /** Guards timer scheduling until _openImpl completes (no slow-open expiry). */
@@ -305,14 +307,15 @@ export class Repository<
   /** @internal Called by the idle timer to request close. */
   _onIdleTimeout(): void {
     if (!this._isIdleEligible()) return;
-    // Fire-and-forget, but never leave the promise unobserved: the lock branch
-    // of _requestRepoIdleClose() awaits a manual close promise that may
-    // rethrow a teardown failure.
+    // Fire-and-forget, but never leave the promise unobserved. A failed
+    // teardown leaves the repo registered in 'closing' so the next open or
+    // close retries it; log so the failure is visible meanwhile.
     void this.db._requestRepoIdleClose(this).catch((e) => {
       log({
-        severity: 'WARNING',
+        severity: 'ERROR',
         error: 'StorageError',
-        message: `Auto-close of repo ${this.path} failed: ${e}`,
+        message:
+          `Auto-close of repo ${this.path} failed; repo left open for retry: ${e}`,
       });
     });
   }

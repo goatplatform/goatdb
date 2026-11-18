@@ -247,13 +247,17 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
         priority,
       )) as typeof reqMsg;
     } catch (e: unknown) {
-      log({
-        severity: 'INFO',
-        error: 'SerializeError',
-        value: (e as Error).message,
-        message: (e as Error).message,
-        trace: (e as Error).stack,
-      });
+      // close() rejects pending sends with serviceUnavailable; log only real
+      // peer/transport faults so shutdown stays quiet.
+      if (!this.scheduler.isClosed) {
+        log({
+          severity: 'INFO',
+          error: 'SerializeError',
+          value: (e as Error).message,
+          message: (e as Error).message,
+          trace: (e as Error).stack,
+        });
+      }
       this._setIsOnline(false);
       return false;
     } finally {
