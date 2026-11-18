@@ -49,6 +49,7 @@ import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { Emitter } from '../base/emitter.ts';
 import { getGoatConfig } from '../base/config.ts';
 import { makeShardConfig, type ShardConfig } from '../repo/shard-format.ts';
+import { assertOpen, serviceUnavailable } from '../cfds/base/errors.ts';
 
 /**
  * The result of a sync operation with all peers for a repository.
@@ -72,6 +73,18 @@ export type SyncResult =
  * @group Database
  */
 export type DBMode = 'client' | 'server';
+
+/**
+ * Lifecycle of a DB instance. This is the single source of truth; `isOpen` is
+ * the only derived signal. `failed` means bootstrap or teardown failed; a
+ * failed instance rejects work but `close()` can still retry teardown.
+ */
+export type DBState =
+  | 'booting'
+  | 'ready'
+  | 'closing'
+  | 'closed'
+  | 'failed';
 
 /**
  * The on-disk storage format for repository commit logs.
@@ -209,6 +222,12 @@ export type EventWriteFailure = 'WriteFailure';
 export type EventItemChanged = 'ItemChanged';
 
 /**
+ * Emitted on every real lifecycle transition. Payload: (state: DBState).
+ * @group Database
+ */
+export type EventLifecycleChanged = 'LifecycleChanged';
+
+/**
  * Payload for the {@link EventWriteFailure} event, fired after 3 consecutive
  * I/O failures cause pending commits to be permanently dropped.
  * @group Database
@@ -241,8 +260,12 @@ export interface WriteFailureDetail {
  * @template US The user schema type, defaults to the base Schema type
  * @group Database
  */
-export class GoatDB<US extends Schema = Schema>
-  extends Emitter<EventUserChanged | EventWriteFailure | EventItemChanged> {
+export class GoatDB<US extends Schema = Schema> extends Emitter<
+  | EventUserChanged
+  | EventWriteFailure
+  | EventItemChanged
+  | EventLifecycleChanged
+> {
   readonly orgId: string;
   readonly registry: DataRegistry;
   readonly trusted: boolean;
@@ -264,9 +287,20 @@ export class GoatDB<US extends Schema = Schema>
   >;
   // Consecutive write-failure count per file; dropped and logged at 3 failures.
   private readonly _appendFailCounts = new Map<JSONLogFile, number>();
-  // Test-only: when > 0, _drainPendingAppends throws instead of
-  // writing, simulating I/O failures. Decremented on each triggered failure.
+  /**
+   * @internal Test-only. When > 0, _drainPendingAppends throws instead of
+   * writing, simulating I/O failures. Decremented on each triggered failure.
+   */
   _testForceAppendFailures = 0;
+  /**
+   * @internal Test-only. When > 0, _tearDownRepo throws before releasing
+   * resources, simulating a failed teardown. Decremented per failure.
+   */
+  _testForceTeardownFailures = 0;
+  /** @internal Test-only. Close-time item commits to allow before the next fails; 0 fails next, -1 disables. */
+  _testForceCommitFailures = -1;
+  /** @internal Test-only. When > 0, the next JSONLogFileClose throws (after detach). */
+  _testForceFileCloseFailures = -1;
   // Tracks the most recent fire-and-forget drain promise per file so that
   // flush()/closeRepo() can await it before their own drain loop.
   private readonly _inFlightDrains = new Map<JSONLogFile, Promise<void>>();
@@ -280,17 +314,21 @@ export class GoatDB<US extends Schema = Schema>
     string,
     Query<Schema, Schema, ReadonlyJSONValue>
   >();
-  /** In-flight repo closes, keyed by repoId (serializes open/close). */
+  /**
+   * In-flight repo closes, keyed by repoId. Doubles as the per-repo mutex:
+   * the entry is installed synchronously before the first await, so JS's
+   * single-threaded scheduling makes concurrent close/open callers observe it.
+   */
   private readonly _closePromises = new Map<string, Promise<void>>();
-  /** Mutex guard against concurrent manual closeRepo() calls for the same repo. */
-  private readonly _closeLocks = new Set<string>();
   private _path: string | undefined;
   private _settingsProvider: DBSettingsProvider | undefined;
   queryPersistence?: QueryPersistence;
   private _trustPool: TrustPool | undefined;
   private _syncSchedulers: SyncScheduler[] | undefined;
   private _trustPoolPromise: Promise<TrustPool>;
-  private _ready: boolean = false;
+  private _state: DBState = 'booting';
+  /** Set by the first close(); repeated close() calls return this promise. */
+  private _closePromise: Promise<void> | undefined;
   readonly shardConfig: ShardConfig;
 
   // ── Inactivity auto-close config ──────────────────────────────
@@ -339,10 +377,19 @@ export class GoatDB<US extends Schema = Schema>
         : Array.from(new Set(config.peers));
       this._repoClients = new Map();
     }
-    this._trustPoolPromise = this._getTrustPoolImpl().catch((err) => {
-      // Store the error but don't let it become an unhandled rejection
-      // It will be re-thrown when readyPromise() is called
-      return Promise.reject(err);
+    // DB logs bootstrap failures; readyPromise() still rejects.
+    this._trustPoolPromise = this._getTrustPoolImpl();
+    this._trustPoolPromise.catch((err) => {
+      // Only a genuine bootstrap failure (while still booting) is an error; a
+      // close() mid-bootstrap cancels via _assertOpen: no ERROR log, no state.
+      if (this._state === 'booting') {
+        log({
+          severity: 'ERROR',
+          error: 'StorageError',
+          message: `Database bootstrap failed: ${err}`,
+        });
+        this._setState('failed');
+      }
     });
 
     // Inactivity is now handled per-resource via one-shot timers
@@ -369,6 +416,7 @@ export class GoatDB<US extends Schema = Schema>
    * that's attached to a known user.
    */
   get loggedIn(): boolean {
+    if (!this.isOpen) return false; // failed teardown keeps the pool for retry
     return this._trustPool?.currentSession.owner !== undefined;
   }
 
@@ -377,39 +425,62 @@ export class GoatDB<US extends Schema = Schema>
    * anonymous.
    */
   get currentUser(): ManagedItem<US> | undefined {
+    this._assertOpen();
     const userId = this._trustPool?.currentSession.owner;
     return userId ? this.item('sys', 'users', userId) : undefined;
   }
 
   /**
    * Returns the current session.
-   * @throws This method throws if called before db.ready returns true.
+   * @throws This method throws if called before the DB is ready.
    */
   get currentSession(): ManagedItem<SchemaTypeSession> {
+    this._assertOpen();
     const sessionId = this._trustPool?.currentSession.id;
     assert(
       sessionId !== undefined,
-      'Session not available yet. Wait for db.ready before accessing the current session.',
+      'Session not available yet. Wait for the DB to be ready before accessing the current session.',
     );
     return this.item('sys', 'sessions', sessionId);
   }
 
   /**
-   * Returns whether this DB instance is ready to receive commands or is it
-   * still performing the initial load.
+   * Lifecycle phase of this instance. Only `ready` runs against fully
+   * bootstrapped state; see `isOpen` for the narrower "accepts work" question
+   * and `readyPromise()` for the awaitable form.
    */
-  get ready(): boolean {
-    return this._ready;
+  get state(): DBState {
+    return this._state;
+  }
+
+  /** Single writer: publish every real lifecycle transition to observers. */
+  private _setState(state: DBState): void {
+    if (this._state === state) return;
+    this._state = state;
+    this.emit('LifecycleChanged', state);
   }
 
   /**
-   * A convenience promise form of the `ready` flag. When the promise returns,
-   * this DB instance is ready to receive commands.
+   * True while the instance accepts work. Booting permits pre-ready calls;
+   * closing, closed, and failed do not. Once closed, create a new GoatDB
+   * instance instead of reopening this one.
+   */
+  get isOpen(): boolean {
+    return this._state === 'booting' || this._state === 'ready';
+  }
+
+  /**
+   * A convenience promise form of the ready lifecycle phase. When the promise
+   * returns, this DB instance is ready to receive commands.
    *
-   * @throws ServiceUnavailable if the initial load failed.
+   * @throws The original bootstrap error if the initial load failed, or
+   *         ServiceUnavailable if the instance is closing or closed.
    */
   async readyPromise(): Promise<void> {
     await this._trustPoolPromise;
+    if (this._state !== 'ready') {
+      throw serviceUnavailable();
+    }
   }
 
   /**
@@ -428,6 +499,7 @@ export class GoatDB<US extends Schema = Schema>
    *          otherwise.
    */
   async loginWithMagicLinkEmail(email: string): Promise<boolean> {
+    this._assertOpen();
     return await sendLoginEmail(
       (
         await this.getTrustPool()
@@ -438,78 +510,180 @@ export class GoatDB<US extends Schema = Schema>
 
   /**
    * Closes the database, releasing all resources including repositories,
-   * sync schedulers, queries, and file handles. This method should be called
-   * when you're done using the database instance.
+   * sync schedulers, queries, and file handles. Call this method when you're
+   * done using the database instance.
+   *
+   * Single-flight: the first call starts teardown synchronously; calls made
+   * while it is in flight and after it succeeds return the same promise.
+   * `state` becomes `closing` immediately and `closed` after teardown settles.
+   * If teardown fails, `state` becomes `failed` and the promise rejects; a
+   * later `close()` retries the remaining teardown.
    */
-  async close(): Promise<void> {
-    // Unschedule all idle timers to prevent concurrent fires during teardown
+  close(): Promise<void> {
+    if (this._closePromise) return this._closePromise;
+    // Publish closing only after installing the single-flight promise.
+    this._closePromise = this._closeImpl().then(
+      () => this._setState('closed'),
+      (e: unknown) => this._onCloseRejected(e),
+    );
+    this._setState('closing');
+    return this._closePromise;
+  }
+
+  /**
+   * Records a failed teardown. Partial teardown is recoverable: clearing the
+   * single-flight promise lets a later close() retry, and `failed` replaces a
+   * false `closed`.
+   */
+  private _onCloseRejected(e: unknown): never {
+    this._closePromise = undefined;
+    this._setState('failed');
+    log({
+      severity: 'ERROR',
+      error: 'StorageError',
+      message: `Database close failed: ${e}`,
+      trace: String(e),
+    });
+    throw e;
+  }
+
+  /**
+   * Teardown body. Waits for bootstrap and pre-close opens first so a late
+   * bootstrap or open cannot install resources after teardown.
+   */
+  private async _closeImpl(): Promise<void> {
+    // Abort peer sync before waiting on bootstrap so repos opened during a
+    // close-overlapping bootstrap spawn no sync clients.
+    this._abortSyncSchedulers();
+    // Wait for bootstrap: its sys-repo opens survive a concurrent close
+    // (allowDuringClose), so accepted pre-ready edits can be persisted below.
+    // A genuinely failed bootstrap rejects here, retaining dirty items instead
+    // of silently discarding them.
+    await this._trustPoolPromise;
+    // Schedulers born during the overlapping bootstrap (assigned in
+    // _createTrustPool after several awaits) postdate the pre-wait abort;
+    // reap them here or their 200ms intervals outlive the resolved close().
+    this._abortSyncSchedulers();
+    await this._awaitPreCloseOpens();
+    this._unscheduleIdleTimers();
+    this._closeAllQueries();
+    await this._closeAllRepositories();
+
+    // Commit dirty items last so every opened repo from the prep phase is
+    // closed before a close-time commit reopens an auto-closed one.
+    const committed = await this._commitDirtyItems();
+    await this._clearQueryPersistence();
+    this._finalizeTeardown(committed);
+
+    if (!committed) {
+      throw new Error('Failed to persist pending item edits during close');
+    }
+  }
+
+  /** Aborts peer sync before teardown so close is not held by a stalled sync. */
+  private _abortSyncSchedulers(): void {
+    if (!this._syncSchedulers) return;
+    for (const scheduler of this._syncSchedulers) {
+      scheduler.close();
+    }
+    this._syncSchedulers = undefined;
+  }
+
+  /** Waits for opens that started before close so teardown sees them. */
+  private async _awaitPreCloseOpens(): Promise<void> {
+    await Promise.allSettled([...this._openPromises.values()]);
+  }
+
+  /** Unschedules idle timers to prevent concurrent fires during teardown. */
+  private _unscheduleIdleTimers(): void {
     for (const repo of this._repositories.values()) {
       repo._idleTimer?.unschedule();
     }
     for (const q of this._openQueries.values()) {
       q._idleTimer?.unschedule();
     }
+  }
 
-    // Stop all sync operations (prevents new writes)
-    if (this._syncSchedulers) {
-      for (const scheduler of this._syncSchedulers) {
-        scheduler.close();
-      }
-      this._syncSchedulers = undefined;
-    }
-
-    // Close all open queries
+  private _closeAllQueries(): void {
     for (const query of this._openQueries.values()) {
       query.close();
     }
     this._openQueries.clear();
+  }
 
-    // Close all repositories
+  private async _closeAllRepositories(): Promise<void> {
     for (const repoPath of [...this._repositories.keys()]) {
-      await this.closeRepo(repoPath);
+      await this._closeRepo(repoPath);
     }
+  }
 
-    // Commit all remaining items (auto-closed repos). Items from
-    // closeRepo'd repos were already removed from _items. The commit
-    // reopens auto-closed repos via acquireRepo. After this, close any
-    // repos still in _repositories (reopened by this loop or by timer
-    // callbacks that fired during closeRepo).
+  /**
+   * Persists dirty managed items (auto-closed repos included) via the
+   * close-time commit path. Returns true only when every dirty item committed;
+   * failures are logged and the item stays dirty so a retried close() can
+   * re-attempt persistence.
+   */
+  private async _commitDirtyItems(): Promise<boolean> {
     const pendingRepos = new Set<string>();
+    const failedItems = new Set<string>();
     for (const item of [...this._items.values()]) {
       // Skip clean items: committing them would reopen an auto-closed repo
       // only for _setValueForKeyImpl() to dedup the no-op write.
       if (!item.isDirty) continue;
       const repoId = itemPathGetRepoId(item.path);
+      const hadRepo = this._repositories.has(repoId);
+      let committed = true;
       try {
-        await item.commit();
+        await item._commitForClose();
       } catch (e) {
+        committed = false;
+        failedItems.add(item.path);
         log({
-          severity: 'WARNING',
+          severity: 'ERROR',
           error: 'StorageError',
           message:
             `Commit of pending item ${item.path} during close() failed: ${e}`,
         });
+        // Only discard a half-open repo THIS commit introduced; a pre-existing
+        // one holds successful sibling commits that must still be torn down.
+        if (!hadRepo) await this._discardHalfOpenRepo(repoId);
       }
-      if (this._repositories.has(repoId)) {
+      // Close only repos reopened by SUCCESSFUL commits. A failed reopen left a
+      // half-open repo; closing it here would discard the pending edit, so a
+      // retried close() finishes it instead.
+      if (committed && this._repositories.has(repoId)) {
         pendingRepos.add(repoId);
       }
     }
     for (const repoId of pendingRepos) {
-      await this.closeRepo(repoId);
+      await this._closeRepo(repoId);
     }
-
-    // Clear query persistence (has flush timer)
-    if (this.queryPersistence) {
-      await this.queryPersistence.close();
-      this.queryPersistence = undefined;
+    // Final success is decided after repo-close retries: a failed sibling
+    // commit may be recovered by _commitDependentItems during teardown. Only
+    // a failed item still dirty means close truly failed; the half-open
+    // failure case keeps its item dirty, preserving retryability.
+    for (const path of failedItems) {
+      if (this._items.get(path)?.isDirty) return false;
     }
+    return true;
+  }
 
-    // Deactivate any leftover managed items so their pending commit timers
-    // cannot reopen a repo after teardown.
+  private async _clearQueryPersistence(): Promise<void> {
+    if (!this.queryPersistence) return;
+    await this.queryPersistence.close();
+    this.queryPersistence = undefined;
+  }
+
+  /** Deactivates leftover items (kept when persistence failed) and drops session keys. */
+  private _finalizeTeardown(committed: boolean): void {
     for (const item of this._items.values()) {
       item.deactivate();
     }
-    this._items.clear();
+    if (committed) {
+      this._items.clear();
+      // Keep the pool on failure so a retried close() can reopen /sys repos.
+      this._trustPool = undefined;
+    }
   }
 
   /**
@@ -517,9 +691,11 @@ export class GoatDB<US extends Schema = Schema>
    * local data. On browsers, this method will also reload the page to ensure
    * a clean state.
    *
-   * @throws ServiceUnavailable if the operation fails.
+   * @throws ServiceUnavailable while closing or after close. A closed
+   *         instance must not wipe local data as a side effect.
    */
   async logout(): Promise<void> {
+    this._assertOpen();
     await this.close();
     await remove(this._basePath);
     if (isBrowser()) {
@@ -531,18 +707,37 @@ export class GoatDB<US extends Schema = Schema>
    * Opens the given repository, loading all its items to memory.
    * This method does nothing if the repository is already open.
    *
+   * An open deferred behind an in-flight closeRepo()/auto-close is cancelled
+   * with serviceUnavailable if db.close() starts first: close is terminal, so
+   * no repository may be installed after its teardown snapshots.
+   *
    * @param path The path to the given repository.
    * @param opts Configuration options when opening this repository.
    */
-  open(path: string, opts?: OpenOptions): Promise<Repository> {
+  async open(path: string, opts?: OpenOptions): Promise<Repository> {
+    this._assertOpen();
+    return await this._openInternal(path, opts);
+  }
+
+  /**
+   * @internal Open body that bypasses the DB lifecycle guard.
+   *
+   * @param allowDuringClose Set by close-time persistence, which must reopen
+   *   auto-closed repos after `state` left 'ready'.
+   */
+  private _openInternal(
+    path: string,
+    opts?: OpenOptions,
+    allowDuringClose = false,
+  ): Promise<Repository> {
     path = itemPathNormalize(path);
     const repoId = itemPathGetRepoId(path);
     const existing = this._repositories.get(repoId);
     // Only hand out an already-open repo when no close is in flight. During a
     // manual closeRepo() the state stays 'open' through the commit/flush phase,
-    // so without the _isCloseInFlight() check open() would return the very
-    // instance that is about to be torn down (close/open overlap). Auto-close
-    // sets 'closing' synchronously, but manual close must be guarded here too.
+    // so without the in-flight check open() would return the very instance
+    // that is about to be torn down (close/open overlap). Auto-close sets
+    // 'closing' synchronously, but manual close must be guarded here too.
     if (
       existing && existing._closeState === 'open' &&
       !this._isCloseInFlight(repoId)
@@ -560,11 +755,29 @@ export class GoatDB<US extends Schema = Schema>
     // in-flight open) and then reopening is the only safe path.
     const closeP = this._closePromises.get(repoId);
     if (closeP) {
-      return closeP.catch(() => {}).then(() => this.open(path, opts));
+      // A rejected close (failed auto-close teardown) is retried from the
+      // fresh open below; the recursion re-checks the registry after settling.
+      return closeP.catch(() => {}).then(() => {
+        // Close wins: db.close() may have started while this open waited.
+        // Recursing unguarded would install a repo after close snapshotted
+        // _openPromises, leaking it behind the cached terminal close promise.
+        // The guard is the sole post-await step, so close cannot interleave.
+        if (!allowDuringClose) this._assertOpen();
+        return this._openInternal(path, opts, allowDuringClose);
+      });
+    }
+    if (existing && existing._closeState === 'closing') {
+      // An auto-close teardown failed and its promise was cleared. Finish the
+      // teardown before opening, otherwise the fresh instance would orphan the
+      // old repo's file handle and listeners.
+      return this._closeRepo(repoId).then(() => {
+        if (!allowDuringClose) this._assertOpen();
+        return this._openInternal(path, opts, allowDuringClose);
+      });
     }
     let result = this._openPromises.get(repoId);
     if (!result) {
-      result = this._openImpl(repoId, opts).finally(() => {
+      result = this._openImpl(repoId, opts, allowDuringClose).finally(() => {
         if (this._openPromises.get(repoId) === result) {
           this._openPromises.delete(repoId);
         }
@@ -585,8 +798,24 @@ export class GoatDB<US extends Schema = Schema>
    * @group Database
    */
   async acquireRepo(...pathComps: string[]): Promise<RepoLease> {
-    const path = itemPathNormalize(pathComps.join('/'));
-    const repo = await this.open(path);
+    this._assertOpen();
+    return await this._acquireRepoImpl(pathComps.join('/'));
+  }
+
+  /**
+   * @internal Close-time variant of acquireRepo(). Bypasses the lifecycle
+   * guard so db.close() can persist dirty items after closing begins.
+   */
+  _acquireRepoForClose(...pathComps: string[]): Promise<RepoLease> {
+    return this._acquireRepoImpl(pathComps.join('/'), true);
+  }
+
+  private async _acquireRepoImpl(
+    repoPath: string,
+    allowDuringClose = false,
+  ): Promise<RepoLease> {
+    const path = itemPathNormalize(repoPath);
+    const repo = await this._openInternal(path, undefined, allowDuringClose);
     repo.acquireIdleLease();
     return new RepoLease(repo, () => repo.releaseIdleLease());
   }
@@ -606,26 +835,29 @@ export class GoatDB<US extends Schema = Schema>
    * @param path Path to the desired repository.
    */
   async closeRepo(path: string): Promise<void> {
+    this._assertOpen();
+    return await this._closeRepo(path);
+  }
+
+  /** @internal closeRepo() body; db.close() uses it while closing. */
+  private async _closeRepo(path: string): Promise<void> {
     path = itemPathNormalize(path);
     const repoId = itemPathGetRepoId(path);
-    // Mutex: acquire the lock synchronously before any await.
-    if (this._closeLocks.has(repoId)) {
-      // Another call is already processing; wait for it via the promise.
-      const p = this._closePromises.get(repoId);
-      if (p) await p;
-      return;
-    }
-    this._closeLocks.add(repoId);
-    // Build the close promise synchronously (before any await) so concurrent
-    // callers and db.open() can properly await it. The promise captures the
-    // entire close lifecycle including commit and teardown.
+    // The map entry is the mutex: it is installed synchronously below, before
+    // any await, so a concurrent caller always joins the in-flight close here.
+    const inFlight = this._closePromises.get(repoId);
+    if (inFlight) return await inFlight;
+    // Build the close promise synchronously so concurrent callers and db.open()
+    // can await it. It captures the whole lifecycle: commit, flush, teardown.
     const cp = this._buildClosePromise(repoId);
     this._closePromises.set(repoId, cp);
     try {
       await cp;
     } finally {
-      this._closePromises.delete(repoId);
-      this._closeLocks.delete(repoId);
+      // Identity check: a later close may have replaced this entry.
+      if (this._closePromises.get(repoId) === cp) {
+        this._closePromises.delete(repoId);
+      }
     }
   }
 
@@ -645,10 +877,14 @@ export class GoatDB<US extends Schema = Schema>
     // Wait for any in-flight open (do not close a half-loaded repo).
     const openP = this._openPromises.get(repoId);
     if (openP) await openP;
-    // _closeLocks guarantees single-entry. Double-check: a previous close
-    // may have already cleared the repo.
+    // The caller holds the _closePromises mutex. Double-check: a previous
+    // close may have already cleared the repo.
     const repo = this.repository(repoId);
-    if (!repo || repo._closeState !== 'open') {
+    // 'closing' means a previous teardown failed part-way; retry it.
+    if (
+      !repo ||
+      (repo._closeState !== 'open' && repo._closeState !== 'closing')
+    ) {
       return;
     }
     // Unschedule idle timer so it cannot fire during the close.
@@ -660,24 +896,26 @@ export class GoatDB<US extends Schema = Schema>
     // Tear down dependent queries (manual close owns this; auto-close never
     // reaches here with queries attached because listener pins prevent it).
     this._closeDependentQueries(repoId);
-    // Flush pending item edits directly to this closing repo. This deliberately
-    // bypasses item.commit()/acquireRepo, which would deadlock by awaiting the
-    // close promise this method itself is running.
-    await this._commitDependentItems(repo);
+    // Flush pending item edits directly to this closing repo, bypassing
+    // item.commit()/acquireRepo (deadlock). Skip when a previous teardown
+    // already detached listeners: committing would lose the edit silently.
+    if (!repo._teardownDetached) {
+      await this._commitDependentItems(repo);
+    }
     for (const k of [...this._items.keys()]) {
       const item = this._items.get(k);
-      if (item && item.repository === repo) {
+      // Skip dirty items: they failed to persist and must survive teardown so
+      // a later close() can retry them (see _commitDirtyItems).
+      if (item && item.repository === repo && !item.isDirty) {
         item.deactivate();
         this._items.delete(k);
       }
     }
-    // Transition to Closing and tear down.
+    // Transition to Closing and tear down. Only mark closed after teardown
+    // resolves; a failure leaves 'closing' so a retry can finish.
     repo._closeState = 'closing';
-    try {
-      await this._tearDownRepo(repo);
-    } finally {
-      repo._closeState = 'closed';
-    }
+    await this._tearDownRepo(repo);
+    repo._closeState = 'closed';
   }
 
   /** Closes queries whose source repo matches the given repoId. */
@@ -738,6 +976,10 @@ export class GoatDB<US extends Schema = Schema>
   private async _tearDownRepo<ST extends RepoStorage<ST>>(
     repo: Repository<ST>,
   ): Promise<void> {
+    if (this._testForceTeardownFailures > 0) {
+      this._testForceTeardownFailures--;
+      throw new Error('test-forced teardown failure');
+    }
     const repoId = repo.path;
     repo._idleTimer?.unschedule();
     // Flush log file - retry if data was re-queued after a transient failure
@@ -759,17 +1001,32 @@ export class GoatDB<US extends Schema = Schema>
     this._repoClients?.delete(repoId);
     // Detach event handlers first to prevent new file operations
     repo.detachAll();
-    // Close log file
+    repo._teardownDetached = true;
+    // Close log file. Drop the map entry as soon as the close succeeds so a
+    // retried teardown (after a later throw) does not close it twice.
     if (fileEntry) {
+      if (this._testForceFileCloseFailures > 0) {
+        this._testForceFileCloseFailures--;
+        throw new Error('test-forced file close failure');
+      }
       await JSONLogFileClose(fileEntry);
+      this._files.delete(repoId);
       this._appendFailCounts.delete(fileEntry);
     }
-    this._files.delete(repoId);
     // Identity guard: a concurrent open() may have installed a fresh repo.
     if (Object.is(this._repositories.get(repoId), repo)) {
       this._repositories.delete(repoId);
     }
     this._warnedLegacyRepos.delete(repoId);
+  }
+
+  // Disposes a repo reopened only by a failed close-time commit; old code
+  // deleted only the registry entry, leaking its _files handle and listeners.
+  private async _discardHalfOpenRepo(repoId: string): Promise<void> {
+    const repo = this._repositories.get(repoId);
+    if (!repo) return;
+    repo._closeState = 'closing'; // teardown failure stays retryable
+    await this._tearDownRepo(repo);
   }
 
   /**
@@ -787,6 +1044,7 @@ export class GoatDB<US extends Schema = Schema>
    * @returns         A managed item that tracks both local and remote edits.
    */
   item<S extends Schema>(...pathComps: string[]): ManagedItem<S> {
+    this._assertOpen();
     for (const s of pathComps) {
       assert(typeof s === 'string'); // Sanity check
     }
@@ -825,6 +1083,7 @@ export class GoatDB<US extends Schema = Schema>
     schema: S,
     data?: Partial<SchemaDataType<S>>,
   ): ManagedItem<S> {
+    this._assertOpen();
     if (itemPathGetPart(path, 'item') === undefined) {
       path = itemPathJoin(path, uniqueId());
     }
@@ -855,6 +1114,7 @@ export class GoatDB<US extends Schema = Schema>
     schema: S,
     data: SchemaDataType<S>,
   ): Promise<void> {
+    this._assertOpen();
     const repo = await this.open(path);
     let key = itemPathGetPart(path, 'item');
     if (!key || key.length <= 0) {
@@ -889,6 +1149,7 @@ export class GoatDB<US extends Schema = Schema>
     schema: S,
     items: { key?: string; data: SchemaDataType<S> }[],
   ): Promise<void> {
+    this._assertOpen();
     const repo = await this.open(repoPath);
     const entries = [];
     for (const item of items) {
@@ -911,8 +1172,10 @@ export class GoatDB<US extends Schema = Schema>
    *
    * @param path The full path to count.
    * @returns    The number of items found or -1.
+   * @throws ServiceUnavailable while closing or after close.
    */
   count(path: string): number {
+    this._assertOpen();
     const repoId = itemPathGetRepoId(path);
     const repo = this.repository(repoId);
     if (!repo) return -1;
@@ -927,8 +1190,10 @@ export class GoatDB<US extends Schema = Schema>
    *
    * @param path Full path to a repository.
    * @returns    The keys at the specified path.
+   * @throws ServiceUnavailable while closing or after close.
    */
   keys(path: string): Iterable<string> {
+    this._assertOpen();
     path = itemPathNormalize(path);
     const repoId = itemPathGetRepoId(path);
     return this.repository(repoId)?.keys() || [];
@@ -957,6 +1222,7 @@ export class GoatDB<US extends Schema = Schema>
   query<IS extends Schema, CTX extends ReadonlyJSONValue, OS extends IS = IS>(
     config: Omit<QueryConfig<IS, OS, CTX>, 'db'>,
   ): Query<IS, OS, CTX> {
+    this._assertOpen();
     const id = resolveQueryId(config);
     let q = this._openQueries.get(id);
     if (!q) {
@@ -1099,6 +1365,7 @@ export class GoatDB<US extends Schema = Schema>
    *             disk.
    */
   async flush(path: string): Promise<void> {
+    this._assertOpen();
     const repoId = itemPathGetRepoId(itemPathNormalize(path));
     path = repoId;
     if (!path.endsWith('/')) {
@@ -1127,6 +1394,7 @@ export class GoatDB<US extends Schema = Schema>
    * Flushes all pending writes for all repositories to disk.
    */
   async flushAll(): Promise<void> {
+    this._assertOpen();
     const promises = mapIterable(
       this._repositories.keys(),
       (path) => this.flush(path),
@@ -1156,6 +1424,7 @@ export class GoatDB<US extends Schema = Schema>
    * }
    */
   async sync(path: string): Promise<SyncResult> {
+    this._assertOpen();
     const repoId = itemPathGetRepoId(itemPathNormalize(path));
     await this.open(repoId);
     const clients = Array.from(this.clientsForRepo(repoId));
@@ -1194,6 +1463,7 @@ export class GoatDB<US extends Schema = Schema>
    * }
    */
   async syncAll(): Promise<Record<string, SyncResult>> {
+    this._assertOpen();
     const repoIds = Array.from(this._repositories.keys());
     const results = await Promise.all(repoIds.map((rid) => this.sync(rid)));
     const out: Record<string, SyncResult> = {};
@@ -1227,8 +1497,12 @@ export class GoatDB<US extends Schema = Schema>
    * Note: You almost never need to use the trust pool directly.
    *
    * @returns The trust pool of this DB instance.
+   * @throws ServiceUnavailable once the instance leaves `booting` (closing,
+   *         closed, or failed). The pool holds session private keys, so a
+   *         non-open instance must not hand it out.
    */
-  getTrustPool(): Promise<TrustPool> {
+  async getTrustPool(): Promise<TrustPool> {
+    this._assertOpen();
     return this._trustPoolPromise;
   }
 
@@ -1236,7 +1510,13 @@ export class GoatDB<US extends Schema = Schema>
     await this._createTrustPool();
     // Open /sys/sessions so all known sessions are properly loaded into our
     // new trust pool
-    const sessionsRepo = await this.open('/sys/sessions');
+    // allowDuringClose: close() may overlap bootstrap; its sys-repo opens must
+    // finish so accepted pre-ready edits persist instead of being discarded.
+    const sessionsRepo = await this._openInternal(
+      '/sys/sessions',
+      undefined,
+      true,
+    );
     // Although the repository automatically adds new sessions to the trust
     // pool, the initial bootstrapping must happen explicitly as the chain of
     // sessions won't be loaded in the correct order.
@@ -1246,8 +1526,11 @@ export class GoatDB<US extends Schema = Schema>
     }
     // Open /sys/users so we can perform login and basic operations without
     // waiting
-    await this.open('/sys/users');
-    this._ready = true;
+    await this._openInternal('/sys/users', undefined, true);
+    // close() may have started during bootstrap; never revive a closing DB.
+    if (this._state === 'booting') {
+      this._setState('ready');
+    }
     return this._trustPool!;
   }
 
@@ -1321,60 +1604,67 @@ export class GoatDB<US extends Schema = Schema>
   }
 
   /**
+   * @internal Throws serviceUnavailable while close is in flight or after it
+   * completes. Public data operations call this before side effects so callers
+   * see the failure at the API boundary, not inside a repository. Close-time
+   * persistence passes allowDuringClose so it may reopen auto-closed repos.
+   */
+  private _assertOpen(allowDuringClose = false): void {
+    if (!allowDuringClose) assertOpen(this.isOpen);
+  }
+
+  /**
    * @internal True while any close (manual or auto) is registered for the repo.
    * Used by Repository._canWrite() to reject writes that would silently land
    * on a repo whose teardown is already in flight.
    */
   _isCloseInFlight(repoId: string): boolean {
-    return this._closeLocks.has(repoId) || this._closePromises.has(repoId);
+    return this._closePromises.has(repoId);
   }
 
   /**
-   * @internal Called by a Repository idle timer. Shares the same
-   * serialization primitives as closeRepo() (_closeLocks,
-   * _closePromises) so manual closeRepo and db.open() see the
+   * @internal Called by a Repository idle timer. Uses the same per-repo mutex
+   * (_closePromises) as closeRepo() so manual close and db.open() see the
    * in-flight close. Does NOT commit pending items or close dependent
-   * queries — pending edits reopen the repo on demand via acquireRepo,
-   * and listener-pinned queries keep repos ineligible for idle close.
+   * queries — pending edits reopen the repo on demand via acquireRepo, and
+   * listener-pinned queries keep repos ineligible for idle close.
+   *
+   * A failed teardown rejects and leaves the repo in 'closing' with no
+   * registered promise, so the next open()/closeRepo() retries it instead of
+   * leaking the file handle.
    */
   async _requestRepoIdleClose<ST extends RepoStorage<ST>>(
     repo: Repository<ST>,
   ): Promise<void> {
+    if (!this.isOpen) return;
     if (repo._closeState !== 'open') return;
     if (!Object.is(this.repository(repo.path), repo)) return; // stale instance
     if (!repo._isIdleEligible()) return;
-    // If manual closeRepo is in-flight, let it handle the close.
-    if (this._closeLocks.has(repo.path)) {
-      const p = this._closePromises.get(repo.path);
-      if (p) await p;
-      return;
-    }
-    // Transition synchronously so concurrent open() and closeRepo()
-    // see the in-flight close before any await.
+    // A manual close is in-flight; join it instead of tearing down twice.
+    const inFlight = this._closePromises.get(repo.path);
+    if (inFlight) return await inFlight;
+    // Transition synchronously so concurrent open() and closeRepo() see the
+    // in-flight close before any await.
     repo._closeState = 'closing';
-    this._closeLocks.add(repo.path);
-    // Resolve the stored promise even on teardown failure so every awaiter
-    // (manual closeRepo included) observes the same, already-logged outcome.
-    const cp = this._tearDownRepo(repo).catch((e) => {
-      log({
-        severity: 'WARNING',
-        error: 'StorageError',
-        message: `Auto-close of repo ${repo.path} failed: ${e}`,
-      });
+    const cp = this._tearDownRepo(repo).then(() => {
+      repo._closeState = 'closed';
     });
     this._closePromises.set(repo.path, cp);
     try {
       await cp;
     } finally {
-      this._closePromises.delete(repo.path);
-      this._closeLocks.delete(repo.path);
-      repo._closeState = 'closed';
+      // Only success marks 'closed' (inside the then above). A rejection
+      // leaves 'closing' so the next open() retries the teardown.
+      if (this._closePromises.get(repo.path) === cp) {
+        this._closePromises.delete(repo.path);
+      }
     }
   }
 
   private async _openImpl(
     repoId: string,
     opts?: OpenOptions,
+    allowDuringClose = false,
   ): Promise<Repository> {
     repoId = Repository.normalizePath(repoId);
     let trustPool: TrustPool;
@@ -1383,7 +1673,9 @@ export class GoatDB<US extends Schema = Schema>
     if (repoId === '/sys/sessions' || repoId === '/sys/users') {
       trustPool = this._trustPool!;
     } else {
-      trustPool = await this.getTrustPool();
+      // Read the promise directly: close-time commits reopen repos while the
+      // public getter rejects (see _acquireRepoForClose).
+      trustPool = await this._trustPoolPromise;
     }
     const repo = new Repository(this as unknown as GoatDB, repoId, trustPool, {
       ...opts,
@@ -1509,41 +1801,93 @@ export class GoatDB<US extends Schema = Schema>
       }
     });
     repo.unmute();
-    if (this._syncSchedulers) {
-      const clients: RepoClient[] = [];
-      for (const scheduler of this._syncSchedulers) {
-        const c = new RepoClient(
-          repo,
-          repoId,
-          scheduler.syncConfig,
-          scheduler,
-          this.orgId,
-        );
-        clients.push(c);
-        c.ready = true;
-        if (
-          !loadedFromBackup && repoId !== '/sys/sessions' &&
-          repoId !== '/sys/users'
-        ) {
-          try {
-            await c.sync();
-          } catch (e: unknown) {
-            log({
-              severity: 'WARNING',
-              error: 'UnknownSyncError',
-              message: `Initial sync failed for ${repoId}`,
-              trace: String(e),
-            });
-          }
-        }
-        c.startSyncing();
-      }
-      this._repoClients!.set(repoId, clients);
-    }
+    // close() nulls _syncSchedulers and aborts fetches. A public open that
+    // lost the race must not revive clients or return a repo teardown destroys.
+    this._assertOpen(allowDuringClose);
+    // Backup loads and sys repos have nothing to reconcile with peers yet.
+    await this._startRepoClients(
+      repo,
+      repoId,
+      allowDuringClose,
+      loadedFromBackup || repoId === '/sys/sessions' ||
+        repoId === '/sys/users',
+    );
     // Arm the idle timer only after the repo is fully loaded, so a slow open
     // cannot immediately expire itself.
     repo._startIdleTimer();
     return repo;
+  }
+
+  /** One REST client per peer scheduler; owns this repo's adaptive sync timer. */
+  private _newRepoClient(
+    repo: Repository,
+    repoId: string,
+    scheduler: SyncScheduler,
+  ): RepoClient {
+    return new RepoClient(
+      repo,
+      repoId,
+      scheduler.syncConfig,
+      scheduler,
+      this.orgId,
+    );
+  }
+
+  /**
+   * Initial peer sync of a freshly opened repo. A close() abort rethrows through
+   * the guard so the open is abandoned; a real sync error is logged and the
+   * open continues.
+   */
+  private async _initialSync(
+    client: RepoClient,
+    repoId: string,
+    allowDuringClose: boolean,
+  ): Promise<void> {
+    try {
+      await client.sync();
+    } catch (e: unknown) {
+      this._assertOpen(allowDuringClose);
+      log({
+        severity: 'WARNING',
+        error: 'UnknownSyncError',
+        message: `Initial sync failed for ${repoId}`,
+        trace: String(e),
+      });
+    }
+  }
+
+  /**
+   * Creates and starts one client per sync scheduler, then registers them for
+   * teardown. An abort leaves the clients created so far unregistered, hence
+   * invisible to _tearDownRepo: close them here or their repeating timers
+   * outlive the closed state.
+   */
+  private async _startRepoClients(
+    repo: Repository,
+    repoId: string,
+    allowDuringClose: boolean,
+    skipInitialSync: boolean,
+  ): Promise<void> {
+    if (!this._syncSchedulers) {
+      return;
+    }
+    const clients: RepoClient[] = [];
+    try {
+      for (const scheduler of this._syncSchedulers) {
+        const client = this._newRepoClient(repo, repoId, scheduler);
+        clients.push(client);
+        client.ready = true;
+        if (!skipInitialSync) {
+          await this._initialSync(client, repoId, allowDuringClose);
+        }
+        this._assertOpen(allowDuringClose);
+        client.startSyncing();
+      }
+    } catch (e: unknown) {
+      for (const client of clients) client.close();
+      throw e;
+    }
+    this._repoClients!.set(repoId, clients);
   }
 
   /**
