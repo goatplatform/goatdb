@@ -10,6 +10,22 @@ import {
   getGlobalLoggerStreams,
   setGlobalLoggerStreams,
 } from '../logging/log.ts';
+import type { LogEntry } from '../logging/log.ts';
+import type { NormalizedLogEntry } from '../logging/entry.ts';
+
+/** Swaps in a capturing log stream for the duration of fn, then restores. */
+export function withLogCapture<T>(
+  fn: (captured: NormalizedLogEntry<LogEntry>[]) => Promise<T>,
+): Promise<T> {
+  const captured: NormalizedLogEntry<LogEntry>[] = [];
+  const prev = getGlobalLoggerStreams();
+  setGlobalLoggerStreams([{
+    appendEntry(e: NormalizedLogEntry<LogEntry>): void {
+      captured.push(e);
+    },
+  }]);
+  return fn(captured).finally(() => setGlobalLoggerStreams(prev));
+}
 
 /**
  * Custom error class for assertion failures.
@@ -165,7 +181,9 @@ export function assertThrowsInstanceOf(
           if (!(caughtError instanceof errorCtor)) {
             throw new AssertionError(
               message ||
-                `Expected error to be instance of ${errorCtor.name}, got ${caughtError?.constructor?.name ?? typeof caughtError}`,
+                `Expected error to be instance of ${errorCtor.name}, got ${
+                  caughtError?.constructor?.name ?? typeof caughtError
+                }`,
             );
           }
         },
@@ -185,7 +203,9 @@ export function assertThrowsInstanceOf(
   if (!(caughtError instanceof errorCtor)) {
     throw new AssertionError(
       message ||
-        `Expected error to be instance of ${errorCtor.name}, got ${caughtError?.constructor?.name ?? typeof caughtError}`,
+        `Expected error to be instance of ${errorCtor.name}, got ${
+          caughtError?.constructor?.name ?? typeof caughtError
+        }`,
     );
   }
 }

@@ -53,9 +53,9 @@ export default function setup(): void {
       assertEquals(db.registry, kDataRegistry);
 
       // Should start not ready
-      assertEquals(db.ready, false);
+      assertEquals(db.state, 'booting');
       await db.readyPromise();
-      assertEquals(db.ready, true);
+      assertEquals(db.state, 'ready');
 
       // Authentication state depends on environment
       if (isBrowser()) {

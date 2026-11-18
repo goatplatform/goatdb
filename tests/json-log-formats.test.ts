@@ -10,7 +10,7 @@
  * session. Verification reads therefore use a fresh session (close + reopen).
  */
 import { TEST } from './mod.ts';
-import { assertEquals, assertTrue } from './asserts.ts';
+import { assertEquals, assertTrue, withLogCapture } from './asserts.ts';
 import { isBrowser } from '../base/common.ts';
 import * as path from '../base/path.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
@@ -26,27 +26,6 @@ import {
 import { GoatDB } from '../db/db.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { BINARY_MAGIC } from '../base/core-types/encoding/binary-commit.ts';
-import {
-  getGlobalLoggerStreams,
-  setGlobalLoggerStreams,
-} from '../logging/log.ts';
-import type { LogEntry } from '../logging/log.ts';
-import type { NormalizedLogEntry } from '../logging/entry.ts';
-
-// Swaps in a capturing log stream for the duration of fn, then restores.
-function withLogCapture<T>(
-  fn: (captured: NormalizedLogEntry<LogEntry>[]) => Promise<T>,
-): Promise<T> {
-  const captured: NormalizedLogEntry<LogEntry>[] = [];
-  const prev = getGlobalLoggerStreams();
-  setGlobalLoggerStreams([{
-    appendEntry(e: NormalizedLogEntry<LogEntry>): void {
-      captured.push(e);
-    },
-  }]);
-  return fn(captured).finally(() => setGlobalLoggerStreams(prev));
-}
-
 type LogFormat = 'goat' | 'jsonl';
 
 const gTextEncoder = new TextEncoder();

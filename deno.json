@@ -66,6 +66,7 @@
     "nodemailer": "npm:nodemailer@^6.10.0",
     "playwright": "npm:playwright@^1.48.0",
     "react": "npm:react@^19.1.0",
+    "react-test-renderer": "npm:react-test-renderer@^19.1.0",
     "source-map": "npm:source-map@^0.7.4",
     "sql.js": "npm:sql.js@^1.11.0",
     "postject": "npm:postject@1.0.0-alpha.6",
