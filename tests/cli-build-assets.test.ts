@@ -1,5 +1,6 @@
 import { APP_ENTRY_POINT } from '../base/app-entry-point.ts';
 import { isBrowser, isDeno, isNode } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import { readTextFile, writeTextFile } from '../base/json-log/file-impl.ts';
 import * as path from '../base/path.ts';
 import {
@@ -817,9 +818,16 @@ export default function setupCliBuildAssetsTests() {
     'debug rebuild emits plugin CSS identical to production and rebuilds it',
     nodeTest(debugCssParityTest),
   );
-  TEST(
-    kSuite,
-    'system-assets/assets.json is fresh (rebuild matches committed worker bundle)',
-    denoTest(systemAssetsFreshnessTest),
-  );
+  // Registered only where it is supported: the check rebuilds worker sources
+  // with the Node toolchain, so it has no meaning under Deno or in a browser.
+  // Wrapping it in nodeTest() instead would silently tally a no-op "pass".
+  // Use getRuntime().id (canonical) rather than deprecated isNode() from
+  // base/common.ts.
+  if (getRuntime().id === 'node') {
+    TEST(
+      kSuite,
+      'system-assets/assets.json is fresh (rebuild matches committed worker bundle)',
+      systemAssetsFreshnessTest,
+    );
+  }
 }
