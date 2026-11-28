@@ -325,7 +325,7 @@ export class AuthEndpoint<US extends Schema> implements Endpoint<US> {
       }
       // Link the session to its new owner
       session.owner = userKey;
-      sessionsRepo.setValueForKey(
+      await sessionsRepo.setValueForKey(
         session.id,
         await sessionToItem(session, services.db.registry),
         sessionsRepo.headForKey(session.id),
@@ -343,10 +343,9 @@ export class AuthEndpoint<US extends Schema> implements Endpoint<US> {
         });
       const now = new Date();
       statsItem.set('lastLoggedIn', now);
-      if (!statsItem.has('firstLoggedIn')) {
-        statsItem.set('firstLoggedIn', now);
-      }
-      statsRepo.setValueForKey(userKey, statsItem, statsEntry && statsEntry[1]);
+      if (!statsItem.has('firstLoggedIn')) statsItem.set('firstLoggedIn', now);
+      const statsHead = statsEntry && statsEntry[1];
+      await statsRepo.setValueForKey(userKey, statsItem, statsHead);
       // Let the updated data time to replicate
       if (services.buildInfo.debugBuild !== true) {
         await sleep(1 * kSecondMs);
