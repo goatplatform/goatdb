@@ -10,7 +10,7 @@
  * session. Verification reads therefore use a fresh session (close + reopen).
  */
 import { TEST } from './mod.ts';
-import { assertEquals, assertTrue } from './asserts.ts';
+import { assertEquals, assertTrue, withLogCapture } from './asserts.ts';
 import { isBrowser } from '../base/common.ts';
 import * as path from '../base/path.ts';
 import { FileImplGet } from '../base/json-log/file-impl.ts';
@@ -26,27 +26,7 @@ import {
 import { GoatDB } from '../db/db.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { BINARY_MAGIC } from '../base/core-types/encoding/binary-commit.ts';
-import {
-  getGlobalLoggerStreams,
-  setGlobalLoggerStreams,
-} from '../logging/log.ts';
-import type { LogEntry } from '../logging/log.ts';
-import type { NormalizedLogEntry } from '../logging/entry.ts';
-
-// Swaps in a capturing log stream for the duration of fn, then restores.
-function withLogCapture<T>(
-  fn: (captured: NormalizedLogEntry<LogEntry>[]) => Promise<T>,
-): Promise<T> {
-  const captured: NormalizedLogEntry<LogEntry>[] = [];
-  const prev = getGlobalLoggerStreams();
-  setGlobalLoggerStreams([{
-    appendEntry(e: NormalizedLogEntry<LogEntry>): void {
-      captured.push(e);
-    },
-  }]);
-  return fn(captured).finally(() => setGlobalLoggerStreams(prev));
-}
-
+import { trackUnhandledRejections } from './lifecycle-fixtures.ts';
 type LogFormat = 'goat' | 'jsonl';
 
 const gTextEncoder = new TextEncoder();
@@ -142,6 +122,105 @@ async function scanAll(file: number): Promise<Uint8Array[]> {
     }
   }
   return all;
+}
+
+// Group 11 fixtures: stale cursor + prefetch retirement (worker crash, debt/94).
+// A log with 200 small records then 50 x 128KB records spans ~6.5MB. The first
+// scan returns one 100-record batch (done:false) and the worker immediately
+// arms a continuation prefetch that is still reading when close() runs. That
+// armed prefetch is what must be retired and consumed, never left unobserved.
+const gPrefetchSmallCount = 200;
+const gPrefetchLargeCount = 50;
+const gPrefetchBlob = 'z'.repeat(128 * 1024);
+
+// seedLog writes `count` small unique entries, then flushes and closes.
+async function seedLog(
+  format: LogFormat,
+  filePath: string,
+  count: number,
+): Promise<void> {
+  const file = await JSONLogFileOpen(filePath, true);
+  try {
+    await JSONLogFileAppend(
+      file,
+      Array.from(
+        { length: count },
+        (_, i) => makeEntry(format, `id-${i}`, { i }),
+      ),
+    );
+    await JSONLogFileFlush(file);
+  } finally {
+    await JSONLogFileClose(file);
+  }
+}
+
+// seedPrefetchLog writes the tail-heavy log described above.
+async function seedPrefetchLog(
+  format: LogFormat,
+  filePath: string,
+): Promise<void> {
+  const file = await JSONLogFileOpen(filePath, true);
+  try {
+    await JSONLogFileAppend(
+      file,
+      Array.from(
+        { length: gPrefetchSmallCount },
+        (_, i) => makeEntry(format, `s-${i}`, { i }),
+      ),
+    );
+    await JSONLogFileAppend(
+      file,
+      Array.from(
+        { length: gPrefetchLargeCount },
+        (_, i) => makeEntry(format, `h-${i}`, { blob: gPrefetchBlob }),
+      ),
+    );
+    await JSONLogFileFlush(file);
+  } finally {
+    await JSONLogFileClose(file);
+  }
+}
+
+// scanError captures a rejected scan instead of letting it reach the runner.
+// Returns undefined when the scan resolves.
+async function scanError(cursor: number): Promise<unknown> {
+  try {
+    await JSONLogFileScan(cursor);
+    return undefined;
+  } catch (err) {
+    return err;
+  }
+}
+
+// drainSettled lets discarded prefetch promises settle, so a missing rejection
+// consumer would reach the unhandledRejection hook before we assert on it.
+async function drainSettled(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 50));
+}
+
+// withDeadline fails fast instead of hanging the suite when the shared worker
+// is gone: a dead worker never answers, so a stale request would stall CI
+// until the global timeout. Late rejections from the abandoned op are consumed
+// so they cannot pollute the unhandled-rejection tracker in T2.
+async function withDeadline<T>(
+  label: string,
+  ms: number,
+  op: () => Promise<T>,
+): Promise<T> {
+  const promise = op();
+  promise.catch(() => {});
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`deadline exceeded: ${label}`)),
+      ms,
+    );
+  });
+  try {
+    return await Promise.race([promise, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export default function setupJsonLogFormats() {
@@ -1440,4 +1519,182 @@ export default function setupJsonLogFormats() {
       },
     );
   }
+
+  // -- Group 11: Stale cursor + prefetch retirement (worker crash, debt/94) --
+  // A scan that reports done:false arms a continuation prefetch. Closing while
+  // armed must retire that cursor everywhere: a later scan on the stale cursor
+  // has to reject as a handled error, and the rejection must never surface as
+  // an unhandled rejection that kills the shared storage worker.
+  for (const format of ['goat', 'jsonl'] as const) {
+    TEST(
+      'JsonLogFormats',
+      `${format}: stale cursor scan rejects after close, worker stays alive`,
+      async (ctx) => {
+        const dir = await ctx.tempDir(`jlf-${format}-stale-cursor`);
+        // Three open/close cycles: clean rejection every time proves the
+        // retired cursor left no accumulated state behind in the worker.
+        for (let cycle = 0; cycle < 3; cycle++) {
+          const tag = `cycle ${cycle}`;
+          const filePath = path.join(
+            dir,
+            `stale-${format}-${cycle}.${format}`,
+          );
+          await seedPrefetchLog(format, filePath);
+
+          // Read-only session: the first scan returns one batch and arms the
+          // continuation prefetch that close() is about to discard.
+          const file = await JSONLogFileOpen(filePath, false);
+          const cursor = await JSONLogFileStartCursor(file);
+          const first = await JSONLogFileScan(cursor);
+          assertTrue(
+            !first.done,
+            `${tag}: first scan must not be done (prefetch armed)`,
+          );
+          await JSONLogFileClose(file);
+
+          // Scanning the stale cursor must reject as a handled error, never
+          // read a closed file handle.
+          const err = await scanError(cursor);
+          assertTrue(
+            err !== undefined,
+            `${tag}: stale cursor scan must reject after close`,
+          );
+
+          // The same worker must still serve a brand new file.
+          await withDeadline(`${tag}: worker alive`, 5000, async () => {
+            const probe = path.join(
+              dir,
+              `probe-${format}-${cycle}.${format}`,
+            );
+            await seedLog(format, probe, 7);
+            const probeFile = await JSONLogFileOpen(probe, false);
+            try {
+              const results = await scanAll(probeFile);
+              assertEquals(
+                results.length,
+                7,
+                `${tag}: worker must still scan a new file`,
+              );
+              for (let i = 0; i < 7; i++) {
+                assertEquals(
+                  decodeEntry(format, results[i]).id,
+                  `id-${i}`,
+                  `${tag}: probe entry ${i} should roundtrip`,
+                );
+              }
+            } finally {
+              await JSONLogFileClose(probeFile);
+            }
+          });
+        }
+      },
+    );
+
+    TEST(
+      'JsonLogFormats',
+      `${format}: close with armed prefetch leaves no unhandled rejection`,
+      async (ctx) => {
+        const dir = await ctx.tempDir(`jlf-${format}-prefetch-rejection`);
+        // Browser has no `process` unhandledRejection hook; the tracker is a
+        // Deno/Node-only assertion, the functional checks below still run
+        // everywhere.
+        const rejections = isBrowser() ? null : trackUnhandledRejections();
+        try {
+          const filePath = path.join(dir, `large.${format}`);
+          // The ~6.5MB tail keeps the continuation prefetch reading when
+          // close() discards it - exactly when an unobserved prefetch would
+          // kill the worker.
+          await seedPrefetchLog(format, filePath);
+
+          const file = await JSONLogFileOpen(filePath, false);
+          const cursor = await JSONLogFileStartCursor(file);
+          const first = await JSONLogFileScan(cursor);
+          assertTrue(
+            !first.done,
+            'scan must leave a continuation prefetch armed',
+          );
+          await JSONLogFileClose(file);
+
+          if (rejections) {
+            await drainSettled();
+            assertEquals(
+              rejections.reasons.length,
+              0,
+              'discarded prefetch must not produce an unhandled rejection',
+            );
+          }
+
+          // The worker must still serve a new file.
+          await withDeadline('worker alive', 5000, async () => {
+            const probe = path.join(dir, `probe.${format}`);
+            await seedLog(format, probe, 10);
+            const probeFile = await JSONLogFileOpen(probe, false);
+            try {
+              const results = await scanAll(probeFile);
+              assertEquals(
+                results.length,
+                10,
+                'worker must serve a new file after close-with-prefetch',
+              );
+            } finally {
+              await JSONLogFileClose(probeFile);
+            }
+          });
+        } finally {
+          rejections?.restore();
+        }
+      },
+    );
+  }
+
+  // A failing json-log operation must surface as a handled rejection, never
+  // as an unhandled rejection that kills the shared worker/process. Append on
+  // a closed handle rejects deterministically on every OS, so this test guards
+  // the handled-rejection invariant on all platforms.
+  TEST(
+    'JsonLogFormats',
+    'append after close rejects without unhandled rejection',
+    async (ctx) => {
+      const dir = await ctx.tempDir('jlf-append-after-close');
+      const rejections = isBrowser() ? null : trackUnhandledRejections();
+      await withLogCapture(async (captured) => {
+        try {
+          const filePath = path.join(dir, 'probe.jsonl');
+          const file = await JSONLogFileOpen(filePath, true);
+          await JSONLogFileClose(file);
+
+          let threw = false;
+          try {
+            await JSONLogFileAppend(file, [makeEntry('jsonl', 'e1')]);
+          } catch {
+            threw = true;
+          }
+          assertTrue(
+            threw,
+            'append after close must reject as a handled error',
+          );
+
+          if (rejections) {
+            await drainSettled();
+            assertEquals(
+              rejections.reasons.length,
+              0,
+              'rejected append must not produce an unhandled rejection',
+            );
+          }
+
+          // The failure must be logged AND contained: severity-500 'File not
+          // found' must land in the capture, never leak to passing output.
+          assertTrue(
+            captured.some((e) =>
+              e.severity === 'ERROR' && e.message?.includes('File not found')
+            ),
+            'append after close must log the failure as a contained ERROR',
+          );
+        } finally {
+          rejections?.restore();
+        }
+      });
+    },
+  );
 }

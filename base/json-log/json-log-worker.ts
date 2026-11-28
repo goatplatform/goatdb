@@ -448,6 +448,18 @@ function scanCursor(
   return BinaryLogFileScan(cursor as BinaryLogFileCursor);
 }
 
+// startScanPrefetch attaches a rejection consumer to the prefetch promise so
+// a read failure cannot crash the shared worker as an unhandled rejection.
+// The returned promise is the original one, so awaiting it in the 'scan'
+// handler still surfaces the error to the scan caller.
+function startScanPrefetch(
+  cursor: BinaryLogFileCursor | JSONLCursor,
+): Promise<ScanResult | BinaryScanResult> {
+  const promise = scanCursor(cursor);
+  promise.catch(() => {});
+  return promise;
+}
+
 function JSONLogFileFlush(file: JSONLogFile): Promise<void> {
   return file.impl.flush(file.handle);
 }
@@ -655,8 +667,15 @@ async function handleRequest(
     case 'close': {
       const file = gOpenFiles.get(req.file);
       if (file) {
-        gOpenFiles.delete(req.file);
         await JSONLogFileClose(file);
+        // Only drop the entry once close succeeds; on rejection keep it so a
+        // retried teardown flush can find the file again.
+        gOpenFiles.delete(req.file);
+        // Retire cursors of the closing file so a stale cursor cannot send
+        // scan requests after its file is gone.
+        for (const [id, entry] of gOpenCursors) {
+          if (entry.cursor.file === file) gOpenCursors.delete(id);
+        }
       }
       const resp: WorkerFileRespClose = {
         type: 'close',
@@ -682,7 +701,7 @@ async function handleRequest(
         ? await JSONLStartCursor(file)
         : await BinaryLogFileStartCursor(file);
       const cursorId = ++gOpenCursorNum;
-      const nextPromise = scanCursor(cursor);
+      const nextPromise = startScanPrefetch(cursor);
       gOpenCursors.set(cursorId, { cursor, nextPromise });
       const resp: WorkerFileRespCursor = {
         type: 'cursor',
@@ -697,16 +716,24 @@ async function handleRequest(
       const entry = gOpenCursors.get(req.cursor);
       assert(entry !== undefined, 'Cursor not found');
       if (!entry.nextPromise) {
-        entry.nextPromise = scanCursor(entry.cursor);
+        entry.nextPromise = startScanPrefetch(entry.cursor);
       }
-      const result = await entry.nextPromise;
+      let result: ScanResult | BinaryScanResult;
+      try {
+        result = await entry.nextPromise;
+      } catch (err) {
+        // Retire the failed cursor so stale scan requests cannot leak or
+        // resend, while preserving the first error for the scan caller.
+        gOpenCursors.delete(req.cursor);
+        throw err;
+      }
 
       // Binary format returns BinaryScanResult (object with buffer/offsets)
       if (!Array.isArray(result)) {
         if (result.done) {
           gOpenCursors.delete(req.cursor);
         } else {
-          entry.nextPromise = scanCursor(entry.cursor);
+          entry.nextPromise = startScanPrefetch(entry.cursor);
         }
         const resp: WorkerFileRespScan = {
           type: 'scan',
@@ -732,7 +759,7 @@ async function handleRequest(
       if (done) {
         gOpenCursors.delete(req.cursor);
       } else {
-        entry.nextPromise = scanCursor(entry.cursor);
+        entry.nextPromise = startScanPrefetch(entry.cursor);
       }
       const resp: WorkerFileRespScan = {
         type: 'scan',

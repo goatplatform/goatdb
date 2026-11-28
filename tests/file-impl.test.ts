@@ -7,9 +7,10 @@
  */
 
 import { TEST } from './mod.ts';
-import { assertEquals, assertTrue } from './asserts.ts';
+import { assertEquals, assertThrows, assertTrue } from './asserts.ts';
 import * as path from '../base/path.ts';
 import { FileImplGet, readFile } from '../base/json-log/file-impl.ts';
+import { FileImplNode } from '../base/json-log/file-impl-node.ts';
 import { isBrowser } from '../base/common.ts';
 
 export default function setupFileImplTests() {
@@ -236,5 +237,21 @@ export default function setupFileImplTests() {
     assertEquals(entries.length, 2, 'should list 2 entries');
     const names = entries.map((e) => e.name).sort();
     assertEquals(names, ['a.txt', 'b.txt'], 'entry names should match');
+  });
+
+  TEST('FileImpl', 'node close propagates handle close rejection', async () => {
+    if (isBrowser()) return;
+    const fakeHandle = {
+      file: {
+        close() {
+          throw new Error('fake close failure');
+        },
+      },
+      pos: 0,
+    } as unknown as Parameters<typeof FileImplNode.close>[0];
+    await assertThrows(
+      () => FileImplNode.close(fakeHandle),
+      'close() must reject when the underlying handle close throws',
+    );
   });
 }

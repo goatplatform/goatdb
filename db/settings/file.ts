@@ -32,7 +32,7 @@ export class FileSettings implements DBSettingsProvider {
     readonly serverUrl?: string,
   ) {}
 
-  async load(): Promise<void> {
+  async load(signal?: AbortSignal): Promise<void> {
     let currentSession: OwnedSession | undefined;
     let updatedSettings = false;
     let roots: Session[] = [];
@@ -74,6 +74,7 @@ export class FileSettings implements DBSettingsProvider {
         const [publicSession, serverRoots] = await createNewSession(
           keys.publicKey,
           this.serverUrl,
+          signal,
         );
         if (publicSession) {
           currentSession = {

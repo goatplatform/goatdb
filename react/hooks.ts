@@ -6,8 +6,14 @@
  *
  * @module GoatDB/React
  */
-import React, { useCallback, useContext, useSyncExternalStore } from 'react';
-import { GoatDB } from '../db/db.ts';
+import React, {
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from 'react';
+import { type DBState, GoatDB } from '../db/db.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 import { ManagedItem } from '../db/managed-item.ts';
 import { type MutationPack, mutationPackHasField } from '../db/mutations.ts';
@@ -15,11 +21,14 @@ import type { ReadonlyJSONValue } from '../base/interfaces.ts';
 import type { Query, QueryConfig } from '../repo/query.ts';
 import { getBaseURL } from '../net/rest-api.ts';
 
-type GoatDBCtxProps = {
+export type GoatDBCtxProps = {
   db?: GoatDB;
 };
 
-const GoatDBContext = React.createContext<GoatDBCtxProps>({});
+/** Exported so tests and hosts can inject a specific DB instance. */
+export const GoatDBContext: React.Context<GoatDBCtxProps> = React.createContext<
+  GoatDBCtxProps
+>({});
 
 /**
  * Opens a local DB, creating it if necessary. Once opened, the DB is available
@@ -49,6 +58,27 @@ export function useDB<US extends Schema>(): GoatDB<
   const getSnapshot = useCallback(() => changeCount, [ctx.db]);
   useSyncExternalStore(subscribe, getSnapshot);
   return ctx.db as unknown as GoatDB<US>;
+}
+
+/**
+ * Materializes a referentially stable snapshot for useSyncExternalStore. The
+ * returned value keeps the same identity while both `a` and `b` are unchanged,
+ * and switches to a fresh object the moment either differs — so DB lifecycle
+ * transitions (e.g. close) force a re-render even when the underlying value is
+ * otherwise identical.
+ */
+function cachedSnapshot<T>(
+  cacheRef: { current: { a: unknown; b: unknown; value: T } | null },
+  a: unknown,
+  b: unknown,
+  value: T,
+): T {
+  const cached = cacheRef.current;
+  if (!cached || cached.a !== a || cached.b !== b) {
+    cacheRef.current = { a, b, value };
+    return value;
+  }
+  return cached.value;
 }
 
 /**
@@ -236,12 +266,13 @@ export function useItem<S extends Schema>(
  * @param item The item to monitor.
  * @param opts Options object for configuring this hook.
  *
- * @returns The given {@link ManagedItem} instance.
+ * @returns The given {@link ManagedItem} instance, or `undefined` once the DB
+ *          is closing, closed, or failed (it stays live while booting).
  */
 export function useItem<S extends Schema>(
   item: ManagedItem<S>,
   opts: UseItemOpts,
-): ManagedItem<S>;
+): ManagedItem<S> | undefined;
 
 /**
  * This hook monitors changes to a specific item, triggering a re-render
@@ -253,11 +284,12 @@ export function useItem<S extends Schema>(
  *
  * @param item The item to monitor.
  *
- * @returns The given {@link ManagedItem} instance.
+ * @returns The given {@link ManagedItem} instance, or `undefined` once the DB
+ *          is closing, closed, or failed (it stays live while booting).
  */
 export function useItem<S extends Schema>(
   item: ManagedItem<S>,
-): ManagedItem<S>;
+): ManagedItem<S> | undefined;
 
 export function useItem<S extends Schema>(
   ...pathCompsOrOpts: (ManagedItem | string | UseItemOpts | undefined)[]
@@ -275,15 +307,16 @@ export function useItem<S extends Schema>(
   } else if (lastArg !== undefined && typeof lastArg !== 'string') {
     opts = pathCompsOrOpts.pop() as UseItemOpts;
   }
-  let item: ManagedItem<S> | undefined = undefined;
-  if (pathCompsOrOpts[0] instanceof ManagedItem) {
-    item = pathCompsOrOpts[0];
-  } else if (typeof pathCompsOrOpts[0] === 'string') {
-    item = db.item<S>(...(pathCompsOrOpts as string[]));
-  }
+  // Resolve the item only while the DB is open; after close the hook
+  // returns undefined instead of throwing inside a render. No useMemo: the
+  // rest-parameter array has a fresh identity per render, and the
+  // ManagedItem branch above already normalized the first argument.
+  const item = !db.isOpen || typeof pathCompsOrOpts[0] !== 'string'
+    ? undefined
+    : db.item<S>(...(pathCompsOrOpts as string[]));
   const subscribe = useCallback(
-    (onStoreChange: () => void) =>
-      item?.attach('change', (mutations: MutationPack) => {
+    (onStoreChange: () => void) => {
+      const detachItem = item?.attach('change', (mutations: MutationPack) => {
         // Skip unneeded updates if a specific set of keys was provided
         if (
           opts?.keys !== undefined &&
@@ -299,10 +332,29 @@ export function useItem<S extends Schema>(
           }
         }
         onStoreChange();
-      }) || (() => {}),
-    [item],
+      }) || (() => {});
+      // Lifecycle events must also re-render so close resolves item to undefined.
+      const detachDb = db.attach('LifecycleChanged', onStoreChange);
+      return () => {
+        detachItem();
+        detachDb();
+      };
+    },
+    [item, db],
   );
-  const getSnapshot = useCallback(() => item?.age, [item]);
+  const snapshotRef = useRef<
+    { a: unknown; b: unknown; value: { state: DBState; age?: number } } | null
+  >(null);
+  const getSnapshot = useCallback(
+    () =>
+      cachedSnapshot(
+        snapshotRef,
+        db.state,
+        item?.age,
+        { state: db.state, age: item?.age },
+      ),
+    [item, db],
+  );
   useSyncExternalStore(subscribe, getSnapshot);
   return typeof item?.schema.ns !== 'string' ? undefined : item;
 }
@@ -310,7 +362,12 @@ export function useItem<S extends Schema>(
 /**
  * Represents the state of the loading process.
  */
-export type DBReadyState = 'loading' | 'ready' | 'error';
+export type DBReadyState =
+  | 'loading'
+  | 'ready'
+  | 'error'
+  | 'closing'
+  | 'closed';
 
 /**
  * A hook for monitoring the DB's loading process. The hook triggers whenever
@@ -320,37 +377,27 @@ export type DBReadyState = 'loading' | 'ready' | 'error';
  */
 export function useDBReady(): DBReadyState {
   const db = useDB();
-  let error = false;
+  // GoatDB logs bootstrap failures; do not add a second readyPromise() consumer.
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
-      if (!db.ready) {
-        let cancelled = false;
-        db.readyPromise()
-          .then(() => {
-            if (!cancelled) {
-              onStoreChange();
-            }
-          })
-          .catch((err) => {
-            console.error(err);
-            error = true;
-            if (!cancelled) {
-              onStoreChange();
-            }
-          });
-        return () => {
-          cancelled = true;
-        };
-      }
-      return () => {};
+      // Return detach so useSyncExternalStore unsubscribes.
+      return db.attach('LifecycleChanged', onStoreChange);
     },
     [db],
   );
   const getSnapshot = useCallback(() => {
-    if (error) {
-      return 'error';
+    switch (db.state) {
+      case 'closed':
+        return 'closed';
+      case 'failed':
+        return 'error';
+      case 'closing':
+        return 'closing';
+      case 'ready':
+        return 'ready';
+      default:
+        return 'loading';
     }
-    return db.ready ? 'ready' : 'loading';
   }, [db]);
   return useSyncExternalStore(subscribe, getSnapshot);
 }
@@ -383,21 +430,50 @@ export interface UseQueryOpts<
  * to resume execution from the cached state.
  * For additional details, refer to the [query mechanism documentation](https://goatdb.dev/docs/query).
  *
+ * Once the DB is closed/failed/closing the hook returns `undefined` instead of
+ * throwing, so mounted consumers keep rendering; combine with
+ * {@link useDBReady} to unmount when the DB closes.
+ *
  * @param config Configuration of the desired query.
- * @returns A live {@link Query} instance.
+ * @returns A live {@link Query} instance, or `undefined` once the DB is
+ *          closing, closed, or failed (it stays live while booting).
  */
 export function useQuery<
   IS extends Schema,
   CTX extends ReadonlyJSONValue,
   OS extends IS = IS,
->(config: UseQueryOpts<IS, CTX, OS>): Query<IS, OS, CTX> {
+>(config: UseQueryOpts<IS, CTX, OS>): Query<IS, OS, CTX> | undefined {
   const db = useDB();
-  const query = db.query(config);
-  const subscribe = useCallback(
-    (onStoreChange: () => void) => query.onResultsChanged(onStoreChange),
-    [query],
+  const query = useMemo<Query<IS, OS, CTX> | undefined>(
+    () => (db.isOpen ? db.query(config) : undefined),
+    [db, db.isOpen, config],
   );
-  const getSnapshot = useCallback(() => query.results(), [query]);
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      const detachQuery = query?.onResultsChanged(onStoreChange) ?? (() => {});
+      // Lifecycle events must also re-render so close resolves query to undefined.
+      const detachDb = db.attach('LifecycleChanged', onStoreChange);
+      return () => {
+        detachQuery();
+        detachDb();
+      };
+    },
+    [query, db],
+  );
+  const snapshotRef = useRef<
+    | { a: unknown; b: unknown; value: { state: DBState; results: unknown } }
+    | null
+  >(null);
+  const getSnapshot = useCallback(
+    () => {
+      const results: unknown = db.isOpen ? query?.results() : undefined;
+      return cachedSnapshot(snapshotRef, db.state, results, {
+        state: db.state,
+        results,
+      });
+    },
+    [query, db],
+  );
   useSyncExternalStore(subscribe, getSnapshot);
   return query;
 }

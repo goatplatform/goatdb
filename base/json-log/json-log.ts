@@ -13,6 +13,7 @@
  */
 import { kStaticAssetsSystem } from '../../system-assets/system-assets.ts';
 import { assert } from '../error.ts';
+import { onSettled } from '../async.ts';
 import type {
   WorkerFileReq,
   WorkerFileReqAppend,
@@ -65,9 +66,7 @@ type NodeWorkerPostMessage = {
  *
  * @returns The Worker instance, either newly created or existing
  */
-export async function startJSONLogWorkerIfNeeded(): Promise<
-  Worker | NodeWorker
-> {
+export function startJSONLogWorkerIfNeeded(): Worker | NodeWorker {
   if (gWorker === undefined) {
     const workerJs = new TextDecoder().decode(
       kStaticAssetsSystem['/system-assets/json-log-worker.js'].data,
@@ -120,17 +119,16 @@ function trackFileOperation<T>(
   const pendingSet = gPendingFileOperations.get(file)!;
   pendingSet.add(operation);
 
-  operation.finally(() => {
+  const cleanup = function () {
     pendingSet.delete(operation);
-    if (pendingSet.size === 0) {
-      gPendingFileOperations.delete(file);
-    }
-  });
+    if (pendingSet.size === 0) gPendingFileOperations.delete(file);
+  };
+  onSettled(operation, cleanup);
 
   return operation;
 }
 
-async function sendRequest<T extends WorkerFileReq>(
+function sendRequest<T extends WorkerFileReq>(
   req: Omit<T, 'id'>,
 ): Promise<WorkerFileRespForReq<T>> {
   let resolve!: (v: WorkerFileResp) => void;
@@ -144,7 +142,7 @@ async function sendRequest<T extends WorkerFileReq>(
     resolve,
     reject,
   });
-  const worker = await startJSONLogWorkerIfNeeded();
+  const worker = startJSONLogWorkerIfNeeded();
   worker.postMessage({
     ...req,
     id,
@@ -295,7 +293,16 @@ export async function JSONLogFileScan(
     promise = trackFileOperation(file, promise);
   }
 
-  const resp = await promise;
+  let resp: WorkerFileRespScan;
+  try {
+    resp = await promise;
+  } catch (err) {
+    // Failed first scan never set gPendingScanPromise (delete is a no-op);
+    // only the cursor-map delete works; trackFileOperation does the rest.
+    gPendingScanPromise.delete(cursor);
+    gCursorToFile.delete(cursor);
+    throw err;
+  }
   if (resp.done) {
     gPendingScanPromise.delete(cursor);
     gCursorToFile.delete(cursor);

@@ -49,7 +49,7 @@ const results = adminUsers.results();
 
 :::note
 
-These examples assume a ready database. In non-React flows, register schemas before use, await `db.readyPromise()`, and close with `await db.flushAll(); await db.close()` in a try/finally block. See [Reading and Writing Data](/docs/read-write-data) for a complete lifecycle example.
+These examples assume a ready database. In non-React flows, register schemas before use and await `db.readyPromise()` before operations; see [Reading and Writing Data](/docs/read-write-data) for the full lifecycle and close-recovery contract.
 
 :::
 

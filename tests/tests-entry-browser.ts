@@ -40,6 +40,9 @@ import setupLiveQuery from './live-query.test.ts';
 import setupHashMap from './hash-map.test.ts';
 import setupCoreValueCompare from './core-value-compare.test.ts';
 import setupAutoClose from './auto-close.test.ts';
+import setupClosedState from './closed-state.test.ts';
+import setupClosedStateLifecycle from './closed-state-lifecycle.test.ts';
+import setupReactDbReady from './react-db-ready.test.ts';
 import { getEnvVar } from '../base/os.ts';
 import { notReached } from '../base/error.ts';
 
@@ -63,6 +66,7 @@ class TestConsoleLogStream implements LogStream {
  * Browser test entry point - all browser-compatible existing tests.
  */
 async function main(): Promise<void> {
+  (globalThis as { global?: unknown }).global = globalThis; // react-test-renderer needs Node's global in browser
   // Wipe OPFS to prevent stale data from previous runs contaminating results
   await clearOPFS();
 
@@ -93,6 +97,9 @@ async function main(): Promise<void> {
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
   setupLiveQuery(); // Live query membership updates on ManagedItem edits
   setupAutoClose(); // Auto-close of inactive repos and queries
+  setupClosedState(); // DB instance closed state
+  setupClosedStateLifecycle(); // Lifecycle edge cases (dropped writes, cancellation vs failure, validation)
+  setupReactDbReady(); // useDBReady follows DB lifecycle transitions
   setupTrusted(); // Database operations in trusted mode - CRITICAL for browser
   setupStaticAssetsEndpoint(); // File serving and asset management
 
@@ -120,10 +127,11 @@ async function main(): Promise<void> {
 
   if (isBrowser()) {
     // Mark summary as completed for browser automation
-    (summary as any).completed = true;
+    (summary as TestSummary & { completed?: boolean }).completed = true;
 
     // In browser, also set global results for automation
-    (globalThis as any).testResults = summary;
+    (globalThis as typeof globalThis & { testResults?: unknown }).testResults =
+      summary;
     globalThis.dispatchEvent(
       new CustomEvent('testsComplete', { detail: summary }),
     );

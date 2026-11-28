@@ -10,6 +10,7 @@ import * as ArrayUtils from '../base/array.ts';
 import { filterIterable, mapIterable } from '../base/common.ts';
 import { coreValueCompare } from '../base/core-types/index.ts';
 import { assert } from '../base/error.ts';
+import { onSettled } from '../base/async.ts';
 import * as SetUtils from '../base/set.ts';
 import { Edit } from '../cfds/base/edit.ts';
 import { Code, ServerError, serviceUnavailable } from '../cfds/base/errors.ts';
@@ -25,7 +26,6 @@ import {
 } from '../cfds/base/schema.ts';
 import {
   Commit,
-  commitContentsIsDelta,
   commitContentsIsDocument,
   type DeltaContents,
 } from './commit.ts';
@@ -126,6 +126,16 @@ export class Repository<
   >;
   /** @internal In-flight write promises (setValueForKey + insert) drained by close. */
   readonly _pendingWrites: Set<Promise<unknown>> = new Set();
+
+  /** @internal Tracks an in-flight write so close drains it before teardown. */
+  private async _trackPendingWrite<T>(p: Promise<T>): Promise<T> {
+    this._pendingWrites.add(p);
+    try {
+      return await p;
+    } finally {
+      this._pendingWrites.delete(p);
+    }
+  }
   private readonly _cachedCommitsPerUser: Map<string | undefined, string[]>;
   private readonly _commitIsCorruptedResult: Map<string, boolean>;
   private readonly _cachedCommitsWithRecord: Set<string>;
@@ -141,7 +151,9 @@ export class Repository<
   /** @internal Close lifecycle state. db.open() and auto-close check this
    * before transitioning; combined with _closePromises in GoatDB for
    * await-based serialization of Open -> Closing -> Closed. */
-  _closeState: 'open' | 'closing' | 'closed' = 'open';
+  _closeState: 'open' | 'closing' | 'close-failed' | 'closed' = 'open';
+  /** @internal True once teardown detached listeners; re-committing is unsafe. */
+  _teardownDetached = false;
   /** @internal Active idle leases (e.g. in-flight item commits via acquireRepo). */
   _idleLeaseCount = 0;
   /** Guards timer scheduling until _openImpl completes (no slow-open expiry). */
@@ -294,25 +306,28 @@ export class Repository<
   }
 
   /**
-   * @internal True when a close (manual or auto) is in flight or the repo is
-   * not open. Writes must fail explicitly instead of silently landing on a
-   * repo that is being torn down.
+   * @internal True when the DB lifecycle is open (this.db.isOpen) and this
+   * repo is open with no close in flight. Writes must fail explicitly
+   * instead of silently landing on a repo that is being torn down.
    */
   _canWrite(): boolean {
-    return this._closeState === 'open' && !this.db._isCloseInFlight(this.path);
+    return this.db.isOpen &&
+      this._closeState === 'open' &&
+      !this.db._isCloseInFlight(this.path);
   }
 
   /** @internal Called by the idle timer to request close. */
   _onIdleTimeout(): void {
     if (!this._isIdleEligible()) return;
-    // Fire-and-forget, but never leave the promise unobserved: the lock branch
-    // of _requestRepoIdleClose() awaits a manual close promise that may
-    // rethrow a teardown failure.
+    // Fire-and-forget, but never leave the promise unobserved. A failed
+    // teardown leaves the repo registered in 'closing' so the next open or
+    // close retries it; log so the failure is visible meanwhile.
     void this.db._requestRepoIdleClose(this).catch((e) => {
       log({
-        severity: 'WARNING',
+        severity: 'ERROR',
         error: 'StorageError',
-        message: `Auto-close of repo ${this.path} failed: ${e}`,
+        message:
+          `Auto-close of repo ${this.path} failed; repo left registered in close-failed state for retry: ${e}`,
       });
     });
   }
@@ -967,7 +982,7 @@ export class Repository<
         revert,
         deltaCompress,
       );
-      result.finally(() => {
+      onSettled(result, () => {
         if (this._pendingCommitPromises.get(key) === result) {
           this._pendingCommitPromises.delete(key);
         }
@@ -1168,7 +1183,7 @@ export class Repository<
         this.trustPool.currentSession,
         mergeCommit,
       );
-      await this.persistVerifiedCommits([signedCommit]);
+      await this._persistVerifiedCommitsImpl([signedCommit]);
       return this.cacheHeadForKey(key, signedCommit);
     } catch (e) {
       if (!(e instanceof ServerError && e.code === Code.ServiceUnavailable)) {
@@ -1177,7 +1192,14 @@ export class Repository<
     }
   }
 
-  async mergeIfNeeded(key: string): Promise<Commit | undefined> {
+  mergeIfNeeded(key: string): Promise<Commit | undefined> {
+    if (!this._canWrite()) throw serviceUnavailable();
+    return this._trackPendingWrite(this._mergeIfNeededImpl(key));
+  }
+
+  /** @internal Unguarded merge body; the caller holds the write gate or is
+   * a close-time teardown internal that must not be blocked by it. */
+  private async _mergeIfNeededImpl(key: string): Promise<Commit | undefined> {
     const leaves = this.leavesForKey(key);
     if (!leaves.length) {
       return undefined;
@@ -1260,7 +1282,7 @@ export class Repository<
    * returned value, future calls to `valueForKey` will return the updated
    * record.
    */
-  async setValueForKey<S extends Schema>(
+  setValueForKey<S extends Schema>(
     key: string,
     value: Item<S>,
     parentCommit: string | Commit | undefined,
@@ -1281,16 +1303,15 @@ export class Repository<
       this.releaseIdleLease();
       throw serviceUnavailable();
     }
-    const p = this._setValueForKeyImpl(key, value, parentCommit).finally(() => {
+    const p = this._setValueForKeyImpl(key, value, parentCommit);
+    onSettled(p, () => {
       this._pendingCommitPromises.delete(key);
-      this._pendingWrites.delete(p);
       // Release the idle lease after the impl completes (success or
       // failure), so auto-close is re-enabled.
       this.releaseIdleLease();
     });
-    this._pendingWrites.add(p);
     this._pendingCommitPromises.set(key, p);
-    return p;
+    return this._trackPendingWrite(p);
   }
 
   /**
@@ -1355,9 +1376,9 @@ export class Repository<
     const signedCommit = this.db.trusted
       ? commit
       : await signCommit(session, commit);
-    await this.persistVerifiedCommits([signedCommit]);
+    await this._persistVerifiedCommitsImpl([signedCommit]);
     this.invalidateCachesForKey(key);
-    return (await this.mergeIfNeeded(key)) || signedCommit;
+    return (await this._mergeIfNeededImpl(key)) || signedCommit;
   }
 
   async create<S extends Schema>(key: string, value: Item<S>): Promise<Commit> {
@@ -1375,12 +1396,9 @@ export class Repository<
     // Hold an idle lease during the bulk write so an auto-close cannot tear
     // down the repo between commits.
     this.acquireIdleLease();
-    const p = this._insertImpl(entries);
-    this._pendingWrites.add(p);
     try {
-      return await p;
+      return await this._trackPendingWrite(this._insertImpl(entries));
     } finally {
-      this._pendingWrites.delete(p);
       this.releaseIdleLease();
     }
   }
@@ -1427,7 +1445,7 @@ export class Repository<
 
     // Persist in one batch
     if (commits.length > 0) {
-      await this.persistVerifiedCommits(commits);
+      await this._persistVerifiedCommitsImpl(commits);
     }
 
     // Await fallback for existing keys
@@ -1638,7 +1656,14 @@ export class Repository<
     return undefined;
   }
 
-  async persistCommits(commits: Iterable<Commit>): Promise<Commit[]> {
+  persistCommits(commits: Iterable<Commit>): Promise<Commit[]> {
+    if (!this._canWrite()) throw serviceUnavailable();
+    return this._trackPendingWrite(this._persistCommitsImpl(commits));
+  }
+
+  private async _persistCommitsImpl(
+    commits: Iterable<Commit>,
+  ): Promise<Commit[]> {
     const batchSize = 50;
     const result: Commit[] = [];
     let batch: Commit[] = [];
@@ -1663,17 +1688,44 @@ export class Repository<
     for (const verifiedCommit of await this.verifyCommits(filtered)) {
       batch.push(verifiedCommit);
       if (batch.length >= batchSize) {
-        ArrayUtils.append(result, await this.persistVerifiedCommits(batch));
+        ArrayUtils.append(
+          result,
+          await this._persistVerifiedCommitsImpl(batch),
+        );
         batch = [];
       }
     }
     if (batch.length > 0) {
-      ArrayUtils.append(result, await this.persistVerifiedCommits(batch));
+      ArrayUtils.append(result, await this._persistVerifiedCommitsImpl(batch));
     }
     return result;
   }
 
-  async persistVerifiedCommits(commits: Iterable<Commit>): Promise<Commit[]> {
+  persistVerifiedCommits(commits: Iterable<Commit>): Promise<Commit[]> {
+    if (!this._canWrite()) throw serviceUnavailable();
+    return this._trackPendingWrite(this._persistVerifiedCommitsImpl(commits));
+  }
+
+  /**
+   * @internal Bootstrap seam: the only cross-module entry to the unguarded
+   * persist primitive. GoatDB's close-time reopen uses this while the DB
+   * lifecycle is transitioning and the public write guard would reject.
+   */
+  _persistVerifiedCommitsForBootstrap(
+    commits: Iterable<Commit>,
+  ): Promise<Commit[]> {
+    return this._persistVerifiedCommitsImpl(commits);
+  }
+
+  /**
+   * @internal Unguarded persist primitive. Private: reachable only from within
+   * this class and via _persistVerifiedCommitsForBootstrap. Public writers must
+   * go through persistCommits() / persistVerifiedCommits(), which carry the
+   * write guard and pending-write tracking.
+   */
+  private async _persistVerifiedCommitsImpl(
+    commits: Iterable<Commit>,
+  ): Promise<Commit[]> {
     const adjList = this._adjList;
     const result: Commit[] = [];
     let batch: Commit[] = [];

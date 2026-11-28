@@ -2,6 +2,7 @@
  * Simple process lifecycle manager for browser testing infrastructure.
  * Handles spawning and cleanup of child processes with graceful shutdown.
  */
+import { onSettled } from './async.ts';
 
 export class ProcessManager {
   private processes = new Set<Deno.ChildProcess>();
@@ -18,7 +19,7 @@ export class ProcessManager {
     this.processes.add(process);
 
     // Auto-cleanup when process exits naturally
-    process.status.finally(() => this.processes.delete(process));
+    onSettled(process.status, () => this.processes.delete(process));
     return process;
   }
 

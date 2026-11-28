@@ -82,9 +82,14 @@ export const FileImplNode: FileImpl<NodeFsFile> = {
     }
   },
 
-  close(handle) {
-    handle.file.close();
-    return Promise.resolve();
+  close(handle): Promise<void> {
+    // Propagate close failures as a rejected promise so callers can retry
+    // teardown flush; sync throws become rejections too.
+    try {
+      return handle.file.close();
+    } catch (e) {
+      return Promise.reject(e);
+    }
   },
 
   async flush(handle) {

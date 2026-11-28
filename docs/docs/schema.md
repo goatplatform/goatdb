@@ -62,7 +62,7 @@ task.set('completed', 'yes'); // ❌ TypeScript error
 
 :::note
 
-In non-React flows, await `db.readyPromise()` before operations and close with `await db.flushAll(); await db.close()` in a try/finally block. See [Reading and Writing Data](/docs/read-write-data) for a complete lifecycle example.
+In non-React flows, await `db.readyPromise()` before operations; see [Reading and Writing Data](/docs/read-write-data) for the full lifecycle and close-recovery contract.
 
 :::
 

@@ -16,7 +16,12 @@ import type { Commit } from '../repo/commit.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { assert } from '../base/error.ts';
 import { getGoatConfig } from '../base/config.ts';
-import { serviceUnavailable } from '../cfds/base/errors.ts';
+import {
+  CancelledError,
+  Code,
+  ServerError,
+  serviceUnavailable,
+} from '../cfds/base/errors.ts';
 
 const COMMIT_SUBMIT_RETRY = 10;
 const MAX_SYNC_FAILURES = 10;
@@ -247,13 +252,16 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
         priority,
       )) as typeof reqMsg;
     } catch (e: unknown) {
-      log({
-        severity: 'INFO',
-        error: 'SerializeError',
-        value: (e as Error).message,
-        message: (e as Error).message,
-        trace: (e as Error).stack,
-      });
+      // Log only real peer/transport faults so shutdown stays quiet.
+      if (!this.scheduler.isClosed) {
+        log({
+          severity: 'INFO',
+          error: 'SerializeError',
+          value: (e as Error).message,
+          message: (e as Error).message,
+          trace: (e as Error).stack,
+        });
+      }
       this._setIsOnline(false);
       return false;
     } finally {
@@ -280,7 +288,24 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
     let persistedCount = 0;
     if (syncResp.values.length) {
       const start = performance.now();
-      persistedCount = await this.persistPeerValues(syncResp.values);
+      try {
+        persistedCount = await this.persistPeerValues(syncResp.values);
+      } catch (e: unknown) {
+        // Swallow only a genuine cancellation (close aborted the write). Real
+        // storage/signature faults propagate even when a close races the
+        // ingest, so they are never masked as a cancellation.
+        if (e instanceof CancelledError) return false;
+        // The repository write guard rejects the ingest once teardown
+        // started; that is close aborting the ingest, not a peer fault.
+        if (
+          e instanceof ServerError &&
+          e.code === Code.ServiceUnavailable &&
+          (this.closed || this.scheduler.isClosed)
+        ) {
+          return false;
+        }
+        throw e;
+      }
       if (randomInt(0, 100) === 0) {
         log({
           severity: 'METRIC',
@@ -331,10 +356,15 @@ export class RepoClient extends Emitter<typeof EVENT_STATUS_CHANGED> {
         if (await this.sendSyncMessage()) {
           ++i;
           failures = 0;
+        } else if (this.closed || this.scheduler.isClosed) {
+          // A closed client/scheduler is cancellation, not retry exhaustion.
+          throw new CancelledError();
         } else if (++failures >= MAX_SYNC_FAILURES) {
           throw serviceUnavailable();
         }
       } while (!this.closed && i <= cycleCount);
+      // A close mid-sync is a cancellation, not a peer failure.
+      if (this.closed || this.scheduler.isClosed) throw new CancelledError();
     } finally {
       this._syncActive = false;
     }

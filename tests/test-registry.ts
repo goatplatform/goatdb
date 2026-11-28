@@ -58,10 +58,15 @@ import setupSecurityBoundaries from './security-boundaries.test.ts';
 import setupLiveQuery from './live-query.test.ts';
 import setupWriteFailure from './write-failure.test.ts';
 import setupQueryId from './query-id.test.ts';
+
 import setupHashMap from './hash-map.test.ts';
 import setupCoreValueCompare from './core-value-compare.test.ts';
 import setupDocsMdxEscape from './docs-mdx-escape.test.ts';
 import setupAutoClose from './auto-close.test.ts';
+import setupClosedState from './closed-state.test.ts';
+import setupClosedStateLifecycle from './closed-state-lifecycle.test.ts';
+import setupClosedPersistCommits from './closed-persist-commits.test.ts';
+import setupReactDbReady from './react-db-ready.test.ts';
 
 /**
  * Registers all test suites with the default TestsRunner.
@@ -112,11 +117,16 @@ export async function registerAllTests(): Promise<void> {
   setupSyncMessageMissing(); // SyncMessage missing-commit detection
   setupSyncConvergence(); // Multi-round sync convergence simulation
   setupFileImplTests(); // FileImpl abstraction (Deno + Node.js)
+
   setupJsonLogFormats(); // JSONLog storage format (GOAT binary + JSONL)
 
   // INTEGRATION TESTS (100-500ms each) - Multiple components, file I/O
   setupLiveQuery(); // Live query membership updates on ManagedItem edits
   setupAutoClose(); // Auto-close of inactive repos and queries
+  setupClosedState(); // DB instance closed state
+  setupClosedStateLifecycle(); // Lifecycle edge cases (dropped writes, cancellation vs failure, validation, bootstrap-failure recovery)
+  setupClosedPersistCommits(); // Repository.persistCommits closed-state guard
+  setupReactDbReady(); // useDBReady follows DB lifecycle transitions
   setupWriteFailure(); // WriteFailure event after 3 consecutive I/O failures
   setupTrusted(); // Database operations in trusted mode
   setupUntrusted(); // Database operations in untrusted mode

@@ -24,7 +24,12 @@
  * only a small E2E layer uses real timers for scheduler integration.
  */
 
-import { assertEquals, assertExists, assertTrue } from './asserts.ts';
+import {
+  assertEquals,
+  assertExists,
+  assertThrows,
+  assertTrue,
+} from './asserts.ts';
 import { TEST } from './mod.ts';
 import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { isBrowser } from '../base/common.ts';
@@ -126,6 +131,21 @@ export default function setup(): void {
       threw = true;
     }
     assertTrue(threw, 'negative repoInactivityTimeoutMs must throw');
+  });
+
+  TEST('AutoClose', 'bootstrapStallMs bounds throw', async (ctx) => {
+    for (const bad of [-1, 0, NaN, Infinity]) {
+      let threw = false;
+      try {
+        await ctx.createDB(`ac-bstall-${bad}`, {
+          registry: kRegistry,
+          bootstrapStallMs: bad,
+        });
+      } catch {
+        threw = true;
+      }
+      assertTrue(threw, `bootstrapStallMs ${bad} must throw`);
+    }
   });
 
   // ════════════════════════════════════════════════════════════════
@@ -1171,6 +1191,50 @@ export default function setup(): void {
 
   TEST(
     'AutoClose',
+    'failed auto-close leaves the repo for retry, then opens a fresh one',
+    async (ctx) => {
+      const db = await ctx.createDB('ac-idle-teardown-failure', {
+        registry: kRegistry,
+      });
+      try {
+        await db.readyPromise();
+        const item = db.create('/data/items/x', kAutoCloseSchema, {
+          value: 'v1',
+        });
+        await item.commit();
+        await db.flushAll();
+        const oldRepo = repoFor(db, '/data/items');
+        assertExists(oldRepo);
+
+        db.setTestFaults({ teardownFailures: 1 });
+        await assertThrows(
+          () => p(oldRepo)._testTriggerIdleTimeout(),
+          'auto-close rejects when teardown fails',
+        );
+        assertTrue(
+          db.repository('/data/items') === oldRepo,
+          'a failed teardown leaves the repo registered for retry',
+        );
+
+        const freshRepo = await db.open('/data/items');
+        assertTrue(freshRepo !== oldRepo, 'open returns a fresh instance');
+        assertTrue(
+          db.repository('/data/items') === freshRepo,
+          'the fresh instance replaced the half-torn repo',
+        );
+        assertEquals(
+          db.item('/data/items/x').get('value'),
+          'v1',
+          'committed data survives a failed teardown retry',
+        );
+      } finally {
+        await db.close();
+      }
+    },
+  );
+
+  TEST(
+    'AutoClose',
     'manual closeRepo awaits in-flight auto-close',
     async (ctx) => {
       const db = await ctx.createDB('ac-race-auto-manual', {
@@ -1372,7 +1436,7 @@ export default function setup(): void {
       const repo = await db.open('/data/items');
 
       // Trigger auto-close, then immediately close the whole database. The two
-      // teardown paths must serialize through _closeLocks/_closePromises
+      // teardown paths must serialize through _closePromises
       // instead of double-tearing the repo down.
       const autoCloseP = p(repo)._testTriggerIdleTimeout();
       await db.close();

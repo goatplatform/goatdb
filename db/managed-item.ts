@@ -1,4 +1,8 @@
-import type { Schema, SchemaDataType } from '../cfds/base/schema.ts';
+import {
+  type Schema,
+  type SchemaDataType,
+  SchemaEquals,
+} from '../cfds/base/schema.ts';
 import type { Commit } from '../repo/commit.ts';
 import type { Repository } from '../repo/repo.ts';
 import { itemPathGetPart, itemPathGetRepoId, itemPathIsValid } from './path.ts';
@@ -12,8 +16,25 @@ import {
 import { SimpleTimer, type Timer } from '../base/timer.ts';
 import type { GoatDB } from './db.ts';
 import { assert } from '../base/error.ts';
+import {
+  assertOpen,
+  serviceUnavailable,
+  ValidationError,
+} from '../cfds/base/errors.ts';
 import { log } from '../logging/log.ts';
 import { ScratchPool } from '../base/scratch-pool.ts';
+
+/** Single source of truth for invalid-item skip messages (public + synthetic dirt). */
+function skippingCommitMessage(path: string, cause: unknown): string {
+  return `[GoatDB] Skipping commit for invalid item at ${path}: ${cause}`;
+}
+
+/** Repo write primitive used by the shared commit tail. */
+type CommitWrite<S extends Schema = Schema> = (
+  key: string,
+  doc: Item<S>,
+  head: string | Commit | undefined,
+) => Promise<Commit | undefined>;
 
 /**
  * A high-level interface for reading, writing, and synchronizing a single item
@@ -28,8 +49,17 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
   private readonly _commitDelayTimer: Timer;
   private _head?: Commit;
   private _item!: Item<S>;
-  private _commitPromise?: Promise<void>;
+  private _commitPromise?: Promise<boolean>;
+  // Bumped by discardPendingEdits() to invalidate any in-flight commit so a
+  // discarded draft cannot be written after the discard decision.
+  private _commitEpoch: number = 0;
+  // The committed record at the current head; discardPendingEdits() restores
+  // this even after a failed close tears the repo down. Refreshed on load,
+  // after writes, and whenever a rebase advances the head, so a discard never
+  // revives stale pre-rebase content.
+  private _committedSnapshot?: Item<S>;
   private _age: number = 0;
+  private _localEditCount: number = 0; // local edits (not rebase artifacts)
   private _commitInProgress: boolean = false;
   // True when local edits have not yet been persisted. Cleared only after a
   // successful commit that was not overtaken by a newer edit; a failed commit
@@ -37,6 +67,8 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
   private _dirty: boolean = false;
   private _ready: boolean = false;
   private _readyPromiseResolve?: () => void;
+  private _readyPromiseReject?: (e: unknown) => void;
+  /** Settles once; stays rejected after a failed load so later awaiters see it. */
   private _readyPromise?: Promise<void>;
   // deno-lint-ignore no-explicit-any
   private readonly _scratchPool = new ScratchPool<Mutation<any>>(
@@ -48,22 +80,31 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     assert(itemPathIsValid(path), `Invalid item path: ${path}`);
     this.path = path;
     this._commitDelayTimer = new SimpleTimer(300, false, () => {
+      // Close owns persistence for dirty items; any other failure is a real
+      // fault and must stay visible (ERROR), not be logged away as WARNING.
+      if (!this.db.isOpen) return;
       this.commit().catch((e) => {
         log({
-          severity: 'WARNING',
+          severity: 'ERROR',
           error: 'StorageError',
           message: `Auto-commit failed for ${this.path}`,
           trace: String(e),
         });
       });
     });
-    this._readyPromise = new Promise<void>((resolve) => {
+    this._readyPromise = new Promise<void>((resolve, reject) => {
       this._readyPromiseResolve = resolve;
+      this._readyPromiseReject = reject;
     });
+    // A failed load must not surface as an unhandled rejection: callers that
+    // care await readyPromise(), and the failure is logged in _failReady().
+    this._readyPromise.catch(() => {});
     const repo = db.repository(itemPathGetRepoId(path));
     this._item = Item.nullItem(db.registry);
     if (!repo) {
-      this.loadRepoAndDoc();
+      // Fire-and-forget load. It may lose the race to close(), which rejects
+      // the open with serviceUnavailable; surface other failures.
+      this.loadRepoAndDoc().catch((e: unknown) => this._failReady(e));
     } else {
       this.loadInitialDoc(repo);
     }
@@ -96,6 +137,9 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
   /**
    * Returns a promise that resolves when this managed item is ready to use.
    * If the item is already ready, the promise resolves immediately.
+   *
+   * @throws The original error if the initial load failed (also logged), or
+   *         ServiceUnavailable if the instance closed while loading.
    */
   readyPromise(): Promise<void> {
     return this._readyPromise ?? Promise.resolve();
@@ -103,9 +147,14 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
 
   /**
    * Returns the repository that manages this item.
+   *
+   * Gated on db.isOpen: the repository owns session private keys, so a
+   * non-open instance (closing/closed/failed) must not hand it out. Internal
+   * teardown flows use ManagedItem.db._repositoryInternal() instead.
    */
   get repository(): Repository | undefined {
-    return this.db.repository(itemPathGetRepoId(this.path));
+    if (!this.db.isOpen) return undefined;
+    return this.db._repoForItem(this.path);
   }
 
   /**
@@ -129,6 +178,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    * item.
    */
   set schema(s: S) {
+    this._assertOpen();
     if (this._item.isLocked) {
       this._item = this._item.clone();
     }
@@ -169,6 +219,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    * Sets this item's delete marker. Used to delete/un-delete an item.
    */
   set isDeleted(flag: boolean) {
+    this._assertOpen();
     const oldValue = this.isDeleted;
     if (oldValue !== flag) {
       if (this._item.isLocked) this._item = this._item.clone();
@@ -232,6 +283,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     key: string & T,
     value: SchemaDataType<S>[T],
   ): void {
+    this._assertOpen();
     const oldValue = this.has(key) ? this.get(key) : undefined;
     if (this._item.isLocked) this._item = this._item.clone();
     this._item.set(key, value);
@@ -267,6 +319,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    * if it didn't exist
    */
   delete<T extends keyof SchemaDataType<S>>(key: string & T): boolean {
+    this._assertOpen();
     const oldValue = this.has(key) ? this.get(key) : undefined;
     if (this._item.isLocked) this._item = this._item.clone();
     if (this._item.delete(key)) {
@@ -301,36 +354,52 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    *
    * @returns A promise that resolves when the commit is complete
    */
-  commit(): Promise<void> {
-    this._item.normalize();
-    const [valid, error] = this._item.validate();
-    if (this.db.debug) {
-      assert(
-        valid,
-        `Attempting to commit an invalid item at ${this.path}: ${error}`,
-      );
-    } else {
-      if (!valid) {
-        log({
-          severity: 'WARNING',
-          error: 'ValidationError',
-          message:
-            `[GoatDB] Skipping commit for invalid item at ${this.path}: ${error}`,
-        });
-        return Promise.resolve();
-      }
-    }
-    // Always flush any scheduled commit and run now
+  async commit(): Promise<void> {
+    await this._commit(false);
+  }
+
+  /**
+   * @internal Close-time commit. Bypasses the DB lifecycle guard so db.close()
+   * can persist dirty items after the instance enters the closing state.
+   */
+  _commitForClose(): Promise<boolean> {
+    return this._commit(true);
+  }
+
+  private _commit(forClose: boolean): Promise<boolean> {
+    // Validation runs once per commit inside _commitTo(); direct repo writes
+    // do not re-validate.
     this._commitDelayTimer.unschedule();
     if (this._commitPromise) {
-      // Wait for the existing commit to finish, then try again if needed
-      return this._commitPromise.then(() => this.commit());
+      // Wait for the existing commit to finish, then try again if needed.
+      // Close retries even after a failure so a commit that raced close()
+      // cannot silently drop the edit; public callers keep failure semantics.
+      const pending = this._commitPromise;
+      return (forClose ? pending.catch(() => {}) : pending).then(() =>
+        this._commit(forClose)
+      );
     }
-    const p = this._commitImpl().finally(() => {
-      if (this._commitPromise === p) {
-        this._commitPromise = undefined;
-      }
-    });
+    const p = this._commitImpl(forClose)
+      .catch((e: unknown) => {
+        // Public commit() keeps its documented skip semantics: a validation
+        // failure is logged and treated as nothing-persisted, leaving the
+        // item dirty. Close-time commits propagate so close() rejects with
+        // the validation cause (see _commitDirtyItems).
+        if (!forClose && e instanceof ValidationError) {
+          log({
+            severity: 'WARNING',
+            error: 'ValidationError',
+            message: skippingCommitMessage(this.path, e.message),
+          });
+          return false;
+        }
+        throw e;
+      })
+      .finally(() => {
+        if (this._commitPromise === p) {
+          this._commitPromise = undefined;
+        }
+      });
     this._commitPromise = p;
     return p;
   }
@@ -343,7 +412,9 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    * in-memory state.
    */
   rebase(): void {
-    const repo = this.repository;
+    // Internal lookup: teardown rebases run while the DB is closing, where
+    // the public repository() getter is gated.
+    const repo = this.db._repoForItem(this.path);
     if (!repo) {
       return;
     }
@@ -365,6 +436,11 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
       this._item = doc;
       if (head) {
         this._head = repo.getCommit(head);
+        // Refresh the committed snapshot to the new head record so a later
+        // discard restores peer fields merged by this rebase, never stale
+        // pre-rebase content.
+        const entry = repo.valueForKey<S>(itemPathGetPart(this.path, 'item')!);
+        this._committedSnapshot = entry ? entry[0].clone() : undefined;
       }
       this.onChange(mutations, true);
     }
@@ -377,7 +453,8 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    */
   downloadDebugGraph(): void {
     const key = itemPathGetPart(this.path, 'item')!;
-    this.repository?.downloadDebugNetworkForKey(key);
+    this.db._repoForItem(this.path)
+      ?.downloadDebugNetworkForKey(key);
   }
 
   /**
@@ -391,6 +468,83 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
   }
 
   /**
+   * Discards any pending local edits, marking the item clean even if the edit
+   * could not be validated/persisted. Use this to recover a DB whose close()
+   * stays stuck on a permanently-invalid pending edit: after discarding, a
+   * retried close() settles without the bad edit. Intentionally ungated so it
+   * works in the `failed` state.
+   *
+   * The in-memory item is restored to the last committed state, so nothing
+   * about the discarded draft survives: no later commit, rebase, or
+   * close-time flush can revive it. An in-flight commit is invalidated via a
+   * generation counter and bails before writing; a write that already reached
+   * the repository cannot be retracted. Emits the same change events as a
+   * normal mutation so mounted consumers observe the restore.
+   */
+  discardPendingEdits(): void {
+    ++this._commitEpoch;
+    this._dirty = false;
+    this._localEditCount = 0;
+    this._commitDelayTimer.unschedule();
+    const key = itemPathGetPart(this.path, 'item')!;
+    const repo = this.db._repoForItem(this.path);
+    const target = this._restoreTarget(repo, key);
+    const mutations = this._restoreMutations(target);
+    this._item = target;
+    // Independent copy so a later _item mutation cannot corrupt the committed snapshot.
+    this._committedSnapshot = target.clone();
+    // Item/db events always fire; the repo event only when a repo is reachable.
+    this._emitRestore(repo, key, mutations);
+  }
+
+  /** Restore target: committed head record when reachable, else the snapshot/null. */
+  private _restoreTarget(repo: Repository | undefined, key: string): Item<S> {
+    const entry = repo?.valueForKey<S>(key);
+    if (entry?.[0] && SchemaEquals(this._item.schema, entry[0].schema)) {
+      return entry[0].clone();
+    }
+    return this._committedSnapshot
+      ? this._committedSnapshot.clone()
+      : Item.nullItem<S>(this.db.registry);
+  }
+
+  /** Mutations turning the current item into the restore target. */
+  private _restoreMutations(target: Item<S>): MutationPack {
+    let mutations: MutationPack;
+    for (const f of this._item.diffKeys(target, true)) {
+      mutations = mutationPackAppend(mutations, [f, false, this._item.get(f)]);
+    }
+    return mutations;
+  }
+
+  /** Notifies observers of a restore; the repo event only when a live repo is reachable. */
+  private _emitRestore(
+    repo: Repository | undefined,
+    key: string,
+    mutations: MutationPack,
+  ): void {
+    ++this._age;
+    this.emit('change', mutations);
+    this.db.emit('ItemChanged', this.path, false);
+    if (repo) repo.emit('DocumentChanged', key);
+  }
+
+  /**
+   * @internal True when the item carries genuine local edits (as opposed to a
+   * synthetic dirty flag from an auto schema upgrade). Only these are
+   * protected by close()'s silent-drop detection: an upgrade-only dirty item
+   * has nothing on disk to lose, while a skipped local edit would.
+   */
+  get hasPendingLocalEdits(): boolean {
+    return this._localEditCount > 0;
+  }
+
+  /** @internal Throws when the DB is not open; booting stays allowed. */
+  private _assertOpen(): void {
+    assertOpen(this.db.isOpen);
+  }
+
+  /**
    * @internal
    * Deactivates the managed item by canceling any pending commits.
    * This method is idempotent - calling it multiple times has no additional
@@ -399,7 +553,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
    * Note: This is an internal method used by GoatDB and should not be called
    * directly by users.
    */
-  deactivate(): Promise<void> | undefined {
+  deactivate(): Promise<boolean> | undefined {
     this._commitDelayTimer.unschedule();
     return this._commitPromise;
   }
@@ -415,72 +569,168 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     isRebase = false,
   ): void {
     ++this._age;
+    if (!isRebase) ++this._localEditCount;
     this.emit('change', mutations);
     this.db.emit('ItemChanged', this.path, isRebase);
     this._dirty = true;
     this._commitDelayTimer.schedule();
   }
 
-  private async _commitImpl(): Promise<void> {
+  /**
+   * @internal True when the in-memory item structurally matches the persisted
+   * head record. Uses checksum equality, which serializes NaN
+   * deterministically: matching NaN payloads compare equal while null vs NaN
+   * differ, so a NaN artifact left by a rebase cannot falsely trip divergence.
+   */
+  private _matchesPersistedHead(repo: Repository): boolean {
+    const entry = repo.valueForKey(itemPathGetPart(this.path, 'item')!);
+    if (!entry) {
+      return false;
+    }
+    // Schema divergence makes the persisted checksum incomputable under the
+    // current schema; bail before touching it so an expected divergence is
+    // not logged as a serialize ERROR.
+    if (!SchemaEquals(this._item.schema, entry[0].schema)) {
+      return false;
+    }
+    try {
+      return this._item.checksum === entry[0].checksum;
+    } catch (e) {
+      log({
+        severity: 'WARNING',
+        error: 'StorageError',
+        message: `Cannot verify persistence convergence for ${this.path}`,
+        trace: String(e),
+      });
+      // A schema/data mismatch (e.g. a pending auto-upgrade) makes the
+      // checksum incomputable; treat as not-converged so the item stays
+      // dirty and the upgrade is re-persisted instead of being dropped.
+      return false;
+    }
+  }
+
+  /**
+   * @internal Clears the dirty flag only when the just-written state is fully
+   * persisted: no newer local edit landed during the await, and the
+   * in-memory item now equals the persisted head record. A rebase (explicit
+   * or triggered by a new commit) may merge remote fields into the item, so
+   * the counter alone cannot prove convergence; the NaN-tolerant checksum
+   * comparison is the ground truth. Otherwise the merged view is still ahead
+   * of disk and must stay dirty so close()/auto-commit re-persists it instead
+   * of dropping it.
+   */
+  private _maybeClearDirty(localEditCount: number, repo: Repository): void {
+    if (this._localEditCount !== localEditCount) {
+      return;
+    }
+    if (this._matchesPersistedHead(repo)) {
+      this._dirty = false;
+      // Reset the local-edit counter alongside the dirty flag so
+      // hasPendingLocalEdits() is not monotonic: after a clean commit the
+      // item reports no pending local edits until new ones arrive.
+      this._localEditCount = 0;
+    }
+  }
+
+  private async _commitImpl(forClose: boolean): Promise<boolean> {
     assert(!this._commitInProgress);
     this._commitInProgress = true;
     try {
       this._commitDelayTimer.unschedule();
-      const currentDoc = this._item.clone();
-      const commitAge = this._age;
-      const key = itemPathGetPart(this.path, 'item')!;
       const repoId = itemPathGetRepoId(this.path);
       // Acquire an open repo + idle lease atomically. Holding the lease
       // prevents an idle close from tearing down the repo this write targets;
       // releasing it (in the finally block via dispose()) re-arms the idle
       // timer. This awaits any close promise registered by closeRepo or
-      // auto-close, so the commit targets a fully open repo.
-      const _lease = await this.db.acquireRepo(repoId);
+      // auto-close, so the commit targets a fully open repo. Close bypasses
+      // the DB-level lifecycle guard via the internal close variant.
+      const _lease = forClose
+        ? await this.db._acquireRepoForClose(repoId)
+        : await this.db.acquireRepo(repoId);
       try {
-        const newHead = await _lease.repo.setValueForKey(
-          key,
-          currentDoc,
-          this._head,
-        );
-        if (newHead) {
-          this._head = newHead;
-          this.rebase();
-        }
-        // Persisted: clear dirty unless a newer edit landed during the await
-        // (age changed) or rebase merged remote fields into the local doc.
-        if (this._age === commitAge) {
-          this._dirty = false;
-        }
+        const forced = forClose ? this.db._consumeCommitFault() : -1;
+        if (forced === 0) throw new Error('test-forced commit failure');
+        // One canonical commit tail for both branches; only the repo write
+        // primitive differs (public guard vs close bypass).
+        const write: CommitWrite<S> = forClose
+          ? (key, doc, head) =>
+            _lease.repo._setValueForKeyForClose(key, doc, head)
+          : (key, doc, head) => _lease.repo.setValueForKey(key, doc, head);
+        await this._commitTo(_lease.repo, write);
       } finally {
         _lease.dispose();
       }
+      return true;
     } finally {
       this._commitInProgress = false;
     }
   }
 
   /**
-   * @internal Commits the current pending edits directly to a repository that
-   * is being closed. Unlike commit(), this does NOT acquire a repo via
-   * db.acquireRepo/open() (which would await the in-flight close promise and
-   * deadlock); the close pipeline owns the repo's teardown.
+   * @internal Canonical commit tail: validate live -> clone -> write -> head
+   * update -> clear dirty; the sole sequence that persists pending edits and
+   * the single validation gate for managed commits. Defaults to the ForClose
+   * direct write (bypasses the public close guard for repos already
+   * transitioning to 'closing'); unlike commit(), it does NOT acquire a repo,
+   * so the close pipeline's teardown is not deadlocked.
    */
-  async _commitTo(repo: Repository): Promise<void> {
+  async _commitTo(
+    repo: Repository,
+    write: CommitWrite<S> = (key, doc, head) =>
+      repo._setValueForKeyForClose(key, doc, head),
+  ): Promise<void> {
+    const epoch = this._commitEpoch;
+    // Single managed-layer validation on the live item before cloning (a
+    // clone sanitizes out-of-schema fields). Invalid items with no genuine
+    // local edits (synthetic schema-upgrade dirt) are skipped, not persisted,
+    // so they never fail close; genuine invalid edits throw ValidationError
+    // (public commit() swallows it -> skip; close propagates it -> reject).
+    this._item.normalize();
+    const [valid, error] = this._item.validate();
+    if (this.db.debug) {
+      assert(
+        valid,
+        `Attempting to commit an invalid item at ${this.path}: ${error}`,
+      );
+    } else if (!valid && this.hasPendingLocalEdits) {
+      // The rejection carries the field-level schema cause, not a log sentence.
+      throw new ValidationError(error);
+    } else if (!valid) {
+      // Synthetic schema-upgrade dirt only (no genuine local edits): skip the
+      // write, but log so the silent drop stays visible and diagnosable.
+      log({
+        severity: 'WARNING',
+        error: 'ValidationError',
+        message: skippingCommitMessage(this.path, error),
+      });
+      return;
+    }
     const currentDoc = this._item.clone();
-    const commitAge = this._age;
+    const localEditCount = this._localEditCount;
     const key = itemPathGetPart(this.path, 'item')!;
-    const newHead = await repo._setValueForKeyForClose(
-      key,
-      currentDoc,
-      this._head,
-    );
+    // Bail before writing when discardPendingEdits() ran while we were
+    // acquiring the repo: the draft must not land on disk after being
+    // discarded. (A write already in flight cannot be retracted; the
+    // post-write check below keeps it from refreshing local state.)
+    if (epoch !== this._commitEpoch) return;
+    const newHead = await write(key, currentDoc, this._head);
     if (newHead) {
+      // A write that landed advances _head even when a concurrent discard
+      // bumped the epoch mid-write (post-epoch writes must not leave a stale
+      // base for later rebases/commits).
       this._head = newHead;
+    }
+    if (epoch !== this._commitEpoch && !newHead) return;
+    this._committedSnapshot = currentDoc;
+    if (newHead) {
+      // A landed mid-write write is new history; a rebase may refresh the
+      // snapshot to the merged head record, which must win over this default.
       this.rebase();
     }
-    if (this._age === commitAge) {
-      this._dirty = false;
-    }
+    const clearCount = epoch === this._commitEpoch
+      ? localEditCount
+      : this._localEditCount;
+    this._maybeClearDirty(clearCount, repo);
   }
 
   /**
@@ -509,6 +759,7 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
         // If our contents are still null, replace them with the item and schema
         // from the repo.
         this._item = entry[0].clone();
+        this._committedSnapshot = entry[0].clone();
         this._head = entry[1];
         // Auto upgrade the schema so the app is guaranteed to see the latest
         // version
@@ -536,6 +787,28 @@ export class ManagedItem<S extends Schema = Schema, US extends Schema = Schema>
     this._readyPromiseResolve?.();
     this._readyPromise = undefined;
     this._readyPromiseResolve = undefined;
+    this._readyPromiseReject = undefined;
     this.emit('LoadingFinished');
+  }
+
+  /**
+   * Settles a failed initial load. Closing/closed is a cancellation by design
+   * (serviceUnavailable); anything else, `failed` included, is a real fault
+   * that is logged and rethrown to readyPromise() awaiters.
+   */
+  private _failReady(e: unknown): void {
+    const { state } = this.db;
+    const cancelled = state === 'closing' || state === 'closed';
+    if (!cancelled) {
+      log({
+        severity: 'ERROR',
+        error: 'StorageError',
+        message: `Failed to load item ${this.path}: ${e}`,
+        trace: String(e),
+      });
+    }
+    this._readyPromiseReject?.(cancelled ? serviceUnavailable() : e);
+    this._readyPromiseResolve = undefined;
+    this._readyPromiseReject = undefined;
   }
 }

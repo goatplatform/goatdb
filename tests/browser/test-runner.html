@@ -100,6 +100,8 @@
         border-left-color: var(--error);
       }
 
+      .result-item.skipped { border-left-color: var(--text-secondary); }
+
       .result-item.running {
         border-left-color: var(--warning);
         animation: pulse 1s infinite;
@@ -337,7 +339,7 @@
         );
         if (resultDiv) {
           resultDiv.className = `result-item ${
-            result.passed ? 'passed' : 'failed'
+            result.skipped ? 'skipped' : result.passed ? 'passed' : 'failed'
           }`;
 
           let errorHtml = '';
@@ -376,6 +378,7 @@
                 <h3 style="color: var(--accent); margin-bottom: 0.5rem;">Test Summary</h3>
                 <p><strong>Passed:</strong> ${results.passed}</p>
                 <p><strong>Failed:</strong> ${results.failed}</p>
+                <p><strong>Skipped:</strong> ${results.skipped ?? 0}</p>
                 <p><strong>Duration:</strong> ${
           (results.duration / 1000).toFixed(2)
         }s</p>

@@ -9,7 +9,12 @@ import type {
 } from '../base/interfaces.ts';
 import { MovingAverage, randomInt } from '../base/math.ts';
 import { sleep } from '../base/time.ts';
-import { Code, ServerError, serviceUnavailable } from '../cfds/base/errors.ts';
+import {
+  CancelledError,
+  Code,
+  ServerError,
+  serviceUnavailable,
+} from '../cfds/base/errors.ts';
 import { log } from '../logging/log.ts';
 import { SyncMessage } from './message.ts';
 import { sendJSONToURL } from './rest-api.ts';
@@ -80,6 +85,9 @@ export class SyncScheduler {
   private _intervalId: ReturnType<typeof setInterval> | undefined;
   private _fetchInProgress = false;
   private _closed = false;
+  // Aborts the in-flight batch-sync fetch so close() cannot wait on the
+  // network timeout (db close must not inherit peer stall latency).
+  private readonly _abortController = new AbortController();
 
   constructor(
     readonly url: string,
@@ -99,18 +107,24 @@ export class SyncScheduler {
     return syncConfigGetCycles(this.syncConfig, this._syncFreqAvg.currentValue);
   }
 
+  /** @internal True after close(): pending work is cancelled, not failing. */
+  get isClosed(): boolean {
+    return this._closed;
+  }
+
   close(): void {
     if (this._closed) {
       return;
     }
     this._closed = true;
+    this._abortController.abort();
     if (this._intervalId !== undefined) {
       clearInterval(this._intervalId);
       this._intervalId = undefined;
     }
     for (const queue of this._pendingRequests.values()) {
       for (const req of queue) {
-        req.reject(serviceUnavailable());
+        req.reject(new CancelledError());
       }
     }
     this._pendingRequests.clear();
@@ -122,7 +136,7 @@ export class SyncScheduler {
     priority: SyncPriority = SyncPriority.normal,
   ): Promise<SyncMessage> {
     if (this._closed) {
-      return Promise.reject(serviceUnavailable());
+      return Promise.reject(new CancelledError());
     }
     let resolve!: (resp: SyncMessage) => void;
     let reject!: (err: unknown) => void;
@@ -178,8 +192,9 @@ export class SyncScheduler {
         reqArr,
         this.orgId,
         this.syncConfig.timeoutMs,
+        this._abortController.signal,
       );
-      respText = resp.status === 200 ? await resp.text() : undefined;
+      respText = resp.status === 200 ? resp.body : undefined;
 
       const syncDurationMs = performance.now() - start;
       this._syncFreqAvg.addValue(syncDurationMs);
@@ -193,14 +208,23 @@ export class SyncScheduler {
         });
       }
     } catch (e: unknown) {
-      log({
-        severity: 'INFO',
-        error: 'FetchError',
-        message: (e as Error).message,
-        trace: (e as Error).stack,
-        url: this.url,
-      });
+      // A close() aborts the in-flight fetch; that is cancellation, not a peer
+      // fault, so it must not be logged as a sync error and must reject the
+      // pending requests as cancelled rather than failed.
+      if (!this._closed) {
+        log({
+          severity: 'INFO',
+          error: 'FetchError',
+          message: (e as Error).message,
+          trace: (e as Error).stack,
+          url: this.url,
+        });
+      }
       this._fetchInProgress = false;
+      if (this._closed) {
+        pendingRequests.forEach((r) => r.reject(new CancelledError()));
+        return;
+      }
     }
 
     if (!respText) {
