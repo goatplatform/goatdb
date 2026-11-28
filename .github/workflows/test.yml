@@ -26,8 +26,11 @@ jobs:
         with:
           node-version: '24.x'
 
+      - name: Install npm dependencies
+        run: npm install
+
       - name: Verify system-assets freshness
-        run: deno task build && git diff --exit-code -- system-assets/assets.json
+        run: npm run build:sys-assets && git diff --exit-code -- system-assets/assets.json
 
       - name: Run Deno tests
         run: deno task test --runtime=deno

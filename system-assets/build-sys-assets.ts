@@ -1,6 +1,8 @@
 import * as path from '@std/path';
 import * as esbuild from 'esbuild';
-import { denoPlugin } from '@deno/esbuild-plugin';
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getRepositoryPath } from '../base/git-root.ts';
 import { normalizeBuildEntryPath } from '../build.ts';
 import type { ReadonlyJSONObject } from '../base/interfaces.ts';
@@ -18,9 +20,9 @@ export async function buildSysAssetMap(): Promise<ReadonlyJSONObject> {
         out: 'json-log-worker',
       },
     ],
-    // noTranspile: let esbuild transpile so the final bundle map is composed
-    // from file-relative sources instead of the loader's repo-relative maps.
-    plugins: [denoPlugin({ noTranspile: true })],
+    // platform: 'node' keeps node: builtins (worker_threads, crypto, fs)
+    // external so the bundles runtime-guarded Node branches stay intact.
+    platform: 'node',
     bundle: true,
     write: false,
     sourcemap: 'external',
@@ -48,7 +50,7 @@ export async function buildSysAssetMap(): Promise<ReadonlyJSONObject> {
     ] as const
   ) {
     assets['/system-assets/' + name] = {
-      data: await Deno.readFile(
+      data: await readFile(
         path.join(repoPath, 'system-assets', file),
       ),
       contentType: type,
@@ -60,12 +62,17 @@ export async function buildSysAssetMap(): Promise<ReadonlyJSONObject> {
 /** Rebuilds system-assets/assets.json from current worker sources. */
 export async function buildSysAssets(): Promise<void> {
   const repoPath = await getRepositoryPath();
-  await Deno.writeTextFile(
+  await writeFile(
     path.join(repoPath, 'system-assets', 'assets.json'),
     JSON.stringify(await buildSysAssetMap()),
   );
 }
 
-if (import.meta.main) {
+// Entry guard that works in both Node (argv[1]) and Deno (import.meta.main).
+const isMain =
+  (import.meta as { main?: boolean }).main === true ||
+  (typeof process !== 'undefined' && process.argv[1] !== undefined &&
+    resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1]));
+if (isMain) {
   await buildSysAssets();
 }

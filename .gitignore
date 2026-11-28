@@ -1,5 +1,7 @@
 node_modules
 .DS_Store
+# system-assets node build temp dirs
+system-assets/.goatdb-build-*/
 test_data
 build
 _site

@@ -21,7 +21,8 @@
     "goatdb": "./dist/cli/init.js"
   },
   "scripts": {
-    "build:npm": "tsup"
+    "build:npm": "tsup",
+    "build:sys-assets": "node system-assets/run-build-node.mjs"
   },
   "dependencies": {
     "@goatdb/orderstamp": "npm:@jsr/goatdb__orderstamp@^1.1.1",
