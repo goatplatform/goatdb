@@ -1,5 +1,6 @@
 import { APP_ENTRY_POINT } from '../base/app-entry-point.ts';
 import { isBrowser, isDeno, isNode } from '../base/common.ts';
+import { getRuntime } from '../base/runtime/index.ts';
 import { readTextFile, writeTextFile } from '../base/json-log/file-impl.ts';
 import * as path from '../base/path.ts';
 import {
@@ -15,7 +16,12 @@ import {
   debugClientBundleSpec,
   debugConfigPaths,
 } from '../cli/debug-server.ts';
+import {
+  kStaticAssetsSystem,
+  staticAssetsToJS,
+} from '../system-assets/system-assets.ts';
 import type { StaticAssets } from '../system-assets/system-assets.ts';
+import { buildSysAssetMap } from '../system-assets/build-sys-assets.ts';
 import type { Plugin } from 'esbuild';
 import { AnyMap, originalPositionFor } from '@jridgewell/trace-mapping';
 import { assertEquals, assertExists, assertTrue } from './asserts.ts';
@@ -714,6 +720,15 @@ async function buildFailureTest(ctx: TestSuite): Promise<void> {
   );
 }
 
+async function systemAssetsFreshnessTest(_ctx: TestSuite): Promise<void> {
+  // A mismatch means the committed worker bundle drifted from current sources.
+  assertEquals(
+    await buildSysAssetMap(),
+    staticAssetsToJS(kStaticAssetsSystem),
+    'system-assets/assets.json matches current bundled worker sources',
+  );
+}
+
 export default function setupCliBuildAssetsTests() {
   TEST(
     kSuite,
@@ -803,4 +818,16 @@ export default function setupCliBuildAssetsTests() {
     'debug rebuild emits plugin CSS identical to production and rebuilds it',
     nodeTest(debugCssParityTest),
   );
+  // Registered only where it is supported: the check rebuilds worker sources
+  // with the Node toolchain, so it has no meaning under Deno or in a browser.
+  // Wrapping it in nodeTest() instead would silently tally a no-op "pass".
+  // Use getRuntime().id (canonical) rather than deprecated isNode() from
+  // base/common.ts.
+  if (getRuntime().id === 'node') {
+    TEST(
+      kSuite,
+      'system-assets/assets.json is fresh (rebuild matches committed worker bundle)',
+      systemAssetsFreshnessTest,
+    );
+  }
 }

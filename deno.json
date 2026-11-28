@@ -40,7 +40,7 @@
     "./link": "./cli/link.ts"
   },
   "tasks": {
-    "build": "deno run -A system-assets/build-sys-assets.ts",
+    "build": "npm run build:sys-assets",
     "test": "deno run -A tests/run.ts",
     "test:smoke": "deno run -A tests/run.ts --runtime=deno --suite=SecurityBoundaries",
     "bench": "deno run -A benchmarks/run.ts",
