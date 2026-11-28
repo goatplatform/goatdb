@@ -1,0 +1,10 @@
+# Keep all text files LF on every OS so build artifacts (system-assets/assets.json)
+# regenerate byte-identically on Windows CI (CRLF checkout was drifting the
+# committed base64 payloads).
+* text=auto eol=lf
+
+# Binary files: never apply line-ending conversion.
+*.wasm binary
+*.png binary
+*.ico binary
+*.woff2 binary
