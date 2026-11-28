@@ -4,7 +4,6 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getRepositoryPath } from '../base/git-root.ts';
-import { normalizeBuildEntryPath } from '../build.ts';
 import type { ReadonlyJSONObject } from '../base/interfaces.ts';
 import { type StaticAssets, staticAssetsToJS } from './system-assets.ts';
 
@@ -14,9 +13,7 @@ export async function buildSysAssetMap(): Promise<ReadonlyJSONObject> {
   const result = await esbuild.build({
     entryPoints: [
       {
-        in: normalizeBuildEntryPath(
-          path.join(repoPath, 'base', 'json-log', 'json-log-worker-entry.ts'),
-        ),
+        in: path.join(repoPath, 'base', 'json-log', 'json-log-worker-entry.ts'),
         out: 'json-log-worker',
       },
     ],
