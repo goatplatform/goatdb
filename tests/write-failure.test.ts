@@ -38,7 +38,7 @@ export default function setup(): void {
 
         // Force the next MAX_WRITE_FAILURES (3) append calls to throw, which
         // is the threshold that triggers the WriteFailure event.
-        db._testForceAppendFailures = 3;
+        db.setTestFaults({ appendFailures: 3 });
 
         // Generate a pending commit and flush — _flushFileWithRetry loops 3
         // times, consuming all 3 forced failures, then emits WriteFailure.
@@ -64,6 +64,63 @@ export default function setup(): void {
         assertTrue(detail.commitIds.length >= 1, 'commitIds is non-empty');
         assertEquals(detail.repoPath, repoPath);
         assertExists(detail.error);
+        assertEquals(
+          (detail.error as Error).message,
+          'test-forced append failure',
+          'WriteFailure must carry the real I/O cause, not the context string',
+        );
+      } finally {
+        await db.flushAll();
+        await db.close();
+      }
+    },
+  );
+
+  TEST(
+    'WriteFailure',
+    'auto-flush is single-attempt: a transient fault retains the batch',
+    async (ctx) => {
+      const db = await ctx.createDB('write-fail-autoflush', {
+        registry: kRegistry,
+      });
+      const repoPath = '/data/items';
+      const failureEvents: unknown[] = [];
+      db.attach('WriteFailure', (detail) => {
+        failureEvents.push(detail);
+      });
+
+      try {
+        await db.readyPromise();
+        const item = db.create('/data/items/item-a', kWriteFailSchema, {
+          value: 'x',
+        });
+        await item.commit();
+        await db.flush(repoPath);
+        assertEquals(failureEvents.length, 0);
+
+        db.setTestFaults({ appendFailures: 1 });
+        // One commit sized past the auto-flush byte threshold.
+        const big = 'y'.repeat(4 * 1024 * 1024);
+        item.set('value', big);
+        await item.commit();
+        // Allow the fire-and-forget auto-flush to run and hit the fault.
+        await new Promise((r) => setTimeout(r, 50));
+        assertEquals(
+          failureEvents.length,
+          0,
+          'auto-flush must retain the batch, never emit WriteFailure',
+        );
+        // A later flush retries and persists the retained batch.
+        await db.flush(repoPath);
+        assertEquals(item.get('value'), big);
+        // Reopen from disk: the batch survived the transient fault.
+        await db.closeRepo(repoPath);
+        await db.open(repoPath);
+        assertEquals(
+          db.item('/data/items/item-a')?.get('value'),
+          big,
+          'batch must survive the transient auto-flush fault',
+        );
       } finally {
         await db.flushAll();
         await db.close();
@@ -93,7 +150,7 @@ export default function setup(): void {
         await db.flush(repoPath);
 
         // Force only 2 failures (below the 3-strike threshold).
-        db._testForceAppendFailures = 2;
+        db.setTestFaults({ appendFailures: 2 });
         item.set('value', 'updated');
         await db.flush(repoPath);
 
@@ -132,7 +189,7 @@ export default function setup(): void {
         await db.flush(repoPath);
 
         // Trigger WriteFailure with 3 consecutive failures.
-        db._testForceAppendFailures = 3;
+        db.setTestFaults({ appendFailures: 3 });
         item1.set('value', 'doomed');
         await db.flush(repoPath);
         assertEquals(failureEvents.length, 1, 'WriteFailure should have fired');

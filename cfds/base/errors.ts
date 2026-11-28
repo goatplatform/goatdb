@@ -1,4 +1,4 @@
-import { JSONValue } from '../../base/interfaces.ts';
+import type { JSONValue } from '../../base/interfaces.ts';
 import { log } from '../../logging/log.ts';
 
 interface SerializedError {
@@ -37,7 +37,7 @@ export class ServerError extends Error implements IServerError {
 
   constructor(
     msg: string | Code,
-    info?: any,
+    info?: JSONValue,
     code?: Code,
     internalInfo?: JSONValue,
   ) {
@@ -51,18 +51,18 @@ export class ServerError extends Error implements IServerError {
     this.internalInfo = internalInfo;
   }
 
-  toJS() {
+  toJS(): SerializedError {
     return toJS(this);
   }
 
-  get type() {
+  get type(): ErrorType {
     if (this._type === undefined) {
       this._type = typeFromCode(this.code);
     }
     return this._type;
   }
 
-  static fromJS(obj: SerializedError) {
+  static fromJS(obj: SerializedError): ServerError {
     return fromJS(obj);
   }
 }
@@ -130,6 +130,36 @@ export function txnConflict(txnKey: string, dataRowKey: string) {
 
 export function serviceUnavailable(): ServerError {
   return new ServerError(Code.ServiceUnavailable);
+}
+
+/**
+ * Signals a request aborted by local teardown/cancellation (close, scheduler
+ * shutdown), as opposed to a real peer or storage fault. Carries the
+ * ServiceUnavailable code so wire formats stay unchanged, but its distinct
+ * class lets sync classifiers tell cancellation apart from genuine failures.
+ */
+export class CancelledError extends ServerError {
+  constructor(internalInfo?: JSONValue) {
+    super(
+      'Request cancelled',
+      undefined,
+      Code.ServiceUnavailable,
+      internalInfo,
+    );
+  }
+}
+
+/** @internal Throws serviceUnavailable unless the owning DB instance is open. */
+export function assertOpen(isOpen: boolean): void {
+  if (!isOpen) throw serviceUnavailable();
+}
+
+/** Signals data failed schema validation and was refused persistence. */
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
 }
 
 export function incompatibleCFDSVersion(

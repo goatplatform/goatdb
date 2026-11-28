@@ -27,6 +27,11 @@ import { DataRegistry } from '../cfds/base/data-registry.ts';
 import { ProgressManager, type TaskId } from '../shared/progress.ts';
 import { Emitter } from '../base/emitter.ts';
 
+// React >=18 requires this global for act() (react-test-renderer@19). The harness
+// runs the react suite in Deno/Node/browser without @testing-library's auto-setup.
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
+
 /**
  * A test function that takes a TestSuite context and returns either void or a
  * Promise<void>. This function type is used to define individual test cases
@@ -46,17 +51,20 @@ export interface TestResult {
   readonly suiteName: string;
   readonly testName: string;
   readonly passed: boolean;
+  readonly skipped?: boolean;
   readonly duration: number;
   readonly error?: Error;
 }
 
 /**
  * Summary of all test execution results.
+ * totalTests counts every executed (registered) test = passed + failed + skipped.
  */
 export interface TestSummary {
   readonly totalTests: number;
   readonly passed: number;
   readonly failed: number;
+  readonly skipped?: number;
   readonly duration: number;
   readonly results: TestResult[];
 }
@@ -73,6 +81,7 @@ export interface TestSummary {
  */
 export class TestSuite {
   private readonly _tests: Map<string, TestFunc>;
+  private readonly _skipped = new Set<string>();
   private _tempDir: string | undefined;
 
   /**
@@ -87,9 +96,18 @@ export class TestSuite {
    * Adds a test case to the suite.
    * @param name - The name of the test case
    * @param test - The test function to execute
+   * @param skipped - When true, the runner tallies the test as skipped without running it
    */
-  add(name: string, test: TestFunc) {
+  add(name: string, test: TestFunc, skipped = false) {
     this._tests.set(name, test);
+    if (skipped) this._skipped.add(name);
+  }
+
+  /**
+   * Returns whether a test was registered as skipped.
+   */
+  isSkipped(name: string): boolean {
+    return this._skipped.has(name);
   }
 
   /**
@@ -112,25 +130,27 @@ export class TestSuite {
 
     for (const [name, test] of this._tests.entries()) {
       const start = performance.now();
-      try {
-        await test(this);
-        results.push({
-          suiteName: this.name,
-          testName: name,
-          passed: true,
-          duration: performance.now() - start,
-        });
-      } catch (error) {
-        results.push({
-          suiteName: this.name,
-          testName: name,
-          passed: false,
-          duration: performance.now() - start,
-          error: error instanceof Error
-            ? error
-            : new Error(error ? String(error) : 'Unknown error'),
-        });
+      let error: Error | undefined;
+      let skipped = false;
+      if (!this.isSkipped(name)) {
+        try {
+          await test(this);
+        } catch (e) {
+          error = e instanceof Error
+            ? e
+            : new Error(e ? String(e) : 'Unknown error');
+        }
+      } else {
+        skipped = true;
       }
+      results.push({
+        suiteName: this.name,
+        testName: name,
+        passed: error === undefined && !skipped,
+        skipped,
+        duration: performance.now() - start,
+        error,
+      });
     }
 
     await this.cleanup();
@@ -326,40 +346,16 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
           // Create suite task as child of root
           const suiteId = pm.create(suite.name, 1, rootId);
           const testId = pm.create(testName, 1, suiteId);
-          pm.update(testId, 0, 'starting');
-          this.emit('testStart', {
-            suite: suite.name,
-            name: testName,
-            current: currentTest,
-            total: totalTests,
-          });
-
-          const start = performance.now();
-          try {
-            await test(suite);
-            pm.complete(testId, 'done');
-            const result = {
-              suiteName: suite.name,
-              testName,
-              passed: true,
-              duration: performance.now() - start,
-            };
-            allResults.push(result);
-            this.emit('testComplete', result);
-          } catch (error) {
-            pm.complete(testId, 'failed');
-            const result = {
-              suiteName: suite.name,
-              testName,
-              passed: false,
-              duration: performance.now() - start,
-              error: error instanceof Error
-                ? error
-                : new Error(error ? String(error) : 'Unknown error'),
-            };
-            allResults.push(result);
-            this.emit('testComplete', result);
-          }
+          await this.runOne(
+            suite,
+            testName,
+            test,
+            pm,
+            testId,
+            currentTest,
+            totalTests,
+            allResults,
+          );
           pm.complete(suiteId);
           completedSuites++;
           pm.update(rootId, completedSuites);
@@ -414,43 +410,18 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
 
     for (const [name, test] of suite['_tests'].entries()) {
       currentTest++;
-
       // Create test task as child of suite
       const testId = pm.create(name, 1, suiteId);
-      pm.update(testId, 0, 'starting');
-      this.emit('testStart', {
-        suite: suite.name,
+      await this.runOne(
+        suite,
         name,
-        current: currentTest,
-        total: totalTests,
-      });
-
-      const start = performance.now();
-      try {
-        await test(suite);
-        pm.complete(testId, 'done');
-        const result = {
-          suiteName: suite.name,
-          testName: name,
-          passed: true,
-          duration: performance.now() - start,
-        };
-        results.push(result);
-        this.emit('testComplete', result);
-      } catch (error) {
-        pm.complete(testId, 'failed');
-        const result = {
-          suiteName: suite.name,
-          testName: name,
-          passed: false,
-          duration: performance.now() - start,
-          error: error instanceof Error
-            ? error
-            : new Error(error ? String(error) : 'Unknown error'),
-        };
-        results.push(result);
-        this.emit('testComplete', result);
-      }
+        test,
+        pm,
+        testId,
+        currentTest,
+        totalTests,
+        results,
+      );
     }
 
     // Complete the suite
@@ -462,6 +433,71 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
   }
 
   /**
+   * Executes one registered test with progress tracking: emits start/complete
+   * events, tallies skipped tests without running them, and records the result.
+   * Shared by run()'s single-test path and runSuiteWithProgress().
+   */
+  private async runOne(
+    suite: TestSuite,
+    name: string,
+    test: TestFunc,
+    pm: ProgressManager,
+    testId: TaskId,
+    currentTest: number,
+    totalTests: number,
+    results: TestResult[],
+  ): Promise<void> {
+    pm.update(testId, 0, 'starting');
+    this.emit('testStart', {
+      suite: suite.name,
+      name,
+      current: currentTest,
+      total: totalTests,
+    });
+
+    const start = performance.now();
+    if (suite.isSkipped(name)) {
+      pm.complete(testId, 'done');
+      const skipped: TestResult = {
+        suiteName: suite.name,
+        testName: name,
+        passed: false,
+        skipped: true,
+        duration: performance.now() - start,
+      };
+      results.push(skipped);
+      this.emit('testComplete', skipped);
+      return;
+    }
+
+    try {
+      await test(suite);
+      pm.complete(testId, 'done');
+      const result = {
+        suiteName: suite.name,
+        testName: name,
+        passed: true,
+        duration: performance.now() - start,
+      };
+      results.push(result);
+      this.emit('testComplete', result);
+    } catch (error) {
+      pm.complete(testId, 'failed');
+      const result = {
+        suiteName: suite.name,
+        testName: name,
+        passed: false,
+        duration: performance.now() - start,
+        error: error instanceof Error
+          ? error
+          : new Error(error ? String(error) : 'Unknown error'),
+      };
+      results.push(result);
+      this.emit('testComplete', result);
+    }
+  }
+
+  /**
    * Creates a test summary from results.
    * @param results - All test results
    * @param duration - Total execution duration
@@ -469,12 +505,14 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
    */
   private createSummary(results: TestResult[], duration: number): TestSummary {
     const passed = results.filter((r) => r.passed).length;
-    const failed = results.length - passed;
+    const skipped = results.filter((r) => r.skipped).length;
+    const failed = results.length - passed - skipped;
 
     return {
       totalTests: results.length,
       passed,
       failed,
+      skipped,
       duration,
       results,
     };
@@ -491,11 +529,12 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
     console.log('=== Test Summary ===');
     console.log(`Total: ${summary.totalTests} tests`);
     console.log(`Passed: ${summary.passed}`);
+    console.log(`Skipped: ${summary.skipped ?? 0}`);
     if (summary.failed > 0) {
       console.log(`Failed: ${summary.failed}`);
       console.log();
       console.log('Failed tests:');
-      const failures = summary.results.filter((r) => !r.passed);
+      const failures = summary.results.filter((r) => !r.passed && !r.skipped);
       for (let i = 0; i < failures.length; i++) {
         const result = failures[i];
         console.log(
@@ -527,6 +566,17 @@ export class TestsRunner extends Emitter<'testStart' | 'testComplete'> {
  * @param test - The test function to run
  */
 
-export function TEST(suite: string, name: string, test: TestFunc) {
-  TestsRunner.default.suite(suite).add(name, test);
+export interface TestOptions {
+  /** Skip this test. A function is evaluated at registration time. */
+  skip?: boolean | (() => boolean);
+}
+
+export function TEST(
+  suite: string,
+  name: string,
+  test: TestFunc,
+  opts?: TestOptions,
+) {
+  const skip = typeof opts?.skip === 'function' ? opts.skip() : !!opts?.skip;
+  TestsRunner.default.suite(suite).add(name, test, skip);
 }

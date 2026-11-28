@@ -1,8 +1,10 @@
 import type { JSONObject, ReadonlyJSONValue } from '../base/interfaces.ts';
+import { onSettled } from '../base/async.ts';
 import type { Query } from './query.ts';
 import { Repository } from './repo.ts';
 import { SimpleTimer, type Timer } from '../base/timer.ts';
 import { kSecondMs } from '../base/date.ts';
+import { log } from '../logging/log.ts';
 import type { Schema } from '../cfds/base/schema.ts';
 
 const QUERY_CACHE_VERSION = 1;
@@ -144,13 +146,22 @@ export class QueryPersistence {
    * @param query The query to register
    */
   register(query: Query<Schema, Schema, ReadonlyJSONValue>): void {
-    let set = this._queries.get(query.repo.path);
+    const repoPath = query._repoInternal()?.path;
+    if (repoPath === undefined) {
+      log({
+        severity: 'DEBUG',
+        message:
+          `Query ${query.id} cache registration skipped: repo unavailable`,
+      });
+      return;
+    }
+    let set = this._queries.get(repoPath);
     if (!set) {
       set = new Set();
-      this._queries.set(query.repo.path, set);
+      this._queries.set(repoPath, set);
     }
     set.add(query);
-    this.flush(query.repo.path);
+    this.flush(repoPath);
   }
 
   /**
@@ -158,11 +169,8 @@ export class QueryPersistence {
    * @param query The query to unregister
    */
   unregister(query: Query<Schema, Schema, ReadonlyJSONValue>): void {
-    // A query can be closed before its source repo was ever opened (e.g. a
-    // query created without loadingFinished()). Such a query was never
-    // registered, so there is nothing to remove -- do not dereference the
-    // missing repo, whose getter returns undefined at runtime.
-    const repoPath = (query.repo as Repository | undefined)?.path;
+    // Cache ownership follows the source repo, not the gated public getter.
+    const repoPath = query._repoInternal()?.path;
     if (repoPath === undefined) return;
     const set = this._queries.get(repoPath);
     if (set) {
@@ -201,7 +209,7 @@ export class QueryPersistence {
     if (!promise) {
       promise = this._loadCacheForRepoImpl(repoId);
       this._loadingPromises.set(repoId, promise);
-      promise.finally(() => {
+      onSettled(promise, () => {
         if (this._loadingPromises.get(repoId) === promise) {
           this._loadingPromises.delete(repoId);
         }
@@ -355,7 +363,7 @@ export class QueryPersistence {
     // Check if any query in persistedGeneration belongs to this repo
     let hasPersisted = false;
     for (const q of this._persistedGeneration.keys()) {
-      if (q.repo.path === repoId) {
+      if (q._repoInternal()?.path === repoId) {
         hasPersisted = true;
         break;
       }

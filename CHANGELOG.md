@@ -2,81 +2,195 @@
 
 All notable changes to GoatDB will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and GoatDB adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and GoatDB adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-> **Pre-1.0 compatibility notice:** GoatDB is still pre-1.0. Backward compatibility is not guaranteed between releases; APIs, storage formats, and behavior may change without notice.
+> **Pre-1.0 compatibility notice:** GoatDB is still pre-1.0. Backward
+> compatibility is not guaranteed between releases; APIs, storage formats, and
+> behavior may change without notice.
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- **`GoatDB.ready` removed**: Use `state === 'ready'`. `state` reports the full
+  lifecycle (`booting`, `ready`, `closing`, `closed`, `failed`) and `isOpen` is
+  the derived "accepts work" signal.
+- **`close()` may reject and must be retried**: A failed teardown (e.g. a
+  persisted item edit that cannot be committed) rejects `close()` with a
+  `GoatDBCloseError` whose `failedItems` lists each still-dirty edit and its
+  cause, reports `state === 'failed'`, and must be called again after the
+  underlying issue is resolved. Repeated `close()` calls are single-flight and
+  return the same promise while teardown runs.
+- **APIs now throw `serviceUnavailable` once closing/closed/failed**:
+  `getTrustPool()`, `count()`, `keys()`, `logout()`, `repository()` gating
+  (returns `undefined` while closing/closed/failed instead of handing out
+  session-key-bearing handles), the `ManagedItem.repository` getter gating
+  (returns `undefined` for the same reason), and the `ManagedItem` mutators
+  (`set()`, `setMulti()`, `delete()`, `schema`, `isDeleted`). Held repository
+  writes (`setValueForKey()`, `create()`, `insert()`) and
+  `Repository.persistVerifiedCommits()` reject the same way once the DB starts
+  closing, so no verified write can bypass the close lifecycle.
+- **`close()` no longer silently drops edits**: A non-debug validation failure
+  during a close-time commit now rejects `close()` instead of reporting success;
+  the edit stays dirty so a retried close can persist it. `ValidationError` is
+  thrown when data fails schema validation and is refused persistence;
+  `ManagedItem.discardPendingEdits()` clears a pending edit so a retried close
+  can settle after a validation failure.
+- **`useQuery` return type narrowed to `Query | undefined`**: The hook now
+  returns `undefined` once the database is closing, closed, or failed (it stays
+  live while booting), instead of always returning a `Query`. Guard the result
+  before calling `results()`. `Query.repo` is likewise nullable once the DB is
+  closing, closed, or failed.
+- **`useItem` return type narrowed to `ManagedItem | undefined`**: The hook
+  returns `undefined` once the DB is closing, closed, or failed (it stays live
+  while booting), so mounted consumers keep rendering; guard the result before
+  use.
+
 ### Added
 
-- `DBInstanceConfig.repoInactivityTimeoutMs` and
-  `queryInactivityTimeoutMs` auto-close idle repositories and queries. Both
-  default to `0` (disabled). A repository closes only when it has no in-flight
-  leases, no external `DocumentChanged` listeners, and no open dependent
-  queries; `/sys/` repositories are exempt.
-- Query loading is lazy: `db.query()` no longer starts a scan. Loading begins
-  on the first subscription (`onResultsChanged`), `onLoadingFinished`, or
+- `DBInstanceConfig.repoInactivityTimeoutMs` and `queryInactivityTimeoutMs`
+  auto-close idle repositories and queries. Both default to `0` (disabled). A
+  repository closes only when it has no in-flight leases, no external
+  `DocumentChanged` listeners, and no open dependent queries; `/sys/`
+  repositories are exempt.
+- `DBInstanceConfig.bootstrapStallMs` (default 2000 ms) bounds how long
+  `close()` waits on a stalled client bootstrap before aborting it and settling
+  the retried close.
+- `ManagedItem.discardPendingEdits()` clears a still-dirty pending edit (for
+  example after a close-time validation failure) so a retried `close()` can
+  settle.
+- Query loading is lazy: `db.query()` no longer starts a scan. Loading begins on
+  the first subscription (`onResultsChanged`), `onLoadingFinished`, or
   `loadingFinished()`; reads (`results()`, `has()`, ...) are side-effect free
   and do not start loading. A fresh unobserved query reports `loading === false`
   and, when `queryInactivityTimeoutMs` is set, is eligible for auto-close. A
   closed query is replaced by calling `db.query()` again.
+- `DBReadyState` gained `closing` and `closed` values: `useDBReady` now reports
+  `closing` while teardown is in flight and `closed` once the database is fully
+  closed, matching the `GoatDB.state` lifecycle.
+- `SyncResult` gained `{ status: 'cancelled' }`, returned when a sync aborts
+  because the database closed (`CancelledError`); real peer failures stay
+  `failed`.
+
+### Fixed
+
+- `GoatDB.state` reports the instance lifecycle (`booting`, `ready`, `closing`,
+  `closed`, `failed`) and replaces the `GoatDB.ready` boolean; use
+  `state === 'ready'` for the old check. Passive inspection (`itemLoaded()`,
+  `clientsForRepo()`, `state`, `isOpen`) stays available; `repository()` and the
+  `ManagedItem.repository` getter return `undefined` during closing/closed/
+  failed; `loggedIn` reports `false` after teardown. A `getTrustPool()` request
+  pending when shutdown starts rejects instead of delivering session keys. An
+  `open()` deferred behind an in-flight close or losing a sync-abort race is
+  cancelled with `serviceUnavailable` when `db.close()` starts; `close()` aborts
+  in-flight peer sync so teardown never waits on a stalled peer's retries or
+  timeouts, and multi-peer `open()` clients that armed sync timers are closed so
+  no repeating timer outlives the closed state. Mounted `useDBReady` consumers
+  follow `LifecycleChanged` through close. Failed bootstraps are logged without
+  an unhandled rejection; `readyPromise()` rejects with the original error.
+- An auto-close teardown that fails leaves the repository registered and rejects
+  with a logged error; the next `open()` or `closeRepo()` finishes the teardown
+  before serving a fresh instance.
+- `ManagedItem.readyPromise()` rejects when the initial load fails instead of
+  resolving as if the item were ready. A close during loading rejects with
+  `serviceUnavailable`. The rejection is handled internally, so it never
+  surfaces as an unhandled rejection.
+- `ManagedItem` mutators (`set()`, `setMulti()`, `delete()`, the `schema`
+  setter, and the `isDeleted` setter) throw `serviceUnavailable` when the DB is
+  closed or closing, so post-close edits fail loudly instead of dropping.
+- Handled JSON-log storage errors (failed scans/appends) surface to the caller
+  instead of surfacing as unhandled rejections; the tracked operation is cleaned
+  up on both fulfill and reject paths.
 
 ## [0.6.1] - 2026-09-01
 
 ### Fixed
 
-- Republish 0.6.0 as 0.6.1: npm prohibits re-publishing an unpublished version (tombstone retention in registry `time` metadata), so 0.6.1 supersedes with identical code.
+- Republish 0.6.0 as 0.6.1: npm prohibits re-publishing an unpublished version
+  (tombstone retention in registry `time` metadata), so 0.6.1 supersedes with
+  identical code.
 
 ## [0.6.0] - 2026-08-30
 
 ### Breaking Changes
 
-- **Binary `.goat` storage format**: Commits are now stored in a compact binary format (magic byte `0x47 'G'`, little-endian commit fields, big-endian 4-byte length framing). Both `.jsonl` and binary storage are supported, with the format selected through `DBInstanceConfig.storageFormat`. Tooling that reads `.goat` files directly requires manual migration.
+- **Binary `.goat` storage format**: Commits are now stored in a compact binary
+  format (magic byte `0x47 'G'`, little-endian commit fields, big-endian 4-byte
+  length framing). Both `.jsonl` and binary storage are supported, with the
+  format selected through `DBInstanceConfig.storageFormat`. Tooling that reads
+  `.goat` files directly requires manual migration.
 
-- **Bloom-filter ancestors replaced with explicit string arrays**: The `af` and `ac` commit fields are no longer written or read. Existing commits using Bloom-filter ancestry load with empty ancestor arrays and rebuild their ancestry through new merge commits.
+- **Bloom-filter ancestors replaced with explicit string arrays**: The `af` and
+  `ac` commit fields are no longer written or read. Existing commits using
+  Bloom-filter ancestry load with empty ancestor arrays and rebuild their
+  ancestry through new merge commits.
 
-- **Strict `.goat` binary records**: Non-binary records in `.goat` files are rejected instead of being silently loaded. Mixed JSON/binary files require manual migration.
+- **Strict `.goat` binary records**: Non-binary records in `.goat` files are
+  rejected instead of being silently loaded. Mixed JSON/binary files require
+  manual migration.
 
-- **Ed25519 signing replaces ECDSA P-384**: Existing ECDSA-signed commits cannot be verified after upgrading and require a fresh trust pool.
+- **Ed25519 signing replaces ECDSA P-384**: Existing ECDSA-signed commits cannot
+  be verified after upgrading and require a fresh trust pool.
 
-- **Query cache identity changed**: Query IDs now use Murmur3 and account for relevant options and normalized source paths. Persisted caches from earlier versions may miss and be rebuilt lazily.
+- **Query cache identity changed**: Query IDs now use Murmur3 and account for
+  relevant options and normalized source paths. Persisted caches from earlier
+  versions may miss and be rebuilt lazily.
 
-- **Query live updates are enabled by default**: Queries now receive uncommitted updates from `set()`. Set `liveUpdates: false` to retain commit-only behavior.
+- **Query live updates are enabled by default**: Queries now receive uncommitted
+  updates from `set()`. Set `liveUpdates: false` to retain commit-only behavior.
 
-- **Public API changes**: The optional `session` parameter was removed from `Repository.leavesForKey()`, and `commitIsHighProbabilityLeaf()` was renamed to `commitIsLeaf()`.
+- **Public API changes**: The optional `session` parameter was removed from
+  `Repository.leavesForKey()`, and `commitIsHighProbabilityLeaf()` was renamed
+  to `commitIsLeaf()`.
 
-- **Item path components are limited to 39 characters**: Type, repository, item, and embed path components longer than 39 characters are rejected.
+- **Item path components are limited to 39 characters**: Type, repository, item,
+  and embed path components longer than 39 characters are rejected.
 
 ### Added
 
-- `GoatDB.insert()` for creating batches of new items without redundant ancestor computation.
+- `GoatDB.insert()` for creating batches of new items without redundant ancestor
+  computation.
 - `liveUpdates` query configuration for selecting live or commit-only updates.
 - `WriteFailure` events on `GoatDB` when a commit cannot be persisted.
-- Shard configuration through `maxShardCommits`, `splitThreshold`, and `minShardCommits`, with read-only access through `GoatDB.shardConfig`.
+- Shard configuration through `maxShardCommits`, `splitThreshold`, and
+  `minShardCommits`, with read-only access through `GoatDB.shardConfig`.
 - Public `AppConfig.esbuildPlugins` support for build customization.
 
 ### Changed
 
-- CSS is bundled through esbuild during compile and debug builds, including plugin processing, hashed `url()` assets, and composed sourcemaps.
-- The normal-accuracy sync Bloom-filter false-positive rate is capped at `0.001` to reduce unnecessary resynchronization rounds. The low-accuracy path retains its previous setting.
-- Repository authentication concurrency is captured when the repository is created, preventing inconsistent verification batching.
+- CSS is bundled through esbuild during compile and debug builds, including
+  plugin processing, hashed `url()` assets, and composed sourcemaps.
+- The normal-accuracy sync Bloom-filter false-positive rate is capped at `0.001`
+  to reduce unnecessary resynchronization rounds. The low-accuracy path retains
+  its previous setting.
+- Repository authentication concurrency is captured when the repository is
+  created, preventing inconsistent verification batching.
 - The homepage, benchmarks, and documentation have been overhauled.
 
 ### Fixed
 
-- Conflict resolution now selects the closest available lowest common ancestor and defers merging when that ancestor is unavailable, avoiding destructive fallback merges.
-- Query IDs no longer collide across relevant options or source paths, explicit empty IDs are preserved, stale aliases are avoided, and generated-ID caching is bounded.
-- Query ordering and `find()` now handle dates, booleans, numbers, `NaN`, and near-equal values consistently.
-- Locally created commits retain monotonic creation order when timestamps collide.
-- `CoroutineQueue` now preserves FIFO ordering, runs a single worker, and recovers after task failures.
+- Conflict resolution now selects the closest available lowest common ancestor
+  and defers merging when that ancestor is unavailable, avoiding destructive
+  fallback merges.
+- Query IDs no longer collide across relevant options or source paths, explicit
+  empty IDs are preserved, stale aliases are avoided, and generated-ID caching
+  is bounded.
+- Query ordering and `find()` now handle dates, booleans, numbers, `NaN`, and
+  near-equal values consistently.
+- Locally created commits retain monotonic creation order when timestamps
+  collide.
+- `CoroutineQueue` now preserves FIFO ordering, runs a single worker, and
+  recovers after task failures.
 - Zero-byte writes now fail explicitly instead of retrying indefinitely.
 
 ## [0.5.1] - 2026-03-05
 
 ### Breaking Changes
 
-- **`./init` sub-path export removed.** `deno run -A jsr:@goatdb/goatdb/init` no longer works.
+- **`./init` sub-path export removed.** `deno run -A jsr:@goatdb/goatdb/init` no
+  longer works.
 
   **Migration:**
   ```bash
@@ -104,7 +218,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Breaking Changes
 
-- **Build tools moved from `@goatdb/goatdb/server`**: `compile`, `startDebugServer`, and `AppConfig` moved to `@goatdb/goatdb/server/build`. Runtime exports (`Server`, `createHttpServer`, etc.) remain in `@goatdb/goatdb/server`.
+- **Build tools moved from `@goatdb/goatdb/server`**: `compile`,
+  `startDebugServer`, and `AppConfig` moved to `@goatdb/goatdb/server/build`.
+  Runtime exports (`Server`, `createHttpServer`, etc.) remain in
+  `@goatdb/goatdb/server`.
 
   **Migration:**
   ```typescript
@@ -118,7 +235,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Security
 
-- Fixed two vulnerabilities in `persistCommits`: null namespace guard and delta-based record bypass
+- Fixed two vulnerabilities in `persistCommits`: null namespace guard and
+  delta-based record bypass
 
 ### Added
 
@@ -130,18 +248,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Loading status exposed on `ManagedItem`
 - `itemPathIsValid()` exported as a public utility
 - `getEnvVar` exported as stable cross-runtime API
-- `setup` callback in `DebugServerOptions` for configuring server-side logic during development
+- `setup` callback in `DebugServerOptions` for configuring server-side logic
+  during development
 - Health check endpoint on `Server`
 - `port` and `address` getters on `Server`; graceful shutdown support
 - Node.js Single Executable Application (SEA) compilation via `compile()`
 - `jsr:@goatdb/goatdb/link` now works in Node.js in addition to Deno
-- HTTPS support with automatic self-signed certificate generation for secure development
+- HTTPS support with automatic self-signed certificate generation for secure
+  development
 
 ### Changed
 
-- Runtime abstraction layer refactored for cross-platform compatibility (Deno, Node.js, Browser)
-- Path utilities moved to `base/path.ts` with POSIX-style handling across all environments
-- Windows path support — backslashes from `Deno.cwd()`/`process.cwd()` are normalized to forward slashes
+- Runtime abstraction layer refactored for cross-platform compatibility (Deno,
+  Node.js, Browser)
+- Path utilities moved to `base/path.ts` with POSIX-style handling across all
+  environments
+- Windows path support — backslashes from `Deno.cwd()`/`process.cwd()` are
+  normalized to forward slashes
 - `FileImpl` interface extended with `exists`, `copyFile`, and `readDir` methods
 - CLI `init` templates externalized to `cli/templates/` directory
 - CLI commands (`init`, `link`) now work in Node.js
@@ -149,9 +272,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Node.js minimum version raised to 24 (required for SEA support)
 - Node.js is now production-ready; experimental warning removed
 - esbuild bumped from 0.24 to 0.25.4
-- Browser `getOS()` uses 3-tier detection (User-Agent Client Hints, `navigator.platform`, User-Agent string) and returns `'unknown'` when platform cannot be detected
+- Browser `getOS()` uses 3-tier detection (User-Agent Client Hints,
+  `navigator.platform`, User-Agent string) and returns `'unknown'` when platform
+  cannot be detected
 - Default server port for HTTPS changed to 8443 (HTTP remains 8080)
-- `ManagedItem.commit()` now ensures all changes are fully committed before returning
+- `ManagedItem.commit()` now ensures all changes are fully committed before
+  returning
 
 ### Removed
 
@@ -164,12 +290,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - First sync awaited when opening a repository for the first time
 - Query scan now correctly awaited in browser environments
 - Resource leak in OPFS `copyFile()` — file handles now properly closed on error
-- Template `DomainConfig` used incorrect method names (`resolveOrg` instead of `mapToOrg`)
+- Template `DomainConfig` used incorrect method names (`resolveOrg` instead of
+  `mapToOrg`)
 - Template HTML referenced raw `index.tsx` instead of built `/app.js`
-- Sync engine: recursive `serverUrl` expansion, infinite loop, dangling promise, and sync-before-open bugs
+- Sync engine: recursive `serverUrl` expansion, infinite loop, dangling promise,
+  and sync-before-open bugs
 - `FileImpl`: partial-read loop and resource cleanup on error
 - No longer crashes when the cache file is missing
-- Now throws an error when commit contents are missing instead of failing silently
+- Now throws an error when commit contents are missing instead of failing
+  silently
 
 ## [0.3.1]
 
@@ -188,7 +317,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- [Orderstamp](https://github.com/goatplatform/orderstamp-js) is now bundled and exposed directly within GoatDB
+- [Orderstamp](https://github.com/goatplatform/orderstamp-js) is now bundled and
+  exposed directly within GoatDB
 
 ## [0.2.2]
 
@@ -211,23 +341,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - `FieldDef.validate` enables custom field level validation
-- Before/After hooks for integrating with external build steps via `LiveReloadOptions.beforeBuild` and `LiveReloadOptions.afterBuild`
+- Before/After hooks for integrating with external build steps via
+  `LiveReloadOptions.beforeBuild` and `LiveReloadOptions.afterBuild`
 - `CoreTypes` are now exported by the top level `mod.ts`
 - It's now possible to set a custom user schema via `SchemaManager.userSchema`
-- Attempting to commit an item with invalid data now throws with a detailed message when running in debug mode
+- Attempting to commit an item with invalid data now throws with a detailed
+  message when running in debug mode
 
 ### Fixed
 
 - Live reload in debug server is now working again
 - Set types being deserialized incorrectly
-- Crash in `useItem` React hook when first passing `undefined` then a `ManagedItem` instance
+- Crash in `useItem` React hook when first passing `undefined` then a
+  `ManagedItem` instance
 
 ## [0.2.0]
 
 ### Added
 
 - Initial support for Node.js
-- Trusted mode which disables security mechanisms for increased performance in trusted environments
+- Trusted mode which disables security mechanisms for increased performance in
+  trusted environments
 
 ### Changed
 
@@ -243,14 +377,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Removed
 
-- Order stamps have been moved to their own repository — https://github.com/goatplatform/orderstamp-js
+- Order stamps have been moved to their own repository —
+  https://github.com/goatplatform/orderstamp-js
 
 ## [0.1.6] - 2025-02-26
 
 ### Added
 
 - `FileImpl.getCWD` to get the current working directory
-- `cli/link.ts` now enables easy development of GoatDB alongside an existing project
+- `cli/link.ts` now enables easy development of GoatDB alongside an existing
+  project
 
 ### Fixed
 
@@ -266,7 +402,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - GoatDB is now licensed under Apache 2.0
 - `JSONLogFile.append` now automatically scans the log file rather than throw
-- `JSONLogFile` worker now uses the transpiled JS version both for the server and the browser
+- `JSONLogFile` worker now uses the transpiled JS version both for the server
+  and the browser
 - Improved React SPA scaffold
 - `ServerOptions.domain` enables fine control over domain / organization mapping
 
@@ -279,7 +416,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - `Item.isNull` to check if an item has a null schema
-- It's now possible to override the authorization rules for `/sys/users` and `/sys/*`
+- It's now possible to override the authorization rules for `/sys/users` and
+  `/sys/*`
 - `Query.sortDescending` to sort results in descending order
 
 ### Changed

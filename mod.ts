@@ -7,7 +7,7 @@
  *
  * @module GoatDB
  */
-import { GoatDB, RepoLease } from './db/db.ts';
+import { GoatDB, GoatDBCloseError, RepoLease } from './db/db.ts';
 import { Query } from './repo/query.ts';
 import type { AppConfig } from './cli/app-config.ts';
 import {
@@ -36,6 +36,7 @@ import { getEnvVar } from './base/os.ts';
 import { normalizeEmail } from './base/string.ts';
 import { Emitter } from './base/emitter.ts';
 import { TrustPool } from './db/session.ts';
+import { CancelledError, ValidationError } from './cfds/base/errors.ts';
 import type { BuildInfo } from './base/build-info.ts';
 
 export * from './cfds/base/schema.ts';
@@ -54,7 +55,9 @@ export type {
 };
 export type {
   DBInstanceConfig,
+  DBState,
   EventItemChanged,
+  EventLifecycleChanged,
   EventWriteFailure,
   StorageFormat,
   WriteFailureDetail,
@@ -63,11 +66,13 @@ export type { QueryConfig } from './repo/query.ts';
 export type { ReadonlyItem } from './cfds/base/item.ts';
 export type { JSONObject, ReadonlyJSONObject } from './base/interfaces.ts';
 export {
+  CancelledError,
   ConsoleLogStream,
   DataRegistry,
   Emitter,
   getEnvVar,
   GoatDB,
+  GoatDBCloseError,
   Item,
   itemPath,
   itemPathGetPart,
@@ -84,6 +89,7 @@ export {
   Repository,
   TrustPool,
   uniqueId,
+  ValidationError,
 };
 
 // Deno CLI entry: `deno run -A jsr:@goatdb/goatdb init` (Node.js enters via cli/init.ts bin)

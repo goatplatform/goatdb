@@ -35,11 +35,11 @@ export default function setup(): void {
       assertEquals(db.registry, kDataRegistry);
 
       // Should start not ready
-      assertEquals(db.ready, false);
+      assertEquals(db.state, 'booting');
 
       // Wait for it to be ready
       await db.readyPromise();
-      assertEquals(db.ready, true);
+      assertEquals(db.state, 'ready');
 
       // Should start with root session
       assertEquals(db.loggedIn, true);

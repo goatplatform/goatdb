@@ -27,6 +27,7 @@ interface WorkerTestCompleteMessage {
     suiteName: string;
     testName: string;
     passed: boolean;
+    skipped?: boolean;
     duration: number;
     error?: { name: string; message: string; stack?: string };
   };
@@ -50,13 +51,12 @@ const WORKER_TIMEOUT_MS = 5 * 60 * 1000;
  * Runs Deno tests using a Web Worker for responsive TUI.
  * The main thread handles TUI rendering while the Worker executes tests.
  */
-async function runDenoWithWorker(
+function runDenoWithWorker(
   suite?: string,
   test?: string,
 ): Promise<{ elapsed: number; summary: TestSummary }> {
   return new Promise((resolve, reject) => {
     const start = performance.now();
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     // Create Worker
     const worker = new Worker(
@@ -69,15 +69,8 @@ async function runDenoWithWorker(
     let rootId: TaskId | undefined;
     const suiteTaskIds = new Map<string, TaskId>();
     const testTaskIds = new Map<string, TaskId>();
-    let animationInterval: ReturnType<typeof setInterval> | undefined;
-    let totalTests = 0;
-    let completedTests = 0;
-    let failedCount = 0;
-    let passedCount = 0;
-    let testSummary: TestSummary | undefined;
-
     // Start animation interval for spinner updates (100ms)
-    animationInterval = setInterval(() => {
+    const animationInterval = setInterval(() => {
       // Trigger re-render to animate spinners without updating progress
       if (rootId) {
         pm.triggerRender();
@@ -85,7 +78,7 @@ async function runDenoWithWorker(
     }, 100);
 
     // Set up worker timeout to prevent indefinite hangs
-    timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       if (animationInterval) {
         clearInterval(animationInterval);
       }
@@ -105,7 +98,6 @@ async function runDenoWithWorker(
       switch (type) {
         case 'ready': {
           // Worker is ready with test counts
-          totalTests = payload.testCount;
           // Use null for indeterminate if no tests match filter, otherwise use suite count
           // (ProgressManager requires total > 0 or null)
           const rootTotal = payload.suiteCount > 0 ? payload.suiteCount : null;
@@ -116,7 +108,7 @@ async function runDenoWithWorker(
 
         case 'testStart': {
           // Test starting - create progress tasks if needed
-          const { suiteName, testName, current, total } = payload;
+          const { suiteName, testName } = payload;
 
           // Create suite task if not exists
           if (!suiteTaskIds.has(suiteName)) {
@@ -134,20 +126,13 @@ async function runDenoWithWorker(
         }
 
         case 'testComplete': {
-          // Test completed
-          const { suiteName, testName, passed, duration, error } = payload;
+          // Test completed; skipped tests are counted separately, never as failed.
+          const { suiteName, testName, passed, skipped } = payload;
           const testKey = `${suiteName}::${testName}`;
           const testId = testTaskIds.get(testKey);
 
           if (testId) {
-            pm.complete(testId, passed ? 'done' : 'failed');
-          }
-
-          completedTests++;
-          if (passed) {
-            passedCount++;
-          } else {
-            failedCount++;
+            pm.complete(testId, skipped || passed ? 'done' : 'failed');
           }
 
           // Update root progress
@@ -167,7 +152,6 @@ async function runDenoWithWorker(
 
         case 'done': {
           // All tests completed
-          testSummary = payload.summary;
 
           // Cleanup
           if (timeoutId) {

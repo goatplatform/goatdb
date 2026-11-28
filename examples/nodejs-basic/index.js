@@ -82,7 +82,7 @@ async function main() {
   setTimeout(async () => {
     console.log('🧹 Cleaning up...');
     await db.flushAll(); // Ensure all changes are written to disk
-    await db.close('/data/todos'); // Properly close the repository
+    await db.close(); // Close the whole database
     process.exit(0);
   }, 3000); // Allow 3s for demo before cleanup
 }

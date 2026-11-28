@@ -54,6 +54,7 @@ interface TestCompleteMessage {
     suiteName: string;
     testName: string;
     passed: boolean;
+    skipped?: boolean;
     duration: number;
     error?: {
       name: string;
@@ -150,13 +151,16 @@ async function runTests(
       const start = performance.now();
       let passed = true;
       let error: Error | undefined;
+      const skipped = suite.isSkipped(tName);
 
-      try {
-        // Execute the test with suite context
-        await testFn(suite);
-      } catch (e) {
-        passed = false;
-        error = e instanceof Error ? e : new Error(String(e));
+      if (!skipped) {
+        try {
+          // Execute the test with suite context
+          await testFn(suite);
+        } catch (e) {
+          passed = false;
+          error = e instanceof Error ? e : new Error(String(e));
+        }
       }
 
       const duration = performance.now() - start;
@@ -164,7 +168,8 @@ async function runTests(
       const result: TestResult = {
         suiteName: name,
         testName: tName,
-        passed,
+        passed: skipped ? false : passed,
+        skipped,
         duration,
         error,
       };
@@ -177,7 +182,8 @@ async function runTests(
           payload: {
             suiteName: name,
             testName: tName,
-            passed,
+            passed: result.passed,
+            skipped,
             duration,
             error: error ? serializeError(error) : undefined,
           },
@@ -191,12 +197,14 @@ async function runTests(
 
   const totalDuration = performance.now() - runStart;
   const passed = allResults.filter((r) => r.passed).length;
-  const failed = allResults.length - passed;
+  const skipped = allResults.filter((r) => r.skipped).length;
+  const failed = allResults.length - passed - skipped;
 
   return {
     totalTests: allResults.length,
     passed,
     failed,
+    skipped,
     duration: totalDuration,
     results: allResults,
   };

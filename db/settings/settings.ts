@@ -8,6 +8,6 @@ export interface DBSettings {
 
 export interface DBSettingsProvider {
   readonly settings: DBSettings;
-  load(): Promise<void>;
+  load(signal?: AbortSignal): Promise<void>;
   update(settings: DBSettings): Promise<void>;
 }

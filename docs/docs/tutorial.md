@@ -182,6 +182,8 @@ export function Contents() {
     ctx: { showChecked },
   });
 
+  if (!query) return null; // closing/closed/failed: undefined (live while booting)
+
   return (
     <div>
       <Header />

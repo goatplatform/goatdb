@@ -8,35 +8,41 @@ import {
 } from '../db/session.ts';
 import { kSecondMs } from '../base/date.ts';
 import type { JSONValue, ReadonlyJSONObject } from '../base/interfaces.ts';
-import { sleep } from '../base/time.ts';
-import { timeout } from '../cfds/base/errors.ts';
+import { serviceUnavailable, timeout } from '../cfds/base/errors.ts';
 import { getGoatConfig } from '../base/config.ts';
 import { getCrypto } from '../base/common.ts';
 
 export async function createNewSession(
   publicKey: CryptoKey,
   serverUrl?: string,
+  signal?: AbortSignal,
 ): Promise<[Session | undefined, Session[] | undefined]> {
   try {
     const url = serverUrl ? `${serverUrl}/auth/session` : '/auth/session';
-    const resp = await sendJSONToURL(url, undefined, {
-      publicKey: (await getCrypto().subtle.exportKey(
-        'jwk',
-        publicKey,
-      )) as ReadonlyJSONObject,
-    });
+    const resp = await sendJSONToURL(
+      url,
+      undefined,
+      {
+        publicKey: (await getCrypto().subtle.exportKey(
+          'jwk',
+          publicKey,
+        )) as ReadonlyJSONObject,
+      },
+      undefined,
+      undefined,
+      signal,
+    );
     if (resp.status !== 200) {
       return [undefined, undefined];
     }
-    const body = await resp.json();
+    const body = JSON.parse(resp.body) as ReadonlyJSONObject;
     const encodedRoots = body.roots as EncodedSession[];
     const roots: Session[] = [];
     for (const e of encodedRoots) {
       roots.push(await decodeSession(e));
     }
-    return [await decodeSession(body.session), roots];
+    return [await decodeSession(body.session as EncodedSession), roots];
   } catch (_err: unknown) {
-    debugger;
     return [undefined, undefined];
   }
 }
@@ -77,8 +83,34 @@ export function sendJSONToEndpoint(
   endpoint: string,
   session: OwnedSession | undefined,
   json: ReadonlyJSONObject,
-): Promise<Response> {
+): Promise<JSONResponse> {
   return sendJSONToURL(urlForEndpoint(endpoint), session, json);
+}
+
+export interface JSONResponse {
+  status: number;
+  body: string;
+}
+
+/** Builds request headers, signing the request once when a session is given. */
+async function buildRequestHeaders(
+  sessionOrSignature: OwnedSession | undefined | string,
+  orgId: string | undefined,
+): Promise<HeadersInit> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  let signature = sessionOrSignature;
+  if (signature !== undefined) {
+    if (typeof signature !== 'string') {
+      signature = await generateRequestSignature(signature);
+    }
+    headers['x-goat-sig'] = signature;
+  }
+  if (orgId) {
+    headers['x-org-id'] = orgId;
+  }
+  return headers;
 }
 
 export async function sendJSONToURL(
@@ -87,35 +119,35 @@ export async function sendJSONToURL(
   json: JSONValue,
   orgId?: string,
   timeoutMs = 5 * kSecondMs,
-): Promise<Response> {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-  if (sessionOrSignature !== undefined) {
-    if (typeof sessionOrSignature !== 'string') {
-      sessionOrSignature = await generateRequestSignature(sessionOrSignature);
-    }
-    headers['x-goat-sig'] = sessionOrSignature;
+  signal?: AbortSignal,
+): Promise<JSONResponse> {
+  const headers = await buildRequestHeaders(sessionOrSignature, orgId);
+  // One controller drives both timeout and external cancellation, so the
+  // fetch has a single abort path with an explicit reason (fetch itself masks
+  // it as a generic AbortError).
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(timeout()), timeoutMs);
+  const onExternalAbort = () => controller.abort(serviceUnavailable());
+  // Registering after an already-aborted signal would never fire; abort now.
+  if (signal?.aborted) {
+    onExternalAbort();
+  } else {
+    signal?.addEventListener('abort', onExternalAbort, { once: true });
   }
-  if (orgId) {
-    headers['x-org-id'] = orgId;
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(json),
+      signal: controller.signal,
+    });
+    // Keep the timeout/abort armed until the body is consumed.
+    return { status: resp.status, body: await resp.text() };
+  } catch (e) {
+    if (controller.signal.aborted) throw controller.signal.reason;
+    throw e;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', onExternalAbort);
   }
-  const abortController = new AbortController();
-  const fetchPromise = fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(json),
-    signal: abortController.signal,
-  });
-  let aborted = false;
-  const timeoutPromise = (async () => {
-    await sleep(timeoutMs);
-    aborted = true;
-    abortController.abort();
-  })();
-  await Promise.any([fetchPromise, timeoutPromise]);
-  if (aborted) {
-    throw timeout();
-  }
-  return await fetchPromise;
 }

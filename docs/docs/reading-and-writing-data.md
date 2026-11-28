@@ -78,7 +78,7 @@ userProfile.set('name', 'John Smith');
 
 :::note
 
-These examples assume a ready database. In non-React flows, register schemas before use, await `db.readyPromise()`, and close with `await db.flushAll(); await db.close()` in a try/finally block. See [Data Durability](#ensuring-data-durability) below.
+These examples assume a ready database. In non-React flows, register schemas before use, await `db.readyPromise()`, and close with `await db.flushAll()` then `await db.close()` in a try/finally block. `close()` can reject and must be retried; the retry rule lives on the [`close()` API reference](/api/GoatDB/classes/GoatDB#close). See [Data Durability](#ensuring-data-durability) below for the runnable shutdown pattern.
 
 :::
 
@@ -200,6 +200,20 @@ await db.flush('/todos/personal');
 
 // Or flush all repositories
 await db.flushAll();
+```
+
+```typescript
+// Shutdown: flush writes, then close; on GoatDBCloseError, resolve failedItems, retry.
+await db.flushAll();
+for (;;) {
+  try {
+    await db.close();
+    break;
+  } catch (e) {
+    if (!(e instanceof GoatDBCloseError)) throw e;
+    for (const { path } of e.failedItems) db.item(path).discardPendingEdits();
+  }
+}
 ```
 
 :::tip

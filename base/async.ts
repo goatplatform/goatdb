@@ -1,47 +1,20 @@
-export interface SuccessResult<T> {
-  status: 'success';
-  result: T;
-}
-
-export interface ErrorResult {
-  status: 'error';
-  error: any;
-}
-
-export type PromiseResult<T> = SuccessResult<T> | ErrorResult;
-
 /**
- * Given an array of promises, awaits on all of them and returns their results.
- * This method returns an array of result objects in the form of { result: res }
- * on success or { error: err } on error. Indexes in the result array are
- * guaranteed to match the indexes of the input array.
+ * Runs `fn` when `p` settles, on both fulfill and reject, without creating an
+ * unobserved rejected promise. Unlike a discarded `p.finally(fn)` child,
+ * which mirrors `p`'s rejection as an unhandled rejection (the json-log
+ * tracked-operation crash, debt/94), `p.then(cleanup, cleanup)` never mirrors
+ * `p`'s rejection: the reject handler returns normally, so the derived child
+ * resolves. The child settles with void unless `fn` throws; keep `fn`
+ * non-throwing or observe the returned promise. The original `p` still
+ * delivers its value or rejection to its real observers.
  */
-export async function awaitPromises<T>(
-  promises: Promise<T>[],
-  returnResults: boolean = true,
-): Promise<PromiseResult<T>[]> {
-  if (!promises.length) {
-    return Promise.resolve([]);
-  }
-
-  const res = await Promise.all<any>(
-    promises.map(async (p) => {
-      try {
-        const res = await p;
-        if (returnResults) {
-          return { status: 'success', result: res };
-        }
-      } catch (err) {
-        if (returnResults) {
-          return { status: 'error', error: err };
-        }
-      }
-    }),
+export function onSettled<T>(p: Promise<T>, fn: () => void): Promise<void> {
+  return p.then(
+    () => {
+      fn();
+    },
+    () => {
+      fn();
+    },
   );
-
-  if (returnResults) {
-    return res.filter((x) => x !== undefined);
-  }
-
-  return res;
 }

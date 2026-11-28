@@ -9,6 +9,8 @@ import type { GoatDB } from '../db/db.ts';
 import type { ReadonlyJSONValue } from '../base/interfaces.ts';
 import { isBrowser } from '../base/common.ts';
 import { CoroutineScheduler } from '../base/coroutine.ts';
+import { onSettled } from '../base/async.ts';
+import { Code, ServerError, serviceUnavailable } from '../cfds/base/errors.ts';
 import {
   itemPathGetPart,
   itemPathGetRepoId,
@@ -346,11 +348,25 @@ export class Query<
    *
    * @returns The repository that this query operates on.
    */
-  get repo(): Repository {
+  get repo(): Repository | undefined {
+    // Public fail-close accessor; in-flight teardown work uses _repoInternal().
+    // An explicit source pins the exact instance: a reopened same-path repo
+    // is a different object and never a replacement.
+    if (!this.db.isOpen) return undefined;
     if (typeof this.source === 'string') {
-      return this.db.repository(this.source)!;
+      return this.db.repository(this.source);
     }
     return this.source instanceof Repository ? this.source : this.source.repo;
+  }
+
+  /** @internal Teardown-safe source-repo lookup (see repo for the public,
+   * fail-close accessor). Returns undefined only when never opened. */
+  _repoInternal(): Repository | undefined {
+    if (typeof this.source === 'string') {
+      return this.db._repositoryInternal(this.source);
+    }
+    if (this.source instanceof Repository) return this.source;
+    return this.source._repoInternal();
   }
 
   /**
@@ -457,10 +473,10 @@ export class Query<
             const lHead = this._headIdForKey.get(left.path);
             const rHead = this._headIdForKey.get(right.path);
             const lVal = lHead
-              ? this.repo.itemForCommit(lHead)?.get(field)
+              ? this.repo?.itemForCommit(lHead)?.get(field)
               : left.get(field);
             const rVal = rHead
-              ? this.repo.itemForCommit(rHead)?.get(field)
+              ? this.repo?.itemForCommit(rHead)?.get(field)
               : right.get(field);
             return coreValueCompare(lVal as CoreValue, rVal as CoreValue) *
               sign;
@@ -503,7 +519,7 @@ export class Query<
       return this.db.item<OS>(path).currentItem;
     }
     const head = this._headIdForKey.get(path);
-    return head !== undefined ? this.repo.itemForCommit(head) : undefined;
+    return head !== undefined ? this.repo?.itemForCommit(head) : undefined;
   }
 
   /**
@@ -679,13 +695,26 @@ export class Query<
     return undefined;
   }
 
+  private _resumeFailLogged = false;
+
   private _failResume(e: unknown): void {
-    log({
-      severity: 'WARNING',
-      error: 'StorageError',
-      message: `Query ${this.id} failed to start loading: ${e}`,
-    });
+    // Cancellation by close() already settled the query; do not log or
+    // touch state.
     if (this._closed) return;
+    // A load aborted by shutdown (ServiceUnavailable while the DB is closing/
+    // closed) is expected during close and must not warn; genuine query
+    // errors still do. Log the terminal outcome once per resume attempt.
+    const shuttingDown = !this.db.isOpen;
+    const cancelled = e instanceof ServerError &&
+      e.code === Code.ServiceUnavailable;
+    if (!(shuttingDown && cancelled) && !this._resumeFailLogged) {
+      log({
+        severity: 'WARNING',
+        error: 'StorageError',
+        message: `Query ${this.id} failed to start loading: ${e}`,
+      });
+      this._resumeFailLogged = true;
+    }
     // Never leave the query in the "scan in flight" state on failure: it
     // would be exempt from the idle timer forever and any loadingFinished()
     // waiter would hang. Settle it like close() does.
@@ -699,6 +728,7 @@ export class Query<
 
   protected override async resume(): Promise<void> {
     super.resume();
+    this._resumeFailLogged = false;
     if (!this._closed) {
       // Loading is lazy: the first subscription/loadingFinished() starts the
       // scan. Mark it in flight and drop any armed idle timer for the
@@ -709,25 +739,23 @@ export class Query<
         if (typeof this.source === 'string') {
           await this.db.open(this.source);
         }
-        // close() may have run while we awaited the open. If so, do NOT scan
-        // or attach the source/live listeners: close() already cleaned up (an
-        // as-yet-unset) _sourceListenerCleanup, so attaching now would leak a
-        // DocumentChanged listener that pins the repo open forever and
-        // defeats idle auto-close.
+        // If close() ran while awaiting open, do not attach listeners:
+        // close() cleaned up already; attaching would leak one forever.
         if (this._closed) return;
         this.scanRepo().catch((e) => this._failResume(e));
         if (!this._sourceListenerCleanup) {
           // Repo emits the plain item key; a chained Query emits the full path.
-          const isChainedQuery = this.source instanceof Query;
+          const sourceEmitter = typeof this.source === 'string'
+            ? this._repoInternal()
+            : this.source;
+          if (!sourceEmitter) throw serviceUnavailable();
           this._sourceListenerCleanup = (
-            (typeof this.source === 'string'
-              ? this.repo
-              : this.source) as Emitter<EventDocumentChanged>
+            sourceEmitter as Emitter<EventDocumentChanged>
           ).attach('DocumentChanged', (keyOrPath: string) => {
-            const key = isChainedQuery
+            const key = this.source instanceof Query
               ? itemPathGetPart(keyOrPath, 'item')!
               : keyOrPath;
-            const commit = this.repo.headForKey(key);
+            const commit = this._repoInternal()?.headForKey(key);
             if (commit) {
               this.onNewCommit(commit);
             }
@@ -889,7 +917,8 @@ export class Query<
 
   private onNewCommit(commit: Commit): void {
     if (this._closed) return;
-    const repo = this.repo;
+    const repo = this._repoInternal();
+    if (!repo) return;
     const key = commit.key;
     const path = itemPathJoin(repo.path, key);
     // For local commits, onItemChanged fires before onNewCommit (set() →
@@ -935,10 +964,14 @@ export class Query<
       return;
     }
     // Only handle items in this query's repository
-    if (!this._repoPrefix) this._repoPrefix = this.repo.path + '/';
-    if (!path.startsWith(this._repoPrefix)) {
-      return;
+    let repoPrefix = this._repoPrefix;
+    if (!repoPrefix) {
+      const repoPath = this._repoInternal()?.path;
+      if (repoPath === undefined) return;
+      repoPrefix = repoPath + '/';
+      this._repoPrefix = repoPrefix;
     }
+    if (!path.startsWith(repoPrefix)) return;
     const wasIncluded = this.has(path);
     // For chained queries: if source no longer has this item, remove it from
     // derived and stop. This relies on the source query's onItemChanged running
@@ -999,7 +1032,12 @@ export class Query<
 
   private async scanRepo(): Promise<void> {
     const startTime = performance.now();
-    const repo = this.repo;
+    const repo = this._repoInternal();
+    if (!repo) {
+      // Source unavailable: settle instead of staying "scan in flight".
+      this._failResume(serviceUnavailable());
+      return;
+    }
     const cache = await repo.db.queryPersistence?.get(repo.path, this.id);
     let skipped = 0;
     let total = 0;
@@ -1030,7 +1068,7 @@ export class Query<
       this._loading = false;
       if (!this._loadingFinished) {
         this._loadingFinished = true;
-        this.repo.db.queryPersistence?.register(
+        repo.db.queryPersistence?.register(
           this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
         );
         this.emit('LoadingFinished');
@@ -1082,10 +1120,13 @@ export class Query<
         this._age = Math.max(this._age, maxAge);
         if (!this._loadingFinished) {
           this._loadingFinished = true;
-          this.repo.db.queryPersistence?.register(
-            this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
-          );
-          await this.repo.db.queryPersistence?.flush(this.repo.path);
+          const repo = this._repoInternal();
+          if (repo) {
+            repo.db.queryPersistence?.register(
+              this as unknown as Query<Schema, Schema, ReadonlyJSONValue>,
+            );
+            await repo.db.queryPersistence?.flush(repo.path);
+          }
           this.emit('LoadingFinished');
         }
       }
@@ -1102,7 +1143,7 @@ export class Query<
           processPath(path, cancelCallback);
         },
       );
-      cancelPromise.then(cleanup, cleanup);
+      onSettled(cancelPromise, cleanup);
     } else {
       let stopProcessing = false;
       const stopProcessingHandle = () => {

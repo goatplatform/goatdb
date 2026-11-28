@@ -61,7 +61,10 @@ required. For more on sessions, see [Sessions and Users](/docs/sessions).
 - **Returns:**
   - `"loading"`: Database is initializing
   - `"ready"`: Database is initialized (local data loaded, session ready)
-  - `"error"`: An error occurred during initialization
+  - `"closing"`: Database is closing (teardown in flight)
+  - `"closed"`: Database is closed
+  - `"error"`: Bootstrap or teardown failed (maps from the internal `failed`
+    state)
 
 **Example:**
 
@@ -73,6 +76,8 @@ function App() {
     return <LoadingScreen />;
   } else if (dbStatus === 'error') {
     return <ErrorScreen message='Failed to load database.' />;
+  } else if (dbStatus === 'closing' || dbStatus === 'closed') {
+    return null; // Unmount while teardown is in flight or complete
   }
 
   return <MainApp />;
@@ -143,6 +148,14 @@ change, including:
 > For more on query performance and best practices, see
 > [Benchmarks](/docs/benchmarks) and [FAQ](/docs/faq).
 
+:::note
+
+`useQuery` returns `Query | undefined`: it is `undefined` once the database is
+closing, closed, or failed, and stays live while booting. Guard the result
+before calling `results()`.
+
+:::
+
 **Example:**
 
 ```javascript
@@ -154,6 +167,10 @@ function TaskList() {
     predicate: ({ item }) => !item.get('done'),
     showIntermittentResults: true,
   });
+
+  if (!tasksQuery) {
+    return null; // Query not available (database closing, closed, or failed)
+  }
 
   return (
     <ul className='task-list'>
@@ -218,6 +235,7 @@ The `useItem` hook will automatically trigger a re-render when:
 - Any tracked field changes
 - The [schema](/docs/schema) changes
 - The item is deleted or restored
+- The DB is closing, closed, or failed (the hook returns `undefined`)
 
 :::
 
