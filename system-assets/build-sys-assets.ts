@@ -3,11 +3,12 @@ import * as esbuild from 'esbuild';
 import { denoPlugin } from '@deno/esbuild-plugin';
 import { getRepositoryPath } from '../base/git-root.ts';
 import { normalizeBuildEntryPath } from '../build.ts';
+import type { ReadonlyJSONObject } from '../base/interfaces.ts';
 import { type StaticAssets, staticAssetsToJS } from './system-assets.ts';
 
-export async function buildSysAssets(): Promise<void> {
+/** Builds the system-assets map from current worker sources without writing. */
+export async function buildSysAssetMap(): Promise<ReadonlyJSONObject> {
   const repoPath = await getRepositoryPath();
-  const outputDir = path.join(repoPath, 'system-assets');
   const result = await esbuild.build({
     entryPoints: [
       {
@@ -23,14 +24,13 @@ export async function buildSysAssets(): Promise<void> {
     bundle: true,
     write: false,
     sourcemap: 'external',
-    outdir: outputDir,
+    outdir: path.join(repoPath, 'system-assets'),
     // minify: true,
     logOverride: {
       'empty-import-meta': 'silent',
     },
   });
 
-  await Deno.mkdir(outputDir, { recursive: true });
   const assets: StaticAssets = {};
   for (const f of result.outputFiles) {
     assets['/system-assets/' + path.basename(f.path)] = {
@@ -40,28 +40,32 @@ export async function buildSysAssets(): Promise<void> {
         : 'text/javascript',
     };
   }
-  assets['/system-assets/bloom_filter.js'] = {
-    data: await Deno.readFile(
-      path.join(repoPath, 'system-assets', 'bloom_filter.js'),
-    ),
-    contentType: 'text/javascript',
-  };
-  assets['/system-assets/bloom-filter.wasm'] = {
-    data: await Deno.readFile(
-      path.join(repoPath, 'system-assets', 'bloom_filter.wasm'),
-    ),
-    contentType: 'application/wasm',
-  };
-  assets['/system-assets/bloom_filter.wasm.map'] = {
-    data: await Deno.readFile(
-      path.join(repoPath, 'system-assets', 'bloom_filter.wasm.map'),
-    ),
-    contentType: 'application/json',
-  };
+  for (
+    const [name, file, type] of [
+      ['bloom_filter.js', 'bloom_filter.js', 'text/javascript'],
+      ['bloom-filter.wasm', 'bloom_filter.wasm', 'application/wasm'],
+      ['bloom_filter.wasm.map', 'bloom_filter.wasm.map', 'application/json'],
+    ] as const
+  ) {
+    assets['/system-assets/' + name] = {
+      data: await Deno.readFile(
+        path.join(repoPath, 'system-assets', file),
+      ),
+      contentType: type,
+    };
+  }
+  return staticAssetsToJS(assets);
+}
+
+/** Rebuilds system-assets/assets.json from current worker sources. */
+export async function buildSysAssets(): Promise<void> {
+  const repoPath = await getRepositoryPath();
   await Deno.writeTextFile(
-    path.join(outputDir, 'assets.json'),
-    JSON.stringify(staticAssetsToJS(assets)),
+    path.join(repoPath, 'system-assets', 'assets.json'),
+    JSON.stringify(await buildSysAssetMap()),
   );
 }
 
-buildSysAssets();
+if (import.meta.main) {
+  await buildSysAssets();
+}

@@ -15,7 +15,12 @@ import {
   debugClientBundleSpec,
   debugConfigPaths,
 } from '../cli/debug-server.ts';
+import {
+  kStaticAssetsSystem,
+  staticAssetsToJS,
+} from '../system-assets/system-assets.ts';
 import type { StaticAssets } from '../system-assets/system-assets.ts';
+import { buildSysAssetMap } from '../system-assets/build-sys-assets.ts';
 import type { Plugin } from 'esbuild';
 import { AnyMap, originalPositionFor } from '@jridgewell/trace-mapping';
 import { assertEquals, assertExists, assertTrue } from './asserts.ts';
@@ -714,6 +719,15 @@ async function buildFailureTest(ctx: TestSuite): Promise<void> {
   );
 }
 
+async function systemAssetsFreshnessTest(_ctx: TestSuite): Promise<void> {
+  // A mismatch means the committed worker bundle drifted from current sources.
+  assertEquals(
+    await buildSysAssetMap(),
+    staticAssetsToJS(kStaticAssetsSystem),
+    'system-assets/assets.json matches current bundled worker sources',
+  );
+}
+
 export default function setupCliBuildAssetsTests() {
   TEST(
     kSuite,
@@ -802,5 +816,10 @@ export default function setupCliBuildAssetsTests() {
     kSuite,
     'debug rebuild emits plugin CSS identical to production and rebuilds it',
     nodeTest(debugCssParityTest),
+  );
+  TEST(
+    kSuite,
+    'system-assets/assets.json is fresh (rebuild matches committed worker bundle)',
+    denoTest(systemAssetsFreshnessTest),
   );
 }
